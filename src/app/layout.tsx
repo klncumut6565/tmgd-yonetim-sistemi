@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import "./globals.css";
 import Sidebar from "@/components/layout/Sidebar";
 
 // TESLİMAT 078'deki <AppLayout><Sidebar/><Header/><Content/></AppLayout>
