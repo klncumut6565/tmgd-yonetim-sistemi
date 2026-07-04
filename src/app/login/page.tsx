@@ -21,13 +21,31 @@ export default function LoginPage() {
   const [info, setInfo] = useState("");
   const [busy, setBusy] = useState(false);
 
+  // E-postayı gönderilebilir hâle getir: boşlukları at, küçük harfe çevir.
+  // (Telefon klavyeleri ve kopyala-yapıştır sıkça sona boşluk ekler;
+  // Supabase bunu "invalid format" diye reddediyor.)
+  function temizEmail(): string {
+    return email.trim().toLowerCase();
+  }
+
+  function emailGecerliMi(e: string): boolean {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(e);
+  }
+
   async function login() {
     setError("");
     setInfo("");
+
+    const eposta = temizEmail();
+    if (!emailGecerliMi(eposta)) {
+      setError("E-posta adresi geçersiz görünüyor. Boşluk veya eksik karakter olmadığından emin ol.");
+      return;
+    }
+
     setBusy(true);
 
     const { error } = await supabase.auth.signInWithPassword({
-      email,
+      email: eposta,
       password,
     });
 
@@ -45,6 +63,11 @@ export default function LoginPage() {
     setError("");
     setInfo("");
 
+    const eposta = temizEmail();
+    if (!emailGecerliMi(eposta)) {
+      setError("E-posta adresi geçersiz görünüyor. Boşluk veya eksik karakter olmadığından emin ol.");
+      return;
+    }
     if (!fullName.trim()) {
       setError("Lütfen ad soyad girin.");
       return;
@@ -56,11 +79,11 @@ export default function LoginPage() {
 
     setBusy(true);
 
-    const { error } = await supabase.auth.signUp({
-      email,
+    const { data, error } = await supabase.auth.signUp({
+      email: eposta,
       password,
       options: {
-        data: { full_name: fullName },
+        data: { full_name: fullName.trim() },
         emailRedirectTo:
           typeof window !== "undefined"
             ? window.location.origin + "/login"
@@ -75,6 +98,14 @@ export default function LoginPage() {
       return;
     }
 
+    // E-posta doğrulaması KAPALIYSA Supabase oturumu hemen açar →
+    // kullanıcıyı doğrudan içeri al (AuthGuard onay ekranını gösterir).
+    if (data.session) {
+      router.push("/");
+      return;
+    }
+
+    // Doğrulama AÇIKSA mail bekleniyor demektir.
     setInfo(
       "Kaydın alındı. E-postana bir doğrulama bağlantısı gönderdik — " +
         "lütfen mailini kontrol et. Doğruladıktan sonra hesabın yönetici " +
@@ -178,6 +209,8 @@ export default function LoginPage() {
 // Supabase'in İngilizce hata mesajlarını Türkçeleştir
 function cevirHata(msg: string): string {
   const m = msg.toLowerCase();
+  if (m.includes("unable to validate email") || m.includes("invalid format"))
+    return "E-posta adresi geçersiz görünüyor. Başında/sonunda boşluk olmadığından emin ol.";
   if (m.includes("invalid login")) return "E-posta veya şifre hatalı.";
   if (m.includes("email not confirmed"))
     return "E-postanı henüz doğrulamadın. Lütfen mailindeki bağlantıya tıkla.";
