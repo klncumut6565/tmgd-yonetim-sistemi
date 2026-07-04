@@ -165,6 +165,11 @@ create policy notifications_update on public.notifications
 -- 6) Belge geçerlilik tarihi → notifications view'ı
 --    Dashboard ve bildirim zili bu view'dan okur.
 -- ---------------------------------------------------------------------
+-- documents tablosuna geçerlilik tarihi kolonu ekle (yoksa)
+alter table public.documents
+    add column if not exists expiry_date date,
+    add column if not exists valid_from  date;
+
 create or replace view public.expiring_documents
 with (security_invoker = true) as
 select
@@ -173,7 +178,6 @@ select
     d.expiry_date,
     d.firm_id,
     f.name  as firm_name,
-    -- kaç gün kaldı (negatif = geçmiş)
     (d.expiry_date - current_date) as days_left
 from public.documents d
 join public.firms     f on f.id = d.firm_id
