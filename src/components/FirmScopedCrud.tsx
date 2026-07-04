@@ -13,6 +13,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase/client";
+import { hataCevir } from "@/lib/hataCevir";
 
 export type FieldType = "text" | "number" | "date" | "select";
 
@@ -70,7 +71,7 @@ export default function FirmScopedCrud({
       .order("name");
 
     if (error) {
-      setError("Firmalar yüklenemedi: " + error.message);
+      setError("Firmalar yüklenemedi: " + hataCevir(error));
       return;
     }
 
@@ -92,7 +93,7 @@ export default function FirmScopedCrud({
       .order(orderBy, { ascending: false });
 
     if (error) {
-      setError("Kayıtlar yüklenemedi: " + error.message);
+      setError("Kayıtlar yüklenemedi: " + hataCevir(error));
       setRows([]);
     } else {
       setRows((data as Row[]) || []);
@@ -175,13 +176,13 @@ export default function FirmScopedCrud({
         .update(payload)
         .eq("id", editingId);
       if (error) {
-        setError("Güncellenemedi: " + error.message);
+        setError("Güncellenemedi: " + hataCevir(error));
         return;
       }
     } else {
       const { error } = await supabase.from(table).insert(payload);
       if (error) {
-        setError("Kaydedilemedi: " + error.message);
+        setError("Kaydedilemedi: " + hataCevir(error));
         return;
       }
     }
@@ -196,7 +197,7 @@ export default function FirmScopedCrud({
 
     const { error } = await supabase.from(table).delete().eq("id", row.id);
     if (error) {
-      setError("Silinemedi: " + error.message);
+      setError("Silinemedi: " + hataCevir(error));
       return;
     }
     loadRows(firmId);

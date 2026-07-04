@@ -9,6 +9,7 @@
 import { use, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase/client";
+import { hataCevir } from "@/lib/hataCevir";
 
 type Firm = {
   id: string;
@@ -186,7 +187,7 @@ export default function FirmDetailPage({
       .eq("id", id);
 
     setSaving(false);
-    setSaveMsg(error ? "Kaydedilemedi: " + error.message : "✓ Kaydedildi");
+    setSaveMsg(error ? "Kaydedilemedi: " + hataCevir(error) : "✓ Kaydedildi");
     if (!error) loadFirm();
   }
 

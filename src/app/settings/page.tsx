@@ -8,6 +8,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase/client";
 import { useUser } from "@/hooks/useUser";
+import { hataCevir } from "@/lib/hataCevir";
 
 const ROLE_TR: Record<string, string> = {
   super_admin: "Süper Yönetici",
@@ -71,7 +72,7 @@ export default function SettingsPage() {
       .eq("id", user.id);
 
     setProfileSaving(false);
-    setProfileMsg(error ? "Kaydedilemedi: " + error.message : "✓ Profil güncellendi");
+    setProfileMsg(error ? "Kaydedilemedi: " + hataCevir(error) : "✓ Profil güncellendi");
   }
 
   async function changePassword() {
@@ -91,7 +92,7 @@ export default function SettingsPage() {
     setPassSaving(false);
 
     if (error) {
-      setPassMsg("Değiştirilemedi: " + error.message);
+      setPassMsg("Değiştirilemedi: " + hataCevir(error));
     } else {
       setPassMsg("✓ Şifre değiştirildi");
       setPassword("");

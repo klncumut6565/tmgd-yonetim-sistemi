@@ -10,6 +10,7 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase/client";
+import { hataCevir } from "@/lib/hataCevir";
 
 type Task = {
   id: string;
@@ -72,7 +73,7 @@ export default function TasksPage() {
     });
 
     if (error) {
-      alert(error.message);
+      alert(hataCevir(error));
       return;
     }
 

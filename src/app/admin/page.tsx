@@ -11,6 +11,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase/client";
 import { useUser } from "@/hooks/useUser";
+import { hataCevir } from "@/lib/hataCevir";
 
 type Profile = {
   id: string;
@@ -96,7 +97,7 @@ function UsersTab() {
       .from("profiles")
       .select("*")
       .order("created_at", { ascending: false });
-    if (error) setError(error.message);
+    if (error) setError(hataCevir(error));
     else setUsers((data as Profile[]) || []);
     setLoading(false);
   }
@@ -114,7 +115,7 @@ function UsersTab() {
         approved_at: status === "approved" ? new Date().toISOString() : null,
       })
       .eq("id", u.id);
-    if (error) setError(error.message);
+    if (error) setError(hataCevir(error));
     else load();
   }
 
@@ -124,7 +125,7 @@ function UsersTab() {
       .from("profiles")
       .update({ is_active: active })
       .eq("id", u.id);
-    if (error) setError(error.message);
+    if (error) setError(hataCevir(error));
     else load();
   }
 
@@ -139,7 +140,7 @@ function UsersTab() {
       return;
     setError("");
     const { error } = await supabase.from("profiles").delete().eq("id", u.id);
-    if (error) setError(error.message);
+    if (error) setError(hataCevir(error));
     else load();
   }
 
@@ -294,7 +295,7 @@ function AssignmentsTab() {
       firm_id: selectedFirm,
       permission: "owner",
     });
-    if (error) setError(error.message);
+    if (error) setError(hataCevir(error));
     else {
       setSelectedFirm("");
       load();
@@ -304,7 +305,7 @@ function AssignmentsTab() {
   async function removeAssignment(id: string) {
     setError("");
     const { error } = await supabase.from("user_firms").delete().eq("id", id);
-    if (error) setError(error.message);
+    if (error) setError(hataCevir(error));
     else load();
   }
 

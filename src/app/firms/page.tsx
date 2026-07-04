@@ -10,6 +10,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
 import { useUser } from "@/hooks/useUser";
+import { hataCevir } from "@/lib/hataCevir";
 
 type Firm = {
   id: string;
@@ -47,7 +48,7 @@ export default function FirmsPage() {
       .select("id, name, city, district, phone, status")
       .order("name");
 
-    if (error) setError("Firmalar yüklenemedi: " + error.message);
+    if (error) setError("Firmalar yüklenemedi: " + hataCevir(error));
     setFirms((data as Firm[]) || []);
     setLoading(false);
   }
@@ -66,7 +67,7 @@ export default function FirmsPage() {
 
     setSaving(false);
     if (error) {
-      setError("Firma eklenemedi: " + error.message);
+      setError("Firma eklenemedi: " + hataCevir(error));
       return;
     }
 
@@ -85,7 +86,7 @@ export default function FirmsPage() {
 
     const { error } = await supabase.from("firms").delete().eq("id", firm.id);
     if (error) {
-      setError("Silinemedi: " + error.message);
+      setError("Silinemedi: " + hataCevir(error));
       return;
     }
     loadFirms();

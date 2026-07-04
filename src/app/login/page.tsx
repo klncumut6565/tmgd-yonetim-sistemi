@@ -8,6 +8,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
+import { hataCevir } from "@/lib/hataCevir";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -52,7 +53,7 @@ export default function LoginPage() {
     setBusy(false);
 
     if (error) {
-      setError(cevirHata(error.message));
+      setError(hataCevir(error));
       return;
     }
 
@@ -94,7 +95,7 @@ export default function LoginPage() {
     setBusy(false);
 
     if (error) {
-      setError(cevirHata(error.message));
+      setError(hataCevir(error));
       return;
     }
 
@@ -206,17 +207,3 @@ export default function LoginPage() {
   );
 }
 
-// Supabase'in İngilizce hata mesajlarını Türkçeleştir
-function cevirHata(msg: string): string {
-  const m = msg.toLowerCase();
-  if (m.includes("unable to validate email") || m.includes("invalid format"))
-    return "E-posta adresi geçersiz görünüyor. Başında/sonunda boşluk olmadığından emin ol.";
-  if (m.includes("invalid login")) return "E-posta veya şifre hatalı.";
-  if (m.includes("email not confirmed"))
-    return "E-postanı henüz doğrulamadın. Lütfen mailindeki bağlantıya tıkla.";
-  if (m.includes("already registered") || m.includes("already exists"))
-    return "Bu e-posta zaten kayıtlı. Giriş yapmayı dene.";
-  if (m.includes("rate limit"))
-    return "Çok fazla deneme yapıldı. Lütfen biraz sonra tekrar dene.";
-  return msg;
-}
