@@ -9,6 +9,7 @@
 import { use, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase/client";
+import { useUser } from "@/hooks/useUser";
 import { hataCevir } from "@/lib/hataCevir";
 
 type Firm = {
@@ -116,6 +117,7 @@ export default function FirmDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = use(params);
+  const { canWrite } = useUser();
 
   const [firm, setFirm] = useState<Firm | null>(null);
   const [loading, setLoading] = useState(true);
@@ -289,16 +291,22 @@ export default function FirmDetailPage({
             </label>
           </div>
 
-          <div className="mt-6 flex items-center gap-3">
-            <button
-              onClick={saveFirm}
-              disabled={saving}
-              className="px-5 py-2 rounded bg-black text-white disabled:opacity-50"
-            >
-              {saving ? "Kaydediliyor..." : "Kaydet"}
-            </button>
-            {saveMsg && <span className="text-sm text-gray-600">{saveMsg}</span>}
-          </div>
+          {canWrite ? (
+            <div className="mt-6 flex items-center gap-3">
+              <button
+                onClick={saveFirm}
+                disabled={saving}
+                className="px-5 py-2 rounded bg-black text-white disabled:opacity-50"
+              >
+                {saving ? "Kaydediliyor..." : "Kaydet"}
+              </button>
+              {saveMsg && <span className="text-sm text-gray-600">{saveMsg}</span>}
+            </div>
+          ) : (
+            <p className="mt-6 text-sm text-gray-400">
+              Hesabın salt okunur — firma bilgilerini görüntüleyebilir ama değiştiremezsin.
+            </p>
+          )}
         </div>
       )}
 

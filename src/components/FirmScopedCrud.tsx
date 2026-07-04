@@ -13,6 +13,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase/client";
+import { useUser } from "@/hooks/useUser";
 import { hataCevir } from "@/lib/hataCevir";
 
 export type FieldType = "text" | "number" | "date" | "select";
@@ -50,6 +51,7 @@ export default function FirmScopedCrud({
   searchKeys,
   orderBy = "created_at",
 }: Props) {
+  const { canWrite } = useUser();
   const [firms, setFirms] = useState<Firm[]>([]);
   const [firmId, setFirmId] = useState("");
   const [rows, setRows] = useState<Row[]>([]);
@@ -218,13 +220,15 @@ export default function FirmScopedCrud({
     <div className="p-6">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-3xl font-bold">{title}</h1>
-        <button
-          onClick={openCreateForm}
-          disabled={!firmId}
-          className="bg-black text-white px-4 py-2 rounded disabled:opacity-40"
-        >
-          + Yeni Ekle
-        </button>
+        {canWrite && (
+          <button
+            onClick={openCreateForm}
+            disabled={!firmId}
+            className="bg-black text-white px-4 py-2 rounded disabled:opacity-40"
+          >
+            + Yeni Ekle
+          </button>
+        )}
       </div>
 
       {/* Firma seçimi + arama */}
@@ -272,13 +276,15 @@ export default function FirmScopedCrud({
                   {f.label}
                 </th>
               ))}
-              <th className="text-right p-3 font-medium">İşlemler</th>
+              {canWrite && (
+                <th className="text-right p-3 font-medium">İşlemler</th>
+              )}
             </tr>
           </thead>
           <tbody>
             {loading && (
               <tr>
-                <td colSpan={tableFields.length + 1} className="p-4 text-gray-500">
+                <td colSpan={tableFields.length + (canWrite ? 1 : 0)} className="p-4 text-gray-500">
                   Yükleniyor...
                 </td>
               </tr>
@@ -286,10 +292,12 @@ export default function FirmScopedCrud({
 
             {!loading && filteredRows.length === 0 && (
               <tr>
-                <td colSpan={tableFields.length + 1} className="p-4 text-gray-500">
-                  {firmId
-                    ? "Kayıt bulunamadı. Sağ üstten yeni ekleyebilirsin."
-                    : "Önce bir firma seç."}
+                <td colSpan={tableFields.length + (canWrite ? 1 : 0)} className="p-4 text-gray-500">
+                  {!firmId
+                    ? "Önce bir firma seç."
+                    : canWrite
+                      ? "Kayıt bulunamadı. Sağ üstten yeni ekleyebilirsin."
+                      : "Kayıt bulunamadı."}
                 </td>
               </tr>
             )}
@@ -302,20 +310,22 @@ export default function FirmScopedCrud({
                       {renderCell(row, f)}
                     </td>
                   ))}
-                  <td className="p-3 text-right whitespace-nowrap">
-                    <button
-                      onClick={() => openEditForm(row)}
-                      className="text-blue-600 hover:underline mr-3"
-                    >
-                      Düzenle
-                    </button>
-                    <button
-                      onClick={() => deleteRow(row)}
-                      className="text-red-600 hover:underline"
-                    >
-                      Sil
-                    </button>
-                  </td>
+                  {canWrite && (
+                    <td className="p-3 text-right whitespace-nowrap">
+                      <button
+                        onClick={() => openEditForm(row)}
+                        className="text-blue-600 hover:underline mr-3"
+                      >
+                        Düzenle
+                      </button>
+                      <button
+                        onClick={() => deleteRow(row)}
+                        className="text-red-600 hover:underline"
+                      >
+                        Sil
+                      </button>
+                    </td>
+                  )}
                 </tr>
               ))}
           </tbody>

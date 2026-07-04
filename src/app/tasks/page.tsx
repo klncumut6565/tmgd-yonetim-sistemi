@@ -10,6 +10,7 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase/client";
+import { useUser } from "@/hooks/useUser";
 import { hataCevir } from "@/lib/hataCevir";
 
 type Task = {
@@ -35,6 +36,7 @@ const columnLabels: Record<string, string> = {
 };
 
 export default function TasksPage() {
+  const { canWrite } = useUser();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [firms, setFirms] = useState<Firm[]>([]);
   const [title, setTitle] = useState("");
@@ -90,33 +92,44 @@ export default function TasksPage() {
     <div className="p-6">
       <h1 className="text-3xl font-bold mb-6">Görevler</h1>
 
-      <div className="mb-8 flex gap-2">
-        <select
-          value={firmId}
-          onChange={(e) => setFirmId(e.target.value)}
-          className="border p-2"
-        >
-          {firms.length === 0 && <option value="">Firma yok</option>}
-          {firms.map((firm) => (
-            <option key={firm.id} value={firm.id}>
-              {firm.name}
-            </option>
-          ))}
-        </select>
+      <div className="mb-8 flex flex-wrap gap-2 items-end">
+        <div>
+          <label className="block text-sm text-gray-600 mb-1">Firma</label>
+          <select
+            value={firmId}
+            onChange={(e) => setFirmId(e.target.value)}
+            className="border p-2 rounded min-w-[200px]"
+          >
+            {firms.length === 0 && <option value="">Firma yok</option>}
+            {firms.map((firm) => (
+              <option key={firm.id} value={firm.id}>
+                {firm.name}
+              </option>
+            ))}
+          </select>
+        </div>
 
-        <input
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          className="border p-2"
-          placeholder="Görev adı"
-        />
-
-        <button
-          onClick={createTask}
-          className="bg-black text-white px-4 py-2 rounded"
-        >
-          Oluştur
-        </button>
+        {canWrite && (
+          <>
+            <div className="flex-1 min-w-[200px]">
+              <label className="block text-sm text-gray-600 mb-1">Yeni Görev</label>
+              <input
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                className="border p-2 rounded w-full"
+                placeholder="Görev adı..."
+                onKeyDown={(e) => e.key === "Enter" && createTask()}
+              />
+            </div>
+            <button
+              onClick={createTask}
+              disabled={!title.trim() || !firmId}
+              className="bg-black text-white px-4 py-2 rounded disabled:opacity-40"
+            >
+              + Oluştur
+            </button>
+          </>
+        )}
       </div>
 
       <div className="grid grid-cols-4 gap-4">

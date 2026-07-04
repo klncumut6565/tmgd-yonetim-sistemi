@@ -21,7 +21,11 @@ export type UseUserResult = {
   profile: Profile | null;
   isSuperAdmin: boolean;
   isApproved: boolean;
+  canWrite: boolean;        // ekle/düzenle/sil yetkisi (rol bazlı)
 };
+
+// database/004_rol_yetkileri.sql'deki yazabilir() ile birebir aynı liste
+const YAZABILEN_ROLLER = ["super_admin", "admin", "tmgd", "assistant"];
 
 export function useUser(): UseUserResult {
   const [loading, setLoading] = useState(true);
@@ -72,11 +76,15 @@ export function useUser(): UseUserResult {
     };
   }, []);
 
+  const isApproved =
+    profile?.approval_status === "approved" && !!profile?.is_active;
+
   return {
     loading,
     authed,
     profile,
     isSuperAdmin: profile?.role === "super_admin",
-    isApproved: profile?.approval_status === "approved" && !!profile?.is_active,
+    isApproved,
+    canWrite: isApproved && YAZABILEN_ROLLER.includes(profile?.role || ""),
   };
 }

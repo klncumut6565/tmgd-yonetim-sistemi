@@ -29,7 +29,7 @@ const STATUS_TR: Record<string, string> = {
 
 export default function FirmsPage() {
   const router = useRouter();
-  const { isSuperAdmin } = useUser();
+  const { isSuperAdmin, canWrite } = useUser();
 
   const [firms, setFirms] = useState<Firm[]>([]);
   const [loading, setLoading] = useState(true);
@@ -117,8 +117,8 @@ export default function FirmsPage() {
       )}
 
       {/* Yan yana: solda liste, sağda yeni firma */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2">
+      <div className={canWrite ? "grid grid-cols-1 lg:grid-cols-3 gap-6" : ""}>
+        <div className={canWrite ? "lg:col-span-2" : ""}>
           <input
             className="border p-2 w-full rounded mb-4"
             placeholder="Ara: firma adı, şehir, ilçe..."
@@ -186,6 +186,7 @@ export default function FirmsPage() {
           </p>
         </div>
 
+        {canWrite && (
         <div>
           <div className="border rounded-xl p-4">
             <h2 className="font-bold mb-4">Yeni Firma</h2>
@@ -218,6 +219,7 @@ export default function FirmsPage() {
             </button>
           </div>
         </div>
+        )}
       </div>
     </div>
   );
