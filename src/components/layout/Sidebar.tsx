@@ -13,6 +13,7 @@ const menu = [
   { title: "Sürücüler", href: "/drivers" },
   { title: "Personeller", href: "/employees" },
   { title: "Ziyaretler", href: "/visits" },
+  { title: "Raporlar", href: "/reports" },
   { title: "Ayarlar", href: "/settings" },
 ];
 
