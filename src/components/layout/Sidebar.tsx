@@ -14,6 +14,7 @@ const menu = [
   { title: "Personeller", href: "/employees" },
   { title: "Ziyaretler", href: "/visits" },
   { title: "Raporlar", href: "/reports" },
+  { title: "ADR Bilgi Motoru", href: "/adr" },
   { title: "Ayarlar", href: "/settings" },
 ];
 
