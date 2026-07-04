@@ -1,11 +1,22 @@
 -- =====================================================================
--- TMGD YÖNETİM SİSTEMİ — MIGRATION 009
+-- TMGD YÖNETİM SİSTEMİ — MIGRATION 009 (v2 — TEKİL)
 -- TAM ADR UN NUMARALARI VERİTABANI (ADR_A_TABLOSU.xlsx kaynaklı)
 -- =====================================================================
--- 95 satırlık 008 seed'ini 2939 gerçek ADR kaydıyla değiştirir.
--- Kaynak: Umut Kılınç'ın ADR_A_TABLOSU.xlsx (resmi ADR listesi)
--- KULLANIM: Supabase → SQL Editor → RUN (Idempotent)
+-- 366 UN numarası birden fazla satırda (farklı ambalaj grupları)
+-- görünüyordu. Bu sürümde her UN için en yüksek tehlike seviyeli
+-- (en düşük PG: I > II > III > boş) kayıt alındı.
+-- KULLANIM: Supabase SQL Editor → tamamını yapıştır → RUN (Idempotent)
 -- =====================================================================
+
+-- RLS (008'den devam — idempotent)
+alter table public.adr_un_numbers enable row level security;
+drop policy if exists adr_un_select on public.adr_un_numbers;
+create policy adr_un_select on public.adr_un_numbers for select using (true);
+drop policy if exists adr_un_write on public.adr_un_numbers;
+create policy adr_un_write on public.adr_un_numbers for all using (public.is_admin());
+alter table public.adr_synonyms enable row level security;
+drop policy if exists adr_syn_select on public.adr_synonyms;
+create policy adr_syn_select on public.adr_synonyms for select using (true);
 
 insert into public.adr_un_numbers
   (un_number,proper_shipping_name,class,classification_code,
@@ -21,15 +32,7 @@ values
 ('0012','KARTUŞLAR, SİLAHLAR İÇİN, TESİRSİZ MERMİLİ veya KARTUŞLAR, HAFİF SİLAHLAR İÇİN','1','1.4S','','E','','1.4','4','5 kg','E0'),
 ('0014','KARTUŞLAR, SİLAHLAR İÇİN, KURUSIKI veya KARTUŞLAR, HAFİF SİLAHLAR İÇİN, KURUSIKI veya KARTUŞLAR, ALETLER İÇİN, KURUSIKI','1','1.4S','','E','','1.4','4','5 kg','E0'),
 ('0015','MÜHİMMAT, DUMANLI paralama hakkı, fırlatma yükü veya sevk maddesi olan veya olmayan','1','1.2G','','B1000C','','1','1','','E0'),
-('0015','MÜHİMMAT, DUMANLI paralama hakkı, fırlatma yükü veya sevk maddesi olan veya olmayan, aşındırıcı maddeler içeren','1','1.2G','','B1000C','','1
-+8','1','','E0'),
-('0015','MÜHİMMAT, DUMANLI paralama hakkı, fırlatma yükü veya sevk maddesi olan veya olmayan, soluma yoluyla zehirli maddeler içeren','1','1.2G','','B1000C','','1
-+6.1','1','','E0'),
 ('0016','MÜHİMMAT, DUMANLI paralama hakkı, fırlatma yükü veya sevk maddesi olan veya olmayan','1','1.3G','','C5000D','','1','1','','E0'),
-('0016','MÜHİMMAT, DUMANLI paralama hakkı, fırlatma yükü veya sevk maddesi olan veya olmayan, aşındırıcı maddeler içeren','1','1.3G','','C5000D','','1
-+8','1','','E0'),
-('0016','MÜHİMMAT, DUMANLI paralama hakkı, fırlatma yükü veya sevk maddesi olan veya olmayan, soluma yoluyla zehirli maddeler içeren','1','1.3G','','C5000D','','1
-+6.1','1','','E0'),
 ('0018','MÜHİMMAT, GÖZ YAŞARTICI paralama hakkı, fırlatma yükü veya sevk maddesi olan','1','1.2G','','B1000C','','1
 +6.1
 +8','1','','E0'),
@@ -206,10 +209,6 @@ values
 +6.1
 +8','2','','E0'),
 ('0303','MÜHİMMAT, DUMANLI paralama  hakkı, fırlatma yükü veya sevk  maddesi olan veya olmayan','1','1.4G','','E','','1.4','2','','E0'),
-('0303','MÜHİMMAT, DUMANLI paralama  hakkı, fırlatma yükü veya sevk  maddesi olan veya olmayan, aşındırıcı maddeler içeren','1','1.4G','','E','','1.4
-+8','2','','E0'),
-('0303','MÜHİMMAT, DUMANLI paralama  hakkı, fırlatma yükü veya sevk  maddesi olan veya olmayan, soluma  yoluyla zehirli maddeler içeren','1','1.4G','','E','','1.4
-+6.1','2','','E0'),
 ('0305','PARLAMA TOZU','1','1.3G','','C5000D','','1','1','','E0'),
 ('0306','MÜHİMMAT İÇİN İZLİ  MERMİLER','1','1.4G','','E','','1.4','2','','E0'),
 ('0312','FİŞEKLERİ, İŞARET','1','1.4G','','E','','1.4','2','','E0'),
@@ -452,8 +451,6 @@ values
 ('1039','ETİL METİL ETER','2','2F','','B/D','23','2.1','2','','E0'),
 ('1040','ETİLEN OKSİT','2','2TF','','B/D','263','2.3
 +2.1','1','','E0'),
-('1040','ETİLEN OKSİT, AZOTLU 50 °C''de  1 MPa''ya (10 bar) kadar toplam  basınç','2','2TF','','B/D','263','2.3
-+2.1','1','','E0'),
 ('1041','ETİLEN OKSİT VE KARBON  DİOKSİT KARIŞIM %9''dan fazlaa  olan ancak %87''den fazla olmayan etilen oksit','2','2F','','B/D','239','2.1','2','','E0'),
 ('1043','GÜBRE, AMONYAKLAŞTIRICI  ÇÖZELTİ, serbest amonyak ile','2','4A','','E','','2.2','','',''),
 ('1044','YANGIN SÖNDÜRÜCÜLER  sıkıştırılmış veya sıvılaştırılmış gazlı','2','6A','','E','','2.2','3','120 ml','E0'),
@@ -528,11 +525,8 @@ values
 +6.1','1','','E0'),
 ('1104','AMİL ASETATLAR','3','F1','III','D/E','30','3','3','5 L','E1'),
 ('1105','PENTANOLLER','3','F1','II','D/E','33','3','2','1 L','E2'),
-('1105','PENTANOLLER','3','F1','III','D/E','30','3','3','5 L','E1'),
 ('1106','AMİLAMİN','3','FC','II','D/E','338','3
 +8','2','1 L','E2'),
-('1106','AMİLAMİN','3','FC','III','D/E','38','3
-+8','3','5 L','E1'),
 ('1107','AMİL KLORÜR','3','F1','II','D/E','33','3','2','1 L','E2'),
 ('1108','1-PENTEN (n-AMİLEN)','3','F1','I','D/E','33','3','1','','E3'),
 ('1109','AMİL FORMATLAR','3','F1','III','D/E','30','3','3','5 L','E1'),
@@ -542,9 +536,7 @@ values
 ('1113','AMİL NİTRİT','3','F1','II','D/E','33','3','2','1 L','E2'),
 ('1114','BENZEN','3','F1','II','D/E','33','3','2','1 L','E2'),
 ('1120','BÜTANOLLER','3','F1','II','D/E','33','3','2','1 L','E2'),
-('1120','BÜTANOLLER','3','F1','III','D/E','30','3','3','5 L','E1'),
 ('1123','BÜTİL ASETATLAR','3','F1','II','D/E','33','3','2','1 L','E2'),
-('1123','BÜTİL ASETATLAR','3','F1','III','D/E','30','3','3','5 L','E1'),
 ('1125','n-BÜTİLAMİN','3','FC','II','D/E','338','3
 +8','2','1 L','E2'),
 ('1126','1 -BROMOBÜTAN','3','F1','II','D/E','33','3','2','1 L','E2'),
@@ -555,22 +547,11 @@ values
 ('1131','KARBON DİSÜLFÜR','3','FT1','I','C/E','336','3
 +6.1','1','','E0'),
 ('1133','YAPIŞTIRICILAR alevlenebilir sıvı  içeren','3','F1','I','D/E','33','3','1','500 ml','E3'),
-('1133','YAPIŞTIRICILAR alevlenebilir sıvı  içeren (50 °C''de buhar basıncı, 110  kPa''dan daha yüksek olan)','3','F1','II','D/E','33','3','2','5 L','E2'),
-('1133','YAPIŞTIRICILAR alevlenebilir sıvı  içeren (50 °C''de buhar basıncı, 110  kPa’a eşit veya daha düşük olan)','3','F1','II','D/E','33','3','2','5 L','E2'),
-('1133','YAPIŞTIRICILAR alevlenebilir sıvı  içeren','3','F1','III','D/E','30','3','3','5 L','E1'),
-('1133','YAPIŞTIRICILAR alevlenebilir sıvı  içeren (2.2.3.1.4 uyarınca viskoz ve  parlama noktası 23 °C''nin altında) (50  °C''de buhar basıncı 110 kPa’dan daha  yüksek olan)','3','F1','III','E','','3','3','5 L','E1'),
-('1133','YAPIŞTIRICILAR alevlenebilir sıvı  içeren (2.2.3.1.4 uyarınca viskoz ve  parlama noktası 23 °C''nin altında) (50  °C''de buhar basıncı 110 kPa’a eşit  veya daha düşük olan)','3','F1','III','E','','3','3','5 L','E1'),
 ('1134','KLOROBENZEN','3','F1','III','D/E','30','3','3','5 L','E1'),
 ('1135','ETİLEN KLOROHİDRİN','6.1','TF1','I','C/D','663','6.1
 +3','1','','E0'),
 ('1136','KÖMÜR KATRANI  DİSTİLATLARI, ALEVLENEBİLİR','3','F1','II','D/E','33','3','2','1 L','E2'),
-('1136','KÖMÜR KATRANI  DİSTİLATLARI, ALEVLENEBİLİR','3','F1','III','D/E','30','3','3','5 L','E1'),
 ('1139','KAPLAMA ÇÖZELTİSİ (yüzey  uygulamaları veya endüstriyel veya  araç alt kaplaması, varil veya fıçı iç  kaplaması gibi diğer kaplamaları  kapsar)','3','F1','I','D/E','33','3','1','500 ml','E3'),
-('1139','KAPLAMA ÇÖZELTİSİ (yüzey  uygulamaları veya endüstriyel veya  araç alt kaplaması, varil veya fıçı iç  kaplaması gibi diğer kaplamaları  kapsar) (50 °C''de buhar basıncı 110  kPa''dan daha yüksek olan)','3','F1','II','D/E','33','3','2','5 L','E2'),
-('1139','KAPLAMA ÇÖZELTİSİ (yüzey uygulamaları veya endüstriyel veya araç alt kaplaması, varil veya fıçı iç kaplaması gibi diğer kaplamaları kapsar) (50 °C''de buhar basıncı 110 kPa’a eşit veya daha düşük olan)','3','F1','II','D/E','33','3','2','5 L','E2'),
-('1139','KAPLAMA ÇÖZELTİSİ (yüzey  uygulamaları veya endüstriyel veya  araç alt kaplaması, varil veya fıçı iç  kaplaması gibi diğer kaplamaları  kapsar)','3','F1','III','D/E','30','3','3','5 L','E1'),
-('1139','KAPLAMA ÇÖZELTİSİ (yüzey  uygulamaları veya endüstriyel veya  araç alt kaplaması, varil veya fıçı iç  kaplaması gibi diğer kaplamaları  kapsar) (2.2.3.1.4 uyarınca viskoz ve  parlama noktası 23 °C''nin altında)  (50 °C''de buhar basıncı 110 kPa''dan  daha yüksek olan)','3','F1','III','E','','3','3','5 L','E1'),
-('1139','KAPLAMA ÇÖZELTİSİ (yüzey  uygulamaları veya endüstriyel veya  araç alt kaplaması, varil veya fıçı iç  kaplaması gibi diğer kaplamaları  kapsar) (2.2.3.1.4''e göre viskoz ve parlama noktası 23 °C''nin altında  olan) (50 °C''de buhar basıncı 110  kPa’a eşit veya daha düşük olan)','3','F1','III','E','','3','3','5 L','E1'),
 ('1143','KROTONALDEHİT veya  KROTONALDEHİT, STABİLİZE','6.1','TF1','I','C/D','663','6.1
 +3','1','','E0'),
 ('1144','KROTONİLEN','3','F1','I','D/E','339','3','1','','E3'),
@@ -578,12 +559,10 @@ values
 ('1146','SİKLOPENTAN','3','F1','II','D/E','33','3','2','1 L','E2'),
 ('1147','DEKAHİDRONAFTALİN','3','F1','III','D/E','30','3','3','5 L','E1'),
 ('1148','DİASETON ALKOL','3','F1','II','D/E','33','3','2','1 L','E2'),
-('1148','DİASETON ALKOL','3','F1','III','D/E','30','3','3','5 L','E1'),
 ('1149','DİBÜTİL ETERLER','3','F1','III','D/E','30','3','3','5 L','E1'),
 ('1150','1,2-DİKLOROETİLEN','3','F1','II','D/E','33','3','2','1 L','E2'),
 ('1152','DİKLOROPENTANLAR','3','F1','III','D/E','30','3','3','5 L','E1'),
 ('1153','ETİLEN GLİKOL DİETİL ETER','3','F1','II','D/E','33','3','2','1 L','E2'),
-('1153','ETİLEN GLİKOL DİETİL ETER','3','F1','III','D/E','30','3','3','5 L','E1'),
 ('1154','DİETİLAMİN','3','FC','II','D/E','338','3
 +8','2','1 L','E2'),
 ('1155','DİETİL ETER (ETİL ETER)','3','F1','I','D/E','33','3','1','','E3'),
@@ -605,7 +584,6 @@ values
 ('1166','DİOKSOLAN','3','F1','II','D/E','33','3','2','1 L','E2'),
 ('1167','DİVİNİL ETER, STABİLİZE','3','F1','I','D/E','339','3','1','','E3'),
 ('1170','ETANOL (ETİL ALKOL) veya  ETANOL ÇÖZELTİSİ (ETİL  ALKOL ÇÖZELTİSİ)','3','F1','II','D/E','33','3','2','1 L','E2'),
-('1170','ETANOL ÇÖZELTİSİ (ETİL  ALKOL ÇÖZELTİSİ)','3','F1','III','D/E','30','3','3','5 L','E1'),
 ('1171','ETİLEN GLİKOL MONOETİL  ETER','3','F1','III','D/E','30','3','3','5 L','E1'),
 ('1172','ETİLEN GLİKOL MONOETİL  ETER ASETAT','3','F1','III','D/E','30','3','3','5 L','E1'),
 ('1173','ETİL ASETAT','3','F1','II','D/E','33','3','2','1 L','E2'),
@@ -639,30 +617,18 @@ values
 ('1196','ETİLTRİKLOROSİLAN','3','FC','II','D/E','X338','3
 +8','2','','E0'),
 ('1197','ÖZÜTLER, SIVI tat veya aroma için (50 °C''de buhar basıncı 110 kPa’dan  daha yüksek olan)','3','F1','II','D/E','33','3','2','5 L','E2'),
-('1197','ÖZÜTLER, SIVI tat veya aroma için 50 °C''de buhar basıncı 110 kPa’a eşit  veya daha düşük olan)','3','F1','II','D/E','33','3','2','5 L','E2'),
-('1197','ÖZÜTLER, SIVI tat veya aroma için','3','F1','III','D/E','30','3','3','5 L','E1'),
-('1197','ÖZÜTLER, SIVI tat veya aroma için (2.2.3.1.4 uyarınca viskoz ve parlama  noktası 23 °C''nin altında) (50 °C''de  buhar basıncı 110 kPa’dan daha  yüksek olan)','3','F1','III','E','','3','3','5 L','E1'),
-('1197','ÖZÜTLER, SIVI tat veya aroma için (2.2.3.1.4 uyarınca viskoz ve parlama  noktası 23 °C''nin altında) (50 °C''de  buhar basıncı 110 kPa’a eşit veya  daha düşük olan)','3','F1','III','E','','3','3','5 L','E1'),
 ('1198','FORMALDEHİT ÇÖZELTİSİ, ALEVLENEBİLİR','3','FC','III','D/E','38','3
 +8','3','5 L','E1'),
 ('1199','FURALDEHİTLER','6.1','TF1','II','D/E','63','6.1
 +3','2','100 ml','E4'),
 ('1201','FUZEL YAĞI','3','F1','II','D/E','33','3','2','1 L','E2'),
-('1201','FUZEL YAĞI','3','F1','III','D/E','30','3','3','5 L','E1'),
 ('1202','GAZ YAĞI veya DİZEL YAKIT  veya ISITMA YAĞI, HAFİF  (parlama noktası 60 °C''den fazla  olmayan)','3','F1','III','D/E','30','3','3','5 L','E1'),
-('1202','DİZEL YAKIT, EN 590:2013+  A1:2017 standardına uygun veya  GAZ YAĞI veya ISITMA YAĞI, HAFİF, EN 590:2013+ A1:2017''de  belirtilen parlama noktasına sahip','3','F1','III','D/E','30','3','3','5 L','E1'),
-('1202','GAZ YAĞI veya DİZEL YAKIT, GAZ YAĞI veya ISITMA YAĞI, HAFİF (parlama noktası 60 °C''den  yüksek ve 100 °C''den düşük olan)','3','F1','III','D/E','30','3','3','5 L','E1'),
 ('1203','BENZİN veya GAZOLİN veya  PETROL','3','F1','II','D/E','33','3','2','1 L','E2'),
 ('1204','NİTROGLİSERİN ÇÖZELTİSİ, ALKOLDE %1''den az nitrogliserin  ile','3','D','II','B','','3','2','1 L','E0'),
 ('1206','HEPTANLAR','3','F1','II','D/E','33','3','2','1 L','E2'),
 ('1207','HEKZALDEHİT','3','F1','III','D/E','30','3','3','5 L','E1'),
 ('1208','HEKZANLAR','3','F1','II','D/E','33','3','2','1 L','E2'),
 ('1210','MATBAA MÜREKKEBİ, alevlenebilir veya MATBAA  MÜREKKEBİ İLE İLGİLİ  MALZEME (matbaa mürekkebi  inceltici veya azaltıcı bileşiği dâhil), alevlenebilir','3','F1','I','D/E','33','3','1','500 ml','E3'),
-('1210','MATBAA MÜREKKEBİ, alevlenebilir veya MATBAA  MÜREKKEBİ İLE İLGİLİ  MALZEME (matbaa mürekkebi  inceltici veya azaltıcı bileşeni dâhil), alevlenebilir (50 °C''de buhar basıncı  110 kPa’dan daha yüksek olan)','3','F1','II','D/E','33','3','2','5 L','E2'),
-('1210','MATBAA MÜREKKEBİ, alevlenebilir veya MATBAA  MÜREKKEBİ İLE İLGİLİ  MALZEME (matbaa mürekkebi  inceltici veya azaltıcı bileşiği dâhil), alevlenebilir (50 °C''de buhar basıncı  110 kPa''a eşit veya daha düşük olan)','3','F1','II','D/E','33','3','2','5 L','E2'),
-('1210','MATBAA MÜREKKEBİ, alevlenebilir veya MATBAA  MÜREKKEBİ İLE İLGİLİ  MALZEME (matbaa mürekkebi  inceltici veya azaltıcı bileşiği dâhil), alevlenebilir','3','F1','III','D/E','30','3','3','5 L','E1'),
-('1210','MATBAA MÜREKKEBİ, alevlenebilir veya MATBAA  MÜREKKEBİ İLE İLGİLİ  MALZEME (matbaa mürekkebi  inceltici veya azaltıcı bileşiği dâhil), alevlenebilir (2.2.3.1.4''e göre viskoz  ve parlama noktası 23 °C''nin altında)  (50 °C''de buhar basıncı 110 kPa’dan  daha yüksek olan)','3','F1','III','E','','3','3','5 L','E1'),
-('1210','MATBAA MÜREKKEBİ, alevlenebilir veya MATBAA  MÜREKKEBİ İLE İLGİLİ  MALZEME (matbaa mürekkebi  inceltici veya azaltıcı bileşiği dâhil), alevlenebilir (2.2.3.1.4''e göre viskoz  ve parlama noktası 23 °C''nin altında)  (50 °C''de buhar basıncı 110 kPa''a eşit  veya daha düşük olan)','3','F1','III','E','','3','3','5 L','E1'),
 ('1212','İZOBÜTANOL (İZOBÜTİL  ALKOL)','3','F1','III','D/E','30','3','3','5 L','E1'),
 ('1213','İZOBÜTİL ASETAT','3','F1','II','D/E','33','3','2','1 L','E2'),
 ('1214','İZOBÜTİLAMİN','3','FC','II','D/E','338','3
@@ -676,12 +642,8 @@ values
 ('1222','İZOPROPİL NİTRAT','3','F1','II','E','','3','2','1 L','E2'),
 ('1223','KEROSEN','3','F1','III','D/E','30','3','3','5 L','E1'),
 ('1224','KETONLAR, SIVI, B.B.B (50 °C''de  buhar basıncı 110 kPa’dan daha  yüksek olan)','3','F1','II','D/E','33','3','2','1 L','E2'),
-('1224','KETONLAR, SIVI, B.B.B (50 °C''de  buhar basıncı 110 kPa’a eşit veya  daha düşük olan)','3','F1','II','D/E','33','3','2','1 L','E2'),
-('1224','KETONLAR, SIVI, B.B.B.','3','F1','III','D/E','30','3','3','5 L','E1'),
 ('1228','MERKAPTANLAR, SIVI, ALEVLENEBİLİR, ZEHİRLİ, B.B.B. veya MERKAPTAN  KARIŞIMI, SIVI, ALEVLENEBİLİR, ZEHİRLİ, B.B.B.','3','FT1','II','D/E','336','3
 +6.1','2','1 L','E0'),
-('1228','MERKAPTANLAR, SIVI, ALEVLENEBİLİR, ZEHİRLİ, B.B.B. veya MERKAPTAN  KARIŞIMI, SIVI, ALEVLENEBİLİR, ZEHİRLİ, B.B.B.','3','FT1','III','D/E','36','3
-+6.1','3','5 L','E1'),
 ('1229','MESİTİL OKSİT','3','F1','III','D/E','30','3','3','5 L','E1'),
 ('1230','METANOL','3','FT1','II','D/E','336','3
 +6.1','2','1 L','E2'),
@@ -718,30 +680,13 @@ values
 ('1261','NİTROMETAN','3','F1','II','E','','3','2','1 L','E0'),
 ('1262','OKTANLAR','3','F1','II','D/E','33','3','2','1 L','E2'),
 ('1263','BOYA (boya, vernik, emaye, renklendirici, lake, cila, parlatıcı sıvı  dolgu ve sıvı vernik bazı dâhil) veya  BOYA İLE İLGİLİ MALZEME  (boya inceltici veya azaltıcı bileşiği  dâhil)','3','F1','I','D/E','33','3','1','500 ml','E3'),
-('1263','BOYA (boya, vernik, emaye, renklendirici, lake, cila, parlatıcı, sıvı  dolgu ve sıvı vernik bazı dâhil) veya  BOYA İLE İLGİLİ MALZEME  (boya inceltici veya azaltıcı bileşiği  dâhil) (50 °C''de buhar basıncı 110  kPa’dan daha yüksek olan)','3','F1','II','D/E','33','3','2','5 L','E2'),
-('1263','BOYA (boya, vernik, emaye, renklendirici, lake, cila, parlatıcı, sıvı  dolgu ve sıvı vernik bazı dâhil) veya  BOYA İLE İLGİLİ MALZEME  (boya inceltici veya azaltıcı bileşiği  dâhil) (50 °C''de buhar basıncı 110  kPa’a eşit veya daha düşük olan)','3','F1','II','D/E','33','3','2','5 L','E2'),
-('1263','BOYA (boya, vernik, emaye, renklendirici, lake, cila, parlatıcı sıvı  dolgu ve sıvı vernik bazı dâhil) veya  BOYA İLE İLGİLİ MALZEME  (boya inceltici veya azaltıcı bileşiği  dâhil)','3','F1','III','D/E','30','3','3','5 L','E1'),
-('1263','BOYA (boya, vernik, emaye, renklendirici, lake, cila, parlatıcı, sıvı  dolgu ve sıvı vernik bazı dâhil) veya  BOYA İLE İLGİLİ MALZEME  (boya inceltici veya azaltıcı bileşiği  dâhil) (2.2.3.1.4''e göre viskoz ve  parlama noktası 23 °C''nin altında)  (50 °C''de buhar basıncı 110 kPa''dan  daha yüksek olan)','3','F1','III','E','','3','3','5 L','E1'),
-('1263','BOYA (boya, vernik, emaye, renklendirici, lake, cila, parlatıcı, sıvı  dolgu ve sıvı vernik bazı dâhil) veya  BOYA İLE İLGİLİ MALZEME  (boya inceltici veya azaltıcı bileşeni  dâhil) (2.2.3.1.4''e göre viskoz ve  parlama noktası 23 °C''nin altında)  (50 °C''de buhar basıncı 110 kPa’a  eşit veya daha düşük olan)','3','F1','III','E','','3','3','5 L','E1'),
 ('1264','PARALDEHİT','3','F1','III','D/E','30','3','3','5 L','E1'),
 ('1265','PENTANLAR, sıvı','3','F1','I','D/E','33','3','1','','E3'),
-('1265','PENTANLAR, sıvı','3','F1','II','D/E','33','3','2','1 L','E2'),
 ('1266','PARFÜMERİ ÜRÜNLERİ  alevlenebilir çözücüler içeren (50  °C''de buhar basıncı, 110 kPa’dan  daha yüksek olan)','3','F1','II','D/E','33','3','2','5 L','E2'),
-('1266','PARFÜMERİ ÜRÜNLERİ  alevlenebilir çözücüler içeren (50  °C''de buhar basıncı, 110 kPa''a eşit  veya daha düşük olan)','3','F1','II','D/E','33','3','2','5 L','E2'),
-('1266','PARFÜMERİ ÜRÜNLERİ  alevlenebilir çözücüler içeren','3','F1','III','D/E','30','3','3','5 L','E1'),
-('1266','PARFÜMERİ ÜRÜNLERİ  alevlenebilir çözücüler içeren  (2.2.3.1.4 uyarınca viskoz ve parlama  noktası 23 °C''nin altında) (50 °C''de  buhar basıncı 110 kPa''dan daha  yüksek olan)','3','F1','III','E','','3','3','5 L','E1'),
-('1266','PARFÜMERİ ÜRÜNLERİ  alevlenebilir çözücüler içeren  (2.2.3.1.4 uyarınca viskoz ve parlama  noktası 23 °C''nin altında) (50 °C''de  buhar basıncı 110 kPa''a eşit veya  daha düşük olan)','3','F1','III','E','','3','3','5 L','E1'),
 ('1267','HAM PETROL','3','F1','I','D/E','33','3','1','500 ml','E3'),
-('1267','HAM PETROL (50 °C''de buhar  basıncı 110 kPa’dan daha yüksek  olan)','3','F1','II','D/E','33','3','2','1 L','E2'),
-('1267','HAM PETROL (50 °C''de buhar  basıncı 110 kPa’a eşit veya daha  düşük olan)','3','F1','II','D/E','33','3','2','1 L','E2'),
-('1267','HAM PETROL','3','F1','III','D/E','30','3','3','5 L','E1'),
 ('1268','PETROL DİSTİLATLARI, B.B.B. veya PETROL ÜRÜNLERİ, B.B.B.','3','F1','I','D/E','33','3','1','500 ml','E3'),
-('1268','PETROL DİSTİLATLARI, B.B.B. veya PETROL ÜRÜNLERİ, B.B.B.(50 °C''de buhar basıncı 110 kPa’dan daha yüksek olan)','3','F1','II','D/E','33','3','2','1 L','E2'),
-('1268','PETROL DİSTİLATLARI, B.B.B. veya PETROL ÜRÜNLERİ, B.B.B. (50 °C''de buhar basıncı 110 kPa’a  eşit veya daha düşük olan)','3','F1','II','D/E','33','3','2','1 L','E2'),
-('1268','PETROL DİSTİLATLARI, B.B.B. veya PETROL ÜRÜNLERİ, B.B.B.','3','F1','III','D/E','30','3','3','5 L','E1'),
 ('1272','ÇAM YAĞI','3','F1','III','D/E','30','3','3','5 L','E1'),
 ('1274','n-PROPANOL (PROPİL ALKOL, NORMAL)','3','F1','II','D/E','33','3','2','1 L','E2'),
-('1274','n-PROPANOL (PROPİL ALKOL, NORMAL)','3','F1','III','D/E','30','3','3','5 L','E1'),
 ('1275','PROPİONALDEHİT','3','F1','II','D/E','33','3','2','1 L','E2'),
 ('1276','n-PROPİL ASETAT','3','F1','II','D/E','33','3','2','1 L','E2'),
 ('1277','PROPİLAMİN','3','FC','II','D/E','338','3
@@ -752,24 +697,12 @@ values
 ('1281','PROPİL FORMATLAR','3','F1','II','D/E','33','3','2','1 L','E2'),
 ('1282','PRİDİN','3','F1','II','D/E','33','3','2','1 L','E2'),
 ('1286','ÇAM SAKIZI YAĞI (50 °C''de buhar  basıncı 110 kPa’dan daha yüksek  olan)','3','F1','II','D/E','33','3','2','5 L','E2'),
-('1286','ÇAM SAKIZI YAĞI (50 °C''de buhar  basıncı 110 kPa’a eşit veya daha  düşük olan)','3','F1','II','D/E','33','3','2','5 L','E2'),
-('1286','ÇAM SAKIZI YAĞI','3','F1','III','D/E','30','3','3','5 L','E1'),
-('1286','ÇAM SAKIZI YAĞI (2.2.3.1.4  uyarınca viskoz ve parlama noktası  23 °C''nin altında) (50 °C''de buhar  basıncı 110 kPa’dan daha yüksek  olan)','3','F1','III','E','','3','3','5 L','E1'),
-('1286','ÇAM SAKIZI YAĞI (2.2.3.1.4  uyarınca viskoz ve parlama noktası  23 °C''nin altında) (50 °C''de buhar  basıncı 110 kPa’a eşit veya daha  düşük olan)','3','F1','III','E','','3','3','5 L','E1'),
 ('1287','KAUÇUK ÇÖZELTİSİ (50 °C''de  buhar basıncı 110 kPa’dan daha  yüksek olan)','3','F1','II','D/E','33','3','2','5 L','E2'),
-('1287','KAUÇUK ÇÖZELTİSİ (50 °C''de  buhar basıncı 110 kPa’a eşit veya  daha düşük olan)','3','F1','II','D/E','33','3','2','5 L','E2'),
-('1287','KAUÇUK ÇÖZELTİSİ','3','F1','III','D/E','30','3','3','5 L','E1'),
-('1287','KAUÇUK ÇÖZELTİSİ (2.2.3.1.4  uyarınca viskoz ve parlama noktası  23 °C''nin altında) (50 °C''de buhar  basıncı 110 kPa''dan daha yüksek  olan)','3','F1','III','E','','3','3','5 L','E1'),
-('1287','KAUÇUK ÇÖZELTİSİ (2.2.3.1.4  uyarınca viskoz ve parlama noktası  23 °C''nin altında) (50 °C''de buhar  basıncı 110 kPa''a eşit veya daha  düşük olan)','3','F1','III','E','','3','3','5 L','E1'),
 ('1288','ŞİST YAĞI','3','F1','II','D/E','33','3','2','1 L','E2'),
-('1288','ŞİST YAĞI','3','F1','III','D/E','30','3','3','5 L','E1'),
 ('1289','SODYUM METİLAT ÇÖZELTİSİ  alkolde','3','FC','II','D/E','338','3
 +8','2','1 L','E2'),
-('1289','SODYUM METİLAT ÇÖZELTİSİ  alkolde','3','FC','III','D/E','38','3
-+8','3','5 L','E1'),
 ('1292','TETRAETİL SİLİKAT','3','F1','III','D/E','30','3','3','5 L','E1'),
 ('1293','TENTÜRLER, TIBBİ','3','F1','II','D/E','33','3','2','1 L','E2'),
-('1293','TENTÜRLER, TIBBİ','3','F1','III','D/E','30','3','3','5 L','E1'),
 ('1294','TOLÜEN','3','F1','II','D/E','33','3','2','1 L','E2'),
 ('1295','TRİKLOROSİLAN','4.3','WFC','I','B/E','X338','4.3
 +3
@@ -778,15 +711,10 @@ values
 +8','2','1 L','E2'),
 ('1297','TRİMETİLAMİN, SULU ÇÖZELTİ, kütlece %50''den az trimetilamin','3','FC','I','C/E','338','3
 +8','1','','E0'),
-('1297','TRİMETİLAMİN, SULU ÇÖZELTİ, kütlece %50''den az trimetilamin','3','FC','II','D/E','338','3
-+8','2','1 L','E2'),
-('1297','TRİMETİLAMİN, SULU ÇÖZELTİ, kütlece %50''den az trimetilamin','3','FC','III','D/E','38','3
-+8','3','5 L','E1'),
 ('1298','TRİMETİLKLOROSİLAN','3','FC','II','D/E','X338','3
 +8','2','','E0'),
 ('1299','TEREBENTİN','3','F1','III','D/E','30','3','3','5 L','E1'),
 ('1300','TEREBENTİN İKAMESİ','3','F1','II','D/E','33','3','2','1 L','E2'),
-('1300','TEREBENTİN İKAMESİ','3','F1','III','D/E','30','3','3','5 L','E1'),
 ('1301','VİNİL ASETAT, STABİLİZE','3','F1','II','D/E','339','3','2','1 L','E2'),
 ('1302','VİNİL ETİL ETER, STABİLİZE','3','F1','I','D/E','339','3','1','','E3'),
 ('1303','VİNİLİDEN KLORÜR, STABİLİZE','3','F1','I','D/E','339','3','1','','E3'),
@@ -794,18 +722,9 @@ values
 ('1305','VİNİLTRİKLOROSİLAN','3','FC','II','D/E','X338','3
 +8','2','','E0'),
 ('1306','AHŞAP KORUYUCULAR, SIVI (50  °C''de buhar basıncı 110 kPa’dan daha  yüksek olan)','3','F1','II','D/E','33','3','2','5 L','E2'),
-('1306','AHŞAP KORUYUCULAR, SIVI (50  °C''de buhar basıncı 110 kPa’a eşit  veya daha düşük olan)','3','F1','II','D/E','33','3','2','5 L','E2'),
-('1306','AHŞAP KORUYUCULAR, SIVI','3','F1','III','D/E','30','3','3','5 L','E1'),
-('1306','AHŞAP KORUYUCULAR, SIVI  (2.2.3.1.4 uyarınca viskoz ve parlama  noktası 23 °C''nin altında) (50 °C''de  buhar basıncı 110 kPa’dan daha  yüksek olan)','3','F1','III','E','','3','3','5 L','E1'),
-('1306','AHŞAP KORUYUCULAR, SIVI  (2.2.3.1.4 uyarınca viskoz ve parlama  noktası 23 °C''nin altında) (50 °C''de  buhar basıncı 110 kPa’a eşit veya  daha düşük olan)','3','F1','III','E','','3','3','5 L','E1'),
 ('1307','KSİLENLER','3','F1','II','D/E','33','3','2','1 L','E2'),
-('1307','KSİLENLER','3','F1','III','D/E','30','3','3','5 L','E1'),
 ('1308','ZİRKONYUM, ALEVLENEBİLİR SIVI İÇİNDE ASKIDA','3','F1','I','D/E','33','3','1','','E0'),
-('1308','ZİRKONYUM, ALEVLENEBİLİR SIVI İÇİNDE ASKIDA (50 °C''de  buhar basıncı 110 kPa’dan daha  yüksek olan)','3','F1','II','D/E','33','3','2','1 L','E2'),
-('1308','ZİRKONYUM, ALEVLENEBİLİR SIVI İÇİNDE ASKIDA (50 °C''de  buhar basıncı 110 kPa’a eşit veya  daha düşük olan)','3','F1','II','D/E','33','3','2','1 L','E2'),
-('1308','ZİRKONYUM, ALEVLENEBİLİR SIVI İÇİNDE ASKIDA','3','F1','III','D/E','30','3','3','5 L','E1'),
 ('1309','ALÜMİNYUM TOZU, KAPLANMIŞ','4.1','F3','II','E','40','4.1','2','1 kg','E2'),
-('1309','ALÜMİNYUM TOZU, KAPLANMIŞ','4.1','F3','III','E','40','4.1','3','5 kg','E1'),
 ('1310','AMONYUM PİKRAT, ISLATILMIŞ  kütlece %10''dan az olmayan su ile','4.1','D','I','B','','4.1','1','','E0'),
 ('1312','BORNEOL','4.1','F1','III','E','40','4.1','3','5 kg','E1'),
 ('1313','KALSİYUM REZİNAT','4.1','F3','III','E','40','4.1','3','5 kg','E1'),
@@ -819,7 +738,6 @@ values
 ('1323','FERROSERYUM','4.1','F3','II','E','40','4.1','2','1 kg','E2'),
 ('1324','FİLMLER, NİTROSELÜLOZ  ESASLI, jelatin kaplı, artık olanlar  hariç','4.1','F1','III','E','','4.1','3','5 kg','E1'),
 ('1325','ALEVLENEBİLİR KATI, ORGANİK, B.B.B.','4.1','F1','II','E','40','4.1','2','1 kg','E2'),
-('1325','ALEVLENEBİLİR KATI, ORGANİK, B.B.B.','4.1','F1','III','E','40','4.1','3','5 kg','E1'),
 ('1326','HAFNİYUM TOZU, ISLATILMIŞ  %25''ten az olmayan su ile','4.1','F3','II','E','40','4.1','2','1 kg','E2'),
 ('1327','Kuru ot, Saman veya Anız','4.1','F1','ADR''YE TABİ DEĞİLDİR','','','','','',''),
 ('1328','HEKZAMETİLENTETRAMİN','4.1','F1','III','E','40','4.1','3','5 kg','E1'),
@@ -854,7 +772,6 @@ values
 ('1360','KALSİYUM FOSFÜR','4.3','WT2','I','E','','4.3
 +6.1','1','','E0'),
 ('1361','KARBON, hayvansal veya bitkisel  kaynaklı','4.2','S2','II','D/E','40','4.2','2','','E0'),
-('1361','KARBON, hayvansal veya bitkisel  kaynaklı','4.2','S2','III','E','40','4.2','4','','E0'),
 ('1362','KARBON, AKTİF','4.2','S2','III','E','40','4.2','4','','E1'),
 ('1363','KOPRA','4.2','S2','III','E','40','4.2','3','','E0'),
 ('1364','PAMUK ARTIĞI, YAĞLI','4.2','S2','III','E','40','4.2','3','','E0'),
@@ -869,8 +786,6 @@ values
 ('1380','PENTABORAN','4.2','ST3','I','B/E','333','4.2
 +6.1','0','','E0'),
 ('1381','FOSFOR, BEYAZ veya SARI, SU  ALTINDA veya ÇÖZELTİ İÇİNDE','4.2','ST3','I','B/E','46','4.2
-+6.1','0','','E0'),
-('1381','FOSFOR, BEYAZ veya SARI, KURU','4.2','ST4','I','B/E','46','4.2
 +6.1','0','','E0'),
 ('1382','POTASYUM SÜLFÜR, SUSUZ veya  POTASYUM SÜLFÜR %30''dan az  kristalizasyon suyu ile','4.2','S4','II','D/E','40','4.2','2','','E2'),
 ('1383','PİROFORİK METAL, B.B.B. veya  PİROFORİK ALAŞIM, B.B.B.','4.2','S4','I','B/E','43','4.2','0','','E0'),
@@ -887,23 +802,19 @@ values
 ('1395','ALÜMİNYUM FERROSİLİKON TOZU','4.3','WT2','II','D/E','462','4.3
 +6.1','2','500 g','E2'),
 ('1396','ALÜMİNYUM TOZU, KAPLANMAMIŞ','4.3','W2','II','D/E','423','4.3','2','500 g','E2'),
-('1396','ALÜMİNYUM TOZU, KAPLANMAMIŞ','4.3','W2','III','E','423','4.3','3','1 kg','E1'),
 ('1397','ALÜMİNYUM FOSFÜR','4.3','WT2','I','E','','4.3
 +6.1','1','','E0'),
 ('1398','ALÜMİNYUM SİLİKON TOZU, KAPLANMAMIŞ','4.3','W2','III','E','423','4.3','3','1 kg','E1'),
 ('1400','BARYUM','4.3','W2','II','D/E','423','4.3','2','500 g','E2'),
 ('1401','KALSİYUM','4.3','W2','II','D/E','423','4.3','2','500 g','E2'),
 ('1402','KALSİYUM KARBÜR','4.3','W2','I','B/E','X423','4.3','1','','E0'),
-('1402','KALSİYUM KARBÜR','4.3','W2','II','D/E','423','4.3','2','500 g','E2'),
 ('1403','KALSİYUM SİYANAMİD %0,1''den  fazla kalsiyum karbür ile','4.3','W2','III','E','423','4.3','0','1 kg','E1'),
 ('1404','KALSİYUM HİDRÜR','4.3','W2','I','E','','4.3','1','','E0'),
 ('1405','KALSİYUM SİLİSİD','4.3','W2','II','D/E','423','4.3','2','500 g','E2'),
-('1405','KALSİYUM SİLİSİD','4.3','W2','III','E','423','4.3','3','1 kg','E1'),
 ('1407','SEZYUM','4.3','W2','I','B/E','X423','4.3','1','','E0'),
 ('1408','FERROSİLİKON %30 veya daha  fazla ancak %90''dan az silikon ile','4.3','WT2','III','E','462','4.3
 +6.1','3','1 kg','E1'),
 ('1409','METAL HİDRİTLERİ, SU İLE  TEPKİMEYE GİREN, B.B.B.','4.3','W2','I','E','','4.3','1','','E0'),
-('1409','METAL HİDRİTLERİ, SU İLE  TEPKİMEYE GİREN, B.B.B.','4.3','W2','II','D/E','423','4.3','2','500 g','E2'),
 ('1410','LİTYUM ALÜMİNYUM HİDRÜR','4.3','W2','I','E','','4.3','1','','E0'),
 ('1411','LİTYUM ALÜMİNYUM HİDRÜR, ETERSİ','4.3','WF1','I','E','','4.3
 +3','1','','E0'),
@@ -913,10 +824,6 @@ values
 ('1417','LİTYUM SİLİKON','4.3','W2','II','D/E','423','4.3','2','500 g','E2'),
 ('1418','MAGNEZYUM TOZU veya  MAGNEZYUM ALAŞIMLARI  TOZU','4.3','WS','I','E','','4.3
 +4.2','1','','E0'),
-('1418','MAGNEZYUM TOZU veya  MAGNEZYUM ALAŞIMLARI  TOZU','4.3','WS','II','D/E','423','4.3
-+4.2','2','','E2'),
-('1418','MAGNEZYUM TOZU veya  MAGNEZYUM ALAŞIMLARI  TOZU','4.3','WS','III','E','423','4.3
-+4.2','3','','E1'),
 ('1419','MAGNEZYUM ALÜMİNYUM  FOSFÜR','4.3','WT2','I','E','','4.3
 +6.1','1','','E0'),
 ('1420','POTASYUM METAL  ALAŞIMLARI, SIVI','4.3','W1','I','B/E','X323','4.3','1','','E0'),
@@ -935,10 +842,6 @@ values
 ('1435','ÇİNKO KÜLLERİ','4.3','W2','III','E','423','4.3','3','1 kg','E1'),
 ('1436','ÇİNKO TOZU veya ÇİNKO TOZ','4.3','WS','I','E','','4.3
 +4.2','1','','E0'),
-('1436','ÇİNKO TOZU veya ÇİNKO TOZ','4.3','WS','II','D/E','423','4.3
-+4.2','2','','E2'),
-('1436','ÇİNKO TOZU veya ÇİNKO TOZ','4.3','WS','III','E','423','4.3
-+4.2','3','','E1'),
 ('1437','ZİRKONYUM HİDRÜR','4.1','F3','II','E','40','4.1','2','1 kg','E2'),
 ('1438','ALÜMİNYUM NİTRAT','5.1','O2','III','E','50','5.1','3','5 kg','E1'),
 ('1439','AMONYUM DİKROMAT','5.1','O2','II','E','50','5.1','2','1 kg','E2'),
@@ -963,9 +866,7 @@ values
 ('1456','KALSİYUM PERMANGANAT','5.1','O2','II','E','50','5.1','2','1 kg','E2'),
 ('1457','KALSİYUM PEROKSİT','5.1','O2','II','E','50','5.1','2','1 kg','E2'),
 ('1458','KLORAT VE BORAT KARIŞIMI','5.1','O2','II','E','50','5.1','2','1 kg','E2'),
-('1458','KLORAT VE BORAT KARIŞIMI','5.1','O2','III','E','50','5.1','3','5 kg','E1'),
 ('1459','KLORAT VE MAGNEZYUM  KLORÜR KARIŞIMI, KATI','5.1','O2','II','E','50','5.1','2','1 kg','E2'),
-('1459','KLORAT VE MAGNEZYUM  KLORÜR KARIŞIMI, KATI','5.1','O2','III','E','50','5.1','3','5 kg','E1'),
 ('1461','KLORATLAR, İNORGANİK, B.B.B.','5.1','O2','II','E','50','5.1','2','1 kg','E2'),
 ('1462','KLORİTLER, İNORGANİK, B.B.B.','5.1','O2','II','E','50','5.1','2','1 kg','E2'),
 ('1463','KROM TRİOKSİT, SUSUZ','5.1','OTC','II','E','568','5.1
@@ -979,23 +880,16 @@ values
 ('1470','KURŞUN PERKLORAT, KATI','5.1','OT2','II','E','56','5.1
 +6.1','2','1 kg','E2'),
 ('1471','LİTYUM HİPOKLORİT, KURU  veya LİTYUM HİPOKLORİT  KARIŞIMI','5.1','O2','II','E','50','5.1','2','1 kg','E2'),
-('1471','LİTYUM HİPOKLORİT, KURU  veya LİTYUM HİPOKLORİT  KARIŞIMI','5.1','O2','III','E','50','5.1','3','5 kg','E1'),
 ('1472','LİTYUM PEROKSİT','5.1','O2','II','E','50','5.1','2','1 kg','E2'),
 ('1473','MAGNEZYUM BROMAT','5.1','O2','II','E','50','5.1','2','1 kg','E2'),
 ('1474','MAGNEZYUM NİTRAT','5.1','O2','III','E','50','5.1','3','5 kg','E1'),
 ('1475','MAGNEZYUM PERKLORAT','5.1','O2','II','E','50','5.1','2','1 kg','E2'),
 ('1476','MAGNEZYUM PEROKSİT','5.1','O2','II','E','50','5.1','2','1 kg','E2'),
 ('1477','NİTRATLAR, İNORGANİK, B.B.B.','5.1','O2','II','E','50','5.1','2','1 kg','E2'),
-('1477','NİTRATLAR, İNORGANİK, B.B.B.','5.1','O2','III','E','50','5.1','3','5 kg','E1'),
 ('1479','YÜKSELTGEN KATI, B.B.B.','5.1','O2','I','E','','5.1','1','','E0'),
-('1479','YÜKSELTGEN KATI, B.B.B.','5.1','O2','II','E','50','5.1','2','1 kg','E2'),
-('1479','YÜKSELTGEN KATI, B.B.B.','5.1','O2','III','E','50','5.1','3','5 kg','E1'),
 ('1481','PERKLORATLAR, İNORGANİK, B.B.B.','5.1','O2','II','E','50','5.1','2','1 kg','E2'),
-('1481','PERKLORATLAR, İNORGANİK, B.B.B.','5.1','O2','III','E','50','5.1','3','5 kg','E1'),
 ('1482','PERMANGANATLAR, İNORGANİK, B.B.B.','5.1','O2','II','E','50','5.1','2','1 kg','E2'),
-('1482','PERMANGANATLAR, İNORGANİK, B.B.B.','5.1','O2','III','E','50','5.1','3','5 kg','E1'),
 ('1483','PEROKSİTLER, İNORGANİK, B.B.B.','5.1','O2','II','E','50','5.1','2','1 kg','E2'),
-('1483','PEROKSİTLER, İNORGANİK, B.B.B.','5.1','O2','III','E','50','5.1','3','5 kg','E1'),
 ('1484','POTASYUM BROMAT','5.1','O2','II','E','50','5.1','2','1 kg','E2'),
 ('1485','POTASYUM KLORAT','5.1','O2','II','E','50','5.1','2','1 kg','E2'),
 ('1486','POTASYUM NİTRAT','5.1','O2','III','E','50','5.1','3','5 kg','E1'),
@@ -1033,8 +927,6 @@ values
 ('1517','ZİRKONYUM PİKRAMAT, ISLATILMIŞ kütlece %20''den az  olmayan su ile','4.1','D','I','B','','4.1','1','','E0'),
 ('1541','ASETON SİYANOHİDRİN, STABİLİZE','6.1','T1','I','C/D','669','6.1','1','','E0'),
 ('1544','ALKALOİTLER, KATI, B.B.B. veya  ALKALOİT TUZLARI, KATI, B.B.B.','6.1','T2','I','C/E','66','6.1','1','','E5'),
-('1544','ALKALOİTLER, KATI, B.B.B. veya  ALKALOİT TUZLARI, KATI, B.B.B.','6.1','T2','II','D/E','60','6.1','2','500 g','E4'),
-('1544','ALKALOİTLER, KATI, B.B.B. veya  ALKALOİT TUZLARI, KATI, B.B.B.','6.1','T2','III','E','60','6.1','2','5 kg','E1'),
 ('1545','ALİL İZOTİYOSİYANAT, STABİLİZE','6.1','TF1','II','D/E','639','6.1
 +3','2','100 ml','E0'),
 ('1546','AMONYUM ARSENAT','6.1','T5','II','D/E','60','6.1','2','500 g','E4'),
@@ -1047,21 +939,15 @@ values
 ('1554','ARSENİK ASİT, KATI','6.1','T5','II','D/E','60','6.1','2','500 g','E4'),
 ('1555','ARSENİK BROMÜR','6.1','T5','II','D/E','60','6.1','2','500 g','E4'),
 ('1556','ARSENİK BİLEŞİĞİ, SIVI, B.B.B., inorganik, içeriği: Arsenatlar, b.b.b., Arsenitler, b.b.b., ve Arsenik sülfürler, b.b.b.','6.1','T4','I','C/E','66','6.1','1','','E5'),
-('1556','ARSENİK BİLEŞİĞİ, SIVI, B.B.B., inorganik, içeriği: Arsenatlar, b.b.b., Arsenitler, b.b.b., ve Arsenik sülfürler,  b.b.b.','6.1','T4','II','D/E','60','6.1','2','100 ml','E4'),
-('1556','ARSENİK BİLEŞİĞİ, SIVI, B.B.B., inorganik, içeriği: Arsenatlar, b.b.b., Arsenitler, b.b.b., ve Arsenik sülfürler b.b.b.','6.1','T4','III','E','60','6.1','2','5 L','E1'),
 ('1557','ARSENİK BİLEŞİĞİ, KATI, B.B.B., inorganik, içeriği: Arsenatlar, b.b.b., Arsenitler, b.b.b. ve Arsenik sülfürler b.b.b.','6.1','T5','I','C/E','66','6.1','1','','E5'),
-('1557','ARSENİK BİLEŞİĞİ, KATI, B.B.B., inorganik, içeriği: Arsenatlar, b.b.b., Arsenitler, b.b.b. ve Arsenik sülfürler b.b.b.','6.1','T5','II','D/E','60','6.1','2','500 g','E4'),
-('1557','ARSENİK BİLEŞİĞİ, KATI, B.B.B., inorganik, içeriği: Arsenatlar, b.b.b., Arsenitler, b.b.b. ve Arsenik sülfürler,  b.b.b.','6.1','T5','III','E','60','6.1','2','5 kg','E1'),
 ('1558','ARSENİK','6.1','T5','II','D/E','60','6.1','2','500 g','E4'),
 ('1559','ARSENİK PENTOKSİT','6.1','T5','II','D/E','60','6.1','2','500 g','E4'),
 ('1560','ARSENİK TRİKLORÜR','6.1','T4','I','C/E','66','6.1','1','','E0'),
 ('1561','ARSENİK TRİOKSİT','6.1','T5','II','D/E','60','6.1','2','500 g','E4'),
 ('1562','ARSENİK TOZU','6.1','T5','II','D/E','60','6.1','2','500 g','E4'),
 ('1564','BARYUM BİLEŞİĞİ, B.B.B.','6.1','T5','II','D/E','60','6.1','2','500 g','E4'),
-('1564','BARYUM BİLEŞİĞİ, B.B.B.','6.1','T5','III','E','60','6.1','2','5 kg','E1'),
 ('1565','BARYUM SİYANÜR','6.1','T5','I','C/E','66','6.1','1','','E5'),
 ('1566','BERİLYUM BİLEŞİĞİ, B.B.B.','6.1','T5','II','D/E','60','6.1','2','500 g','E4'),
-('1566','BERİLYUM BİLEŞİĞİ, B.B.B.','6.1','T5','III','E','60','6.1','2','5 kg','E1'),
 ('1567','BERİLYUM TOZU','6.1','TF3','II','D/E','64','6.1
 +4.1','2','500 g','E4'),
 ('1569','BROMOASETON','6.1','TF1','II','D/E','63','6.1
@@ -1080,14 +966,10 @@ values
 ('1581','KLOROPİKRİN VE METİL  BROMÜR KARIŞIMI %2''den fazla  kloropikrin ile','2','2T','','C/D','26','2.3','1','','E0'),
 ('1582','KLOROPİKRİN VE METİL  KLORÜR KARIŞIMI','2','2T','','C/D','26','2.3','1','','E0'),
 ('1583','KLOROPİKRİN KARIŞIMI, B.B.B.','6.1','T1','I','C/E','66','6.1','1','','E0'),
-('1583','KLOROPİKRİN KARIŞIMI, B.B.B.','6.1','T1','II','D/E','60','6.1','2','100 ml','E0'),
-('1583','KLOROPİKRİN KARIŞIMI, B.B.B.','6.1','T1','III','E','60','6.1','2','5 L','E0'),
 ('1585','BAKIR ASETOARSENİT','6.1','T5','II','D/E','60','6.1','2','500 g','E4'),
 ('1586','BAKIR ARSENİT','6.1','T5','II','D/E','60','6.1','2','500 g','E4'),
 ('1587','BAKIR SİYANÜR','6.1','T5','II','D/E','60','6.1','2','500 g','E4'),
 ('1588','SİYANÜRLER, İNORGANİK, KATI, B.B.B.','6.1','T5','I','C/E','66','6.1','1','','E5'),
-('1588','SİYANÜRLER, İNORGANİK, KATI, B.B.B.','6.1','T5','II','D/E','60','6.1','2','500 g','E4'),
-('1588','SİYANÜRLER, İNORGANİK, KATI, B.B.B.','6.1','T5','III','E','60','6.1','2','5 kg','E1'),
 ('1589','SİYANOJEN KLORÜR,  STABİLİZE','2','2TC','','D','','2.3
 +8','1','','E0'),
 ('1590','DİKLOROANİLİNLER, SIVI','6.1','T1','II','D/E','60','6.1','2','100 ml','E4'),
@@ -1098,17 +980,11 @@ values
 +8','1','','E0'),
 ('1596','DİNİTROANİLİNLER','6.1','T2','II','D/E','60','6.1','2','500 g','E4'),
 ('1597','DİNİTROBENZENLER, SIVI','6.1','T1','II','D/E','60','6.1','2','100 ml','E4'),
-('1597','DİNİTROBENZENLER, SIVI','6.1','T1','III','E','60','6.1','2','5 L','E1'),
 ('1598','DİNİTRO-o-KRESOL','6.1','T2','II','D/E','60','6.1','2','500 g','E4'),
 ('1599','DİNİTROFENOL ÇÖZELTİSİ','6.1','T1','II','D/E','60','6.1','2','100 ml','E4'),
-('1599','DİNİTROFENOL ÇÖZELTİSİ','6.1','T1','III','E','60','6.1','2','5 L','E1'),
 ('1600','DİNİTROTOLUENLER, ERİMİŞ','6.1','T1','II','D/E','60','6.1','0','','E0'),
 ('1601','DEZENFEKTAN, KATI, ZEHİRLİ, B.B.B.','6.1','T2','I','C/E','66','6.1','1','','E5'),
-('1601','DEZENFEKTAN, KATI, ZEHİRLİ, B.B.B.','6.1','T2','II','D/E','60','6.1','2','500 g','E4'),
-('1601','DEZENFEKTAN, KATI, ZEHİRLİ, B.B.B.','6.1','T2','III','E','60','6.1','2','5 kg','E1'),
 ('1602','BOYA, SIVI, ZEHİRLİ, B.B.B. veya  BOYA ARA ÜRÜN, SIVI, ZEHİRLİ, B.B.B.','6.1','T1','I','C/E','66','6.1','1','','E5'),
-('1602','BOYA, SIVI, ZEHİRLİ, B.B.B. veya  BOYA ARA ÜRÜN, SIVI, ZEHİRLİ, B.B.B.','6.1','T1','II','D/E','60','6.1','2','100 ml','E4'),
-('1602','BOYA, SIVI, ZEHİRLİ, B.B.B. veya  BOYA ARA ÜRÜN, SIVI, ZEHİRLİ, B.B.B.','6.1','T1','III','E','60','6.1','2','5 L','E1'),
 ('1603','ETİL BROMOASETAT','6.1','TF1','II','D/E','63','6.1
 +3','2','100 ml','E0'),
 ('1604','ETİLENDİAMİN','8','CF1','II','D/E','83','8
@@ -1158,13 +1034,9 @@ values
 ('1653','NİKEL SİYANÜR','6.1','T5','II','D/E','60','6.1','2','500 g','E4'),
 ('1654','NİKOTİN','6.1','T1','II','D/E','60','6.1','2','100 ml','E4'),
 ('1655','NİKOTİN BİLEŞİĞİ, KATI, B.B.B. veya NİKOTİN MÜSTAHZAR, KATI, B.B.B.','6.1','T2','I','C/E','66','6.1','1','','E5'),
-('1655','NİKOTİN BİLEŞİĞİ, KATI, B.B.B. veya NİKOTİN MÜSTAHZAR, KATI, B.B.B.','6.1','T2','II','D/E','60','6.1','2','500 g','E4'),
-('1655','NİKOTİN BİLEŞİĞİ, KATI, B.B.B. veya NİKOTİN MÜSTAHZAR, KATI, B.B.B.','6.1','T2','III','E','60','6.1','2','5 kg','E1'),
 ('1656','NİKOTİN HİDROKLORÜR, SIVI  veya ÇÖZELTİ','6.1','T1','II','D/E','60','6.1','2','100 ml','E4'),
-('1656','NİKOTİN HİDROKLORÜR, SIVI  veya ÇÖZELTİ','6.1','T1','III','E','60','6.1','2','5 L','E1'),
 ('1657','NİKOTİN SALİSİLAT','6.1','T2','II','D/E','60','6.1','2','500 g','E4'),
 ('1658','NİKOTİN SÜLFAT, ÇÖZELTİ','6.1','T1','II','D/E','60','6.1','2','100 ml','E4'),
-('1658','NİKOTİN SÜLFAT, ÇÖZELTİ','6.1','T1','III','E','60','6.1','2','5 L','E1'),
 ('1659','NİKOTİN TARTARAT','6.1','T2','II','D/E','60','6.1','2','500 g','E4'),
 ('1660','NİTRİK OKSİT, SIKIŞTIRILMIŞ','2','1TOC','','D','','2.3
 +5.1
@@ -1188,7 +1060,6 @@ values
 ('1684','GÜMÜŞ SİYANÜR','6.1','T5','II','D/E','60','6.1','2','500 g','E4'),
 ('1685','SODYUM ARSENAT','6.1','T5','II','D/E','60','6.1','2','500 g','E4'),
 ('1686','SODYUM ARSENİT, SULU  ÇÖZELTİ','6.1','T4','II','D/E','60','6.1','2','100 ml','E4'),
-('1686','SODYUM ARSENİT, SULU  ÇÖZELTİ','6.1','T4','III','E','60','6.1','2','5 L','E1'),
 ('1687','SODYUM AZİD','6.1','T5','II','E','','6.1','2','500 g','E4'),
 ('1688','SODYUM KAKODİLAT','6.1','T5','II','D/E','60','6.1','2','500 g','E4'),
 ('1689','SODYUM SİYANÜR, KATI','6.1','T5','I','C/E','66','6.1','1','','E5'),
@@ -1196,7 +1067,6 @@ values
 ('1691','STRONSİYUM ARSENİT','6.1','T5','II','D/E','60','6.1','2','500 g','E4'),
 ('1692','STRİKNİN veya STRİKNİN  TUZLARI','6.1','T2','I','C/E','66','6.1','1','','E5'),
 ('1693','GÖZ YAŞARTICI GAZ MADDESİ, SIVI, B.B.B.','6.1','T1','I','C/E','66','6.1','1','','E0'),
-('1693','GÖZ YAŞARTICI GAZ MADDESİ, SIVI, B.B.B.','6.1','T1','II','D/E','60','6.1','2','','E0'),
 ('1694','BROMOBENZİL SİYANÜRLER, SIVI','6.1','T1','I','C/E','66','6.1','1','','E0'),
 ('1695','KLOROASETON, STABİLİZE','6.1','TFC','I','C/D','663','6.1
 +3
@@ -1225,7 +1095,6 @@ values
 +8','2','1 L','E2'),
 ('1718','BÜTİL ASİT FOSFAT','8','C3','III','E','80','8','3','5 L','E1'),
 ('1719','KOSTİK ALKALİ SIVI, B.B.B.','8','C5','II','E','80','8','2','1 L','E2'),
-('1719','KOSTİK ALKALİ SIVI, B.B.B.','8','C5','III','E','80','8','3','5 L','E1'),
 ('1722','ALİL KLOROFORMAT','6.1','TFC','I','C/D','668','6.1
 +3
 +8','1','','E0'),
@@ -1240,7 +1109,6 @@ values
 ('1729','ANİZOİL KLORÜR','8','C4','II','E','80','8','2','1 kg','E2'),
 ('1730','ANTİMON PENTAKLORÜR, SIVI','8','C1','II','E','X80','8','2','1 L','E2'),
 ('1731','ANTİMON PENTAKLORÜR ÇÖZELTİSİ','8','C1','II','E','80','8','2','1 L','E2'),
-('1731','ANTİMON PENTAKLORÜR ÇÖZELTİSİ','8','C1','III','E','80','8','3','5 L','E1'),
 ('1732','ANTİMON PENTAFLORÜR','8','CT1','II','E','86','8
 +6.1','2','1 L','E0'),
 ('1733','ANTİMON TRİKLORÜR','8','C2','II','E','80','8','2','1 kg','E2'),
@@ -1251,7 +1119,6 @@ values
 +8','2','','E4'),
 ('1739','BENZİL KLOROFORMAT','8','C9','I','E','88','8','1','','E0'),
 ('1740','HİDROJENDİFLORÜRLER, KATI, B.B.B.','8','C2','II','E','80','8','2','1 kg','E2'),
-('1740','HİDROJENDİFLORÜRLER, KATI, B.B.B.','8','C2','III','E','80','8','3','5 kg','E1'),
 ('1741','BOR TRİKLORÜR','2','2TC','','C/D','268','2.3
 +8','1','','E0'),
 ('1742','BOR TRİFLORÜR ASETİK ASİT  KOMPLEKSİ, SIVI','8','C3','II','E','80','8','2','1 L','E2'),
@@ -1267,7 +1134,6 @@ values
 ('1747','BÜTİLTRİKLOROSİLAN','8','CF1','II','D/E','X83','8
 +3','2','','E0'),
 ('1748','KALSİYUM HİPOKLORİT, KURU  veya KALSİYUM HİPOKLORİT  KARIŞIMI, KURU %39''dan fazla  hazır klorür (%8,8 hazır oksijen) ile','5.1','O2','II','E','50','5.1','2','1 kg','E2'),
-('1748','KALSİYUM HİPOKLORİT, KURU  veya KALSİYUM HİPOKLORİT  KARIŞIMI, KURU %39''dan fazla  hazır klorür (%8,8 hazır oksijen) ile','5.1','O2','III','E','50','5.1','3','5 kg','E1'),
 ('1749','KLOR TRİFLORÜR','2','2TOC','','C/D','265','2.3
 +5.1
 +8','1','','E0'),
@@ -1280,21 +1146,13 @@ values
 ('1753','KLOROFENİL-TRİKLOROSİLAN','8','C3','II','E','X80','8','2','','E0'),
 ('1754','KLOROSÜLFONİK ASİT (kükürt  trioksit içeren veya içermeyen)','8','C1','I','E','X88','8','1','','E0'),
 ('1755','KROMİK ASİT ÇÖZELTİSİ','8','C1','II','E','80','8','2','1 L','E2'),
-('1755','KROMİK ASİT ÇÖZELTİSİ','8','C1','III','E','80','8','3','5 L','E1'),
 ('1756','KROMİK FLORÜR, KATI','8','C2','II','E','80','8','2','1 kg','E2'),
 ('1757','KROMİK FLORÜR ÇÖZELTİSİ','8','C1','II','E','80','8','2','1 L','E2'),
-('1757','KROMİK FLORÜR ÇÖZELTİSİ','8','C1','III','E','80','8','3','5 L','E1'),
 ('1758','KROM OKSİKLORÜR','8','C1','I','E','X88','8','1','','E0'),
 ('1759','AŞINDIRICI KATI, B.B.B.','8','C10','I','E','88','8','1','','E0'),
-('1759','AŞINDIRICI KATI, B.B.B.','8','C10','II','E','80','8','2','1 kg','E2'),
-('1759','AŞINDIRICI KATI, B.B.B.','8','C10','III','E','80','8','3','5 kg','E1'),
 ('1760','AŞINDIRICI SIVI, B.B.B.','8','C9','I','E','88','8','1','','E0'),
-('1760','AŞINDIRICI SIVI, B.B.B.','8','C9','II','E','80','8','2','1 L','E2'),
-('1760','AŞINDIRICI SIVI, B.B.B.','8','C9','III','E','80','8','3','5 L','E1'),
 ('1761','KÜPRİETİLENDİAMİN  ÇÖZELTİSİ','8','CT1','II','E','86','8
 +6.1','2','1 L','E2'),
-('1761','KÜPRİETİLENDİAMİN  ÇÖZELTİSİ','8','CT1','III','E','86','8
-+6.1','3','5 L','E1'),
 ('1762','SİKLOHEKSENİLTRİKLORO- SİLAN','8','C3','II','E','X80','8','2','','E0'),
 ('1763','SİKLOHEKSENİLTRİKLORO- SİLAN','8','C3','II','E','X80','8','2','','E0'),
 ('1764','DİKLOROASETİK ASİT','8','C3','II','E','80','8','2','1 L','E2'),
@@ -1318,30 +1176,20 @@ values
 ('1781','HEKZADESİLTRİKLOROSİLAN','8','C3','II','E','X80','8','2','','E0'),
 ('1782','HEKZAFLOROFOSFORİK ASİT','8','C1','II','E','80','8','2','1 L','E2'),
 ('1783','HEKZAMETİLENDİAMİN  ÇÖZELTİSİ','8','C7','II','E','80','8','2','1 L','E2'),
-('1783','HEKZAMETİLENDİAMİN  ÇÖZELTİSİ','8','C7','III','E','80','8','3','5 L','E1'),
 ('1784','HEKZİLTRİKLOROSİLAN','8','C3','II','E','X80','8','2','','E0'),
 ('1786','HİDROFLORİK ASİT VE  SÜLFÜRİK ASİT KARIŞIMI','8','CT1','I','C/D','886','8
 +6.1','1','','E0'),
 ('1787','HİDRİYODİK ASİT','8','C1','II','E','80','8','2','1 L','E2'),
-('1787','HİDRİYODİK ASİT','8','C1','III','E','80','8','3','5 L','E1'),
 ('1788','HİDROBROMİK ASİT','8','C1','II','E','80','8','2','1 L','E2'),
-('1788','HİDROBROMİK ASİT','8','C1','III','E','80','8','3','5 L','E1'),
 ('1789','HİDROKLORİK ASİT','8','C1','II','E','80','8','2','1 L','E2'),
-('1789','HİDROKLORİK ASİT','8','C1','III','E','80','8','3','5 L','E1'),
 ('1790','HİDROFLORİK ASİT %85''ten fazla  hidrojen florür içeren','8','CT1','I','C/D','886','8
 +6.1','1','','E0'),
-('1790','HİDROFLORİK ASİT %60''tan fazla, %85''ten az hidrojen florür içeren','8','CT1','I','C/D','886','8
-+6.1','1','','E0'),
-('1790','HİDROFLORİK ASİT %60''tan az  hidrojen florür içeren','8','CT1','II','E','86','8
-+6.1','2','1 L','E2'),
 ('1791','HİPOKLORİT ÇÖZELTİSİ','8','C9','II','E','80','8','2','1 L','E2'),
-('1791','HİPOKLORİT ÇÖZELTİSİ','8','C9','III','E','80','8','3','5 L','E1'),
 ('1792','İYOT MONOKLORÜR, KATI','8','C2','II','E','80','8','2','1 kg','E0'),
 ('1793','İZOPROPİL ASİT FOSFAT','8','C3','III','E','80','8','3','5 L','E1'),
 ('1794','KURŞUN SÜLFAT %3''ten fazla  serbest asit içeren','8','C2','II','E','80','8','2','1 kg','E2'),
 ('1796','NİTRATLAYICI ASİT KARIŞIMI  %50''den fazla nitrik asit içeren','8','CO1','I','E','885','8
 +5.1','1','','E0'),
-('1796','NİTRATLAYICI ASİT KARIŞIMI  %50''den fazla olmayan nitrik asit  içeren','8','C1','II','E','80','8','2','1 L','E0'),
 ('1798','NİTROHİDROKLORİK ASİT','8','COT','TAŞINMASI YASAKTIR','','','','','',''),
 ('1799','NONİLTRİKLOROSİLAN','8','C3','II','E','X80','8','2','','E0'),
 ('1800','OKTADESİLTRİKLOROSİLAN','8','C3','II','E','X80','8','2','','E0'),
@@ -1363,7 +1211,6 @@ values
 ('1812','POTASYUM FLORÜR, KATI','6.1','T5','III','E','60','6.1','2','5 kg','E1'),
 ('1813','POTASYUM HİDROKSİT, KATI','8','C6','II','E','80','8','2','1 kg','E2'),
 ('1814','POTASYUM HİDROKSİT  ÇÖZELTİSİ','8','C5','II','E','80','8','2','1 L','E2'),
-('1814','POTASYUM HİDROKSİT  ÇÖZELTİSİ','8','C5','III','E','80','8','3','5 L','E1'),
 ('1815','PROPİONİL KLORÜR','3','FC','II','D/E','338','3
 +8','2','1 L','E2'),
 ('1816','PROPİLTRİKLOROSİLAN','8','CF1','II','D/E','X83','8
@@ -1371,14 +1218,11 @@ values
 ('1817','PİROSÜLFİRİL KLORÜR','8','C1','II','E','X80','8','2','1 L','E2'),
 ('1818','SİLİKON TETRAKLORÜR','8','C1','II','E','X80','8','2','','E0'),
 ('1819','SODYUM ALÜMİNAT ÇÖZELTİSİ','8','C5','II','E','80','8','2','1 L','E2'),
-('1819','SODYUM ALÜMİNAT ÇÖZELTİSİ','8','C5','III','E','80','8','3','5 L','E1'),
 ('1823','SODYUM HİDROKSİT, KATI','8','C6','II','E','80','8','2','1 kg','E2'),
 ('1824','SODYUM HİDROKSİT ÇÖZELTİSİ','8','C5','II','E','80','8','2','1 L','E2'),
-('1824','SODYUM HİDROKSİT ÇÖZELTİSİ','8','C5','III','E','80','8','3','5 L','E1'),
 ('1825','SODYUM MONOKSİT','8','C6','II','E','80','8','2','1 kg','E2'),
 ('1826','NİTRATLAYICI ASİT KARIŞIMI, KULLANILMIŞ %50''den fazla nitrik  asit içeren','8','CO1','I','E','885','8
 +5.1','1','','E0'),
-('1826','NİTRATLAYICI ASİT KARIŞIMI, KULLANILMIŞ %50''den az nitrik  asit içeren','8','C1','II','E','80','8','2','1 L','E0'),
 ('1827','KALAY KLORÜR SUSUZ','8','C1','II','E','X80','8','2','1 L','E2'),
 ('1828','KÜKÜRT KLORÜRLER','8','C1','I','E','X88','8','1','','E0'),
 ('1829','KÜKÜRT TRİOKSİT, STABİLİZE','8','C1','I','E','X88','8','1','','E0'),
@@ -1391,7 +1235,6 @@ values
 +8','1','','E0'),
 ('1835','TETRAMETİLAMONYUM HİDROKSİT SULU ÇÖZELTİSİ,  %2,5’dan fazla ancak %25’ten az  tetrametilamonyum hidroksit içeren','8','CT1','II','E','86','8
 +6.1','2','1 L','E2'),
-('1835','TETRAMETİLAMONYUM HİDROKSİT SULU ÇÖZELTİSİ,  %2,5’dan fazla olmayan  tetrametilamonyum hidroksit içeren','8','C7','III','E','80','8','3','5 L','E1'),
 ('1836','TİYONİL KLORÜR','8','C1','I','E','X88','8','1','','E0'),
 ('1837','TİYOFOSFORİL KLORÜR','8','C1','II','E','X80','8','2','1 L','E0'),
 ('1838','TİTANYUM TETRAKLORÜR','6.1','TC3','I','C/D','X668','6.1
@@ -1406,7 +1249,6 @@ values
 ('1848','PROPİYONİK ASİT, kütlece  %10''dan fazla ancak %90''dan az asit  içeren','8','C3','III','E','80','8','3','5 L','E1'),
 ('1849','SODYUM SÜLFÜR,  HİDRATLANMIŞ %30''dan az  olmayan su ile','8','C6','II','E','80','8','2','1 kg','E2'),
 ('1851','İLAÇ, SIVI, ZEHİRLİ, B.B.B.','6.1','T1','II','D/E','60','6.1','2','100 ml','E4'),
-('1851','İLAÇ, SIVI, ZEHİRLİ, B.B.B.','6.1','T1','III','E','60','6.1','2','5 L','E1'),
 ('1854','BARYUM ALAŞIMLARI, PİROFORİK','4.2','S4','I','B/E','43','4.2','0','','E0'),
 ('1855','KALSİYUM, PİROFORİK veya  KALSİYUM ALAŞIMLARI, PİROFORİK','4.2','S4','I','E','','4.2','0','','E0'),
 ('1856','Paçavralar, yağlı','4.2','S2','ADR''YE TABİ DEĞİLDİR','','','','','',''),
@@ -1417,16 +1259,8 @@ values
 ('1860','VİNİL FLORÜR, STABİLİZE','2','2F','','B/D','239','2.1','2','','E0'),
 ('1862','ETİL KROTONAT','3','F1','II','D/E','33','3','2','1 L','E2'),
 ('1863','YAKITI, HAVACILIK, TÜRBİN  MOTORU','3','F1','I','D/E','33','3','1','500 ml','E3'),
-('1863','YAKITI, HAVACILIK, TÜRBİN  MOTORU (50 °C''de buhar basıncı  110 kPa’dan daha yüksek olan)','3','F1','II','D/E','33','3','2','1 L','E2'),
-('1863','YAKITI, HAVACILIK, TÜRBİN  MOTORU (50 °C''de buhar basıncı  110 kPa’a eşit veya daha düşük olan)','3','F1','II','D/E','33','3','2','1 L','E2'),
-('1863','YAKITI, HAVACILIK, TÜRBİN  MOTORU','3','F1','III','D/E','30','3','3','5 L','E1'),
 ('1865','n-PROPİL NİTRAT','3','F1','II','E','','3','2','1 L','E2'),
 ('1866','REÇİNE ÇÖZELTİSİ, alevlenebilir','3','F1','I','D/E','33','3','1','500 ml','E3'),
-('1866','REÇİNE ÇÖZELTİSİ, alevlenebilir (50 °C''de buhar basıncı, 110 kPa’dan  daha yüksek olan)','3','F1','II','D/E','33','3','2','5 L','E2'),
-('1866','REÇİNE ÇÖZELTİSİ, alevlenebilir (50 °C''de buhar basıncı, 110 kPa’a eşit  veya daha düşük olan)','3','F1','II','D/E','33','3','2','5 L','E2'),
-('1866','REÇİNE ÇÖZELTİSİ, alevlenebilir','3','F1','III','D/E','30','3','3','5 L','E1'),
-('1866','REÇİNE ÇÖZELTİSİ, alevlenebilir (2.2.3.1.4 uyarınca viskoz ve parlama  noktası 23 °C''nin altında) (50 °C''de  buhar basıncı 110 kPa’dan daha  yüksek olan)','3','F1','III','E','','3','3','5 L','E1'),
-('1866','REÇİNE ÇÖZELTİSİ, alevlenebilir (2.2.3.1.4 uyarınca viskoz ve parlama  noktası 23 °C''nin altında) (50 °C''de  buhar basıncı 110 kPa’a eşit veya daha  düşük olan)','3','F1','III','E','','3','3','5 L','E1'),
 ('1868','DEKABORAN','4.1','FT2','II','E','46','4.1
 +6.1','2','1 kg','E0'),
 ('1869','MAGNEZYUM veya  MAGNEZYUM ALAŞIMLARI  topak, talaş veya bantlar halinde  %50''den fazla magnezyum içeren','4.1','F3','III','E','40','4.1','3','5 kg','E1'),
@@ -1451,13 +1285,10 @@ values
 ('1898','ASETİL İYODÜR','8','C3','II','E','80','8','2','1 L','E2'),
 ('1902','DİİZOOKTİL ASİT FOSFAT','8','C3','III','E','80','8','3','5 L','E1'),
 ('1903','DEZENFEKTAN, SIVI, AŞINDIRICI, B.B.B.','8','C9','I','E','88','8','1','','E0'),
-('1903','DEZENFEKTAN, SIVI, AŞINDIRICI, B.B.B.','8','C9','II','E','80','8','2','1 L','E2'),
-('1903','DEZENFEKTAN, SIVI, AŞINDIRICI, B.B.B.','8','C9','III','E','80','8','3','5 L','E1'),
 ('1905','SELENİK ASİT','8','C2','I','E','88','8','1','','E0'),
 ('1906','CÜRUF ASİT','8','C1','II','E','80','8','2','1 L','E0'),
 ('1907','SODALI KİREÇ %4''ten daha fazla  sodyum hidroksit içeren','8','C6','III','E','80','8','3','5 kg','E1'),
 ('1908','KLORİT ÇÖZELTİSİ','8','C9','II','E','80','8','2','1 L','E2'),
-('1908','KLORİT ÇÖZELTİSİ','8','C9','III','E','80','8','3','5 L','E1'),
 ('1910','Kalsiyum oksit','8','C6','ADR''YE TABİ DEĞİLDİR','','','','','',''),
 ('1911','DİBORAN','2','2TF','','D','','2.3
 +2.1','1','','E0'),
@@ -1482,10 +1313,7 @@ values
 ('1931','ÇİNKO DİTİYONİT (ÇİNKO  HİDROSÜLFİT)','9','M11','III','E','90','9','3','5 kg','E1'),
 ('1932','ZİRKONYUM HURDASI','4.2','S4','III','E','40','4.2','3','','E0'),
 ('1935','SİYANÜR ÇÖZELTİSİ, B.B.B.','6.1','T4','I','C/E','66','6.1','1','','E5'),
-('1935','SİYANÜR ÇÖZELTİSİ, B.B.B.','6.1','T4','II','D/E','60','6.1','2','100 ml','E4'),
-('1935','SİYANÜR ÇÖZELTİSİ, B.B.B.','6.1','T4','III','E','60','6.1','2','5 L','E1'),
 ('1938','BROMOASETİK ASİT ÇÖZELTİSİ','8','C3','II','E','80','8','2','1 L','E2'),
-('1938','BROMOASETİK ASİT ÇÖZELTİSİ','8','C3','III','E','80','8','3','5 L','E1'),
 ('1939','FOSFOR OKSİBROMÜR','8','C2','II','E','80','8','2','1 kg','E0'),
 ('1940','TİYOGLİKOLİK ASİT','8','C3','II','E','80','8','2','1 L','E2'),
 ('1941','DİBROMODİFLOROMETAN','9','M11','III','E','90','9','3','5 L','E1'),
@@ -1493,33 +1321,6 @@ values
 ('1944','KİBRİTLERİ, EMNİYET (paket, karton veya kutu)','4.1','F1','III','E','','4.1','4','5 kg','E1'),
 ('1945','KİBRİTLER, MUMLU ''VESTA''','4.1','F1','III','E','','4.1','4','5 kg','E1'),
 ('1950','AEROSOLLER, asfiksant','2','5A','','E','','2.2','3','1 L','E0'),
-('1950','AEROSOLLER, aşındırıcı','2','5C','','E','','2.2
-+8','1','1 L','E0'),
-('1950','AEROSOLLER, aşındırıcı, yükseltgen','2','5CO','','E','','2.2
-+5.1
-+8','1','1 L','E0'),
-('1950','AEROSOLLER, alevlenebilir','2','5F','','D','','2.1','2','1 L','E0'),
-('1950','AEROSOLLER, alevlenebilir,  aşındırıcı','2','5FC','','D','','2.1
-+8','1','1 L','E0'),
-('1950','AEROSOLLER, yükseltgen','2','5O','','E','','2.2
-+5.1','3','1 L','E0'),
-('1950','AEROSOLLER, zehirli','2','5T','','D','','2.2
-+6.1','1','120 ml','E0'),
-('1950','AEROSOLLER, zehirli, aşındırıcı','2','5TC','','D','','2.2
-+6.1
-+8','1','120 ml','E0'),
-('1950','AEROSOLLER, zehirli, alevlenebilir','2','5TF','','D','','2.1
-+6.1','1','120 ml','E0'),
-('1950','AEROSOLLER, zehirli, alevlenebilir,  aşındırıcı','2','5TFC','','D','','2.1
-+6.1
-+8','1','120 ml','E0'),
-('1950','AEROSOLLER, zehirli, yükseltgen','2','5TO','','D','','2.2
-+5.1
-+6.1','1','120 ml','E0'),
-('1950','AEROSOLLER, zehirli, yükseltgen, aşındırıcı','2','5TOC','','D','','2.2
-+5.1
-+6.1
-+8','1','120 ml','E0'),
 ('1951','ARGON, SOĞUTULMUŞ SIVI','2','3A','','C/E','22','2.2','3','120 ml','E1'),
 ('1952','ETİLEN OKSİT VE KARBON DİOKSİT KARIŞIMI %9''dan fazla olmayan etilen oksit ile','2','2A','','C/E','20','2.2','3','120 ml','E1'),
 ('1953','SIKIŞTIRILMIŞ GAZ, ZEHİRLİ, ALEVLENEBİLİR, B.B.B.','2','1TF','','B/D','263','2.3
@@ -1555,53 +1356,25 @@ values
 ('1984','TRİFLOROMETAN (SOĞUTUCU  GAZ R 23)','2','2A','','C/E','20','2.2','3','120 ml','E1'),
 ('1986','ALKOLLER, ALEVLENEBİLİR,  ZEHİRLİ, B.B.B.','3','FT1','I','C/E','336','3
 +6.1','1','','E0'),
-('1986','ALKOLLER, ALEVLENEBİLİR,  ZEHİRLİ, B.B.B.','3','FT1','II','D/E','336','3
-+6.1','2','1 L','E2'),
-('1986','ALKOLLER, ALEVLENEBİLİR,  ZEHİRLİ, B.B.B.','3','FT1','III','D/E','36','3
-+6.1','3','5 L','E1'),
 ('1987','ALKOLLER, B.B.B (50 °C''de buhar  basıncı 110 kPa’dan daha yüksek  olan)','3','F1','II','D/E','33','3','2','1 L','E2'),
-('1987','ALKOLLER, B.B.B (50 °C''de buhar  basıncı 110 kPa’a eşit veya daha  düşük olan)','3','F1','II','D/E','33','3','2','1 L','E2'),
-('1987','ALKOLLER, B.B.B.','3','F1','III','D/E','30','3','3','5 L','E1'),
 ('1988','ALDEHİTLER, ALEVLENEBİLİR,  ZEHİRLİ, B.B.B.','3','FT1','I','C/E','336','3
 +6.1','1','','E0'),
-('1988','ALDEHİTLER, ALEVLENEBİLİR,  ZEHİRLİ, B.B.B.','3','FT1','II','D/E','336','3
-+6.1','2','1 L','E2'),
-('1988','ALDEHİTLER, ALEVLENEBİLİR,  ZEHİRLİ, B.B.B.','3','FT1','III','D/E','36','3
-+6.1','3','5 L','E1'),
 ('1989','ALDEHİTLER, B.B.B.','3','F1','I','D/E','33','3','1','','E3'),
-('1989','ALDEHİTLER, B.B.B (50 °C''de  buhar basıncı 110 kPa’dan daha  yüksek olan)','3','F1','II','D/E','33','3','2','1 L','E2'),
-('1989','ALDEHİTLER, B.B.B (50 °C''de  buhar basıncı 110 kPa’a eşit veya  daha düşük olan)','3','F1','II','D/E','33','3','2','1 L','E2'),
-('1989','ALDEHİTLER, B.B.B.','3','F1','III','D/E','30','3','3','5 L','E1'),
 ('1990','BENZALDEHİT','9','M11','III','E','90','9','3','5 L','E1'),
 ('1991','KLOROPREN, STABİLİZE','3','FT1','I','C/E','336','3
 +6.1','1','','E0'),
 ('1992','ALEVLENEBİLİR SIVI, ZEHİRLİ, B.B.B.','3','FT1','I','C/E','336','3
 +6.1','1','','E0'),
-('1992','ALEVLENEBİLİR SIVI, ZEHİRLİ, B.B.B.','3','FT1','II','D/E','336','3
-+6.1','2','1 L','E2'),
-('1992','ALEVLENEBİLİR SIVI, ZEHİRLİ, B.B.B.','3','FT1','III','D/E','36','3
-+6.1','3','5 L','E1'),
 ('1993','ALEVLENEBİLİR SIVI, B.B.B.','3','F1','I','D/E','33','3','1','','E3'),
-('1993','ALEVLENEBİLİR SIVI, B.B.B (50  °C''de buhar basıncı 110 kPa’dan daha  yüksek olan)','3','F1','II','D/E','33','3','2','1 L','E2'),
-('1993','ALEVLENEBİLİR SIVI, B.B.B (50  °C''de buhar basıncı 110 kPa’a eşit  veya daha düşük olan)','3','F1','II','D/E','33','3','2','1 L','E2'),
-('1993','ALEVLENEBİLİR SIVI, B.B.B.','3','F1','III','D/E','30','3','3','5 L','E1'),
-('1993','ALEVLENEBİLİR SIVI, B.B.B. (2.2.3.1.4 uyarınca akmaz ve parlama  noktası 23 °C''nin altında) (50 °C''de  buhar basıncı 110 kPa’dan daha  yüksek olan)','3','F1','III','E','','3','3','5 L','E1'),
-('1993','ALEVLENEBİLİR SIVI, B.B.B. (2.2.3.1.4 uyarınca viskoz ve parlama  noktası 23 °C''nin altında) (50 °C''de  buhar basıncı 110 kPa’a eşit veya  daha düşük olan)','3','F1','III','E','','3','3','5 L','E1'),
 ('1994','DEMİR PENTAKARBONİL','6.1','TF1','I','C/D','663','6.1
 +3','1','','E0'),
 ('1999','KATRANLAR, SIVI, yol yağı ve  inceltilmiş bitümler dâhil (50 °C''de  buhar basıncı 110 kPa’dan daha  yüksek olan)','3','F1','II','D/E','33','3','2','5 L','E2'),
-('1999','KATRANLAR, SIVI, yol yağları ve  inceltilmiş bitümler dâhil (50 °C''de  buhar basıncı 110 kPa’a eşit veya  daha düşük olan)','3','F1','II','D/E','33','3','2','5 L','E2'),
-('1999','KATRANLAR, SIVI, yol yağları ve  inceltilmiş bitümler dâhil','3','F1','III','D/E','30','3','3','5 L','E1'),
-('1999','KATRANLAR, SIVI, yol yağları ve  inceltilmiş bitümler dâhil (2.2.3.1.4 uyarınca viskoz ve parlama noktası  23 °C''nin altında) (50 °C''de buhar  basıncı 110 kPa''dan daha yüksek  olan)','3','F1','III','E','','3','3','5 L','E1'),
-('1999','KATRANLAR, SIVI, yol yağları ve  inceltilmiş bitümler dâhil (2.2.3.1.4 uyarınca viskoz ve parlama noktası  23 °C''nin altında) (50 °C''de buhar  basıncı 110 kPa''a eşit veya daha  düşük olan)','3','F1','III','E','','3','3','5 L','E1'),
 ('2000','SELÜLOİT blok, çubuk, rulo, tabaka, tüpler, vb. halinde, hurda dışında','4.1','F1','III','E','','4.1','3','5 kg','E1'),
 ('2001','KOBALT NAFTENATLAR, TOZ','4.1','F3','III','E','40','4.1','3','5 kg','E1'),
 ('2002','SELÜLOİT ARTIK','4.2','S2','III','E','','4.2','3','','E0'),
 ('2004','MAGNEZYUM DİAMİD','4.2','S4','II','D/E','40','4.2','2','','E2'),
 ('2006','PLASTİKLER, NİTROSELÜLOZ  ESASLI, KENDİLİĞİNDEN  ISINAN, B.B.B.','4.2','S2','III','E','','4.2','3','','E0'),
 ('2008','ZİRKONYUM TOZU, KURU','4.2','S4','I','B/E','43','4.2','0','','E0'),
-('2008','ZİRKONYUM TOZU, KURU','4.2','S4','II','D/E','40','4.2','2','','E2'),
-('2008','ZİRKONYUM TOZU, KURU','4.2','S4','III','E','40','4.2','3','','E1'),
 ('2009','ZİRKONYUM, KURU, işlenmiş  tabakalar, şeritler veya sarmal tel  şeklinde','4.2','S4','III','E','40','4.2','3','','E1'),
 ('2010','MAGNEZYUM HİDRİT','4.3','W2','I','E','','4.3','1','','E0'),
 ('2011','MAGNEZYUM FOSFÜR','4.3','WT2','I','E','','4.3
@@ -1613,8 +1386,6 @@ values
 ('2014','HİDROJEN PEROKSİT, SULU  ÇÖZELTİ hidrojen peroksit oranı  %20''den fazla, ancak %60''tan az  (gerektiği gibi stabilize)','5.1','OC1','II','E','58','5.1
 +8','2','1 L','E2'),
 ('2015','HİDROJEN PEROKSİT, STABİLİZE veya HİDROJEN  PEROKSİT, SULU ÇÖZELTİ, STABİLİZE %70''den fazla hidrojen  peroksit ile','5.1','OC1','I','B/E','559','5.1
-+8','1','','E0'),
-('2015','HİDROJEN PEROKSİT, SULU  ÇÖZELTİ, STABİLİZE %60''tan fazla ancak %70''den az hidrojen peroksit  ile','5.1','OC1','I','B/E','559','5.1
 +8','1','','E0'),
 ('2016','MÜHİMMAT, ZEHİRLİ, PATLAYICI OLMAYAN paralama  hakkı veya fırlatma yükü olmayan, fünyesiz','6.1','T10','','E','','6.1','2','','E0'),
 ('2017','MÜHİMMAT, GÖZ YAŞARTICI, PATLAYICI OLMAYAN paralama  hakkı veya fırlatma yükü olmayan, fünyesiz','6.1','TC5','','E','','6.1
@@ -1628,14 +1399,8 @@ values
 ('2023','EPİKLOROHİDRİN','6.1','TF1','II','D/E','63','6.1
 +3','2','100 ml','E4'),
 ('2024','CIVA BİLEŞİĞİ, SIVI, B.B.B.','6.1','T4','I','C/E','66','6.1','1','','E5'),
-('2024','CIVA BİLEŞİĞİ, SIVI, B.B.B.','6.1','T4','II','D/E','60','6.1','2','100 ml','E4'),
-('2024','CIVA BİLEŞİĞİ, SIVI, B.B.B.','6.1','T4','III','E','60','6.1','2','5 L','E1'),
 ('2025','CIVA BİLEŞİĞİ, KATI, B.B.B.','6.1','T5','I','C/E','66','6.1','1','','E5'),
-('2025','CIVA BİLEŞİĞİ, KATI, B.B.B.','6.1','T5','II','D/E','60','6.1','2','500 g','E4'),
-('2025','CIVA BİLEŞİĞİ, KATI, B.B.B.','6.1','T5','III','E','60','6.1','2','5 kg','E1'),
 ('2026','FENİLCIVA BİLEŞİĞİ, B.B.B.','6.1','T3','I','C/E','66','6.1','1','','E5'),
-('2026','FENİLCIVA BİLEŞİĞİ, B.B.B.','6.1','T3','II','D/E','60','6.1','2','500 g','E4'),
-('2026','FENİLCIVA BİLEŞİĞİ, B.B.B.','6.1','T3','III','E','60','6.1','2','5 kg','E1'),
 ('2027','SODYUM ARSENİT, KATI','6.1','T5','II','D/E','60','6.1','2','500 g','E4'),
 ('2028','BOMBALAR, SİS, PATLAYICI  OLMAYAN, aşındırıcı sıvı ile, tepkime başlatma düzeneği olmayan','8','C11','','E','','8','2','','E0'),
 ('2029','HİDRAZİN, SUSUZ','8','CFT','I','E','','8
@@ -1643,15 +1408,8 @@ values
 +6.1','1','','E0'),
 ('2030','HİDRAZİN SULU ÇÖZELTİ, kütlece  %37''den fazla hidrazin içeren','8','CT1','I','C/D','886','8
 +6.1','1','','E0'),
-('2030','HİDRAZİN SULU ÇÖZELTİ, kütlece  %37''den fazla hidrazin içeren','8','CT1','II','E','86','8
-+6.1','2','1 L','E0'),
-('2030','HİDRAZİN SULU ÇÖZELTİ, kütlece  %37''den fazla hidrazin içeren','8','CT1','III','E','86','8
-+6.1','3','5 L','E1'),
 ('2031','NİTRİK ASİT, kırmızı dumanlı  dışında, %70''den fazla nitrik asit  içeren','8','CO1','I','E','885','8
 +5.1','1','','E0'),
-('2031','NİTRİK ASİT, en az %65 kırmızı  dumanlı dışında, %70''ten fazla  olmayan nitrik asit içeren','8','CO1','II','E','85','8
-+5.1','2','1 L','E2'),
-('2031','NİTRİK ASİT, kırmızı dumanlı  dışında, %65''ten az nitrik asit içeren','8','C1','II','E','80','8','2','1 L','E2'),
 ('2032','NİTRİK ASİT, KIRMIZI DUMANLI','8','COT','I','C/D','856','8
 +5.1
 +6.1','1','','E0'),
@@ -1660,28 +1418,11 @@ values
 ('2035','1,1,1-TRİFLOROETAN  (SOĞUTUCU GAZ R 143a)','2','2F','','B/D','23','2.1','2','','E0'),
 ('2036','KSENON','2','2A','','C/E','20','2.2','3','120 ml','E1'),
 ('2037','KAPLAR, KÜÇÜK, GAZ İÇEREN  (GAZ KARTUŞLARI) tahliye  düzeneği olmayan ve yeniden  doldurulamayan','2','5A','','E','','2.2','3','1 L','E0'),
-('2037','KAPLAR, KÜÇÜK, GAZ İÇEREN  (GAZ KARTUŞLARI) tahliye  düzeneği olmayan ve yeniden  doldurulamayan','2','5F','','D','','2.1','2','1 L','E0'),
-('2037','KAPLAR, KÜÇÜK, GAZ İÇEREN  (GAZ KARTUŞLARI) tahliye  düzeneği olmayan ve yeniden  doldurulamayan','2','5O','','E','','2.2
-+5.1','3','1 L','E0'),
-('2037','KAPLAR, KÜÇÜK, GAZ İÇEREN  (GAZ KARTUŞLARI) tahliye  düzeneği olmayan ve yeniden  doldurulamayan','2','5T','','D','','2.3','1','120 ml','E0'),
-('2037','KAPLAR, KÜÇÜK, GAZ İÇEREN  (GAZ KARTUŞLARI) tahliye  düzeneği olmayan ve yeniden  doldurulamayan','2','5TC','','D','','2.3
-+8','1','120 ml','E0'),
-('2037','KAPLAR, KÜÇÜK, GAZ İÇEREN  (GAZ KARTUŞLARI) tahliye  düzeneği olmayan ve yeniden  doldurulamayan','2','5TF','','D','','2.3
-+2.1','1','120 ml','E0'),
-('2037','KAPLAR, KÜÇÜK, GAZ İÇEREN  (GAZ KARTUŞLARI) tahliye  düzeneği olmayan ve yeniden  doldurulamayan','2','5TFC','','D','','2.3
-+2.1
-+8','1','120 ml','E0'),
-('2037','KAPLAR, KÜÇÜK, GAZ İÇEREN  (GAZ KARTUŞLARI) tahliye  düzeneği olmayan ve yeniden  doldurulamayan','2','5TO','','D','','2.3
-+5.1','1','120 ml','E0'),
-('2037','KAPLAR, KÜÇÜK, GAZ İÇEREN  (GAZ KARTUŞLARI) tahliye  düzeneği olmayan ve yeniden  doldurulamayan','2','5TOC','','D','','2.3
-+5.1
-+8','1','120 ml','E0'),
 ('2038','DİNİTROTOLUENLER, SIVI','6.1','T1','II','D/E','60','6.1','2','100 ml','E4'),
 ('2044','2,2-DİMETİLPROPAN','2','2F','','B/D','23','2.1','2','','E0'),
 ('2045','İZOBÜTİRALDEHİT (İZOBÜTİL  ALDEHİT)','3','F1','II','D/E','33','3','2','1 L','E2'),
 ('2046','SİMENLER','3','F1','III','D/E','30','3','3','5 L','E1'),
 ('2047','DİKLOROPROPENLER','3','F1','II','D/E','33','3','2','1 L','E2'),
-('2047','DİKLOROPROPENLER','3','F1','III','D/E','30','3','3','5 L','E1'),
 ('2048','DİSİKLOPENTADİEN','3','F1','III','D/E','30','3','3','5 L','E1'),
 ('2049','DİETİLBENZEN','3','F1','III','D/E','30','3','3','5 L','E1'),
 ('2050','DİİZOBÜTİLEN, İZOMERİK  BİLEŞİKLER','3','F1','II','D/E','33','3','2','1 L','E2'),
@@ -1694,12 +1435,8 @@ values
 ('2055','STRİEN MONOMER, STABİLİZE','3','F1','III','D/E','39','3','3','5 L','E1'),
 ('2056','TETRAHİDROFURAN','3','F1','II','D/E','33','3','2','1 L','E2'),
 ('2057','TRİPROPİLEN','3','F1','II','D/E','33','3','2','1 L','E2'),
-('2057','TRİPROPİLEN','3','F1','III','D/E','30','3','3','5 L','E1'),
 ('2058','VALERALDEHİT','3','F1','II','D/E','33','3','2','1 L','E2'),
 ('2059','NİTROSELÜLOZ ÇÖZELTİSİ, ALEVLENEBİLİR kuru kütlece  %12,6''dan fazla azot ve %55''ten fazla  nitroselüloz içermeyen','3','D','I','B','33','3','1','','E0'),
-('2059','NİTROSELÜLOZ ÇÖZELTİSİ, ALEVLENEBİLİR kuru kütlece %12,6''dan fazla azot ve %55''ten fazla nitroselüloz içermeyen (50 °C''deki buhar basıncı 110 kPa’dan daha yüksek olan)','3','D','II','B','33','3','2','1 L','E0'),
-('2059','NİTROSELÜLOZ ÇÖZELTİSİ, ALEVLENEBİLİR kuru kütlece  %12,6''dan fazla azot ve %55''ten fazla  nitroselüloz içermeyen (50 °C''deki  buhar basıncı 110 kPa’a eşit veya  daha düşük olan)','3','D','II','B','33','3','2','1 L','E0'),
-('2059','NİTROSELÜLOZ ÇÖZELTİSİ, ALEVLENEBİLİR kuru kütlece  %12,6''dan fazla azot ve %55''ten fazla nitroselüloz içermeyen','3','D','III','B','30','3','3','5 L','E0'),
 ('2067','AMONYUM NİTRAT ESASLI  GÜBRELER','5.1','O2','III','E','50','5.1','3','5 kg','E1'),
 ('2071','AMONYUM NİTRAT ESASLI  GÜBRELER','9','M11','','','','','','',''),
 ('2073','AMONYAK ÇÖZELTİSİ, 15 °C''de  su içerisinde bağıl yoğunluğu  0,880''den az olan ve %35''ten fazla  ama %50''den az amonyak içeren','2','4A','','E','20','2.2','3','120 ml','E0'),
@@ -1746,7 +1483,6 @@ values
 +2.1','1','','E0'),
 ('2205','ADİPONİTRİL','6.1','T1','III','E','60','6.1','2','5 L','E1'),
 ('2206','İZOSİYANATLAR, ZEHİRLİ, B.B.B. veya İZOSİYANAT  ÇÖZELTİSİ, ZEHİRLİ, B.B.B.','6.1','T1','II','D/E','60','6.1','2','100 ml','E4'),
-('2206','İZOSİYANATLAR, ZEHİRLİ, B.B.B. veya İZOSİYANAT  ÇÖZELTİSİ, ZEHİRLİ, B.B.B.','6.1','T1','III','E','60','6.1','2','5 L','E1'),
 ('2208','KALSİYUM HİPOKLORİT  KARIŞIMI, KURU % 10''dan fazla  ancak% 39''dan az hazır klor içeren','5.1','O2','III','E','50','5.1','3','5 kg','E1'),
 ('2209','FORMALDEHİT ÇÖZELTİ %25''ten  fazla formaldehit içeren','8','C9','III','E','80','8','3','5 L','E1'),
 ('2210','MANEB veya MANEB  MÜSTAHZARI %60''tan fazla maneb  içeren','4.2','SW1','III','E','40','4.2
@@ -1756,7 +1492,6 @@ values
 ('2213','PARAFORMALDEHİT','4.1','F1','III','E','40','4.1','3','5 kg','E1'),
 ('2214','FİTALİK ANHİDRİT %0,05''ten fazla maleik anhidrit içeren','8','C4','III','E','80','8','3','5 kg','E1'),
 ('2215','MALEİK ANHİDRİT, ERİMİŞ','8','C3','III','E','80','8','0','','E0'),
-('2215','MALEİK ANHİDRİT','8','C4','III','E','80','8','3','5 kg','E1'),
 ('2216','Balık unu (Balık atığı), stabilize','9','M11','ADR''YE TABİ DEĞİLDİR','','','','','',''),
 ('2217','TOHUM KÜSPESİ kütlece %1,5''ten  az yağ ve kütlece %11''den az nem  içeren','4.2','S2','III','E','40','4.2','3','','E0'),
 ('2218','AKRİLİK ASİT, STABİLİZE','8','CF1','II','D/E','839','8
@@ -1893,14 +1628,12 @@ values
 ('2342','BROMOMETİLPROPANLAR','3','F1','II','D/E','33','3','2','1 L','E2'),
 ('2343','2-BROMOPENTAN','3','F1','II','D/E','33','3','2','1 L','E2'),
 ('2344','BROMOPROPANLAR','3','F1','II','D/E','33','3','2','1 L','E2'),
-('2344','BROMOPROPANLAR','3','F1','III','D/E','30','3','3','5 L','E1'),
 ('2345','3-BROMOPROPİN','3','F1','II','D/E','33','3','2','1 L','E2'),
 ('2346','BÜTANDİON','3','F1','II','D/E','33','3','2','1 L','E2'),
 ('2347','BÜTİL MERKAPTAN','3','F1','II','D/E','33','3','2','1 L','E2'),
 ('2348','BÜTİL AKRİLATLAR, STABİLİZE','3','F1','III','D/E','39','3','3','5 L','E1'),
 ('2350','BÜTİL METİL ETER','3','F1','II','D/E','33','3','2','1 L','E2'),
 ('2351','BÜTİL NİTRİTLER','3','F1','II','D/E','33','3','2','1 L','E2'),
-('2351','BÜTİL NİTRİTLER','3','F1','III','D/E','30','3','3','5 L','E1'),
 ('2352','BÜTİL VİNİL ETER, STABİLİZE','3','F1','II','D/E','339','3','2','1 L','E2'),
 ('2353','BÜTİRİL KLORÜR','3','FC','II','D/E','338','3
 +8','2','1 L','E2'),
@@ -1994,14 +1727,9 @@ values
 ('2424','OKTAFLOROPROPAN  (SOĞUTUCU GAZ R 218)','2','2A','','C/E','20','2.2','3','120 ml','E1'),
 ('2426','AMONYUM NİTRAT, SIVI (sıcak  konsantre çözelti)','5.1','O1','','E','59','5.1','0','','E0'),
 ('2427','POTASYUM KLORAT, SULU  ÇÖZELTİ','5.1','O1','II','E','50','5.1','2','1 L','E2'),
-('2427','POTASYUM KLORAT, SULU  ÇÖZELTİ','5.1','O1','III','E','50','5.1','3','5 L','E1'),
 ('2428','SODYUM KLORAT, SULU  ÇÖZELTİ','5.1','O1','II','E','50','5.1','2','1 L','E2'),
-('2428','SODYUM KLORAT, SULU  ÇÖZELTİ','5.1','O1','III','E','50','5.1','3','5 L','E1'),
 ('2429','KALSİYUM KLORAT, SULU  ÇÖZELTİ','5.1','O1','II','E','50','5.1','2','1 L','E2'),
-('2429','KALSİYUM KLORAT, SULU  ÇÖZELTİ','5.1','O1','III','E','50','5.1','3','5 L','E1'),
 ('2430','ALKİLFENOLLER, KATI, B.B.B. (C2-C12 homologlar dâhil)','8','C4','I','E','88','8','1','','E0'),
-('2430','ALKİLFENOLLER, KATI, B.B.B. (C2-C12 homologlar dâhil)','8','C4','II','E','80','8','2','1 kg','E2'),
-('2430','ALKİLFENOLLER, KATI, B.B.B. (C2-C12 homologlar dâhil)','8','C4','III','E','80','8','3','5 kg','E1'),
 ('2431','ANİSİDİNLER','6.1','T1','III','E','60','6.1','2','5 L','E1'),
 ('2432','N,N-DİETİLANİLİN','6.1','T1','III','E','60','6.1','2','5 L','E1'),
 ('2433','KLORONİTROTOLUENLER, SIVI','6.1','T1','III','E','60','6.1','2','5 L','E1'),
@@ -2051,8 +1779,6 @@ values
 +3','1','','E0'),
 ('2478','İZOSİYANATLAR, ALEVLENEBİLİR, ZEHİRLİ, B.B.B. veya İZOSİYANAT  ÇÖZELTİSİ, ALEVLENEBİLİR,  ZEHİRLİ, B.B.B.','3','FT1','II','D/E','336','3
 +6.1','2','1 L','E2'),
-('2478','İZOSİYANATLAR, ALEVLENEBİLİR, ZEHİRLİ, B.B.B. veya İZOSİYANAT  ÇÖZELTİSİ, ALEVLENEBİLİR,  ZEHİRLİ, B.B.B.','3','FT1','III','D/E','36','3
-+6.1','3','5 L','E1'),
 ('2480','METİL İZOSİYANAT','6.1','TF1','I','C/D','663','6.1
 +3','1','','E0'),
 ('2481','ETİL İZOSİYANAT','6.1','TF1','I','C/D','663','6.1
@@ -2081,7 +1807,6 @@ values
 ('2496','PROPİYONİK ANHİDRİT','8','C3','III','E','80','8','3','5 L','E1'),
 ('2498','1,2,3,6-TETRAHİDROBENZAL- DEHİT','3','F1','III','D/E','30','3','3','5 L','E1'),
 ('2501','TRİS-(1-AZİRİDİNİL) FOSFİN  OKSİT ÇÖZELTİSİ','6.1','T1','II','D/E','60','6.1','2','100 ml','E4'),
-('2501','TRİS-(1-AZİRİDİNİL) FOSFİN  OKSİT ÇÖZELTİSİ','6.1','T1','III','E','60','6.1','2','5 L','E1'),
 ('2502','VALERİL KLORÜR','8','CF1','II','D/E','83','8
 +3','2','1 L','E2'),
 ('2503','ZİRKONYUM TETRAKLORÜR','8','C2','III','E','80','8','3','5 kg','E1'),
@@ -2123,11 +1848,7 @@ values
 ('2541','TERPİNOLEN','3','F1','III','D/E','30','3','3','5 L','E1'),
 ('2542','TRİBÜTİLAMİN','6.1','T1','II','D/E','60','6.1','2','100 ml','E4'),
 ('2545','HAFNİYUM TOZU, KURU','4.2','S4','I','E','','4.2','0','','E0'),
-('2545','HAFNİYUM TOZU, KURU','4.2','S4','II','D/E','40','4.2','2','','E2'),
-('2545','HAFNİYUM TOZU, KURU','4.2','S4','III','E','40','4.2','3','','E1'),
 ('2546','TİTANYUM TOZU, KURU','4.2','S4','I','E','','4.2','0','','E0'),
-('2546','TİTANYUM TOZU, KURU','4.2','S4','II','D/E','40','4.2','2','','E2'),
-('2546','TİTANYUM TOZU, KURU','4.2','S4','III','E','40','4.2','3','','E1'),
 ('2547','SODYUM SÜPEROKSİT','5.1','O2','I','E','','5.1','1','','E0'),
 ('2548','KLOR PENTAFLORÜR','2','2TOC','','D','','2.3
 +5.1
@@ -2142,12 +1863,9 @@ values
 ('2560','2-METİLPENTAN-2-OL','3','F1','III','D/E','30','3','3','5 L','E1'),
 ('2561','3-METİL-1-BÜTEN','3','F1','I','D/E','33','3','1','','E3'),
 ('2564','TRİKLOROASETİK ASİT  ÇÖZELTİSİ','8','C3','II','E','80','8','2','1 L','E2'),
-('2564','TRİKLOROASETİK ASİT  ÇÖZELTİSİ','8','C3','III','E','80','8','3','5 L','E1'),
 ('2565','DİSİKLOHEKZİLAMİN','8','C7','III','E','80','8','3','5 L','E1'),
 ('2567','SODYUM PENTAKLOROFENAT','6.1','T2','II','D/E','60','6.1','2','500 g','E4'),
 ('2570','KADMİYUM BİLEŞİĞİ','6.1','T5','I','C/E','66','6.1','1','','E5'),
-('2570','KADMİYUM BİLEŞİĞİ','6.1','T5','II','D/E','60','6.1','2','500 g','E4'),
-('2570','KADMİYUM BİLEŞİĞİ','6.1','T5','III','E','60','6.1','2','5 kg','E1'),
 ('2571','ALKİLSÜLFÜRİK ASİTLER','8','C3','II','E','80','8','2','1 L','E2'),
 ('2572','FENİLHİDRAZİN','6.1','T1','II','D/E','60','6.1','2','100 ml','E4'),
 ('2573','TALYUM KLORAT','5.1','OT2','II','E','56','5.1
@@ -2166,8 +1884,6 @@ values
 ('2586','ALKİLSÜLFONİK ASİTLER, SIVI  veya ARİLSÜLFONİK ASİTLER, SIVI %5''ten az serbest sülfirik asit  içeren','8','C3','III','E','80','8','3','5 L','E1'),
 ('2587','BENZOKUİNON','6.1','T2','II','D/E','60','6.1','2','500 g','E4'),
 ('2588','PESTİSİT, KATI, ZEHİRLİ, B.B.B.','6.1','T7','I','C/E','66','6.1','1','','E5'),
-('2588','PESTİSİT, KATI, ZEHİRLİ, B.B.B.','6.1','T7','II','D/E','60','6.1','2','500 g','E4'),
-('2588','PESTİSİT, KATI, ZEHİRLİ, B.B.B.','6.1','T7','III','E','60','6.1','2','5 kg','E1'),
 ('2589','VİNİL KLOROASETAT','6.1','TF1','II','D/E','63','6.1
 +3','2','100 ml','E4'),
 ('2590','ASBEST, KRİZOTİL','9','M1','III','E','90','9','3','5 kg','E1'),
@@ -2194,7 +1910,6 @@ values
 ('2614','METALİL ALKOL','3','F1','III','D/E','30','3','3','5 L','E1'),
 ('2615','ETİL PROPİL ETER','3','F1','II','D/E','33','3','2','1 L','E2'),
 ('2616','TRİİZOPROPİL BORAT','3','F1','II','D/E','33','3','2','1 L','E2'),
-('2616','TRİİZOPROPİL BORAT','3','F1','III','D/E','30','3','3','5 L','E1'),
 ('2617','METİLSİKLOHEKZANOLLER, alevlenebilir','3','F1','III','D/E','30','3','3','5 L','E1'),
 ('2618','VİNİLTOLUENLER, STABİLİZE','3','F1','III','D/E','39','3','3','5 L','E1'),
 ('2619','BENZİLDİMETİLAMİN','8','CF1','II','D/E','83','8
@@ -2232,7 +1947,6 @@ values
 ('2668','KLOROASETONİTRİL','6.1','TF1','I','C/D','663','6.1
 +3','1','','E0'),
 ('2669','KLOROKRESOLLER ÇÖZELTİSİ','6.1','T1','II','D/E','60','6.1','2','100 ml','E4'),
-('2669','KLOROKRESOLLER ÇÖZELTİSİ','6.1','T1','III','E','60','6.1','2','5 L','E1'),
 ('2670','SİYANÜRİK KLORÜR','8','C4','II','E','80','8','2','1 kg','E2'),
 ('2671','AMİNOPİRİDİNLER (o-, m-, p-)','6.1','T2','II','D/E','60','6.1','2','500 g','E4'),
 ('2672','AMONYAK ÇÖZELTİSİ, 15 °C''de su  içerisinde bağıl yoğunluğu 0,880 veya  0,957 arasında olan ve %10''dan fazla  ama %35''ten az amonyak içeren','8','C5','III','E','80','8','3','5 L','E1'),
@@ -2241,13 +1955,10 @@ values
 ('2676','STİBİN','2','2TF','','D','','2.3
 +2.1','1','','E0'),
 ('2677','RUBİDYUM HİDROKSİT  ÇÖZELTİSİ','8','C5','II','E','80','8','2','1 L','E2'),
-('2677','RUBİDYUM HİDROKSİT  ÇÖZELTİSİ','8','C5','III','E','80','8','3','5 L','E1'),
 ('2678','RUBİDYUM HİDROKSİT','8','C6','II','E','80','8','2','1 kg','E2'),
 ('2679','LİTYUM HİDROKSİT ÇÖZELTİSİ','8','C5','II','E','80','8','2','1 L','E2'),
-('2679','LİTYUM HİDROKSİT ÇÖZELTİSİ','8','C5','III','E','80','8','3','5 L','E1'),
 ('2680','LİTYUM HİDROKSİT','8','C6','II','E','80','8','2','1 kg','E2'),
 ('2681','SEZYUM HİDROKSİT ÇÖZELTİSİ','8','C5','II','E','80','8','2','1 L','E2'),
-('2681','SEZYUM HİDROKSİT ÇÖZELTİSİ','8','C5','III','E','80','8','3','5 L','E1'),
 ('2682','SEZYUM HİDROKSİT','8','C6','II','E','80','8','2','1 kg','E2'),
 ('2683','AMONYUM SÜLFÜR ÇÖZELTİSİ','8','CFT','II','D/E','836','8
 +3
@@ -2269,7 +1980,6 @@ values
 ('2699','TRİFLOROASETİK ASİT','8','C3','I','E','88','8','1','','E0'),
 ('2705','1-PENTOL','8','C9','II','E','80','8','2','1 L','E2'),
 ('2707','DİMETİLDİOKSANLAR','3','F1','II','D/E','33','3','2','1 L','E2'),
-('2707','DİMETİLDİOKSANLAR','3','F1','III','D/E','30','3','3','5 L','E1'),
 ('2709','BÜTİLBENZENLER','3','F1','III','D/E','30','3','3','5 L','E1'),
 ('2710','DİPROPİL KETON','3','F1','III','D/E','30','3','3','5 L','E1'),
 ('2713','AKRİDİN','6.1','T2','III','E','60','6.1','2','5 kg','E1'),
@@ -2294,17 +2004,9 @@ values
 ('2732','NİTROBROMOBENZENLER, SIVI','6.1','T1','III','E','60','6.1','2','5 L','E1'),
 ('2733','AMİNLER, ALEVLENEBİLİR,  AŞINDIRICI, B.B.B. veya POLİAMİNLER, ALEVLENEBİLİR,  AŞINDIRICI, B.B.B.','3','FC','I','C/E','338','3
 +8','1','','E0'),
-('2733','AMİNLER, ALEVLENEBİLİR,  AŞINDIRICI, B.B.B. veya POLİAMİNLER, ALEVLENEBİLİR,  AŞINDIRICI, B.B.B.','3','FC','II','D/E','338','3
-+8','2','1 L','E2'),
-('2733','AMİNLER, ALEVLENEBİLİR,  AŞINDIRICI, B.B.B. veya POLİAMİNLER, ALEVLENEBİLİR,  AŞINDIRICI, B.B.B.','3','FC','III','D/E','38','3
-+8','3','5 L','E1'),
 ('2734','AMİNLER, SIVI, AŞINDIRICI, ALEVLENEBİLİR, B.B.B. veya  POLİAMİNLER, SIVI, AŞINDIRICI, ALEVLENEBİLİR, B.B.B.','8','CF1','I','D/E','883','8
 +3','1','','E0'),
-('2734','AMİNLER, SIVI, AŞINDIRICI, ALEVLENEBİLİR, B.B.B. veya  POLİAMİNLER, SIVI, AŞINDIRICI, ALEVLENEBİLİR, B.B.B.','8','CF1','II','D/E','83','8
-+3','2','1 L','E2'),
 ('2735','AMİNLER, SIVI, AŞINDIRICI, B.B.B. veya POLİAMİNLER, SIVI, AŞINDIRICI, B.B.B.','8','C7','I','E','88','8','1','','E0'),
-('2735','AMİNLER, SIVI, AŞINDIRICI, B.B.B. veya POLİAMİNLER, SIVI, AŞINDIRICI, B.B.B.','8','C7','II','E','80','8','2','1 L','E2'),
-('2735','AMİNLER, SIVI, AŞINDIRICI, B.B.B. veya POLİAMİNLER, SIVI, AŞINDIRICI, B.B.B.','8','C7','III','E','80','8','3','5 L','E1'),
 ('2738','N-BÜTİLANİLİN','6.1','T1','II','D/E','60','6.1','2','100 ml','E4'),
 ('2739','BÜTİRİK ANHİDRİT','8','C3','III','E','80','8','3','5 L','E1'),
 ('2740','n-PROPİL KLOROFORMAT','6.1','TFC','I','C/D','668','6.1
@@ -2335,90 +2037,43 @@ values
 ('2753','N-ETİLBENZİLTOLUİDİNLER, SIVI','6.1','T1','III','E','60','6.1','2','5 L','E1'),
 ('2754','N-ETİLTOLUİDİNLER','6.1','T1','II','D/E','60','6.1','2','100 ml','E4'),
 ('2757','KARBAMAT PESTİSİT, KATI, ZEHİRLİ','6.1','T7','I','C/E','66','6.1','1','','E5'),
-('2757','KARBAMAT PESTİSİT, KATI, ZEHİRLİ','6.1','T7','II','D/E','60','6.1','2','500 g','E4'),
-('2757','KARBAMAT PESTİSİT, KATI, ZEHİRLİ','6.1','T7','III','E','60','6.1','2','5 kg','E1'),
 ('2758','KARBAMAT PESTİSİT, SIVI, ALEVLENEBİLİR, ZEHİRLİ, parlama noktası 23 °C''den düşük olan','3','FT2','I','C/E','336','3
 +6.1','1','','E0'),
-('2758','KARBAMAT PESTİSİT, SIVI, ALEVLENEBİLİR, ZEHİRLİ, parlama noktası 23 °C''den düşük olan','3','FT2','II','D/E','336','3
-+6.1','2','1 L','E2'),
 ('2759','ARSENİKLİ PESTİSİT, KATI, ZEHİRLİ','6.1','T7','I','C/E','66','6.1','1','','E5'),
-('2759','ARSENİKLİ PESTİSİT, KATI, ZEHİRLİ','6.1','T7','II','D/E','60','6.1','2','500 g','E4'),
-('2759','ARSENİKLİ PESTİSİT, KATI, ZEHİRLİ','6.1','T7','III','E','60','6.1','2','5 kg','E1'),
 ('2760','ARSENİKLİ PESTİSİT, SIVI, ALEVLENEBİLİR, ZEHİRLİ, parlama noktası 23 °C''den düşük olan','3','FT2','I','C/E','336','3
 +6.1','1','','E0'),
-('2760','ARSENİKLİ PESTİSİT, SIVI, ALEVLENEBİLİR, ZEHİRLİ, parlama noktası 23 °C''den düşük olan','3','FT2','II','D/E','336','3
-+6.1','2','1 L','E2'),
 ('2761','ORGANOKLORİN PESTİSİT, KATI, ZEHİRLİ','6.1','T7','I','C/E','66','6.1','1','','E5'),
-('2761','ORGANOKLORİN PESTİSİT, KATI, ZEHİRLİ','6.1','T7','II','D/E','60','6.1','2','500 g','E4'),
-('2761','ORGANOKLORİN PESTİSİT, KATI, ZEHİRLİ','6.1','T7','III','E','60','6.1','2','5 kg','E1'),
 ('2762','ORGANOKLORLU PESTİSİT, SIVI, ALEVLENEBİLİR, ZEHİRLİ, parlama noktası 23 °C''den düşük olan','3','FT2','I','C/E','336','3
 +6.1','1','','E0'),
-('2762','ORGANOKLORLU PESTİSİT, SIVI, ALEVLENEBİLİR, ZEHİRLİ, parlama noktası 23 °C''den düşük olan','3','FT2','II','D/E','336','3
-+6.1','2','1 L','E2'),
 ('2763','TRİAZİN PESTİSİT, KATI, ZEHİRLİ','6.1','T7','I','C/E','66','6.1','1','','E5'),
-('2763','TRİAZİN PESTİSİT, KATI, ZEHİRLİ','6.1','T7','II','D/E','60','6.1','2','500 g','E4'),
-('2763','TRİAZİN PESTİSİT, KATI, ZEHİRLİ','6.1','T7','III','E','60','6.1','2','5 kg','E1'),
 ('2764','TRİAZİN PESTİSİT, SIVI, ALEVLENEBİLİR, ZEHİRLİ, parlama noktası 23 °C''den düşük olan','3','FT2','I','C/E','336','3
 +6.1','1','','E0'),
-('2764','TRİAZİN PESTİSİT, SIVI, ALEVLENEBİLİR, ZEHİRLİ, parlama noktası 23 °C''den düşük olan','3','FT2','II','D/E','336','3
-+6.1','2','1 L','E2'),
 ('2771','TİYOKARBAMAT PESTİSİT, KATI, ZEHİRLİ','6.1','T7','I','C/E','66','6.1','1','','E5'),
-('2771','TİYOKARBAMAT PESTİSİT, KATI, ZEHİRLİ','6.1','T7','II','D/E','60','6.1','2','500 g','E4'),
-('2771','TİYOKARBAMAT PESTİSİT, KATI, ZEHİRLİ','6.1','T7','III','E','60','6.1','2','5 kg','E1'),
 ('2772','TİYOKARBAMAT PESTİSİT, SIVI, ALEVLENEBİLİR, ZEHİRLİ, parlama noktası 23 °C''den düşük olan','3','FT2','I','C/E','336','3
 +6.1','1','','E0'),
-('2772','TİYOKARBAMAT PESTİSİT, SIVI, ALEVLENEBİLİR, ZEHİRLİ, parlama noktası 23 °C''den düşük olan','3','FT2','II','D/E','336','3
-+6.1','2','1 L','E2'),
 ('2775','BAKIR ESASLI PESTİSİT, KATI, ZEHİRLİ','6.1','T7','I','C/E','66','6.1','1','','E5'),
-('2775','BAKIR ESASLI PESTİSİT, KATI, ZEHİRLİ','6.1','T7','II','D/E','60','6.1','2','500 g','E4'),
-('2775','BAKIR ESASLI PESTİSİT, KATI, ZEHİRLİ','6.1','T7','III','E','60','6.1','2','5 kg','E1'),
 ('2776','BAKIR ESASLI PESTİSİT, SIVI, ALEVLENEBİLİR, ZEHİRLİ, parlama noktası 23 °C''den düşük','3','FT2','I','C/E','336','3
 +6.1','1','','E0'),
-('2776','BAKIR ESASLI PESTİSİT, SIVI, ALEVLENEBİLİR, ZEHİRLİ, parlama noktası 23 °C''den düşük','3','FT2','II','D/E','336','3
-+6.1','2','1 L','E2'),
 ('2777','CIVA ESASLI PESTİSİT, KATI, ZEHİRLİ','6.1','T7','I','C/E','66','6.1','1','','E5'),
-('2777','CIVA ESASLI PESTİSİT, KATI, ZEHİRLİ','6.1','T7','II','D/E','60','6.1','2','500 g','E4'),
-('2777','CIVA ESASLI PESTİSİT, KATI, ZEHİRLİ','6.1','T7','III','E','60','6.1','2','5 kg','E1'),
 ('2778','CIVA ESASLI PESTİSİT, SIVI, ALEVLENEBİLİR, ZEHİRLİ, parlama noktası 23 °C''den düşük olan','3','FT2','I','C/E','336','3
 +6.1','1','','E0'),
-('2778','CIVA ESASLI PESTİSİT, SIVI, ALEVLENEBİLİR, ZEHİRLİ, parlama noktası 23 °C''den düşük olan','3','FT2','II','D/E','336','3
-+6.1','2','1 L','E2'),
 ('2779','İKAMELİ NİTROFENOL  PESTİSİT, KATI, ZEHİRLİ','6.1','T7','I','C/E','66','6.1','1','','E5'),
-('2779','İKAMELİ NİTROFENOL  PESTİSİT, KATI, ZEHİRLİ','6.1','T7','II','D/E','60','6.1','2','500 g','E4'),
-('2779','İKAMELİ NİTROFENOL  PESTİSİT, KATI, ZEHİRLİ','6.1','T7','III','E','60','6.1','2','5 kg','E1'),
 ('2780','İKAMELİ NİTROFENOL  PESTİSİT, SIVI, ALEVLENEBİLİR,  ZEHİRLİ, parlama noktası 23 °C''den  düşük olan','3','FT2','I','C/E','336','3
 +6.1','1','','E0'),
-('2780','İKAMELİ NİTROFENOL  PESTİSİT, SIVI, ALEVLENEBİLİR,  ZEHİRLİ, parlama noktası 23 °C''den  düşük olan','3','FT2','II','D/E','336','3
-+6.1','2','1 L','E2'),
 ('2781','BİPİRİDİLYUM PESTİSİT, KATI, ZEHİRLİ','6.1','T7','I','C/E','66','6.1','1','','E5'),
-('2781','BİPİRİDİLYUM PESTİSİT, KATI, ZEHİRLİ','6.1','T7','II','D/E','60','6.1','2','500 g','E4'),
-('2781','BİPİRİDİLYUM PESTİSİT, KATI, ZEHİRLİ','6.1','T7','III','E','60','6.1','2','5 kg','E1'),
 ('2782','BİPİRİDİLYUM PESTİSİT, SIVI, ALEVLENEBİLİR, ZEHİRLİ, parlama noktası 23 °C''den düşük olan','3','FT2','I','C/E','336','3
 +6.1','1','','E0'),
-('2782','BİPİRİDİLYUM PESTİSİT, SIVI, ALEVLENEBİLİR, ZEHİRLİ, parlama noktası 23 °C''den düşük olan','3','FT2','II','D/E','336','3
-+6.1','2','1 L','E2'),
 ('2783','ORGANOFOSFOR PESTİSİT, KATI, ZEHİRLİ','6.1','T7','I','C/E','66','6.1','1','','E5'),
-('2783','ORGANOFOSFOR PESTİSİT, KATI, ZEHİRLİ','6.1','T7','II','D/E','60','6.1','2','500 g','E4'),
-('2783','ORGANOFOSFOR PESTİSİT, KATI, ZEHİRLİ','6.1','T7','III','E','60','6.1','2','5 kg','E1'),
 ('2784','ORGANOFOSFOR PESTİSİT, SIVI, ALEVLENEBİLİR, ZEHİRLİ, parlama noktası 23 °C''den düşük olan','3','FT2','I','C/E','336','3
 +6.1','1','','E0'),
-('2784','ORGANOFOSFOR PESTİSİT, SIVI, ALEVLENEBİLİR, ZEHİRLİ, parlama noktası 23 °C''den düşük olan','3','FT2','II','D/E','336','3
-+6.1','2','1 L','E2'),
 ('2785','4-TİYAPENTANAL','6.1','T1','III','E','60','6.1','2','5 L','E1'),
 ('2786','ORGANOTİN PESTİSİT, KATI, ZEHİRLİ','6.1','T7','I','C/E','66','6.1','1','','E5'),
-('2786','ORGANOTİN PESTİSİT, KATI, ZEHİRLİ','6.1','T7','II','D/E','60','6.1','2','500 g','E4'),
-('2786','ORGANOTİN PESTİSİT, KATI, ZEHİRLİ','6.1','T7','III','E','60','6.1','2','5 kg','E1'),
 ('2787','ORGANOTİN PESTİSİT, SIVI, ALEVLENEBİLİR, ZEHİRLİ, parlama noktası 23 °C''den düşük olan','3','FT2','I','C/E','336','3
 +6.1','1','','E0'),
-('2787','ORGANOTİN PESTİSİT, SIVI, ALEVLENEBİLİR, ZEHİRLİ, parlama noktası 23 °C''den düşük olan','3','FT2','II','D/E','336','3
-+6.1','2','1 L','E2'),
 ('2788','ORGANOTİN BİLEŞİĞİ, SIVI, B.B.B.','6.1','T3','I','C/E','66','6.1','1','','E5'),
-('2788','ORGANOTİN BİLEŞİĞİ, SIVI, B.B.B.','6.1','T3','II','D/E','60','6.1','2','100 ml','E4'),
-('2788','ORGANOTİN BİLEŞİĞİ, SIVI, B.B.B.','6.1','T3','III','E','60','6.1','2','5 L','E1'),
 ('2789','ASETİK ASİT, GLASİYAL veya  ASETİK ASİT ÇÖZELTİSİ, kütlece  %80''den fazla asit içeren','8','CF1','II','D/E','83','8
 +3','2','1 L','E2'),
 ('2790','ASETİK ASİT ÇÖZELTİSİ, kütlece  %50''den fazla ancak %80''den az asit  içeren','8','C3','II','E','80','8','2','1 L','E2'),
-('2790','ASETİK ASİT ÇÖZELTİSİ, kütlece  %10''dan fazla ancak %50''den az asit  içeren','8','C3','III','E','80','8','3','5 L','E1'),
 ('2793','DEMİR METAL TALAŞLARI,  KIRPINTILARI,HURDALARI veya  KIYMIKLARI kendiliğinden  ısınmaya yatkın halde','4.2','S4','III','E','40','4.2','3','','E1'),
 ('2794','AKÜLER, SULU, ASİT  DOLDURULMUŞ, elektrik depolama','8','C11','','E','80','8','3','1 L','E0'),
 ('2795','AKÜLER, SULU, ALKALİ  DOLDURULMUŞ, elektrik depolama','8','C11','','E','80','8','3','1 L','E0'),
@@ -2428,8 +2083,6 @@ values
 ('2799','FENİLFOSFOR TİYODİKLORÜR','8','C3','II','E','80','8','2','1 L','E0'),
 ('2800','AKÜLER, SULU, DÖKÜLMEYEN, elektrik depolama','8','C11','','E','80','8','3','1 L','E0'),
 ('2801','BOYA, SIVI, AŞINDIRICI, B.B.B. veya BOYA ARA ÜRÜN, SIVI, AŞINDIRICI, B.B.B.','8','C9','I','E','88','8','1','','E0'),
-('2801','SAÇ BOYASI, SIVI, AŞINDIRICI, B.B.B. veya BOYA ARA ÜRÜN, SIVI, AŞINDIRICI, B.B.B.','8','C9','II','E','80','8','2','1 L','E2'),
-('2801','BOYA, SIVI, AŞINDIRICI, B.B.B. veya BOYA ARA ÜRÜN, SIVI, AŞINDIRICI, B.B.B.','8','C9','III','E','80','8','3','5 L','E1'),
 ('2802','BAKIR KLORÜR','8','C2','III','E','80','8','3','5 kg','E1'),
 ('2803','GALYUM','8','C10','III','E','80','8','3','5 kg','E0'),
 ('2805','LİTYUM HİDRİT, ERGİTİLMİŞ  KATI','4.3','W2','II','D/E','423','4.3','2','500 g','E2'),
@@ -2438,33 +2091,19 @@ values
 ('2809','CIVA','8','CT1','III','E','86','8
 +6.1','3','5 kg','E0'),
 ('2810','ZEHİRLİ SIVI, ORGANİK, B.B.B.','6.1','T1','I','C/E','66','6.1','1','','E5'),
-('2810','ZEHİRLİ SIVI, ORGANİK, B.B.B.','6.1','T1','II','D/E','60','6.1','2','100 ml','E4'),
-('2810','ZEHİRLİ SIVI, ORGANİK, B.B.B.','6.1','T1','III','E','60','6.1','2','5 L','E1'),
 ('2811','ZEHİRLİ KATI, ORGANİK, B.B.B.','6.1','T2','I','C/E','66','6.1','1','','E5'),
-('2811','ZEHİRLİ KATI, ORGANİK, B.B.B.','6.1','T2','II','D/E','60','6.1','2','500 g','E4'),
-('2811','ZEHİRLİ KATI, ORGANİK, B.B.B.','6.1','T2','III','E','60','6.1','2','5 kg','E1'),
 ('2812','Sodyum alüminat, katı','8','C6','ADR''YE TABİ DEĞİLDİR','','','','','',''),
 ('2813','SU İLE TEPKİMEYE GİREN, KATI, B.B.B.','4.3','W2','I','B/E','X423','4.3','0','','E0'),
-('2813','SU İLE TEPKİMEYE GİREN, KATI, B.B.B.','4.3','W2','II','D/E','423','4.3','0','500 g','E2'),
-('2813','SU İLE TEPKİMEYE GİREN, KATI, B.B.B.','4.3','W2','III','E','423','4.3','0','1 kg','E1'),
 ('2814','BULAŞICI MADDE, İNSANLARI  ETKİLEYEN','6.2','I1','','','','6.2','0','','E0'),
-('2814','BULAŞICI MADDE, İNSANLARI  ETKİLEYEN, soğutulmuş sıvı azot  içinde','6.2','I1','','E','','6.2
-+2.2','0','','E0'),
-('2814','BULAŞICI MADDE, İNSANLARI  ETKİLEYEN (yalnız hayvansal  malzemeler)','6.2','I1','','E','606','6.2','0','','E0'),
 ('2815','N-AMİNOETİLPİPERAZİN','8','CT1','III','E','86','8
 +6.1','3','5 L','E1'),
 ('2817','AMONYUM HİDROJENDİFLORÜR ÇÖZELTİSİ','8','CT1','II','E','86','8
 +6.1','2','1 L','E2'),
-('2817','AMONYUM HİDROJENDİFLORÜR  ÇÖZELTİSİ','8','CT1','III','E','86','8
-+6.1','3','5 L','E1'),
 ('2818','AMONYUM POLİSÜLFÜR ÇÖZELTİSİ','8','CT1','II','E','86','8
 +6.1','2','1 L','E2'),
-('2818','AMONYUM POLİSÜLFÜR ÇÖZELTİSİ','8','CT1','III','E','86','8
-+6.1','3','5 L','E1'),
 ('2819','AMİL ASİT FOSFAT','8','C3','III','E','80','8','3','5 L','E1'),
 ('2820','BÜTİRİK ASİT','8','C3','III','E','80','8','3','5 L','E1'),
 ('2821','FENOL ÇÖZELTİSİ','6.1','T1','II','D/E','60','6.1','2','100 ml','E4'),
-('2821','FENOL ÇÖZELTİSİ','6.1','T1','III','E','60','6.1','2','5 L','E1'),
 ('2822','2-KLOROPİRİDİN','6.1','T1','II','D/E','60','6.1','2','100 ml','E4'),
 ('2823','KROTONİK ASİT, KATI','8','C4','III','E','80','8','3','5 kg','E1'),
 ('2826','ETİL KLOROOTİYOFORMAT','8','CF1','II','D/E','83','8
@@ -2475,7 +2114,6 @@ values
 ('2834','FOSFOR ASİT','8','C2','III','E','80','8','3','5 kg','E1'),
 ('2835','SODYUM ALÜMİNYUM HİDRİT','4.3','W2','II','D/E','423','4.3','2','500 g','E0'),
 ('2837','BİSÜLFATLAR, SULU ÇÖZELTİ','8','C1','II','E','80','8','2','1 L','E2'),
-('2837','BİSÜLFATLAR, SULU ÇÖZELTİ','8','C1','III','E','80','8','3','5 L','E1'),
 ('2838','VİNİL BÜTİRAT, STABİLİZE','3','F1','II','D/E','339','3','2','1 L','E2'),
 ('2839','ALDOL','6.1','T1','II','D/E','60','6.1','2','100 ml','E4'),
 ('2840','BÜTİRALDOKSİM','3','F1','III','D/E','30','3','3','5 L','E1'),
@@ -2502,14 +2140,10 @@ values
 ('2864','POTASYUM METAVANADAT','6.1','T5','II','D/E','60','6.1','2','500 g','E4'),
 ('2865','HİDROKSİLAMİN SÜLFAT','8','C2','III','E','80','8','3','5 kg','E1'),
 ('2869','TİTANYUM TRİKLORÜR  KARIŞIMI','8','C2','II','E','80','8','2','1 kg','E2'),
-('2869','TİTANYUM TRİKLORÜR  KARIŞIMI','8','C2','III','E','80','8','3','5 kg','E1'),
 ('2870','ALÜMİNYUM BOROHİDRİT','4.2','SW1','I','B/E','X333','4.2
-+4.3','0','','E0'),
-('2870','ALÜMİNYUM BOROHİDRİT  ALETLERDE','4.2','SW2','','E','','4.2
 +4.3','0','','E0'),
 ('2871','ANTİMON TOZU','6.1','T5','III','E','60','6.1','2','5 kg','E1'),
 ('2872','DİBROMOKLOROPROPANLAR','6.1','T1','II','D/E','60','6.1','2','100 ml','E4'),
-('2872','DİBROMOKLOROPROPANLAR','6.1','T1','III','E','60','6.1','2','5 L','E1'),
 ('2873','DİBÜTİLAMİNOETANOL','6.1','T1','III','E','60','6.1','2','5 L','E1'),
 ('2874','FURFURİL ALKOL','6.1','T1','III','E','60','6.1','2','5 L','E1'),
 ('2875','HEKZAKLOROFEN','6.1','T2','III','E','60','6.1','2','5 kg','E1'),
@@ -2518,26 +2152,14 @@ values
 ('2879','SELENYUM OKSİKLORÜR','8','CT1','I','C/D','X886','8
 +6.1','1','','E0'),
 ('2880','KALSİYUM HİPOKLORİT, HİDRATLANMIŞ veya  KALSİYUM HİPOKLORİT, HİDRATLANMIŞ KARIŞIM, %  5,5''ten az olmayan ancak % 16''dan  fazla su içermeyen','5.1','O2','II','E','50','5.1','2','1 kg','E2'),
-('2880','KALSİYUM HİPOKLORİT, HİDRATLANMIŞ veya  KALSİYUM HİPOKLORİT, HİDRATLANMIŞ KARIŞIM, %  5,5''ten az olmayan ancak % 16''dan  fazla su içermeyen','5.1','O2','III','E','50','5.1','3','5 kg','E1'),
 ('2881','METAL KATALİZÖR, KURU','4.2','S4','I','B/E','43','4.2','0','','E0'),
-('2881','METAL KATALİZÖR, KURU','4.2','S4','II','D/E','40','4.2','2','','E0'),
-('2881','METAL KATALİZÖR, KURU','4.2','S4','III','E','40','4.2','3','','E1'),
 ('2900','BULAŞICI MADDE, yalnızca  HAYVANLARI ETKİLEYEN','6.2','I2','','','','6.2','0','','E0'),
-('2900','BULAŞICI MADDE, yalnızca  HAYVANLARI ETKİLEYEN, soğutulmuş sıvı azot içinde','6.2','I2','','E','','6.2
-+2.2','0','','E0'),
-('2900','BULAŞICI MADDE, yalnızca  HAYVANLARI ETKİLEYEN  (yalnız hayvansal malzemeler)','6.2','I2','','E','606','6.2','0','','E0'),
 ('2901','BROM KLORÜR','2','2TOC','','C/D','265','2.3
 +5.1
 +8','1','','E0'),
 ('2902','PESTİSİT, SIVI, ZEHİRLİ, B.B.B.','6.1','T6','I','C/E','66','6.1','1','','E5'),
-('2902','PESTİSİT, SIVI, ZEHİRLİ, B.B.B.','6.1','T6','II','D/E','60','6.1','2','100 ml','E4'),
-('2902','PESTİSİT, SIVI, ZEHİRLİ, B.B.B.','6.1','T6','III','E','60','6.1','2','5 L','E1'),
 ('2903','PESTİSİT, SIVI, ZEHİRLİ, ALEVLENEBİLİR, B.B.B., parlama  noktası 23 °C''den düşük olmayan','6.1','TF2','I','C/E','663','6.1
 +3','1','','E5'),
-('2903','PESTİSİT, SIVI, ZEHİRLİ, ALEVLENEBİLİR, B.B.B., parlama  noktası 23 °C''den düşük olmayan','6.1','TF2','II','D/E','63','6.1
-+3','2','100 ml','E4'),
-('2903','PESTİSİT, SIVI, ZEHİRLİ, ALEVLENEBİLİR, B.B.B., parlama  noktası 23 °C''den düşük olmayan','6.1','TF2','III','D/E','63','6.1
-+3','2','5 L','E1'),
 ('2904','KLOROFENOLATLAR, SIVI veya  FENOLATLAR, SIVI','8','C9','III','E','80','8','3','5 L','E1'),
 ('2905','KLOROFENOLATLAR, KATI veya  FENOLATLAR, KATI','8','C10','III','E','80','8','3','5 kg','E1'),
 ('2907','İZOSORBİD DİNİTRAT KARIŞIMI  içerdiği laktoz, mannoz, nişasta veya  kalsiyum hidrojen fosfat miktarı  %60''tan az olmayan','4.1','D','II','B','','4.1','2','','E0'),
@@ -2553,54 +2175,26 @@ values
 ('2919','RADYOAKTİF MALZEME, ÖZEL  DÜZENLEME İLE TAŞINAN, bölünebilir olmayan veya istisnai bölünebilir','7','','','','70','7X','0','','E0'),
 ('2920','AŞINDIRICI SIVI, ALEVLENEBİLİR, B.B.B.','8','CF1','I','D/E','883','8
 +3','1','','E0'),
-('2920','AŞINDIRICI SIVI, ALEVLENEBİLİR, B.B.B.','8','CF1','II','D/E','83','8
-+3','2','1 L','E2'),
 ('2921','AŞINDIRICI KATI, ALEVLENEBİLİR, B.B.B.','8','CF2','I','E','884','8
 +4.1','1','','E0'),
-('2921','AŞINDIRICI KATI, ALEVLENEBİLİR, B.B.B.','8','CF2','II','E','84','8
-+4.1','2','1 kg','E2'),
 ('2922','AŞINDIRICI SIVI, ZEHİRLİ, B.B.B.','8','CT1','I','C/D','886','8
 +6.1','1','','E0'),
-('2922','AŞINDIRICI SIVI, ZEHİRLİ, B.B.B.','8','CT1','II','E','86','8
-+6.1','2','1 L','E2'),
-('2922','AŞINDIRICI SIVI, ZEHİRLİ, B.B.B.','8','CT1','III','E','86','8
-+6.1','3','5 L','E1'),
 ('2923','AŞINDIRICI KATI, ZEHİRLİ, B.B.B.','8','CT2','I','E','886','8
 +6.1','1','','E0'),
-('2923','AŞINDIRICI KATI, ZEHİRLİ, B.B.B.','8','CT2','II','E','86','8
-+6.1','2','1 kg','E2'),
-('2923','AŞINDIRICI KATI, ZEHİRLİ, B.B.B.','8','CT2','III','E','86','8
-+6.1','3','5 kg','E1'),
 ('2924','ALEVLENEBİLİR SIVI, AŞINDIRICI, B.B.B.','3','FC','I','C/E','338','3
 +8','1','','E0'),
-('2924','ALEVLENEBİLİR SIVI, AŞINDIRICI, B.B.B.','3','FC','II','D/E','338','3
-+8','2','1 L','E2'),
-('2924','ALEVLENEBİLİR SIVI, AŞINDIRICI, B.B.B.','3','FC','III','D/E','38','3
-+8','3','5 L','E1'),
 ('2925','ALEVLENEBİLİR KATI, AŞINDIRICI, ORGANİK, B.B.B.','4.1','FC1','II','E','48','4.1
 +8','2','1 kg','E2'),
-('2925','ALEVLENEBİLİR KATI, AŞINDIRICI, ORGANİK, B.B.B.','4.1','FC1','III','E','48','4.1
-+8','3','5 kg','E1'),
 ('2926','ALEVLENEBİLİR KATI, ZEHİRLİ, ORGANİK, B.B.B.','4.1','FT1','II','E','46','4.1
 +6.1','2','1 kg','E2'),
-('2926','ALEVLENEBİLİR KATI, ZEHİRLİ, ORGANİK, B.B.B.','4.1','FT1','III','E','46','4.1
-+6.1','3','5 kg','E1'),
 ('2927','ZEHİRLİ SIVI, AŞINDIRICI, ORGANİK, B.B.B.','6.1','TC1','I','C/E','668','6.1
 +8','1','','E5'),
-('2927','ZEHİRLİ SIVI, AŞINDIRICI, ORGANİK, B.B.B.','6.1','TC1','II','D/E','68','6.1
-+8','2','100 ml','E4'),
 ('2928','ZEHİRLİ KATI, AŞINDIRICI, ORGANİK, B.B.B.','6.1','TC2','I','C/E','668','6.1
 +8','1','','E5'),
-('2928','ZEHİRLİ KATI, AŞINDIRICI, ORGANİK, B.B.B.','6.1','TC2','II','D/E','68','6.1
-+8','2','500 g','E4'),
 ('2929','ZEHİRLİ SIVI, ALEVLENEBİLİR,  ORGANİK, B.B.B.','6.1','TF1','I','C/D','663','6.1
 +3','1','','E5'),
-('2929','ZEHİRLİ SIVI, ALEVLENEBİLİR,  ORGANİK, B.B.B.','6.1','TF1','II','D/E','63','6.1
-+3','2','100 ml','E4'),
 ('2930','ZEHİRLİ KATI, ALEVLENEBİLİR,  ORGANİK, B.B.B.','6.1','TF3','I','C/E','664','6.1
 +4.1','1','','E5'),
-('2930','ZEHİRLİ KATI, ALEVLENEBİLİR,  ORGANİK, B.B.B.','6.1','TF3','II','D/E','64','6.1
-+4.1','2','500 g','E4'),
 ('2931','VANADİL SÜLFAT','6.1','T5','II','D/E','60','6.1','2','500 g','E4'),
 ('2933','METİL 2-KLOROPROPİONAT','3','F1','III','D/E','30','3','3','5 L','E1'),
 ('2934','İZOPROPİL 2-KLOROPROPİONAT','3','F1','III','D/E','30','3','3','5 L','E1'),
@@ -2645,130 +2239,51 @@ values
 +3
 +8','0','','E0'),
 ('2989','KURŞUN FOSFİT, DİBAZİK','4.1','F3','II','E','40','4.1','2','1 kg','E2'),
-('2989','KURŞUN FOSFİT, DİBAZİK','4.1','F3','III','E','40','4.1','3','5 kg','E1'),
 ('2990','CAN KURTARICI ALETLER, KENDİLİĞİNDEN ŞİŞEN','9','M5','','E','','9','3','','E0'),
 ('2991','KARBAMAT PESTİSİT, SIVI, ALEVLENEBİLİR, ZEHİRLİ, parlama noktası 23 °C''den düşük  olmayan','6.1','TF2','I','C/E','663','6.1
 +3','1','','E5'),
-('2991','KARBAMAT PESTİSİT, SIVI, ALEVLENEBİLİR, ZEHİRLİ, parlama noktası 23 °C''den düşük  olmayan','6.1','TF2','II','D/E','63','6.1
-+3','2','100 ml','E4'),
-('2991','KARBAMAT PESTİSİT, SIVI, ALEVLENEBİLİR, ZEHİRLİ, parlama noktası 23 °C''den düşük  olmayan','6.1','TF2','III','D/E','63','6.1
-+3','2','5 L','E1'),
 ('2992','KARBAMAT PESTİSİT, SIVI, ZEHİRLİ','6.1','T6','I','C/E','66','6.1','1','','E5'),
-('2992','KARBAMAT PESTİSİT, SIVI, ZEHİRLİ','6.1','T6','II','D/E','60','6.1','2','100 ml','E4'),
-('2992','KARBAMAT PESTİSİT, SIVI, ZEHİRLİ','6.1','T6','III','E','60','6.1','2','5 L','E1'),
 ('2993','ARSENİKLİ PESTİSİT, SIVI, ZEHİRLİ, ALEVLENEBİLİR,  parlama noktası 23 °C''den düşük  olmayan','6.1','TF2','I','C/E','663','6.1
 +3','1','','E5'),
-('2993','ARSENİKLİ PESTİSİT, SIVI, ZEHİRLİ, ALEVLENEBİLİR,  parlama noktası 23 °C''den düşük  olmayan','6.1','TF2','II','D/E','63','6.1
-+3','2','100 ml','E4'),
-('2993','ARSENİKLİ PESTİSİT, SIVI, ZEHİRLİ, ALEVLENEBİLİR,  parlama noktası 23 °C''den düşük  olmayan','6.1','TF2','III','D/E','63','6.1
-+3','2','5 L','E1'),
 ('2994','ARSENİKLİ PESTİSİT, SIVI, ZEHİRLİ','6.1','T6','I','C/E','66','6.1','1','','E5'),
-('2994','ARSENİKLİ PESTİSİT, SIVI, ZEHİRLİ','6.1','T6','II','D/E','60','6.1','2','100 ml','E4'),
-('2994','ARSENİKLİ PESTİSİT, SIVI, ZEHİRLİ','6.1','T6','III','E','60','6.1','2','5 L','E1'),
 ('2995','ORGANOKLORLU PESTİSİT, SIVI, ZEHİRLİ, ALEVLENEBİLİR,  parlama noktası 23 °C''den düşük  olmayan','6.1','TF2','I','C/E','663','6.1
 +3','1','','E5'),
-('2995','ORGANOKLORLU PESTİSİT, SIVI, ZEHİRLİ, ALEVLENEBİLİR,  parlama noktası 23 °C''den düşük  olmayan','6.1','TF2','II','D/E','63','6.1
-+3','2','100 ml','E4'),
-('2995','ORGANOKLORLU PESTİSİT, SIVI, ZEHİRLİ, ALEVLENEBİLİR,  parlama noktası 23 °C''den düşük  olmayan','6.1','TF2','III','D/E','63','6.1
-+3','2','5 L','E1'),
 ('2996','ORGANOKLORLU PESTİSİT, SIVI, ZEHİRLİ','6.1','T6','I','C/E','66','6.1','1','','E5'),
-('2996','ORGANOKLORLU PESTİSİT, SIVI, ZEHİRLİ','6.1','T6','II','D/E','60','6.1','2','100 ml','E4'),
-('2996','ORGANOKLORLU PESTİSİT, SIVI, ZEHİRLİ','6.1','T6','III','E','60','6.1','2','5 L','E1'),
 ('2997','TRİAZİN PESTİSİT, SIVI, ZEHİRLİ, ALEVLENEBİLİR,  parlama noktası 23 °C''den düşük  olmayan','6.1','TF2','I','C/E','663','6.1
 +3','1','','E5'),
-('2997','TRİAZİN PESTİSİT, SIVI, ZEHİRLİ, ALEVLENEBİLİR,  parlama noktası 23 °C''den düşük  olmayan','6.1','TF2','II','D/E','63','6.1
-+3','2','100 ml','E4'),
-('2997','TRİAZİN PESTİSİT, SIVI, ZEHİRLİ, ALEVLENEBİLİR,  parlama noktası 23 °C''den düşük  olmayan','6.1','TF2','III','D/E','63','6.1
-+3','2','5 L','E1'),
 ('2998','TRİAZİN PESTİSİT, SIVI, ZEHİRLİ','6.1','T6','I','C/E','66','6.1','1','','E5'),
-('2998','TRİAZİN PESTİSİT, SIVI, ZEHİRLİ','6.1','T6','II','D/E','60','6.1','2','100 ml','E4'),
-('2998','TRİAZİN PESTİSİT, SIVI, ZEHİRLİ','6.1','T6','III','E','60','6.1','2','5 L','E1'),
 ('3005','TİYOKARBAMAT PESTİSİT, SIVI, ZEHİRLİ, ALEVLENEBİLİR,  parlama noktası 23 °C''den düşük  olmayan','6.1','TF2','I','C/E','663','6.1
 +3','1','','E5'),
-('3005','TİYOKARBAMAT PESTİSİT, SIVI, ZEHİRLİ, ALEVLENEBİLİR,  parlama noktası 23 °C''den düşük  olmayan','6.1','TF2','II','D/E','63','6.1
-+3','2','100 ml','E4'),
-('3005','TİYOKARBAMAT PESTİSİT, SIVI, ZEHİRLİ, ALEVLENEBİLİR,  parlama noktası 23 °C''den düşük  olmayan','6.1','TF2','III','D/E','63','6.1
-+3','2','5 L','E1'),
 ('3006','TİYOKARBAMAT PESTİSİT, SIVI, ZEHİRLİ','6.1','T6','I','C/E','66','6.1','1','','E5'),
-('3006','TİYOKARBAMAT PESTİSİT, SIVI, ZEHİRLİ','6.1','T6','II','D/E','60','6.1','2','100 ml','E4'),
-('3006','TİYOKARBAMAT PESTİSİT, SIVI, ZEHİRLİ','6.1','T6','III','E','60','6.1','2','5 L','E1'),
 ('3009','BAKIR ESASLI PESTİSİT, SIVI, ZEHİRLİ, ALEVLENEBİLİR,  parlama noktası 23 °C''den düşük  olmayan','6.1','TF2','I','C/E','663','6.1
 +3','1','','E5'),
-('3009','BAKIR ESASLI PESTİSİT, SIVI, ZEHİRLİ, ALEVLENEBİLİR,  parlama noktası 23 °C''den düşük  olmayan','6.1','TF2','II','D/E','63','6.1
-+3','2','100 ml','E4'),
-('3009','BAKIR ESASLI PESTİSİT, SIVI, ZEHİRLİ, ALEVLENEBİLİR,  parlama noktası 23 °C''den düşük  olmayan','6.1','TF2','III','D/E','63','6.1
-+3','2','5 L','E1'),
 ('3010','BAKIR ESASLI PESTİSİT, SIVI, ZEHİRLİ','6.1','T6','I','C/E','66','6.1','1','','E5'),
-('3010','BAKIR ESASLI PESTİSİT, SIVI, ZEHİRLİ','6.1','T6','II','D/E','60','6.1','2','100 ml','E4'),
-('3010','BAKIR ESASLI PESTİSİT, SIVI, ZEHİRLİ','6.1','T6','III','E','60','6.1','2','5 L','E1'),
 ('3011','CIVA ESASLI PESTİSİT, SIVI, ZEHİRLİ, ALEVLENEBİLİR,  parlama noktası 23 °C''den düşük  olmayan','6.1','TF2','I','C/E','663','6.1
 +3','1','','E5'),
-('3011','CIVA ESASLI PESTİSİT, SIVI, ZEHİRLİ, ALEVLENEBİLİR,  parlama noktası 23 °C''den düşük  olmayan','6.1','TF2','II','D/E','63','6.1
-+3','2','100 ml','E4'),
-('3011','CIVA ESASLI PESTİSİT, SIVI, ZEHİRLİ, ALEVLENEBİLİR,  parlama noktası 23 °C''den düşük  olmayan','6.1','TF2','III','D/E','63','6.1
-+3','2','5 L','E1'),
 ('3012','CIVA ESASLI PESTİSİT, SIVI, ZEHİRLİ','6.1','T6','I','C/E','66','6.1','1','','E5'),
-('3012','CIVA ESASLI PESTİSİT, SIVI, ZEHİRLİ','6.1','T6','II','D/E','60','6.1','2','100 ml','E4'),
-('3012','CIVA ESASLI PESTİSİT, SIVI, ZEHİRLİ','6.1','T6','III','E','60','6.1','2','5 L','E1'),
 ('3013','İKAMELİ NİTROFENOL PESTİSİT, SIVI, ZEHİRLİ, ALEVLENEBİLİR,  parlama noktası 23 °C''den düşük  olmayan','6.1','TF2','I','C/E','663','6.1
 +3','1','','E5'),
-('3013','İKAMELİ NİTROFENOL PESTİSİT, SIVI, ZEHİRLİ, ALEVLENEBİLİR,  parlama noktası 23 °C''den düşük  olmayan','6.1','TF2','II','D/E','63','6.1
-+3','2','100 ml','E4'),
-('3013','İKAMELİ NİTROFENOL PESTİSİT, SIVI, ZEHİRLİ, ALEVLENEBİLİR,  parlama noktası 23 °C''den düşük  olmayan','6.1','TF2','III','D/E','63','6.1
-+3','2','5 L','E1'),
 ('3014','İKAMELİ NİTROFENOL PESTİSİT, SIVI, ZEHİRLİ','6.1','T6','I','C/E','66','6.1','1','','E5'),
-('3014','İKAMELİ NİTROFENOL PESTİSİT, SIVI, ZEHİRLİ','6.1','T6','II','D/E','60','6.1','2','100 ml','E4'),
-('3014','İKAMELİ NİTROFENOL PESTİSİT, SIVI, ZEHİRLİ','6.1','T6','III','E','60','6.1','2','5 L','E1'),
 ('3015','BİPİRİDİLYUM PESTİSİT, SIVI, ZEHİRLİ, ALEVLENEBİLİR,  parlama noktası 23 °C''den düşük  olmayan','6.1','TF2','I','C/E','663','6.1
 +3','1','','E5'),
-('3015','BİPİRİDİLYUM PESTİSİT, SIVI, ZEHİRLİ, ALEVLENEBİLİR,  parlama noktası 23 °C''den düşük  olmayan','6.1','TF2','II','D/E','63','6.1
-+3','2','100 ml','E4'),
-('3015','BİPİRİDİLYUM PESTİSİT, SIVI, ZEHİRLİ, ALEVLENEBİLİR,  parlama noktası 23 °C''den düşük  olmayan','6.1','TF2','III','D/E','63','6.1
-+3','2','5 L','E1'),
 ('3016','BİPİRİDİLYUM PESTİSİT, SIVI, ZEHİRLİ','6.1','T6','I','C/E','66','6.1','1','','E5'),
-('3016','BİPİRİDİLYUM PESTİSİT, SIVI, ZEHİRLİ','6.1','T6','II','D/E','60','6.1','2','100 ml','E4'),
-('3016','BİPİRİDİLYUM PESTİSİT, SIVI, ZEHİRLİ','6.1','T6','III','E','60','6.1','2','5 L','E1'),
 ('3017','ORGANOFOSFORLU PESTİSİT, SIVI, ZEHİRLİ, ALEVLENEBİLİR,  parlama noktası 23 °C''den düşük  olmayan','6.1','TF2','I','C/E','663','6.1
 +3','1','','E5'),
-('3017','ORGANOFOSFORLU PESTİSİT, SIVI, ZEHİRLİ, ALEVLENEBİLİR,  parlama noktası 23 °C''den düşük  olmayan','6.1','TF2','II','D/E','63','6.1
-+3','2','100 ml','E4'),
-('3017','ORGANOFOSFORLU PESTİSİT, SIVI, ZEHİRLİ, ALEVLENEBİLİR,  parlama noktası 23 °C''den düşük  olmayan','6.1','TF2','III','D/E','63','6.1
-+3','2','5 L','E1'),
 ('3018','ORGANOFOSFOR PESTİSİT, SIVI, ZEHİRLİ','6.1','T6','I','C/E','66','6.1','1','','E5'),
-('3018','ORGANOFOSFOR PESTİSİT, SIVI, ZEHİRLİ','6.1','T6','II','D/E','60','6.1','2','100 ml','E4'),
-('3018','ORGANOFOSFOR PESTİSİT, SIVI, ZEHİRLİ','6.1','T6','III','E','60','6.1','2','5 L','E1'),
 ('3019','ORGANOTİN PESTİSİT, SIVI, ZEHİRLİ, ALEVLENEBİLİR,  parlama noktası 23 °C''den düşük  olmayan','6.1','TF2','I','C/E','663','6.1
 +3','1','','E5'),
-('3019','ORGANOTİN PESTİSİT, SIVI, ZEHİRLİ, ALEVLENEBİLİR,  parlama noktası 23 °C''den düşük  olmayan','6.1','TF2','II','D/E','63','6.1
-+3','2','100 ml','E4'),
-('3019','ORGANOTİN PESTİSİT, SIVI, ZEHİRLİ, ALEVLENEBİLİR,  parlama noktası 23 °C''den düşük  olmayan','6.1','TF2','III','D/E','63','6.1
-+3','2','5 L','E1'),
 ('3020','ORGANOTİN PESTİSİT, SIVI, ZEHİRLİ','6.1','T6','I','C/E','66','6.1','1','','E5'),
-('3020','ORGANOTİN PESTİSİT, SIVI, ZEHİRLİ','6.1','T6','II','D/E','60','6.1','2','100 ml','E4'),
-('3020','ORGANOTİN PESTİSİT, SIVI, ZEHİRLİ','6.1','T6','III','E','60','6.1','2','5 L','E1'),
 ('3021','PESTİSİT, SIVI, ALEVLENEBİLİR,  ZEHİRLİ, B.B.B., parlama noktası 23  °C''den düşük olan','3','FT2','I','C/E','336','3
 +6.1','1','','E0'),
-('3021','PESTİSİT, SIVI, ALEVLENEBİLİR,  ZEHİRLİ, B.B.B., parlama noktası 23  °C''den düşük olan','3','FT2','II','D/E','336','3
-+6.1','2','1 L','E2'),
 ('3022','1,2-BÜTİLEN OKSİT, STABİLİZE','3','F1','II','D/E','339','3','2','1 L','E2'),
 ('3023','2-METİL-2-HEPTANETİYOL','6.1','TF1','I','C/D','663','6.1
 +3','1','','E0'),
 ('3024','KUMARİN TÜREVLİ PESTİSİT, SIVI, ALEVLENEBİLİR, ZEHİRLİ, parlama noktası 23 °C''den düşük olan','3','FT2','I','C/E','336','3
 +6.1','1','','E0'),
-('3024','KUMARİN TÜREVLİ PESTİSİT, SIVI, ALEVLENEBİLİR, ZEHİRLİ, parlama noktası 23 °C''den düşük olan','3','FT2','II','D/E','336','3
-+6.1','2','1 L','E2'),
 ('3025','KUMARİN TÜREVLİ PESTİSİT, ALEVLENEBİLİR, SIVI, ZEHİRLİ, parlama noktası 23 °C''den düşük  olmayan','6.1','TF2','I','C/E','663','6.1
 +3','1','','E5'),
-('3025','KUMARİN TÜREVLİ PESTİSİT, ALEVLENEBİLİR, SIVI, ZEHİRLİ, parlama noktası 23 °C''den düşük  olmayan','6.1','TF2','II','D/E','63','6.1
-+3','2','100 ml','E4'),
-('3025','KUMARİN TÜREVLİ PESTİSİT, ALEVLENEBİLİR, SIVI, ZEHİRLİ, parlama noktası 23 °C''den düşük  olmayan','6.1','TF2','III','D/E','63','6.1
-+3','2','5 L','E1'),
 ('3026','KUMARİN TÜREVLİ PESTİSİT, SIVI, ZEHİRLİ','6.1','T6','I','C/E','66','6.1','1','','E5'),
-('3026','KUMARİN TÜREVLİ PESTİSİT, SIVI, ZEHİRLİ','6.1','T6','II','D/E','60','6.1','2','100 ml','E4'),
-('3026','KUMARİN TÜREVLİ PESTİSİT, SIVI, ZEHİRLİ','6.1','T6','III','E','60','6.1','2','5 L','E1'),
 ('3027','KUMARİN TÜREVLİ PESTİSİT, KATI, ZEHİRLİ','6.1','T7','I','C/E','66','6.1','1','','E5'),
-('3027','KUMARİN TÜREVLİ PESTİSİT, KATI, ZEHİRLİ','6.1','T7','II','D/E','60','6.1','2','500 g','E4'),
-('3027','KUMARİN TÜREVLİ PESTİSİT, KATI, ZEHİRLİ','6.1','T7','III','E','60','6.1','2','5 kg','E1'),
 ('3028','AKÜLER, KURU, POTASYUM  HİDROKSİT İÇEREN, KATI, elektrik depolama','8','C11','','E','80','8','3','2 kg','E0'),
 ('3048','ALÜMİNYUM FOSFÜR PESTİSİT','6.1','T7','I','C/E','642','6.1','1','','E0'),
 ('3054','SİKLOHEKZİL MERKAPTAN','3','F1','III','D/E','30','3','3','5 L','E1'),
@@ -2778,9 +2293,7 @@ values
 +8','1','','E0'),
 ('3064','NİTROGLİSERİN ÇÖZELTİSİ  ALKOLDE %1''den fazla ama %5''ten  daha az nitrogliserin içeren','3','D','II','B','','3','2','','E0'),
 ('3065','ALKOLLÜ İÇKİLER, hacimce  %70''den fazla alkol içeren','3','F1','II','D/E','33','3','2','5 L','E2'),
-('3065','ALKOLLÜ İÇKİLER, hacimce  %24''ten fazla ancak %70''ten az alkol  içeren','3','F1','III','D/E','30','3','3','5 L','E1'),
 ('3066','BOYA (boya, vernik, emaye, renklendirici, lake, cila, parlatıcı, sıvı  dolgu ve sıvı vernik bazı dâhil) veya  BOYA İLE İLGİLİ MALZEME  (boya inceltici veya azaltıcı bileşiği  dâhil)','8','C9','II','E','80','8','2','1 L','E2'),
-('3066','BOYA (boya, vernik, emaye, renklendirici, lake, cila, parlatıcı, sıvı  dolgu ve sıvı vernik bazı dâhil) veya  BOYA İLE İLGİLİ MALZEME  (boya inceltici veya azaltıcı bileşiği  dâhil)','8','C9','III','E','80','8','3','5 L','E1'),
 ('3070','ETİLEN OKSİT VE  DİKLORODİFLOROMETAN  KARIŞIMI, %12,5''ten fazla olmayan  etilen oksit içeren','2','2A','','C/E','20','2.2','3','120 ml','E1'),
 ('3071','MERKAPTANLAR, SIVI, ZEHİRLİ, ALEVLENEBİLİR,  B.B.B. veya MERKAPTAN  KARIŞIMI, SIVI, ZEHİRLİ, ALEVLENEBİLİR, B.B.B.','6.1','TF1','II','D/E','63','6.1
 +3','2','100 ml','E4'),
@@ -2799,60 +2312,30 @@ values
 +5.1','1','','E0'),
 ('3084','AŞINDIRICI KATI, YÜKSELTGEN, B.B.B.','8','CO2','I','E','885','8
 +5.1','1','','E0'),
-('3084','AŞINDIRICI KATI, YÜKSELTGEN, B.B.B.','8','CO2','II','E','85','8
-+5.1','2','1 kg','E2'),
 ('3085','YÜKSELTGEN KATI, AŞINDIRICI, B.B.B.','5.1','OC2','I','E','','5.1
 +8','1','','E0'),
-('3085','YÜKSELTGEN KATI, AŞINDIRICI, B.B.B.','5.1','OC2','II','E','58','5.1
-+8','2','1 kg','E2'),
-('3085','YÜKSELTGEN KATI, AŞINDIRICI, B.B.B.','5.1','OC2','III','E','58','5.1
-+8','3','5 kg','E1'),
 ('3086','ZEHİRLİ KATI, YÜKSELTGEN, B.B.B.','6.1','TO2','I','C/E','665','6.1
 +5.1','1','','E5'),
-('3086','ZEHİRLİ KATI, YÜKSELTGEN, B.B.B.','6.1','TO2','II','D/E','65','6.1
-+5.1','2','500 g','E4'),
 ('3087','YÜKSELTGEN KATI, ZEHİRLİ, B.B.B.','5.1','OT2','I','E','','5.1
 +6.1','1','','E0'),
-('3087','YÜKSELTGEN KATI, ZEHİRLİ, B.B.B.','5.1','OT2','II','E','56','5.1
-+6.1','2','1 kg','E2'),
-('3087','YÜKSELTGEN KATI, ZEHİRLİ, B.B.B.','5.1','OT2','III','E','56','5.1
-+6.1','3','5 kg','E1'),
 ('3088','KENDİLİĞİNDEN ISINAN KATI, ORGANİK, B.B.B.','4.2','S2','II','D/E','40','4.2','2','','E2'),
-('3088','KENDİLİĞİNDEN ISINAN KATI, ORGANİK, B.B.B.','4.2','S2','III','E','40','4.2','3','','E1'),
 ('3089','METAL TOZU, ALEVLENEBİLİR,  B.B.B.','4.1','F3','II','E','40','4.1','2','1 kg','E2'),
-('3089','METAL TOZU, ALEVLENEBİLİR,  B.B.B.','4.1','F3','III','E','40','4.1','3','5 kg','E1'),
 ('3090','LİTYUM METAL BATARYALAR  (lityum alaşımlı bataryalar dâhil)','9','M4','','E','','9A','2','','E0'),
 ('3091','LİTYUM METAL BATARYALAR  TEÇHİZAT İÇİNDE veya LİTYUM  METAL BATARYALAR  TEÇHİZATLA AMBALAJLANMIŞ  (lityum alaşımlı bataryalar dâhil)','9','M4','','E','','9A','2','','E0'),
 ('3092','1-METOKSİ-2-PROPANOL','3','F1','III','D/E','30','3','3','5 L','E1'),
 ('3093','AŞINDIRICI SIVI, YÜKSELTGEN, B.B.B.','8','CO1','I','E','885','8
 +5.1','1','','E0'),
-('3093','AŞINDIRICI SIVI, YÜKSELTGEN, B.B.B.','8','CO1','II','E','85','8
-+5.1','2','1 L','E2'),
 ('3094','AŞINDIRICI SIVI, SU İLE  TEPKİMEYE GİREN, B.B.B.','8','CW1','I','D/E','823','8
 +4.3','1','','E0'),
-('3094','AŞINDIRICI SIVI, SU İLE  TEPKİMEYE GİREN, B.B.B.','8','CW1','II','E','823','8
-+4.3','2','1 L','E2'),
 ('3095','AŞINDIRICI KATI, KENDİLİĞİNDEN ISINAN, B.B.B.','8','CS2','I','E','884','8
 +4.2','1','','E0'),
-('3095','AŞINDIRICI KATI, KENDİLİĞİNDEN ISINAN, B.B.B.','8','CS2','II','E','84','8
-+4.2','2','1 kg','E2'),
 ('3096','AŞINDIRICI KATI, SU İLE  TEPKİMEYE GİREN, B.B.B.','8','CW2','I','E','842','8
 +4.3','1','','E0'),
-('3096','AŞINDIRICI KATI, SU İLE  TEPKİMEYE GİREN, B.B.B.','8','CW2','II','E','842','8
-+4.3','2','1 kg','E2'),
 ('3097','ALEVLENEBİLİR KATI, YÜKSELTGEN, B.B.B.','4.1','FO','TAŞINMASI YASAKTIR','','','','','',''),
 ('3098','YÜKSELTGEN SIVI, AŞINDIRICI, B.B.B.','5.1','OC1','I','E','','5.1
 +8','1','','E0'),
-('3098','YÜKSELTGEN SIVI, AŞINDIRICI, B.B.B.','5.1','OC1','II','E','','5.1
-+8','2','1 L','E2'),
-('3098','YÜKSELTGEN SIVI, AŞINDIRICI, B.B.B.','5.1','OC1','III','E','','5.1
-+8','3','5 L','E1'),
 ('3099','YÜKSELTGEN SIVI, ZEHİRLİ, B.B.B.','5.1','OT1','I','E','','5.1
 +6.1','1','','E0'),
-('3099','YÜKSELTGEN SIVI, ZEHİRLİ, B.B.B.','5.1','OT1','II','E','','5.1
-+6.1','2','1 L','E2'),
-('3099','YÜKSELTGEN SIVI, ZEHİRLİ, B.B.B.','5.1','OT1','III','E','','5.1
-+6.1','3','5 L','E1'),
 ('3100','YÜKSELTGEN KATI, KENDİLİĞİNDEN ISINAN, B.B.B.','5.1','OS','TAŞINMASI YASAKTIR','','','','','',''),
 ('3101','ORGANİK PEROKSİT TİP B, SIVI','5.2','P1','','B','','5.2
 +1','1','25 ml','E0'),
@@ -2881,97 +2364,43 @@ values
 ('3121','YÜKSELTGEN KATI, SU İLE  TEPKİMEYE GİREN, B.B.B.','5.1','OW','TAŞINMASI YASAKTIR','','','','','',''),
 ('3122','ZEHİRLİ SIVI, YÜKSELTGEN, B.B.B.','6.1','TO1','I','C/E','665','6.1
 +5.1','1','','E0'),
-('3122','ZEHİRLİ SIVI, YÜKSELTGEN, B.B.B.','6.1','TO1','II','D/E','65','6.1
-+5.1','2','100 ml','E4'),
 ('3123','ZEHİRLİ SIVI, SU İLE  TEPKİMEYE GİREN, B.B.B.','6.1','TW1','I','C/E','623','6.1
 +4.3','1','','E0'),
-('3123','ZEHİRLİ SIVI, SU İLE  TEPKİMEYE GİREN, B.B.B.','6.1','TW1','II','D/E','623','6.1
-+4.3','2','100 ml','E4'),
 ('3124','ZEHİRLİ KATI, KENDİLİĞİNDEN  ISINAN, B.B.B.','6.1','TS','I','C/E','664','6.1
 +4.2','1','','E5'),
-('3124','ZEHİRLİ KATI, KENDİLİĞİNDEN  ISINAN, B.B.B.','6.1','TS','II','D/E','64','6.1
-+4.2','2','','E4'),
 ('3125','ZEHİRLİ KATI, SU İLE  TEPKİMEYE GİREN, B.B.B.','6.1','TW2','I','C/E','642','6.1
 +4.3','1','','E5'),
-('3125','ZEHİRLİ KATI, SU İLE  TEPKİMEYE GİREN, B.B.B.','6.1','TW2','II','D/E','642','6.1
-+4.3','2','500 g','E4'),
 ('3126','KENDİLİĞİNDEN ISINAN KATI, AŞINDIRICI, ORGANİK, B.B.B.','4.2','SC2','II','D/E','48','4.2
 +8','2','','E2'),
-('3126','KENDİLİĞİNDEN ISINAN KATI, AŞINDIRICI, ORGANİK, B.B.B.','4.2','SC2','III','E','48','4.2
-+8','3','','E1'),
 ('3127','KENDİLİĞİNDEN ISINAN KATI, YÜKSELTGEN, B.B.B.','4.2','SO','TAŞINMASI YASAKTIR','','','','','',''),
 ('3128','KENDİLİĞİNDEN ISINAN KATI, ZEHİRLİ, ORGANİK, B.B.B.','4.2','ST2','II','D/E','46','4.2
 +6.1','2','','E2'),
-('3128','KENDİLİĞİNDEN ISINAN KATI, ZEHİRLİ, ORGANİK, B.B.B.','4.2','ST2','III','E','46','4.2
-+6.1','3','','E1'),
 ('3129','SU İLE TEPKİMEYE GİREN SIVI, AŞINDIRICI, B.B.B.','4.3','WC1','I','B/E','X382','4.3
 +8','0','','E0'),
-('3129','SU İLE TEPKİMEYE GİREN SIVI, AŞINDIRICI, B.B.B.','4.3','WC1','II','D/E','382','4.3
-+8','0','500 ml','E0'),
-('3129','SU İLE TEPKİMEYE GİREN SIVI, AŞINDIRICI, B.B.B.','4.3','WC1','III','E','382','4.3
-+8','0','1 L','E1'),
 ('3130','SU İLE TEPKİMEYE GİREN SIVI, ZEHİRLİ, B.B.B.','4.3','WT1','I','B/E','X362','4.3
 +6.1','0','','E0'),
-('3130','SU İLE TEPKİMEYE GİREN SIVI, ZEHİRLİ, B.B.B.','4.3','WT1','II','D/E','362','4.3
-+6.1','0','500 ml','E0'),
-('3130','SU İLE TEPKİMEYE GİREN SIVI, ZEHİRLİ, B.B.B.','4.3','WT1','III','E','362','4.3
-+6.1','0','1 L','E1'),
 ('3131','SU İLE TEPKİMEYE GİREN KATI, AŞINDIRICI, B.B.B.','4.3','WC2','I','B/E','X482','4.3
 +8','0','','E0'),
-('3131','SU İLE TEPKİMEYE GİREN KATI, AŞINDIRICI, B.B.B.','4.3','WC2','II','D/E','482','4.3
-+8','0','500 g','E2'),
-('3131','SU İLE TEPKİMEYE GİREN KATI, AŞINDIRICI, B.B.B.','4.3','WC2','III','E','482','4.3
-+8','0','1 kg','E1'),
 ('3132','SU İLE TEPKİMEYE GİREN KATI, ALEVLENEBİLİR, B.B.B.','4.3','WF2','I','E','','4.3
 +4.1','0','','E0'),
-('3132','SU İLE TEPKİMEYE GİREN KATI, ALEVLENEBİLİR, B.B.B.','4.3','WF2','II','D/E','423','4.3
-+4.1','0','500 g','E2'),
-('3132','SU İLE TEPKİMEYE GİREN KATI, ALEVLENEBİLİR, B.B.B.','4.3','WF2','III','E','423','4.3
-+4.1','0','1 kg','E1'),
 ('3133','SU İLE TEPKİMEYE GİREN KATI, YÜKSELTGEN, B.B.B.','4.3','WO','TAŞINMASI YASAKTIR','','','','','',''),
 ('3134','SU İLE TEPKİMEYE GİREN KATI, ZEHİRLİ, B.B.B.','4.3','WT2','I','E','','4.3
 +6.1','0','','E0'),
-('3134','SU İLE TEPKİMEYE GİREN KATI, ZEHİRLİ, B.B.B.','4.3','WT2','II','D/E','462','4.3
-+6.1','0','500 g','E2'),
-('3134','SU İLE TEPKİMEYE GİREN KATI, ZEHİRLİ, B.B.B.','4.3','WT2','III','E','462','4.3
-+6.1','0','1 kg','E1'),
 ('3135','SU İLE TEPKİMEYE GİREN KATI, KENDİLİĞİNDEN ISINAN, B.B.B.','4.3','WS','I','E','','4.3
 +4.2','1','','E0'),
-('3135','SU İLE TEPKİMEYE GİREN KATI, KENDİLİĞİNDEN ISINAN, B.B.B.','4.3','WS','II','D/E','423','4.3
-+4.2','2','','E2'),
-('3135','SU İLE TEPKİMEYE GİREN KATI, KENDİLİĞİNDEN ISINAN, B.B.B.','4.3','WS','III','E','423','4.3
-+4.2','3','','E1'),
 ('3136','TRİFLOROMETAN, SOĞUTULMUŞ SIVI','2','3A','','C/E','22','2.2','3','120 ml','E1'),
 ('3137','YÜKSELTGEN KATI, ALEVLENEBİLİR, B.B.B.','5.1','OF','TAŞINMASI YASAKTIR','','','','','',''),
 ('3138','ETİLEN, ASETİLEN VE  PROPİLEN KARIŞIMI, SOĞUTULMUŞ SIVI %6''dan az  propilen, %22,5''ten az asetilen ve en  az %71,5 etilen içeren','2','3F','','B/D','223','2.1','2','','E0'),
 ('3139','YÜKSELTGEN SIVI, B.B.B.','5.1','O1','I','E','','5.1','1','','E0'),
-('3139','YÜKSELTGEN SIVI, B.B.B.','5.1','O1','II','E','','5.1','2','1 L','E2'),
-('3139','YÜKSELTGEN SIVI, B.B.B.','5.1','O1','III','E','','5.1','3','5 L','E1'),
 ('3140','ALKALOİTLER, SIVI, B.B.B. veya  ALKALOİT TUZLARI, SIVI, B.B.B.','6.1','T1','I','C/E','66','6.1','1','','E5'),
-('3140','ALKALOİTLER, SIVI, B.B.B. veya  ALKALOİT TUZLARI, SIVI, B.B.B.','6.1','T1','II','D/E','60','6.1','2','100 ml','E4'),
-('3140','ALKALOİTLER, SIVI, B.B.B. veya  ALKALOİT TUZLARI, SIVI, B.B.B.','6.1','T1','III','E','60','6.1','2','5 L','E1'),
 ('3141','ANTİMON BİLEŞİĞİ, İNORGANİK, SIVI, B.B.B.','6.1','T4','III','E','60','6.1','2','5 L','E1'),
 ('3142','DEZENFEKTAN, SIVI, ZEHİRLİ, B.B.B.','6.1','T1','I','C/E','66','6.1','1','','E5'),
-('3142','DEZENFEKTAN, SIVI, ZEHİRLİ, B.B.B.','6.1','T1','II','D/E','60','6.1','2','100 ml','E4'),
-('3142','DEZENFEKTAN, SIVI, ZEHİRLİ, B.B.B.','6.1','T1','III','E','60','6.1','2','5 L','E1'),
 ('3143','BOYA, KATI, ZEHİRLİ, B.B.B. veya BOYA ARA ÜRÜN, KATI, ZEHİRLİ, B.B.B.','6.1','T2','I','C/E','66','6.1','1','','E5'),
-('3143','BOYA, KATI, ZEHİRLİ, B.B.B. veya BOYA ARA ÜRÜN, KATI, ZEHİRLİ, B.B.B.','6.1','T2','II','D/E','60','6.1','2','500 g','E4'),
-('3143','BOYA, KATI, ZEHİRLİ, B.B.B. veya BOYA ARA ÜRÜN, KATI, ZEHİRLİ, B.B.B.','6.1','T2','III','E','60','6.1','2','5 kg','E1'),
 ('3144','NİKOTİN BİLEŞİĞİ, SIVI, B.B.B. veya NİKOTİN MÜSTAHZARI, SIVI, B.B.B.','6.1','T1','I','C/E','66','6.1','1','','E5'),
-('3144','NİKOTİN BİLEŞİĞİ, SIVI, B.B.B. veya NİKOTİN MÜSTAHZARI, SIVI, B.B.B.','6.1','T1','II','D/E','60','6.1','2','100 ml','E4'),
-('3144','NİKOTİN BİLEŞİĞİ, SIVI, B.B.B. veya NİKOTİN MÜSTAHZARI, SIVI, B.B.B.','6.1','T1','III','E','60','6.1','2','5 L','E1'),
 ('3145','ALKİLFENOLLER, SIVI, B.B.B. (C2- C12 homologlar dâhil)','8','C3','I','E','88','8','1','','E0'),
-('3145','ALKİLFENOLLER, SIVI, B.B.B. (C2- C12 homologlar dâhil)','8','C3','II','E','80','8','2','1 L','E2'),
-('3145','ALKİLFENOLLER, SIVI, B.B.B. (C2- C12 homologlar dâhil)','8','C3','III','E','80','8','3','5 L','E1'),
 ('3146','ORGANOTİN BİLEŞİĞİ, KATI, B.B.B.','6.1','T3','I','C/E','66','6.1','1','','E5'),
-('3146','ORGANOTİN BİLEŞİĞİ, KATI, B.B.B.','6.1','T3','II','D/E','60','6.1','2','500 g','E4'),
-('3146','ORGANOTİN BİLEŞİĞİ, KATI, B.B.B.','6.1','T3','III','E','60','6.1','2','5 kg','E1'),
 ('3147','BOYA, KATI, AŞINDIRICI, B.B.B. veya BOYA ARA ÜRÜN, KATI, AŞINDIRICI, B.B.B.','8','C10','I','E','88','8','1','','E0'),
-('3147','BOYA, KATI, AŞINDIRICI, B.B.B. veya BOYA ARA ÜRÜN, KATI, AŞINDIRICI, B.B.B.','8','C10','II','E','80','8','2','1 kg','E2'),
-('3147','BOYA, KATI, AŞINDIRICI, B.B.B. veya BOYA ARA ÜRÜN, KATI, AŞINDIRICI, B.B.B.','8','C10','III','E','80','8','3','5 kg','E1'),
 ('3148','SU İLE TEPKİMEYE GİREN SIVI, B.B.B.','4.3','W1','I','B/E','X323','4.3','0','','E0'),
-('3148','SU İLE TEPKİMEYE GİREN SIVI, B.B.B.','4.3','W1','II','D/E','323','4.3','0','500 ml','E2'),
-('3148','SU İLE TEPKİMEYE GİREN SIVI, B.B.B.','4.3','W1','III','E','323','4.3','0','1 L','E1'),
 ('3149','HİDROJEN PEROKSİT VE  PEROKSİASETİK ASİT KARIŞIMI  asit(ler), su içeren ve içerdiği peroksiasetik asit oranı %5''ten fazla  olmayan; STABİLİZE','5.1','OC1','II','E','58','5.1
 +8','2','1 L','E2'),
 ('3150','DÜZENEKLER, KÜÇÜK, HİDROKARBON GAZIYLA  ÇALIŞAN veya KÜÇÜK  DÜZENEKLER İÇİN  HİDROKARBON GAZ YEDEKLERİ, tahliye cihazı içeren','2','6F','','D','','2.1','2','','E0'),
@@ -3001,92 +2430,51 @@ values
 +2.1','1','','E0'),
 ('3169','GAZ NUMUNESİ, BASINÇSIZ, ZEHİRLİ, B.B.B., soğutulmamış sıvı','2','7T','','D','','2.3','1','','E0'),
 ('3170','ALÜMİNYUM İZABESİ YAN  ÜRÜNLERİ veya ALÜMİNYUM  YENİDEN ERİTME YAN  ÜRÜNLERİ','4.3','W2','II','D/E','423','4.3','2','500 g','E2'),
-('3170','ALÜMİNYUM İZABESİ YAN  ÜRÜNLERİ veya ALÜMİNYUM  YENİDEN ERİTME YAN  ÜRÜNLERİ','4.3','W2','III','E','423','4.3','3','1 kg','E1'),
 ('3171','BATARYA İLE ÇALIŞAN ARAÇ  veya BATARYA İLE ÇALIŞAN  TEÇHİZAT','9','M11','','','','','','',''),
 ('3172','TOKSİNLER, CANLI  KAYNAKLARDAN  AYRIŞTIRILMIŞ, SIVI, B.B.B.','6.1','T1','I','C/E','66','6.1','1','','E5'),
-('3172','TOKSİNLER, CANLI  KAYNAKLARDAN  AYRIŞTIRILMIŞ, SIVI, B.B.B.','6.1','T1','II','D/E','60','6.1','2','100 ml','E4'),
-('3172','TOKSİNLER, CANLI  KAYNAKLARDAN  AYRIŞTIRILMIŞ, SIVI, B.B.B.','6.1','T1','III','E','60','6.1','2','5 L','E1'),
 ('3174','TİTANYUM DİSÜLFÜR','4.2','S4','III','E','40','4.2','3','','E1'),
 ('3175','KATILAR veya katı karışımları  (müstahzar ve atıklar gibi), parlama  noktası 60 °C''ye kadar olan  ALEVLENEBİLİR SIVI, B.B.B. İÇEREN','4.1','F1','II','E','40','4.1','2','1 kg','E2'),
 ('3176','ALEVLENEBİLİR KATI, ORGANİK, ERİMİŞ, B.B.B.','4.1','F2','II','E','44','4.1','2','','E0'),
-('3176','ALEVLENEBİLİR KATI, ORGANİK, ERİMİŞ, B.B.B.','4.1','F2','III','E','44','4.1','3','','E0'),
 ('3178','ALEVLENEBİLİR KATI, İNORGANİK, B.B.B.','4.1','F3','II','E','40','4.1','2','1 kg','E2'),
-('3178','ALEVLENEBİLİR KATI, İNORGANİK, B.B.B.','4.1','F3','III','E','40','4.1','3','5 kg','E1'),
 ('3179','ALEVLENEBİLİR KATI, ZEHİRLİ, İNORGANİK, B.B.B.','4.1','FT2','II','E','46','4.1
 +6.1','2','1 kg','E2'),
-('3179','ALEVLENEBİLİR KATI, ZEHİRLİ, İNORGANİK, B.B.B.','4.1','FT2','III','E','46','4.1
-+6.1','3','5 kg','E1'),
 ('3180','ALEVLENEBİLİR KATI, AŞINDIRICI, İNORGANİK, B.B.B.','4.1','FC2','II','E','48','4.1
 +8','2','1 kg','E2'),
-('3180','ALEVLENEBİLİR KATI, AŞINDIRICI, İNORGANİK, B.B.B.','4.1','FC2','III','E','48','4.1
-+8','3','5 kg','E1'),
 ('3181','ORGANİK BİLEŞİKLERİN  METAL TUZLARI, ALEVLENEBİLİR, B.B.B.','4.1','F3','II','E','40','4.1','2','1 kg','E2'),
-('3181','ORGANİK BİLEŞİKLERİN  METAL TUZLARI, ALEVLENEBİLİR, B.B.B.','4.1','F3','III','E','40','4.1','3','5 kg','E1'),
 ('3182','METAL HİDRİTLER, ALEVLENEBİLİR, B.B.B.','4.1','F3','II','E','40','4.1','2','1 kg','E2'),
-('3182','METAL HİDRİTLER, ALEVLENEBİLİR, B.B.B.','4.1','F3','III','E','40','4.1','3','5 kg','E1'),
 ('3183','KENDİLİĞİNDEN ISINAN SIVI, ORGANİK, B.B.B.','4.2','S1','II','D/E','30','4.2','2','','E2'),
-('3183','KENDİLİĞİNDEN ISINAN SIVI, ORGANİK, B.B.B.','4.2','S1','III','E','30','4.2','3','','E1'),
 ('3184','KENDİLİĞİNDEN ISINAN SIVI, ZEHİRLİ, ORGANİK, B.B.B.','4.2','ST1','II','D/E','36','4.2
 +6.1','2','','E2'),
-('3184','KENDİLİĞİNDEN ISINAN SIVI, ZEHİRLİ, ORGANİK, B.B.B.','4.2','ST1','III','E','36','4.2
-+6.1','3','','E1'),
 ('3185','KENDİLİĞİNDEN ISINAN SIVI, AŞINDIRICI, ORGANİK, B.B.B.','4.2','SC1','II','D/E','38','4.2
 +8','2','','E2'),
-('3185','KENDİLİĞİNDEN ISINAN SIVI, AŞINDIRICI, ORGANİK, B.B.B.','4.2','SC1','III','E','38','4.2
-+8','3','','E1'),
 ('3186','KENDİLİĞİNDEN ISINAN SIVI, İNORGANİK, B.B.B.','4.2','S3','II','D/E','30','4.2','2','','E2'),
-('3186','KENDİLİĞİNDEN ISINAN SIVI, İNORGANİK, B.B.B.','4.2','S3','III','E','30','4.2','3','','E1'),
 ('3187','KENDİLİĞİNDEN ISINAN SIVI, ZEHİRLİ, İNORGANİK, B.B.B.','4.2','ST3','II','D/E','36','4.2
 +6.1','2','','E2'),
-('3187','KENDİLİĞİNDEN ISINAN SIVI, ZEHİRLİ, İNORGANİK, B.B.B.','4.2','ST3','III','E','36','4.2
-+6.1','3','','E1'),
 ('3188','KENDİLİĞİNDEN ISINAN SIVI, AŞINDIRICI, İNORGANİK, B.B.B.','4.2','SC3','II','D/E','38','4.2
 +8','2','','E2'),
-('3188','KENDİLİĞİNDEN ISINAN SIVI, AŞINDIRICI, İNORGANİK, B.B.B.','4.2','SC3','III','E','38','4.2
-+8','3','','E1'),
 ('3189','METAL TOZU, KENDİLİĞİNDEN  ISINAN, B.B.B.','4.2','S4','II','D/E','40','4.2','2','','E2'),
-('3189','METAL TOZU, KENDİLİĞİNDEN  ISINAN, B.B.B.','4.2','S4','III','E','40','4.2','3','','E1'),
 ('3190','KENDİLİĞİNDEN ISINAN KATI, İNORGANİK, B.B.B.','4.2','S4','II','D/E','40','4.2','2','','E2'),
-('3190','KENDİLİĞİNDEN ISINAN KATI, İNORGANİK, B.B.B.','4.2','S4','III','E','40','4.2','3','','E1'),
 ('3191','KENDİLİĞİNDEN ISINAN KATI, ZEHİRLİ, İNORGANİK, B.B.B.','4.2','ST4','II','D/E','46','4.2
 +6.1','2','','E2'),
-('3191','KENDİLİĞİNDEN ISINAN KATI, ZEHİRLİ, İNORGANİK, B.B.B.','4.2','ST4','III','E','46','4.2
-+6.1','3','','E1'),
 ('3192','KENDİLİĞİNDEN ISINAN KATI, AŞINDIRICI, İNORGANİK, B.B.B.','4.2','SC4','II','D/E','48','4.2
 +8','2','','E2'),
-('3192','KENDİLİĞİNDEN ISINAN KATI, AŞINDIRICI, İNORGANİK, B.B.B.','4.2','SC4','III','E','48','4.2
-+8','3','','E1'),
 ('3194','PİROFORİK SIVI, İNORGANİK, B.B.B.','4.2','S3','I','B/E','333','4.2','0','','E0'),
 ('3200','PİROFORİK KATI, İNORGANİK, B.B.B.','4.2','S4','I','B/E','43','4.2','0','','E0'),
 ('3205','ALKALİ TOPRAK METAL  ALKOLATLAR, B.B.B.','4.2','S4','II','D/E','40','4.2','2','','E2'),
-('3205','ALKALİ TOPRAK METAL  ALKOLATLAR, B.B.B.','4.2','S4','III','E','40','4.2','3','','E1'),
 ('3206','ALKALİ METAL ALKOLATLAR, KENDİLİĞİNDEN ISINAN, AŞINDIRICI, B.B.B.','4.2','SC4','II','D/E','48','4.2
 +8','2','','E2'),
-('3206','ALKALİ METAL ALKOLATLAR, KENDİLİĞİNDEN ISINAN, AŞINDIRICI, B.B.B.','4.2','SC4','III','E','48','4.2
-+8','3','','E1'),
 ('3208','METALİK MADDE, SU İLE  TEPKİMEYE GİREN, B.B.B.','4.3','W2','I','E','','4.3','1','','E0'),
-('3208','METALİK MADDE, SU İLE  TEPKİMEYE GİREN, B.B.B.','4.3','W2','II','D/E','423','4.3','2','500 g','E2'),
-('3208','METALİK MADDE, SU İLE  TEPKİMEYE GİREN, B.B.B.','4.3','W2','III','E','423','4.3','3','1 kg','E1'),
 ('3209','METALİK MADDE, SU İLE  TEPKİMEYE GİREN, KENDİLİĞİNDEN ISINAN, B.B.B.','4.3','WS','I','E','','4.3
 +4.2','1','','E0'),
-('3209','METALİK MADDE, SU İLE  TEPKİMEYE GİREN, KENDİLİĞİNDEN ISINAN, B.B.B.','4.3','WS','II','D/E','423','4.3
-+4.2','2','','E0'),
-('3209','METALİK MADDE, SU İLE  TEPKİMEYE GİREN, KENDİLİĞİNDEN ISINAN, B.B.B.','4.3','WS','III','E','423','4.3
-+4.2','3','','E1'),
 ('3210','KLORATLAR, İNORGANİK, SULU  ÇÖZELTİ, B.B.B.','5.1','O1','II','E','50','5.1','2','1 L','E2'),
-('3210','KLORATLAR, İNORGANİK, SULU ÇÖZELTİ, B.B.B.','5.1','O1','III','E','50','5.1','3','5 L','E1'),
 ('3211','PERKLORATLAR, İNORGANİK, SULU ÇÖZELTİ, B.B.B.','5.1','O1','II','E','50','5.1','2','1 L','E2'),
-('3211','PERKLORATLAR, İNORGANİK, SULU ÇÖZELTİ, B.B.B.','5.1','O1','III','E','50','5.1','3','5 L','E1'),
 ('3212','HİPOKLORİTLER, İNORGANİK, B.B.B.','5.1','O2','II','E','50','5.1','2','1 kg','E2'),
 ('3213','BROMATLAR, İNORGANİK, SULU ÇÖZELTİ, B.B.B.','5.1','O1','II','E','50','5.1','2','1 L','E2'),
-('3213','BROMATLAR, İNORGANİK, SULU ÇÖZELTİ, B.B.B.','5.1','O1','III','E','50','5.1','3','5 L','E1'),
 ('3214','PERMANGANATLAR, İNORGANİK, SULU ÇÖZELTİ, B.B.B.','5.1','O1','II','E','50','5.1','2','1 L','E2'),
 ('3215','PERSÜLFATLAR, İNORGANİK, B.B.B.','5.1','O2','III','E','50','5.1','3','5 kg','E1'),
 ('3216','PERSÜLFATLAR, İNORGANİK, SULU ÇÖZELTİ, B.B.B.','5.1','O1','III','E','50','5.1','3','5 L','E1'),
 ('3218','NİTRATLAR, İNORGANİK, SULU  ÇÖZELTİ, B.B.B.','5.1','O1','II','E','50','5.1','2','1 L','E2'),
-('3218','NİTRATLAR, İNORGANİK, SULU  ÇÖZELTİ, B.B.B.','5.1','O1','III','E','50','5.1','3','5 L','E1'),
 ('3219','NİTRİTLER, İNORGANİK, SULU  ÇÖZELTİ, B.B.B.','5.1','O1','II','E','50','5.1','2','1 L','E2'),
-('3219','NİTRİTLER, İNORGANİK, SULU  ÇÖZELTİ, B.B.B.','5.1','O1','III','E','50','5.1','3','5 L','E1'),
 ('3220','PENTAFLOROETAN (SOĞUTUCU  GAZ R 125)','2','2A','','C/E','20','2.2','3','120 ml','E1'),
 ('3221','KENDİLİĞİNDEN TEPKİMEYE  GİREN SIVI, TİP B','4.1','SR1','','B','','4.1
 +1','1','25 ml','E0'),
@@ -3117,17 +2505,12 @@ values
 ('3243','ZEHİRLİ SIVI İÇEREN KATILAR, B.B.B.','6.1','T9','II','D/E','60','6.1','2','500 g','E4'),
 ('3244','AŞINDIRICI SIVI İÇEREN  KATILAR, B.B.B.','8','C10','II','E','80','8','2','1 kg','E2'),
 ('3245','GENETİĞİ DEĞİŞTİRİLMİŞ  MİKROORGANİZMALAR veya  GENETİĞİ DEĞİŞTİRİLMİŞ  ORGANİZMALAR','9','M8','','E','','9','2','','E0'),
-('3245','GENETİĞİ DEĞİŞTİRİLMİŞ  MİKROORGANİZMALAR veya  GENETİĞİ DEĞİŞTİRİLMİŞ  ORGANİZMALAR, soğutulmuş sıvı  azot içinde','9','M8','','E','','9
-+2.2','2','','E0'),
 ('3246','METANSÜLFONİL KLORÜR','6.1','TC1','I','C/D','668','6.1
 +8','1','','E0'),
 ('3247','SODYUM PEROKZOBORAT, SUSUZ','5.1','O2','II','E','50','5.1','2','1 kg','E2'),
 ('3248','İLAÇ, SIVI, ALEVLENEBİLİR,  ZEHİRLİ, B.B.B.','3','FT1','II','D/E','336','3
 +6.1','2','1 L','E2'),
-('3248','İLAÇ, SIVI, ALEVLENEBİLİR,  ZEHİRLİ, B.B.B.','3','FT1','III','D/E','36','3
-+6.1','3','5 L','E1'),
 ('3249','İLAÇ, KATI, ZEHİRLİ, B.B.B.','6.1','T2','II','D/E','60','6.1','2','500 g','E4'),
-('3249','İLAÇ, KATI, ZEHİRLİ, B.B.B.','6.1','T2','III','E','60','6.1','2','5 kg','E1'),
 ('3250','KLOROASETİK ASİT, ERİMİŞ','6.1','TC1','II','D/E','68','6.1
 +8','0','','E0'),
 ('3251','İZOSORBİT-5-MONONİTRAT','4.1','SR1','III','D','','4.1','3','5 kg','E0'),
@@ -3136,116 +2519,55 @@ values
 ('3254','TRİBÜTİLFOSFAN','4.2','S1','I','B/E','333','4.2','0','','E0'),
 ('3255','tert-BÜTİL HİPOKLORİT','4.2','SC1','TAŞINMASI YASAKTIR','','','','','',''),
 ('3256','YÜKSEK SICAKLIKLI SIVI, ALEVLENEBİLİR, B.B.B. parlama  noktası 60 °C''nin üstünde, parlama  noktasında veya üzerinde ve 100  °C''nin altında','3','F2','III','D/E','30','3','3','','E0'),
-('3256','YÜKSEK SICAKLIKLI SIVI, ALEVLENEBİLİR, B.B.B. parlama  noktası 60 °C''nin üstünde, parlama  noktasında veya üstünde ve 100  °C''nin üstünde','3','F2','III','D/E','30','3','3','','E0'),
 ('3257','YÜKSEK SICAKLIKLI SIVI, B.B.B., 100 °C''de veya üzerinde ve  parlama noktasının altında (erimiş  metaller ve erimiş metal tuzları vb. dâhil), 190 °C''den yüksek sıcaklıkta  doldurulmuş','9','M9','III','D','99','9','3','','E0'),
-('3257','YÜKSEK SICAKLIKLI SIVI, B.B.B., 100 °C''de veya üstünde ve  parlama noktasının altında (erimiş  metaller ve erimiş metal tuzları vb. dâhil), 190 °C''de veya altında  sıcaklıkta doldurulmuş','9','M9','III','D','99','9','3','','E0'),
 ('3258','YÜKSEK SICAKLIKLI KATI, B.B.B., 240 °C''de veya altında','9','M10','III','D','99','9','3','','E0'),
 ('3259','AMİNLER, KATI, AŞINDIRICI, B.B.B. veya POLİAMİNLER, KATI, AŞINDIRICI, B.B.B.','8','C8','I','E','88','8','1','','E0'),
-('3259','AMİNLER, KATI, AŞINDIRICI, B.B.B. veya POLİAMİNLER, KATI, AŞINDIRICI, B.B.B.','8','C8','II','E','80','8','2','1 kg','E2'),
-('3259','AMİNLER, KATI, AŞINDIRICI, B.B.B. veya POLİAMİNLER, KATI, AŞINDIRICI, B.B.B.','8','C8','III','E','80','8','3','5 kg','E1'),
 ('3260','AŞINDIRICI KATI, ASİDİK, İNORGANİK, B.B.B.','8','C2','I','E','88','8','1','','E0'),
-('3260','AŞINDIRICI KATI, ASİDİK, İNORGANİK, B.B.B.','8','C2','II','E','80','8','2','1 kg','E2'),
-('3260','AŞINDIRICI KATI, ASİDİK, İNORGANİK, B.B.B.','8','C2','III','E','80','8','3','5 kg','E1'),
 ('3261','AŞINDIRICI KATI, ASİDİK, ORGANİK, B.B.B.','8','C4','I','E','88','8','1','','E0'),
-('3261','AŞINDIRICI KATI, ASİDİK, ORGANİK, B.B.B.','8','C4','II','E','80','8','2','1 kg','E2'),
-('3261','AŞINDIRICI KATI, ASİDİK, ORGANİK, B.B.B.','8','C4','III','E','80','8','3','5 kg','E1'),
 ('3262','AŞINDIRICI KATI, BAZİK, İNORGANİK, B.B.B.','8','C6','I','E','88','8','1','','E0'),
-('3262','AŞINDIRICI KATI, BAZİK, İNORGANİK, B.B.B.','8','C6','II','E','80','8','2','1 kg','E2'),
-('3262','AŞINDIRICI KATI, BAZİK, İNORGANİK, B.B.B.','8','C6','III','E','80','8','3','5 kg','E1'),
 ('3263','AŞINDIRICI KATI, BAZİK, ORGANİK, B.B.B.','8','C8','I','E','88','8','1','','E0'),
-('3263','AŞINDIRICI KATI, BAZİK, ORGANİK, B.B.B.','8','C8','II','E','80','8','2','1 kg','E2'),
-('3263','AŞINDIRICI KATI, BAZİK, ORGANİK, B.B.B.','8','C8','III','E','80','8','3','5 kg','E1'),
 ('3264','AŞINDIRICI SIVI, ASİDİK, İNORGANİK, B.B.B.','8','C1','I','E','88','8','1','','E0'),
-('3264','AŞINDIRICI SIVI, ASİDİK, İNORGANİK, B.B.B.','8','C1','II','E','80','8','2','1 L','E2'),
-('3264','AŞINDIRICI SIVI, ASİDİK, İNORGANİK, B.B.B.','8','C1','III','E','80','8','3','5 L','E1'),
 ('3265','AŞINDIRICI SIVI, ASİDİK, ORGANİK, B.B.B.','8','C3','I','E','88','8','1','','E0'),
-('3265','AŞINDIRICI SIVI, ASİDİK, ORGANİK, B.B.B.','8','C3','II','E','80','8','2','1 L','E2'),
-('3265','AŞINDIRICI SIVI, ASİDİK, ORGANİK, B.B.B.','8','C3','III','E','80','8','3','5 L','E1'),
 ('3266','AŞINDIRICI SIVI, BAZİK, İNORGANİK, B.B.B.','8','C5','I','E','88','8','1','','E0'),
-('3266','AŞINDIRICI SIVI, BAZİK, İNORGANİK, B.B.B.','8','C5','II','E','80','8','2','1 L','E2'),
-('3266','AŞINDIRICI SIVI, BAZİK, İNORGANİK, B.B.B.','8','C5','III','E','80','8','3','5 L','E1'),
 ('3267','AŞINDIRICI SIVI, BAZİK, ORGANİK, B.B.B.','8','C7','I','E','88','8','1','','E0'),
-('3267','AŞINDIRICI SIVI, BAZİK, ORGANİK, B.B.B.','8','C7','II','E','80','8','2','1 L','E2'),
-('3267','AŞINDIRICI SIVI, BAZİK, ORGANİK, B.B.B.','8','C7','III','E','80','8','3','5 L','E1'),
 ('3268','EMNİYET CİHAZLARI, elektrikle  çalışan','9','M5','','E','','9','4','','E0'),
 ('3269','POLYESTER REÇİNE KİTİ, sıvı  taban malzemesi','3','F1','II','E','','3','2','5 L','Bkz. ÖH 340'),
-('3269','POLYESTER REÇİNE KİTİ, sıvı  taban malzemesi','3','F1','III','E','','3','3','5 L','Bkz. ÖH 340'),
 ('3270','NİTROSELÜLOZ MEMBRAN  FİLTRELER, kuru kütlece %12,6''dan  fazla azot içermeyen','4.1','F1','II','E','','4.1','2','1 kg','E2'),
 ('3271','ETERLER, B.B.B.','3','F1','II','D/E','33','3','2','1 L','E2'),
-('3271','ETERLER, B.B.B.','3','F1','III','D/E','30','3','3','5 L','E1'),
 ('3272','ESTERLER, B.B.B.','3','F1','II','D/E','33','3','2','1 L','E2'),
-('3272','ESTERLER, B.B.B.','3','F1','III','D/E','30','3','3','5 L','E1'),
 ('3273','NİTRİLLER, ALEVLENEBİLİR,  ZEHİRLİ, B.B.B.','3','FT1','I','C/E','336','3
 +6.1','1','','E0'),
-('3273','NİTRİLLER, ALEVLENEBİLİR,  ZEHİRLİ, B.B.B.','3','FT1','II','D/E','336','3
-+6.1','2','1 L','E2'),
 ('3274','ALKOLATLAR ÇÖZELTİ, B.B.B., alkolde','3','FC','II','D/E','338','3
 +8','2','1 L','E2'),
 ('3275','NİTRİLLER, ZEHİRLİ, ALEVLENEBİLİR, B.B.B.','6.1','TF1','I','C/D','663','6.1
 +3','1','','E5'),
-('3275','NİTRİLLER, ZEHİRLİ, ALEVLENEBİLİR, B.B.B.','6.1','TF1','II','D/E','63','6.1
-+3','2','100 ml','E4'),
 ('3276','NİTRİLLER, SIVI, ZEHİRLİ, B.B.B.','6.1','T1','I','C/E','66','6.1','1','','E5'),
-('3276','NİTRİLLER, SIVI, ZEHİRLİ, B.B.B.','6.1','T1','II','D/E','60','6.1','2','100 ml','E4'),
-('3276','NİTRİLLER, SIVI, ZEHİRLİ, B.B.B.','6.1','T1','III','E','60','6.1','2','5 L','E1'),
 ('3277','KLOROFORMATLAR, ZEHİRLİ, AŞINDIRICI, B.B.B.','6.1','TC1','II','D/E','68','6.1
 +8','2','100 ml','E4'),
 ('3278','ORGANOFOSFORLU BİLEŞİK, SIVI, ZEHİRLİ, B.B.B.','6.1','T1','I','C/E','66','6.1','1','','E5'),
-('3278','ORGANOFOSFORLU BİLEŞİK, SIVI, ZEHİRLİ, B.B.B.','6.1','T1','II','D/E','60','6.1','2','100 ml','E4'),
-('3278','ORGANOFOSFORLU BİLEŞİK, SIVI, ZEHİRLİ, B.B.B.','6.1','T1','III','E','60','6.1','2','5 L','E1'),
 ('3279','ORGANOFOSFOR BİLEŞİĞİ,  ZEHİRLİ, ALEVLENEBİLİR,  B.B.B.','6.1','TF1','I','C/D','663','6.1
 +3','1','','E5'),
-('3279','ORGANOFOSFOR BİLEŞİĞİ,  ZEHİRLİ, ALEVLENEBİLİR,  B.B.B.','6.1','TF1','II','D/E','63','6.1
-+3','2','100 ml','E4'),
 ('3280','ORGANOARSENİK BİLEŞİĞİ,  SIVI, B.B.B.','6.1','T3','I','C/E','66','6.1','1','','E5'),
-('3280','ORGANOARSENİK BİLEŞİĞİ,  SIVI, B.B.B.','6.1','T3','II','D/E','60','6.1','2','100 ml','E4'),
-('3280','ORGANOARSENİK BİLEŞİĞİ,  SIVI, B.B.B.','6.1','T3','III','E','60','6.1','2','5 L','E1'),
 ('3281','METAL KARBONİLLER, SIVI, B.B.B.','6.1','T3','I','C/E','66','6.1','1','','E5'),
-('3281','METAL KARBONİLLER, SIVI, B.B.B.','6.1','T3','II','D/E','60','6.1','2','100 ml','E4'),
-('3281','METAL KARBONİLLER, SIVI, B.B.B.','6.1','T3','III','E','60','6.1','2','5 L','E1'),
 ('3282','ORGANOMETALİK BİLEŞİK, SIVI, ZEHİRLİ, B.B.B.','6.1','T3','I','C/E','66','6.1','1','','E5'),
-('3282','ORGANOMETALİK BİLEŞİK, SIVI, ZEHİRLİ, B.B.B.','6.1','T3','II','D/E','60','6.1','2','100 ml','E4'),
-('3282','ORGANOMETALİK BİLEŞİK, SIVI, ZEHİRLİ, B.B.B.','6.1','T3','III','E','60','6.1','2','5 L','E1'),
 ('3283','SELENYUM BİLEŞİĞİ, KATI, B.B.B.','6.1','T5','I','C/E','66','6.1','1','','E5'),
-('3283','SELENYUM BİLEŞİĞİ, KATI, B.B.B.','6.1','T5','II','D/E','60','6.1','2','500 g','E4'),
-('3283','SELENYUM BİLEŞİĞİ, KATI, B.B.B.','6.1','T5','III','E','60','6.1','2','5 kg','E1'),
 ('3284','TELLÜR BİLEŞİĞİ, B.B.B.','6.1','T5','I','C/E','66','6.1','1','','E5'),
-('3284','TELLÜR BİLEŞİĞİ, B.B.B.','6.1','T5','II','D/E','60','6.1','2','500 g','E4'),
-('3284','TELLÜR BİLEŞİĞİ, B.B.B.','6.1','T5','III','E','60','6.1','2','5 kg','E1'),
 ('3285','VANADYUM BİLEŞİĞİ, B.B.B.','6.1','T5','I','C/E','66','6.1','1','','E5'),
-('3285','VANADYUM BİLEŞİĞİ, B.B.B.','6.1','T5','II','D/E','60','6.1','2','500 g','E4'),
-('3285','VANADYUM BİLEŞİĞİ, B.B.B.','6.1','T5','III','E','60','6.1','2','5 kg','E1'),
 ('3286','ALEVLENEBİLİR SIVI, ZEHİRLİ, AŞINDIRICI, B.B.B.','3','FTC','I','C/E','368','3
 +6.1
 +8','1','','E0'),
-('3286','ALEVLENEBİLİR SIVI, ZEHİRLİ, AŞINDIRICI, B.B.B.','3','FTC','II','D/E','368','3
-+6.1
-+8','2','1 L','E2'),
 ('3287','ZEHİRLİ SIVI, İNORGANİK, B.B.B.','6.1','T4','I','C/E','66','6.1','1','','E5'),
-('3287','ZEHİRLİ SIVI, İNORGANİK, B.B.B.','6.1','T4','II','D/E','60','6.1','2','100 ml','E4'),
-('3287','ZEHİRLİ SIVI, İNORGANİK, B.B.B.','6.1','T4','III','E','60','6.1','2','5 L','E1'),
 ('3288','ZEHİRLİ KATI, İNORGANİK, B.B.B.','6.1','T5','I','C/E','66','6.1','1','','E5'),
-('3288','ZEHİRLİ KATI, İNORGANİK, B.B.B.','6.1','T5','II','D/E','60','6.1','2','500 g','E4'),
-('3288','ZEHİRLİ KATI, İNORGANİK, B.B.B.','6.1','T5','III','E','60','6.1','2','5 kg','E1'),
 ('3289','ZEHİRLİ SIVI, AŞINDIRICI, İNORGANİK, B.B.B.','6.1','TC3','I','C/E','668','6.1
 +8','1','','E5'),
-('3289','ZEHİRLİ SIVI, AŞINDIRICI, İNORGANİK, B.B.B.','6.1','TC3','II','D/E','68','6.1
-+8','2','100 ml','E4'),
 ('3290','ZEHİRLİ KATI, AŞINDIRICI, İNORGANİK, B.B.B.','6.1','TC4','I','C/E','668','6.1
 +8','1','','E5'),
-('3290','ZEHİRLİ KATI, AŞINDIRICI, İNORGANİK, B.B.B.','6.1','TC4','II','D/E','68','6.1
-+8','2','500 g','E4'),
 ('3291','KLİNİK ATIK, TANIMLANMAMIŞ, B.B.B. veya  (BİYOLOJİK) TIBBİ ATIK, B.B.B. veya DÜZENLENMİŞ TIBBİ ATIK, B.B.B.','6.2','I3','','V1','606','6.2','2','','E0'),
-('3291','KLİNİK ATIK, TANIMLANMAMIŞ, B.B.B. veya  (BİYOLOJİK) TIBBİ ATIK, B.B.B. veya DÜZENLENMİŞ TIBBİ ATIK, B.B.B., soğutulmuş sıvı azot içinde','6.2','I3','','V1','','6.2
-+2.2','2','','E0'),
 ('3292','BATARYALAR, METALİK  SODYUM VEYA SODYUM  ALAŞIMI İÇEREN veya PİLLER, METALİK SODYUM VEYA  SODYUM ALAŞIMI İÇEREN','4.3','W3','','E','','4.3','2','','E0'),
 ('3293','HİDRAZİN SULU ÇÖZELTİ, kütlece %37''den az hidrazin içeren','6.1','T4','III','E','60','6.1','2','5 L','E1'),
 ('3294','HİDROJEN SİYANÜR, ALKOLDE  ÇÖZELTİ %45''ten az hidrojen siyanür içeren','6.1','TF1','I','C/D','663','6.1
 +3','0','','E0'),
 ('3295','HİDROKARBONLAR, SIVI, B.B.B.','3','F1','I','D/E','33','3','1','500 ml','E3'),
-('3295','HİDROKARBONLAR, SIVI, B.B.B  (50 °C''de buhar basıncı 110 kPa’dan  daha yüksek olan)','3','F1','II','D/E','33','3','2','1 L','E2'),
-('3295','HİDROKARBONLAR, SIVI, B.B.B  (50 °C''de buhar basıncı 110 kPa’a eşit  veya daha düşük olan)','3','F1','II','D/E','33','3','2','1 L','E2'),
-('3295','HİDROKARBONLAR, SIVI, B.B.B.','3','F1','III','D/E','30','3','3','5 L','E1'),
 ('3296','HEPTAFLOROPROPAN  (SOĞUTUCU GAZ R 227)','2','2A','','C/E','20','2.2','3','120 ml','E1'),
 ('3297','ETİLEN OKSİT VE  KLOROTETRAFLORO-ETAN  KARIŞIMI, %8,8''den fazla olmayan  etilen oksit ile','2','2A','','C/E','20','2.2','3','120 ml','E1'),
 ('3298','ETİLEN OKSİT VE  PENTAFLOROETAN KARIŞIMI  %7,9''dan fazla olmayan etilen oksit  ile','2','2A','','C/E','20','2.2','3','120 ml','E1'),
@@ -3254,8 +2576,6 @@ values
 +2.1','1','','E0'),
 ('3301','AŞINDIRICI SIVI, KENDİLİĞİNDEN ISINAN, B.B.B.','8','CS1','I','E','884','8
 +4.2','1','','E0'),
-('3301','AŞINDIRICI SIVI, KENDİLİĞİNDEN ISINAN, B.B.B.','8','CS1','II','E','84','8
-+4.2','2','','E2'),
 ('3302','2-DİMETİLAMİNOETİL-AKRİLAT, STABİLİZE','6.1','T1','II','D/E','60','6.1','2','100 ml','E4'),
 ('3303','SIKIŞTIRILMIŞ GAZ, ZEHİRLİ, YÜKSELTGEN, B.B.B.','2','1TO','','C/D','265','2.3
 +5.1','1','','E0'),
@@ -3281,7 +2601,6 @@ values
 +5.1','3','','E0'),
 ('3312','GAZ, SOĞUTULMUŞ SIVI, ALEVLENEBİLİR, B.B.B.','2','3F','','B/D','223','2.1','2','','E0'),
 ('3313','ORGANİK PİGMENTLER, KENDİLİĞİNDEN ISINAN','4.2','S2','II','D/E','40','4.2','2','','E2'),
-('3313','ORGANİK PİGMENTLER, KENDİLİĞİNDEN ISINAN','4.2','S2','III','E','40','4.2','3','','E1'),
 ('3314','PLASTİK KALIP BİLEŞİĞİ hamur, tabaka veya çekilmiş kordon  formunda olan, ALEVLENEBİLİR buhar açığa çıkartan','9','M3','III','D/E','90','Yok','3','5 kg','E1'),
 ('3315','KİMYASAL NUMUNE, ZEHİRLİ','6.1','T8','I','E','','6.1','1','','E0'),
 ('3316','KİMYASAL KİTİ veya İLK  YARDIM KİTİ','9','M11','','E','','9','','Bkz. ÖH 251','Bkz. ÖH 340'),
@@ -3290,7 +2609,6 @@ values
 +8','1','','E0'),
 ('3319','NİTROGLİSERİN KARIŞIMI, DUYARLILIĞI AZALTILMIŞ, KATI, B.B.B. nitrogliserin içeriği  kütlece %2''den fazla fakat %10''dan az  olan','4.1','D','II','B','','4.1','2','','E0'),
 ('3320','SODYUM BOROHİDRİT VE  SODYUM HİDROKSİT ÇÖZELTİSİ, kütlece %12''den az sodyum borohidrit  ve %40''dan az sodyum hidroksit  içeren','8','C5','II','E','80','8','2','1 L','E2'),
-('3320','SODYUM BOROHİDRİT VE SODYUM HİDROKSİT ÇÖZELTİSİ, kütlece %12''den az sodyum borohidrit  ve %40''dan az sodyum hidroksit içeren','8','C5','III','E','80','8','3','5 L','E1'),
 ('3321','RADYOAKTİF MALZEME, DÜŞÜK ÖZGÜL AKTİVİTE (LSA- II), bölünebilir olmayan veya istisnai  bölünebilir','7','','','E','70','7X','0','','E0'),
 ('3322','RADYOAKTİF MALZEME, DÜŞÜK ÖZGÜL AKTİVİTE (LSA- III), bölünebilir olmayan veya istisnai  bölünebilir','7','','','E','70','7X','0','','E0'),
 ('3323','RADYOAKTİF MALZEME, TİP C  AMBALAJ, bölünebilir olmayan veya  istisnai bölünebilir','7','','','E','70','7X','0','','E0'),
@@ -3316,51 +2634,26 @@ values
 ('3334','Havacılık düzenlemelerine tabi sıvı, b.b.b.','9','M11','ADR''YE TABİ DEĞİLDİR','','','','','',''),
 ('3335','Havacılık düzenlemelerine tabi katı, b.b.b.','9','M11','ADR''YE TABİ DEĞİLDİR','','','','','',''),
 ('3336','MERKAPTANLAR, SIVI, ALEVLENEBİLİR, B.B.B. veya  MERKAPTAN KARIŞIMI, SIVI, ALEVLENEBİLİR, B.B.B.','3','F1','I','D/E','33','3','1','','E0'),
-('3336','MERKAPTANLAR, SIVI, ALEVLENEBİLİR, B.B.B. veya  MERKAPTAN KARIŞIMI, SIVI, ALEVLENEBİLİR, B.B.B. (50 °C''de  buhar basıncı 110 kPa’dan daha  yüksek olan)','3','F1','II','D/E','33','3','2','1 L','E2'),
-('3336','MERKAPTANLAR, SIVI, ALEVLENEBİLİR, B.B.B. veya  MERKAPTAN KARIŞIMI, SIVI, ALEVLENEBİLİR, B.B.B. (50 °C''de  buhar basıncı 110 kPa’a eşit veya  daha düşük olan)','3','F1','II','D/E','33','3','2','1 L','E2'),
-('3336','MERKAPTANLAR, SIVI, ALEVLENEBİLİR, B.B.B. veya  MERKAPTAN KARIŞIMI, SIVI, ALEVLENEBİLİR, B.B.B.','3','F1','III','D/E','30','3','3','5 L','E1'),
 ('3337','SOĞUTUCU GAZ R 404A (takriben  %44 pentafloroetan ve %52 1,1,1- trifloroetan içeren pentafloroetan, 1,1,1-trifloroetan ve 1,1,1,2- tetrafloroetan zeotropik karışımı)','2','2A','','C/E','20','2.2','3','120 ml','E1'),
 ('3338','SOĞUTUCU GAZ R 407A (takriben  %40 pentafloroetan ve %20  diflorometan içeren diflorometan, pentafloroetan ve 1,1,1,2- tetrafloroetan zeotropik karışımı)','2','2A','','C/E','20','2.2','3','120 ml','E1'),
 ('3339','SOĞUTUCU GAZ R 407B (takriben  %70 pentafloroetan ve %10  diflorometan içeren diflorometan, pentafloroetan ve 1,1,1,2- tetrafloroetan zeotropik karışımı)','2','2A','','C/E','20','2.2','3','120 ml','E1'),
 ('3340','SOĞUTUCU GAZ R 407C (takriben  %25 pentafloroetan ve %23  diflorometan içeren diflorometan, pentafloroetan ve 1,1,1,2- tetrafloroetan zeotropik karışımı)','2','2A','','C/E','20','2.2','3','120 ml','E1'),
 ('3341','TİYOÜRE DİOKSİT','4.2','S2','II','D/E','40','4.2','2','','E2'),
-('3341','TİYOÜRE DİOKSİT','4.2','S2','III','E','40','4.2','3','','E1'),
 ('3342','KSANTATLAR','4.2','S2','II','D/E','40','4.2','2','','E2'),
-('3342','KSANTATLAR','4.2','S2','III','E','40','4.2','3','','E1'),
 ('3343','NİTROGLİSERİN KARIŞIMI, DUYARLILIĞI AZALTILMIŞ, SIVI, ALEVLENEBİLİR, B.B.B. kütlece %30''dan az nitrogliserin  içeren','3','D','','B','','3','0','','E0'),
 ('3344','PENTAERİTRİT TETRANİTRAT  (PENTAERİTRİTOL  TETRANİTRAT; PETN) KARIŞIMI, DUYARLILIĞI AZALTILMIŞ, KATI, B.B.B., kütlece %10''dan fazla  fakat %20''den az PETN içeren','4.1','D','II','B','','4.1','2','','E0'),
 ('3345','FENOKSİASETİK ASİT TÜREVLİ  PESTİSİT, KATI, ZEHİRLİ','6.1','T7','I','C/E','66','6.1','1','','E5'),
-('3345','FENOKSİASETİK ASİT TÜREVLİ  PESTİSİT, KATI, ZEHİRLİ','6.1','T7','II','D/E','60','6.1','2','500 g','E4'),
-('3345','FENOKSİASETİK ASİT TÜREVLİ  PESTİSİT, KATI, ZEHİRLİ','6.1','T7','III','E','60','6.1','2','5 kg','E1'),
 ('3346','FENOKSİASETİK ASİT TÜREVLİ  PESTİSİT, SIVI, ALEVLENEBİLİR,  ZEHİRLİ, parlama noktası 23 °C''den  düşük olan','3','FT2','I','C/E','336','3
 +6.1','1','','E0'),
-('3346','FENOKSİASETİK ASİT TÜREVLİ  PESTİSİT, SIVI, ALEVLENEBİLİR, ZEHİRLİ, parlama noktası 23 °C''den  düşük olan','3','FT2','II','D/E','336','3
-+6.1','2','1 L','E2'),
 ('3347','FENOKSİASETİK ASİT TÜREVLİ  PESTİSİT, SIVI, ZEHİRLİ, ALEVLENEBİLİR, parlama noktası  23 °C''den düşük olmayan','6.1','TF2','I','C/E','663','6.1
 +3','1','','E5'),
-('3347','FENOKSİASETİK ASİT TÜREVLİ  PESTİSİT, SIVI, ZEHİRLİ, ALEVLENEBİLİR, parlama noktası  23 °C''den düşük olmayan','6.1','TF2','II','D/E','63','6.1
-+3','2','100 ml','E4'),
-('3347','FENOKSİASETİK ASİT TÜREVLİ  PESTİSİT, SIVI, ZEHİRLİ, ALEVLENEBİLİR, parlama noktası  23 °C''den düşük olmayan','6.1','TF2','III','D/E','63','6.1
-+3','2','5 L','E1'),
 ('3348','FENOKSİASETİK ASİT TÜREVLİ  PESTİSİT, SIVI, ZEHİRLİ','6.1','T6','I','C/E','66','6.1','1','','E5'),
-('3348','FENOKSİASETİK ASİT TÜREVLİ  PESTİSİT, SIVI, ZEHİRLİ','6.1','T6','II','D/E','60','6.1','2','100 ml','E4'),
-('3348','FENOKSİASETİK ASİT TÜREVLİ  PESTİSİT, SIVI, ZEHİRLİ','6.1','T6','III','E','60','6.1','2','5 L','E1'),
 ('3349','PİRETROİD PESTİSİT, KATI, ZEHİRLİ','6.1','T7','I','C/E','66','6.1','1','','E5'),
-('3349','PİRETROİD PESTİSİT, KATI, ZEHİRLİ','6.1','T7','II','D/E','60','6.1','2','500 g','E4'),
-('3349','PİRETROİD PESTİSİT, KATI, ZEHİRLİ','6.1','T7','III','E','60','6.1','2','5 kg','E1'),
 ('3350','PİRETROİD PESTİSİT, SIVI, ALEVLENEBİLİR, ZEHİRLİ, parlama noktası 23 °C''den düşük olan','3','FT2','I','C/E','336','3
 +6.1','1','','E0'),
-('3350','PİRETROİD PESTİSİT, SIVI, ALEVLENEBİLİR, ZEHİRLİ, parlama noktası 23 °C''den düşük olan','3','FT2','II','D/E','336','3
-+6.1','2','1 L','E2'),
 ('3351','PİRETROİD PESTİSİT, SIVI, ZEHİRLİ, ALEVLENEBİLİR,  parlama noktası 23 °C''den düşük  olmayan','6.1','TF2','I','C/E','663','6.1
 +3','1','','E5'),
-('3351','PİRETROİD PESTİSİT, SIVI, ZEHİRLİ, ALEVLENEBİLİR,  parlama noktası 23 °C''den düşük  olmayan','6.1','TF2','II','D/E','63','6.1
-+3','2','100 ml','E4'),
-('3351','PİRETROİD PESTİSİT, SIVI, ZEHİRLİ, ALEVLENEBİLİR,  parlama noktası 23 °C''den düşük  olmayan','6.1','TF2','III','D/E','63','6.1
-+3','2','5 L','E1'),
 ('3352','PİRETROİD PESTİSİT, SIVI, ZEHİRLİ','6.1','T6','I','C/E','66','6.1','1','','E5'),
-('3352','PİRETROİD PESTİSİT, SIVI, ZEHİRLİ','6.1','T6','II','D/E','60','6.1','2','100 ml','E4'),
-('3352','PİRETROİD PESTİSİT, SIVI, ZEHİRLİ','6.1','T6','III','E','60','6.1','2','5 L','E1'),
 ('3354','İNSEKTİSİT GAZ, ALEVLENEBİLİR, B.B.B.','2','2F','','B/D','23','2.1','2','','E0'),
 ('3355','İNSEKTİSİT GAZ, ZEHİRLİ, ALEVLENEBİLİR, B.B.B.','2','2TF','','B/D','263','2.3
 +2.1','1','','E0'),
@@ -3385,14 +2678,11 @@ values
 ('3370','ÜRE NİTRAT, ISLATILMIŞ kütlece  %10''dan az olmayan su ile','4.1','D','I','B','','4.1','1','','E0'),
 ('3371','2-METİLBÜTANAL','3','F1','II','D/E','33','3','2','1 L','E2'),
 ('3373','BİYOLOJİK MADDE, KATEGORİ  B','6.2','I4','','','606','6.2','','','E0'),
-('3373','BİYOLOJİK MADDE, KATEGORİ  B (yalnız hayvansal malzeme)','6.2','I4','','','606','6.2','','','E0'),
 ('3374','ASETİLEN, ÇÖZÜCÜSÜZ','2','2F','','D','','2.1','2','','E0'),
 ('3375','AMONYUM NİTRAT  EMÜLSİYON veya SÜSPANSİYON  veya JEL, tahripli patlayıcılar için ara  ürün, sıvı','5.1','O1','II','E','50','5.1','2','','E2'),
-('3375','AMONYUM NİTRAT  EMÜLSİYON veya SÜSPANSİYON  veya JEL, tahripli patlayıcılar için ara  ürün, katı','5.1','O2','II','E','50','5.1','2','','E2'),
 ('3376','4-NİTROFENİLHİDRAZİN, kütlece  %30''dan az olmayan su ile','4.1','D','I','B','','4.1','1','','E0'),
 ('3377','SODYUM PERBORAT  MONOHİDRAT','5.1','O2','III','E','50','5.1','3','5 kg','E1'),
 ('3378','SODYUM KARBONAT  PEROKSİHİDRAT','5.1','O2','II','E','50','5.1','2','1 kg','E2'),
-('3378','SODYUM KARBONAT  PEROKSİHİDRAT','5.1','O2','III','E','50','5.1','3','5 kg','E1'),
 ('3379','DUYARLILIĞI AZALTILMIŞ  PATLAYICI, SIVI, B.B.B.','3','D','I','B','','3','1','','E0'),
 ('3380','DUYARLILIĞI AZALTILMIŞ  PATLAYICI, KATI, B.B.B.','4.1','D','I','B','','4.1','1','','E0'),
 ('3381','SOLUMA İLE ZEHİRLİ SIVI, B.B.B, 200 ml/m3''ten düşük veya eşit  LC50 değerine sahip olan ve doymuş  buhar konsantrasyonu 500 LC50''ye  eşit veya daha yüksek olan','6.1','T1 veya T4','I','C/D','66','6.1','1','','E0'),
@@ -3420,61 +2710,31 @@ values
 ('3394','ORGANOMETALİK MADDE, SIVI, PİROFORİK, SU İLE  TEPKİMEYE GİREN','4.2','SW1','I','B/E','X333','4.2
 +4.3','0','','E0'),
 ('3395','ORGANOMETALİK MADDE, KATI, SU İLE TEPKİMEYE GİREN','4.3','W2','I','B/E','X423','4.3','1','','E0'),
-('3395','ORGANOMETALİK MADDE, KATI, SU İLE TEPKİMEYE GİREN','4.3','W2','II','D/E','423','4.3','2','500 g','E2'),
-('3395','ORGANOMETALİK MADDE, KATI, SU İLE TEPKİMEYE  GİREN','4.3','W2','III','E','423','4.3','3','1 kg','E1'),
 ('3396','ORGANOMETALİK MADDE, KATI, SU İLE TEPKİMEYE  GİREN, ALEVLENEBİLİR','4.3','WF2','I','B/E','X423','4.3
 +4.1','0','','E0'),
-('3396','ORGANOMETALİK MADDE, KATI, SU İLE TEPKİMEYE  GİREN, ALEVLENEBİLİR','4.3','WF2','II','D/E','423','4.3
-+4.1','0','500 g','E2'),
-('3396','ORGANOMETALİK MADDE, KATI, SU İLE TEPKİMEYE  GİREN, ALEVLENEBİLİR','4.3','WF2','III','E','423','4.3
-+4.1','0','1 kg','E1'),
 ('3397','ORGANOMETALİK MADDE, KATI, SU İLE TEPKİMEYE  GİREN, KENDİLİĞİNDEN ISINAN','4.3','WS','I','B/E','X423','4.3
 +4.2','1','','E0'),
-('3397','ORGANOMETALİK MADDE, KATI, SU İLE TEPKİMEYE  GİREN, KENDİLİĞİNDEN ISINAN','4.3','WS','II','D/E','423','4.3
-+4.2','2','500 g','E2'),
-('3397','ORGANOMETALİK MADDE, KATI, SU İLE TEPKİMEYE  GİREN, KENDİLİĞİNDEN ISINAN','4.3','WS','III','E','423','4.3
-+4.2','3','1 kg','E1'),
 ('3398','ORGANOMETALİK MADDE, SIVI, SU İLE TEPKİMEYE GİREN','4.3','W1','I','B/E','X323','4.3','0','','E0'),
-('3398','ORGANOMETALİK MADDE, SIVI, SU İLE TEPKİMEYE GİREN','4.3','W1','II','D/E','323','4.3','0','500 ml','E2'),
-('3398','ORGANOMETALİK MADDE, SIVI, SU İLE TEPKİMEYE GİREN','4.3','W1','III','E','323','4.3','0','1 L','E1'),
 ('3399','ORGANOMETALİK MADDE, SIVI, SU İLE TEPKİMEYE GİREN, ALEVLENEBİLİR','4.3','WF1','I','B/E','X323','4.3
 +3','0','','E0'),
-('3399','ORGANOMETALİK MADDE, SIVI, SU İLE TEPKİMEYE GİREN, ALEVLENEBİLİR','4.3','WF1','II','D/E','323','4.3
-+3','0','500 ml','E2'),
-('3399','ORGANOMETALİK MADDE, SIVI, SU İLE TEPKİMEYE GİREN, ALEVLENEBİLİR','4.3','WF1','III','E','323','4.3
-+3','0','1 L','E1'),
 ('3400','ORGANOMETALİK MADDE, KATI, KENDİLİĞİNDEN ISINAN','4.2','S5','II','D/E','40','4.2','2','500 g','E2'),
-('3400','ORGANOMETALİK MADDE, KATI, KENDİLİĞİNDEN ISINAN','4.2','S5','III','E','40','4.2','3','1 kg','E1'),
 ('3401','ALKALİ METAL AMALGAM, KATI','4.3','W2','I','B/E','X423','4.3','1','','E0'),
 ('3402','ALKALİ TOPRAK METAL  AMALGAM, KATI','4.3','W2','I','B/E','X423','4.3','1','','E0'),
 ('3403','POTASYUM METAL  ALAŞIMLARI, KATI','4.3','W2','I','B/E','X423','4.3','1','','E0'),
 ('3404','POTASYUM SODYUM  ALAŞIMLARI, KATI','4.3','W2','I','B/E','X423','4.3','1','','E0'),
 ('3405','BARYUM KLORAT ÇÖZELTİSİ','5.1','OT1','II','E','56','5.1
 +6.1','2','1 L','E2'),
-('3405','BARYUM KLORAT ÇÖZELTİSİ','5.1','OT1','III','E','56','5.1
-+6.1','3','5 L','E1'),
 ('3406','BARYUM PERKLORAT  ÇÖZELTİSİ','5.1','OT1','II','E','56','5.1
 +6.1','2','1 L','E2'),
-('3406','BARYUM PERKLORAT  ÇÖZELTİSİ','5.1','OT1','III','E','56','5.1
-+6.1','3','5 L','E1'),
 ('3407','KLORAT VE MAGNEZYUM  KLORÜR ÇÖZELTİSİ','5.1','O1','II','E','50','5.1','2','1 L','E2'),
-('3407','KLORAT VE MAGNEZYUM  KLORÜR ÇÖZELTİSİ','5.1','O1','III','E','50','5.1','3','5 L','E1'),
 ('3408','KURŞUN PERKLORAT  ÇÖZELTİSİ','5.1','OT1','II','E','56','5.1
 +6.1','2','1 L','E2'),
-('3408','KURŞUN PERKLORAT  ÇÖZELTİSİ','5.1','OT1','III','E','56','5.1
-+6.1','3','5 L','E1'),
 ('3409','KLORONİTROBENZENLER, SIVI','6.1','T1','II','D/E','60','6.1','2','100 ml','E4'),
 ('3410','4-KLORO-o-TOLUİDİN  HİDROKLORÜR ÇÖZELTİSİ','6.1','T1','III','E','60','6.1','2','5 L','E1'),
 ('3411','beta-NAFTİLAMİN ÇÖZELTİSİ','6.1','T1','II','D/E','60','6.1','2','100 ml','E4'),
-('3411','beta-NAFTİLAMİN ÇÖZELTİSİ','6.1','T1','III','E','60','6.1','2','5 L','E1'),
 ('3412','FORMİK ASİT, kütlece %10''dan  fazla ancak %85''ten az asit içeren','8','C3','II','E','80','8','2','1 L','E2'),
-('3412','FORMİK ASİT, kütlece %5''ten fazla  ancak %10''dan az asit içeren','8','C3','III','E','80','8','3','5 L','E1'),
 ('3413','POTASYUM SİYANÜR  ÇÖZELTİSİ','6.1','T4','I','C/E','66','6.1','1','','E5'),
-('3413','POTASYUM SİYANÜR  ÇÖZELTİSİ','6.1','T4','II','D/E','60','6.1','2','100 ml','E4'),
-('3413','POTASYUM SİYANÜR  ÇÖZELTİSİ','6.1','T4','III','E','60','6.1','2','5 L','E1'),
 ('3414','SODYUM SİYANÜR ÇÖZELTİSİ','6.1','T4','I','C/E','66','6.1','1','','E5'),
-('3414','SODYUM SİYANÜR ÇÖZELTİSİ','6.1','T4','II','D/E','60','6.1','2','100 ml','E4'),
-('3414','SODYUM SİYANÜR ÇÖZELTİSİ','6.1','T4','III','E','60','6.1','2','5 L','E1'),
 ('3415','SODYUM FLORÜR ÇÖZELTİSİ','6.1','T4','III','E','60','6.1','2','5 L','E1'),
 ('3416','KLOROASETO-FENON, SIVI','6.1','T1','II','D/E','60','6.1','2','','E0'),
 ('3417','KSİLİL BROMÜR, KATI','6.1','T2','II','D/E','60','6.1','2','','E4'),
@@ -3483,12 +2743,9 @@ values
 ('3420','BOR TRİFLORÜR PROPİYONİK  ASİT KOMPLEKSİ, KATI','8','C4','II','E','80','8','2','1 kg','E2'),
 ('3421','POTASYUM  HİDROJENDİFLORÜR ÇÖZELTİSİ','8','CT1','II','E','86','8
 +6.1','2','1 L','E2'),
-('3421','POTASYUM  HİDROJENDİFLORÜR ÇÖZELTİSİ','8','CT1','III','E','86','8
-+6.1','3','5 L','E1'),
 ('3422','POTASYUM FLORÜR ÇÖZELTİSİ','6.1','T4','III','E','60','6.1','2','5 L','E1'),
 ('3423','TETRAMETİLAMONYUM HİDROKSİT, KATI','6.1','TC2','I','C/E','668','6.1.+8','1','','E5'),
 ('3424','AMONYUM DİNİTRO-o- KRESOLAT ÇÖZELTİSİ','6.1','T1','II','D/E','60','6.1','2','100 ml','E4'),
-('3424','AMONYUM DİNİTRO-o- KRESOLAT ÇÖZELTİSİ','6.1','T1','III','E','60','6.1','2','5 L','E1'),
 ('3425','BROMOASETİK ASİT, KATI','8','C4','II','E','80','8','2','1 kg','E2'),
 ('3426','AKRİLAMİD ÇÖZELTİSİ','6.1','T1','III','E','60','6.1','2','5 L','E1'),
 ('3427','KLOROBENZİL KLORÜRLER, KATI','6.1','T2','III','E','60','6.1','2','5 kg','E1'),
@@ -3502,11 +2759,7 @@ values
 ('3437','KLOROKRESOLLER, KATI','6.1','T2','II','D/E','60','6.1','2','500 g','E4'),
 ('3438','alfa-METİLBENZİL ALKOL, KATI','6.1','T2','III','E','60','6.1','2','5 kg','E1'),
 ('3439','NİTRİLLER, KATI, ZEHİRLİ, B.B.B.','6.1','T2','I','C/E','66','6.1','1','','E5'),
-('3439','NİTRİLLER, KATI, ZEHİRLİ, B.B.B.','6.1','T2','II','D/E','60','6.1','2','500 g','E4'),
-('3439','NİTRİLLER, KATI, ZEHİRLİ, B.B.B.','6.1','T2','III','E','60','6.1','2','5 kg','E1'),
 ('3440','SELENYUM BİLEŞİĞİ, SIVI, B.B.B.','6.1','T4','I','C/E','66','6.1','1','','E5'),
-('3440','SELENYUM BİLEŞİĞİ, SIVI, B.B.B.','6.1','T4','II','D/E','60','6.1','2','100 ml','E4'),
-('3440','SELENYUM BİLEŞİĞİ, SIVI, B.B.B.','6.1','T4','III','E','60','6.1','2','5 L','E1'),
 ('3441','KLORODİNİTROBENZENLER, KATI','6.1','T2','II','D/E','60','6.1','2','500 g','E4'),
 ('3442','DİKLOROANİLİNLER, KATI','6.1','T2','II','D/E','60','6.1','2','500 g','E4'),
 ('3443','DİNİTROBENZENLER, KATI','6.1','T2','II','D/E','60','6.1','2','500 g','E4'),
@@ -3515,7 +2768,6 @@ values
 ('3446','NİTROTOLUENLER, KATI','6.1','T2','II','D/E','60','6.1','2','500 g','E4'),
 ('3447','NİTROKSİLENLER, KATI','6.1','T2','II','D/E','60','6.1','2','500 g','E4'),
 ('3448','GÖZ YAŞARTICI GAZ MADDESİ, KATI, B.B.B.','6.1','T2','I','C/E','66','6.1','1','','E0'),
-('3448','GÖZ YAŞARTICI GAZ MADDESİ, KATI, B.B.B.','6.1','T2','II','D/E','60','6.1','2','','E0'),
 ('3449','BROMOBENZİL SİYANÜRLER, KATI','6.1','T2','I','C/E','66','6.1','1','','E5'),
 ('3450','DİFENİLKLORO-ARSİN, KATI','6.1','T3','I','C/E','66','6.1','1','','E0'),
 ('3451','TOLUDİNLER, KATI','6.1','T2','II','D/E','60','6.1','2','500 g','E4'),
@@ -3530,35 +2782,19 @@ values
 ('3459','NİTROBROMOBENZENLER, KATI','6.1','T2','III','E','60','6.1','2','5 kg','E1'),
 ('3460','N-ETİLBENZİLTOLUİDİNLER, KATI','6.1','T2','III','E','60','6.1','2','5 kg','E1'),
 ('3462','TOKSİNLER, CANLI  KAYNAKLARDAN  AYRIŞTIRILMIŞ, KATI, B.B.B','6.1','T2','I','C/E','66','6.1','1','','E5'),
-('3462','TOKSİNLER, CANLI  KAYNAKLARDAN  AYRIŞTIRILMIŞ, KATI, B.B.B','6.1','T2','II','D/E','60','6.1','2','500 g','E4'),
-('3462','TOKSİNLER, CANLI  KAYNAKLARDAN  AYRIŞTIRILMIŞ, KATI, B.B.B','6.1','T2','III','E','60','6.1','2','5 kg','E1'),
 ('3463','PROPİYONİK ASİT kütlece  %90''dan az olmayan asit ile','8','CF1','II','D/E','83','8
 +3','2','1 L','E2'),
 ('3464','ORGANOFOSFORLU BİLEŞİK, KATI, ZEHİRLİ, B.B.B.','6.1','T2','I','C/E','66','6.1','1','','E5'),
-('3464','ORGANOFOSFORLU BİLEŞİK, KATI, ZEHİRLİ, B.B.B.','6.1','T2','II','D/E','60','6.1','2','500 g','E4'),
-('3464','ORGANOFOSFORLU BİLEŞİK, KATI, ZEHİRLİ, B.B.B.','6.1','T2','III','E','60','6.1','2','5 kg','E1'),
 ('3465','ORGANOARSENİK BİLEŞİĞİ,  KATI, B.B.B.','6.1','T3','I','C/E','66','6.1','1','','E5'),
-('3465','ORGANOARSENİK BİLEŞİĞİ,  KATI, B.B.B.','6.1','T3','II','D/E','60','6.1','2','500 g','E4'),
-('3465','ORGANOARSENİK BİLEŞİĞİ,  KATI, B.B.B.','6.1','T3','III','E','60','6.1','2','5 kg','E1'),
 ('3466','METAL KARBONİLLER, KATI, B.B.B.','6.1','T3','I','C/E','66','6.1','1','','E5'),
-('3466','METAL KARBONİLLER, KATI, B.B.B.','6.1','T3','II','D/E','60','6.1','2','500 g','E4'),
-('3466','METAL KARBONİLLER, KATI, B.B.B.','6.1','T3','III','E','60','6.1','2','5 kg','E1'),
 ('3467','ORGANOMETALİK BİLEŞİK, KATI, ZEHİRLİ, B.B.B.','6.1','T3','I','C/E','66','6.1','1','','E5'),
-('3467','ORGANOMETALİK BİLEŞİK, KATI, ZEHİRLİ, B.B.B.','6.1','T3','II','D/E','60','6.1','2','500 g','E4'),
-('3467','ORGANOMETALİK BİLEŞİK, KATI, ZEHİRLİ, B.B.B.','6.1','T3','III','E','60','6.1','2','5 kg','E1'),
 ('3468','METAL HİDRİT DEPOLAMA  SİSTEMİ İÇİNDE HİDROJEN veya  TEÇHİZAT İÇERİSİNDE  BULUNAN METAL HİDRİT  DEPOLAMA SİSTEMİ İÇİNDE  HİDROJEN veya TEÇHİZAT İLE  AMBALAJLANMIŞ METAL  HİDRİT DEPOLAMA SİSTEMİ  İÇİNDE HİDROJEN','2','1F','','D','','2.1','2','','E0'),
 ('3469','BOYA, ALEVLENEBİLİR,  AŞINDIRICI (boya, vernik, emaye, renklendirici, lake, cila, parlatıcı sıvı  dolgu ve sıvı vernik bazı dâhil) veya  BOYA İLE İLGİLİ MALZEME, ALEVLENEBİLİR, AŞINDIRICI  (boya inceltici veya azaltıcı bileşiği  dâhil)','3','FC','I','C/E','338','3
 +8','1','','E0'),
-('3469','BOYA, ALEVLENEBİLİR,  AŞINDIRICI (boya, vernik, emaye, renklendirici, lake, cila, parlatıcı sıvı  dolgu ve sıvı vernik bazı dâhil) veya  BOYA İLE İLGİLİ MALZEME, ALEVLENEBİLİR, AŞINDIRICI  (boya inceltici veya azaltıcı bileşiği  dâhil)','3','FC','II','D/E','338','3
-+8','2','1 L','E2'),
-('3469','BOYA, ALEVLENEBİLİR,  AŞINDIRICI (boya, vernik, emaye, renklendirici, lake, cila, parlatıcı sıvı  dolgu ve sıvı vernik bazı dâhil) veya  BOYA İLE İLGİLİ MALZEME, ALEVLENEBİLİR, AŞINDIRICI  (boya inceltici veya azaltıcı bileşiği  dâhil)','3','FC','III','D/E','38','3
-+8','3','5 L','E1'),
 ('3470','BOYA, AŞINDIRICI, ALEVLENEBİLİR (boya, vernik, emaye, renklendirici, lake, cila, parlatıcı, sıvı dolgu ve sıvı vernik  bazı dâhil) veya BOYA İLE İLGİLİ  MALZEME, AŞINDIRICI, ALEVLENEBİLİR (boya inceltici  veya azaltıcı bileşiği dâhil)','8','CF1','II','D/E','83','8
 +3','2','1 L','E2'),
 ('3471','HİDROJENDİFLORÜRLER  ÇÖZELTİSİ, B.B.B.','8','CT1','II','E','86','8
 +6.1','2','1 L','E2'),
-('3471','HİDROJENDİFLORÜRLER  ÇÖZELTİSİ, B.B.B.','8','CT1','III','E','86','8
-+6.1','3','5 L','E1'),
 ('3472','KROTONİK ASİT, SIVI','8','C3','III','E','80','8','3','5 L','E1'),
 ('3473','YAKIT PİLİ KARTUŞLARI veya TEÇHİZAT İÇİNDE BULUNAN YAKIT PİLİ KARTUŞLARI veya  TEÇHİZAT İLE  AMBALAJLANMIŞ YAKIT PİLİ  KARTUŞLARI alevlenebilir sıvılar  içeren','3','F3','','E','','3','3','1 L','E0'),
 ('3474','1-HİDROKSİBENZOTRİAZOL  MONOHİDRAT','4.1','D','I','B','','4.1','1','','E0'),
@@ -3583,8 +2819,6 @@ values
 +8','3','5 kg','E1'),
 ('3487','KALSİYUM HİPOKLORİT, HİDRATLANMIŞ, AŞINDIRICI veya  KALSİYUM HİPOKLORİT, HİDRATLANMIŞ KARIŞIM, AŞINDIRICI % 5,5''ten az olmayan  ancak % 16''dan fazla su içermeyen','5.1','OC2','II','E','58','5.1
 +8','2','1 kg','E2'),
-('3487','KALSİYUM HİPOKLORİT, HİDRATLANMIŞ, AŞINDIRICI veya  KALSİYUM HİPOKLORİT, HİDRATLANMIŞ KARIŞIM, AŞINDIRICI % 5,5''ten az olmayan  ancak % 16''dan fazla su içermeyen','5.1','OC2','III','E','58','5.1
-+8','3','5 kg','E1'),
 ('3488','SOLUMAYLA ZEHİRLİ SIVI, ALEVLENEBİLİR AŞINDIRICI, B.B.B. 200 ml/m³''ten düşük veya eşit  LC50 değerine sahip olan ve doymuş  buhar konsantrasyonu 500 LC50''ye eşit  veya daha yüksek','6.1','TFC','I','C/D','663','6.1
 +3
 +8','1','','E0'),
@@ -3599,15 +2833,10 @@ values
 +4.3','1','','E0'),
 ('3494','KÜKÜRTLÜ HAM PETROL, ALEVLENEBİLİR, ZEHİRLİ','3','FT1','I','C/E','336','3
 +6.1','1','','E0'),
-('3494','KÜKÜRTLÜ HAM PETROL, ALEVLENEBİLİR, ZEHİRLİ','3','FT1','II','D/E','336','3
-+6.1','2','1 L','E2'),
-('3494','KÜKÜRTLÜ HAM PETROL, ALEVLENEBİLİR, ZEHİRLİ','3','FT1','III','D/E','36','3
-+6.1','3','5 L','E1'),
 ('3495','İYOT','8','CT2','III','E','86','8
 +6.1','3','5 kg','E1'),
 ('3496','Bataryalar, nikel-metal hidrit','9','M11','ADR''YE TABİ DEĞİLDİR','','','','','',''),
 ('3497','KRİL KÜSPESİ','4.2','S2','II','D/E','40','4.2','2','','E2'),
-('3497','KRİL KÜSPESİ','4.2','S2','III','E','40','4.2','3','','E1'),
 ('3498','İYOT MONOKLORÜR, SIVI','8','C1','II','E','80','8','2','1 L','E0'),
 ('3499','KAPASİTÖR, ELEKTRİKLİ ÇİFT  KATMANLI (0,3 Wh''den daha büyük  enerji depolama kapasitesine sahip)','9','M11','','E','','9','4','','E0'),
 ('3500','BASINÇ ALTINDA KİMYASAL, B.B.B.','2','8A','','C/E','20','2.2','3','','E0'),
@@ -3661,7 +2890,6 @@ values
 ('3526','HİDROJEN SELENÜR, ADSORBE','2','9TF','','D','','2.3
 +2.1','1','','E0'),
 ('3527','POLİESTER REÇİNE KİTİ, katı  taban malzemesi','4.1','F1','II','E','','4.1','2','5 kg','bkz ÖH 340'),
-('3527','POLİESTER REÇİNE KİTİ, katı  taban malzemesi','4.1','F1','III','E','','4.1','3','5 kg','bkz ÖH 340'),
 ('3528','MOTOR İÇTEN YANMALI, ALEVLENEBİLİR SIVIYLA  ÇALIŞAN veya MOTOR, YAKIT  PİLİ, ALEVLENEBİLİR SIVIYLA  ÇALIŞAN veya MAKİNE, İÇTEN  YANMALI, ALEVLENEBİLİR SIVIYLA ÇALIŞAN veya  MAKİNE, YAKIT PİLİ, ALEVLENEBİLİR SIVIYLA  ÇALIŞAN','3','F3','','D','','3','','','E0'),
 ('3529','MOTOR İÇTEN YANMALI, ALEVLENEBİLİR GAZLA  ÇALIŞAN veya MOTOR, YAKIT  PİLİ, ALEVLENEBİLİR GAZLA  ÇALIŞAN veya MAKİNE, İÇTEN  YANMALI, ALEVLENEBİLİR GAZLA ÇALIŞAN veya MAKİNE, YAKIT PİLİ, ALEVLENEBİLİR GAZLA ÇALIŞAN','2','6F','','B','','2.1','','','E0'),
 ('3530','MOTOR, İÇTEN YANMALI veya  MAKİNE, İÇTEN YANMALI','9','M11','','E','','9','','','E0'),
@@ -3671,8 +2899,6 @@ values
 ('3534','POLİMERLEŞTİRİCİ MADDE, SIVI, SICAKLIK KONTROLLÜ, B.B.B.','4.1','PM2','III','D','40','4.1','1','','E0'),
 ('3535','ZEHİRLİ KATI, ALEVLENEBİLİR,  İNORGANİK, B.B.B.','6.1','TF3','I','C/E','664','6.1
 +4.1','1','','E5'),
-('3535','ZEHİRLİ KATI, ALEVLENEBİLİR,  İNORGANİK, B.B.B.','6.1','TF3','II','D/E','64','6.1
-+4.1','2','500 g','E4'),
 ('3536','LİTYUM BATARYALAR, KARGO  TAŞIMA ÜNİTESİNE MONTE  EDİLEN, lityum iyon bataryalar veya  lityum metal bataryalar','9','M4','','E','','9','2','','E0'),
 ('3537','NESNELER, ALEVLENEBİLİR GAZ İÇEREN, B.B.B.','2','6F','','E','','Bkz.
 5.2.2.1.
