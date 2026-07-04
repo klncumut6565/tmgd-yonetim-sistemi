@@ -1,68 +1,82 @@
 "use client";
 
-// ⚠️ NOT: Bu dosya kaynak metinde (anaproje.txt) TANIMLANMAMIŞTI.
-// TESLİMAT 077, "@/hooks/useUser" içe aktarımına dayanıyordu ama
-// hiçbir teslimatta bu hook'un kendisi verilmedi. Import'un kırık
-// kalmaması için burada minimal bir TASLAK eklendi — gerçek auth/yetki
-// mantığını bağlamanız gerekir.
-//
-// Önerilen gerçek akış (database/schema.sql'deki tablolarla):
-//   1) supabase.auth.getUser() ile oturum açan kullanıcıyı al
-//   2) profiles tablosundan role bilgisini çek
-//   3) role_permissions + permissions tablolarını join'leyip
-//      o role'e ait permission "code" listesini döndür
+// Oturum açan kullanıcının prof: onay durumu, rolü, temel bilgileri.
+// Tüm korumalı sayfalar ve Sidebar bunu kullanır.
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase/client";
 
-type UseUserResult = {
-  permissions: string[];
+export type Profile = {
+  id: string;
+  full_name: string | null;
+  email: string | null;
+  role: string;
+  approval_status: "pending" | "approved" | "rejected";
+  is_active: boolean;
+};
+
+export type UseUserResult = {
   loading: boolean;
+  authed: boolean;          // oturum açık mı
+  profile: Profile | null;
+  isSuperAdmin: boolean;
+  isApproved: boolean;
 };
 
 export function useUser(): UseUserResult {
-  const [permissions, setPermissions] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
+  const [authed, setAuthed] = useState(false);
+  const [profile, setProfile] = useState<Profile | null>(null);
 
   useEffect(() => {
+    let mounted = true;
+
     async function load() {
       const { data: authData } = await supabase.auth.getUser();
-      const authUser = authData?.user;
+      const user = authData?.user;
 
-      if (!authUser) {
-        setPermissions([]);
-        setLoading(false);
+      if (!user) {
+        if (mounted) {
+          setAuthed(false);
+          setProfile(null);
+          setLoading(false);
+        }
         return;
       }
 
-      const { data: profile } = await supabase
+      if (mounted) setAuthed(true);
+
+      const { data: prof } = await supabase
         .from("profiles")
-        .select("role")
-        .eq("id", authUser.id)
+        .select("id, full_name, email, role, approval_status, is_active")
+        .eq("id", user.id)
         .single();
 
-      if (!profile) {
-        setPermissions([]);
+      if (mounted) {
+        setProfile((prof as Profile) || null);
         setLoading(false);
-        return;
       }
-
-      const { data: rolePerms } = await supabase
-        .from("role_permissions")
-        .select("permissions ( code )")
-        .eq("role_name", profile.role);
-
-      const codes =
-        (rolePerms as unknown as { permissions: { code: string } | null }[])
-          ?.map((row) => row.permissions?.code)
-          .filter((code): code is string => Boolean(code)) || [];
-
-      setPermissions(codes);
-      setLoading(false);
     }
 
     load();
+
+    // Oturum değişince (giriş/çıkış) yeniden yükle
+    const { data: sub } = supabase.auth.onAuthStateChange(() => {
+      setLoading(true);
+      load();
+    });
+
+    return () => {
+      mounted = false;
+      sub.subscription.unsubscribe();
+    };
   }, []);
 
-  return { permissions, loading };
+  return {
+    loading,
+    authed,
+    profile,
+    isSuperAdmin: profile?.role === "super_admin",
+    isApproved: profile?.approval_status === "approved" && !!profile?.is_active,
+  };
 }

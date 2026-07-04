@@ -1135,6 +1135,101 @@ create policy tasks_delete on public.tasks for delete using (
     )
 );
 
+-- ---------------------------------------------------------------------
+-- EK POLİTİKALAR 2 — vehicles / drivers / employees / visits
+-- ---------------------------------------------------------------------
+-- Bu dört tablo için arayüzde tam CRUD ekranları yazıldı (Araçlar,
+-- Sürücüler, Personeller, Ziyaretler). Bu yüzden SELECT'in yanı sıra
+-- INSERT/UPDATE/DELETE politikaları da gerekiyor. Hepsi aynı mantıkta:
+-- kullanıcı, kaydın ait olduğu firmanın üyesi olmalı (user_firms).
+-- Silme için editör/owner yetkisi aranır.
+
+-- Bu dört tablodaki SELECT politikaları BÖLÜM 16'da zaten tanımlı.
+
+-- VEHICLES
+drop policy if exists vehicles_insert on public.vehicles;
+create policy vehicles_insert on public.vehicles for insert with check (
+    public.is_super_admin()
+    or exists (select 1 from public.user_firms uf
+        where uf.firm_id = vehicles.firm_id and uf.user_id = auth.uid())
+);
+drop policy if exists vehicles_update on public.vehicles;
+create policy vehicles_update on public.vehicles for update using (
+    public.is_super_admin()
+    or exists (select 1 from public.user_firms uf
+        where uf.firm_id = vehicles.firm_id and uf.user_id = auth.uid())
+);
+drop policy if exists vehicles_delete on public.vehicles;
+create policy vehicles_delete on public.vehicles for delete using (
+    public.is_super_admin()
+    or exists (select 1 from public.user_firms uf
+        where uf.firm_id = vehicles.firm_id and uf.user_id = auth.uid()
+        and uf.permission in ('owner','editor'))
+);
+
+-- DRIVERS
+drop policy if exists drivers_insert on public.drivers;
+create policy drivers_insert on public.drivers for insert with check (
+    public.is_super_admin()
+    or exists (select 1 from public.user_firms uf
+        where uf.firm_id = drivers.firm_id and uf.user_id = auth.uid())
+);
+drop policy if exists drivers_update on public.drivers;
+create policy drivers_update on public.drivers for update using (
+    public.is_super_admin()
+    or exists (select 1 from public.user_firms uf
+        where uf.firm_id = drivers.firm_id and uf.user_id = auth.uid())
+);
+drop policy if exists drivers_delete on public.drivers;
+create policy drivers_delete on public.drivers for delete using (
+    public.is_super_admin()
+    or exists (select 1 from public.user_firms uf
+        where uf.firm_id = drivers.firm_id and uf.user_id = auth.uid()
+        and uf.permission in ('owner','editor'))
+);
+
+-- EMPLOYEES
+drop policy if exists employees_insert on public.employees;
+create policy employees_insert on public.employees for insert with check (
+    public.is_super_admin()
+    or exists (select 1 from public.user_firms uf
+        where uf.firm_id = employees.firm_id and uf.user_id = auth.uid())
+);
+drop policy if exists employees_update on public.employees;
+create policy employees_update on public.employees for update using (
+    public.is_super_admin()
+    or exists (select 1 from public.user_firms uf
+        where uf.firm_id = employees.firm_id and uf.user_id = auth.uid())
+);
+drop policy if exists employees_delete on public.employees;
+create policy employees_delete on public.employees for delete using (
+    public.is_super_admin()
+    or exists (select 1 from public.user_firms uf
+        where uf.firm_id = employees.firm_id and uf.user_id = auth.uid()
+        and uf.permission in ('owner','editor'))
+);
+
+-- VISITS
+drop policy if exists visits_insert on public.visits;
+create policy visits_insert on public.visits for insert with check (
+    public.is_super_admin()
+    or exists (select 1 from public.user_firms uf
+        where uf.firm_id = visits.firm_id and uf.user_id = auth.uid())
+);
+drop policy if exists visits_update on public.visits;
+create policy visits_update on public.visits for update using (
+    public.is_super_admin()
+    or exists (select 1 from public.user_firms uf
+        where uf.firm_id = visits.firm_id and uf.user_id = auth.uid())
+);
+drop policy if exists visits_delete on public.visits;
+create policy visits_delete on public.visits for delete using (
+    public.is_super_admin()
+    or exists (select 1 from public.user_firms uf
+        where uf.firm_id = visits.firm_id and uf.user_id = auth.uid()
+        and uf.permission in ('owner','editor'))
+);
+
 
 -- =====================================================================
 -- BÖLÜM 17 — FONKSİYONLAR, TRIGGER'LAR & VIEW'LAR (kaynak: 008_functions.sql)
