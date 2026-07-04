@@ -7,6 +7,7 @@
 import { usePathname, useRouter } from "next/navigation";
 import AuthGuard from "@/components/AuthGuard";
 import Sidebar from "@/components/layout/Sidebar";
+import PendingApprovalsBell from "@/components/PendingApprovalsBell";
 import { useUser } from "@/hooks/useUser";
 import { supabase } from "@/lib/supabase/client";
 
@@ -17,7 +18,7 @@ export default function AppShell({
 }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { profile, isApproved } = useUser();
+  const { profile, isApproved, isSuperAdmin } = useUser();
 
   const isLoginPage = pathname === "/login";
 
@@ -42,6 +43,7 @@ export default function AppShell({
             <header className="border-b p-4 flex items-center justify-between">
               <span className="font-medium">TMGD Yönetim Sistemi</span>
               <div className="flex items-center gap-3 text-sm">
+                {isSuperAdmin && <PendingApprovalsBell />}
                 <span className="text-gray-600">
                   {profile?.full_name || profile?.email}
                   {profile?.role === "super_admin" && (
