@@ -87,9 +87,49 @@ export default function AdminPage() {
 // SEKME 1 — Kullanıcılar
 // ---------------------------------------------------------------------
 function UsersTab() {
+  const { profile: benimProfilim } = useUser();
   const [users, setUsers] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+
+  // Şemadaki role check kısıtlamasıyla birebir aynı liste
+  const ROLLER: { value: string; label: string }[] = [
+    { value: "super_admin", label: "Süper Yönetici" },
+    { value: "admin", label: "Yönetici" },
+    { value: "tmgd", label: "TMGD" },
+    { value: "assistant", label: "Asistan" },
+    { value: "viewer", label: "İzleyici" },
+    { value: "company", label: "Firma Kullanıcısı" },
+  ];
+
+  async function setRole(u: Profile, yeniRol: string) {
+    if (yeniRol === u.role) return;
+    setError("");
+
+    // Kendi süper yönetici yetkini düşürmeye çalışıyorsan uyar:
+    // sistemde başka super_admin yoksa Yönetim sayfasına bir daha giremezsin.
+    if (u.id === benimProfilim?.id && u.role === "super_admin" && yeniRol !== "super_admin") {
+      const digerAdminVar = users.some(
+        (x) => x.id !== u.id && x.role === "super_admin" && x.is_active
+      );
+      const mesaj = digerAdminVar
+        ? "Kendi rolünü Süper Yönetici'den düşürmek üzeresin. Devam edilsin mi?"
+        : "DİKKAT: Sistemdeki TEK süper yönetici sensin. Rolünü düşürürsen " +
+          "Yönetim sayfasına bir daha giremezsin ve geri almak için SQL gerekir. " +
+          "Yine de devam edilsin mi?";
+      if (!window.confirm(mesaj)) {
+        load(); // seçim kutusunu eski değerine döndür
+        return;
+      }
+    }
+
+    const { error } = await supabase
+      .from("profiles")
+      .update({ role: yeniRol })
+      .eq("id", u.id);
+    if (error) setError(hataCevir(error));
+    else load();
+  }
 
   async function load() {
     setLoading(true);
@@ -178,7 +218,17 @@ function UsersTab() {
                 <td className="p-3">{u.full_name || "—"}</td>
                 <td className="p-3">{u.email}</td>
                 <td className="p-3">
-                  {u.role === "super_admin" ? "Yönetici" : "TMGD"}
+                  <select
+                    value={u.role}
+                    onChange={(e) => setRole(u, e.target.value)}
+                    className="border rounded p-1.5 text-sm bg-white"
+                  >
+                    {ROLLER.map((r) => (
+                      <option key={r.value} value={r.value}>
+                        {r.label}
+                      </option>
+                    ))}
+                  </select>
                 </td>
                 <td className="p-3">
                   <span
