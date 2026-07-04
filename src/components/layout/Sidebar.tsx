@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { useUser } from "@/hooks/useUser";
 
 const menu = [
-  { title: "Dashboard", href: "/dashboard" },
+  { title: "Gösterge Paneli", href: "/dashboard" },
   { title: "Firmalar", href: "/firms" },
   { title: "Görevler", href: "/tasks" },
   { title: "Belgeler", href: "/documents" },
