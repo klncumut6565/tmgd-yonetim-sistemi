@@ -33,9 +33,18 @@ type MixItem  = { row: UnRow };
 const CAT_MUL: Record<string, number> = { "1":50, "2":333, "3":1000, "4":Infinity };
 
 // ── Etiket yardımcıları (utils.py'den) ───────────────────────────────────
+// Etiket normalizasyonu: alt sınıf etiketleri ana sınıfa indirgenir
+// "2.1" → "2", "2.2" → "2", "2.3" → "2" (ADR 7.5.2.1'de Sınıf 2 tek satır)
+// "7A","7B","7C","7D","7E" → "7" (muaf paket → Sınıf 7)
+// Uyumluluk grubu HARFLERİ (1.4S, 1.1D) olduğu gibi kalır — bunlar Sınıf 1 içindir
 function normalizeLabel(s: string): string {
   if (!s) return "";
-  return s.replace(",", ".").replace(/\s/g, "").toUpperCase();
+  let n = s.replace(",", ".").replace(/\s/g, "").toUpperCase();
+  // Sınıf 2 alt etiketleri → "2"
+  if (n === "2.1" || n === "2.2" || n === "2.3") return "2";
+  // Sınıf 7 alt etiketleri (7A, 7B, 7C, 7D, 7E) → "7"
+  if (/^7[A-E]$/.test(n)) return "7";
+  return n;
 }
 
 function splitLabels(cell: string | null): string[] {
@@ -68,6 +77,8 @@ function isMassExplosiveRow(labels: string[]): boolean {
 
 // ── ADR 7.5.2.1 Etiket segregasyon matrisi (rule_engine.py'den) ──────────
 // STATUS_OK | STATUS_FORBIDDEN | STATUS_UNKNOWN | STATUS_EXPLOSIVE_SPECIAL | STATUS_FOOD_CAUTION
+// Segregasyon matrisi: ana sınıf VEYA alt etiket (2.1/2.2/2.3 → Sınıf 2 kuralı)
+// Etiket normalize fonksiyonu alt sınıf etiketlerini ana sınıfa indirger.
 const SEG: Record<string, Record<string, string>> = {
   "2":  {"3":"OK","4.1":"OK","4.2":"OK","4.3":"OK","5.1":"OK","5.2":"OK","6.1":"OK","6.2":"NO","7":"NO","8":"OK","9":"OK"},
   "3":  {"3":"OK","4.1":"OK","4.2":"OK","4.3":"OK","5.1":"OK","5.2":"COND","6.1":"OK","6.2":"NO","7":"NO","8":"OK","9":"OK"},
