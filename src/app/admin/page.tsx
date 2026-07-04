@@ -32,18 +32,19 @@ type Assignment = {
 };
 
 export default function AdminPage() {
-  const { loading: userLoading, isSuperAdmin } = useUser();
+  const { loading: userLoading, isSuperAdmin, profile } = useUser();
+  const isAdmin = profile?.role === 'admin';
   const [tab, setTab] = useState<"users" | "assignments">("users");
 
   if (userLoading) {
     return <div className="p-6 text-gray-500">Yükleniyor...</div>;
   }
 
-  if (!isSuperAdmin) {
+  if (!isSuperAdmin && !isAdmin) {
     return (
       <div className="p-6">
-        <div className="max-w-md p-4 rounded bg-red-50 text-red-700">
-          Bu sayfa yalnızca sistem yöneticisi içindir.
+        <div className="max-w-md p-4 rounded bg-amber-50 text-amber-800">
+          Bu sayfa yalnızca yöneticiler içindir.
         </div>
       </div>
     );
@@ -87,10 +88,19 @@ export default function AdminPage() {
 // SEKME 1 — Kullanıcılar
 // ---------------------------------------------------------------------
 function UsersTab() {
-  const { profile: benimProfilim } = useUser();
+  const { profile: benimProfilim, isSuperAdmin } = useUser();
   const [users, setUsers] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+
+  const ROLE_TR: Record<string, string> = {
+    super_admin: "Süper Yönetici",
+    admin: "Yönetici",
+    tmgd: "TMGD",
+    assistant: "Asistan",
+    viewer: "İzleyici",
+    company: "Firma Kullanıcısı",
+  };
 
   // Şemadaki role check kısıtlamasıyla birebir aynı liste
   const ROLLER: { value: string; label: string }[] = [
@@ -133,10 +143,17 @@ function UsersTab() {
 
   async function load() {
     setLoading(true);
-    const { data, error } = await supabase
+    let query = supabase
       .from("profiles")
       .select("*")
       .order("created_at", { ascending: false });
+
+    // super_admin profilleri sadece super_admin görebilir
+    if (!isSuperAdmin) {
+      query = query.neq("role", "super_admin");
+    }
+
+    const { data, error } = await query;
     if (error) setError(hataCevir(error));
     else setUsers((data as Profile[]) || []);
     setLoading(false);
@@ -218,17 +235,23 @@ function UsersTab() {
                 <td className="p-3">{u.full_name || "—"}</td>
                 <td className="p-3">{u.email}</td>
                 <td className="p-3">
-                  <select
-                    value={u.role}
-                    onChange={(e) => setRole(u, e.target.value)}
-                    className="border rounded p-1.5 text-sm bg-white"
-                  >
-                    {ROLLER.map((r) => (
-                      <option key={r.value} value={r.value}>
-                        {r.label}
-                      </option>
-                    ))}
-                  </select>
+                  {isSuperAdmin ? (
+                    <select
+                      value={u.role}
+                      onChange={(e) => setRole(u, e.target.value)}
+                      className="border rounded p-1.5 text-sm bg-white"
+                    >
+                      {ROLLER.map((r) => (
+                        <option key={r.value} value={r.value}>
+                          {r.label}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <span className="text-sm text-gray-600">
+                      {ROLE_TR[u.role] || u.role}
+                    </span>
+                  )}
                 </td>
                 <td className="p-3">
                   <span
@@ -277,12 +300,14 @@ function UsersTab() {
                       Aktif Et
                     </button>
                   )}
-                  <button
-                    onClick={() => removeUser(u)}
-                    className="text-red-600 hover:underline"
-                  >
-                    Sil
-                  </button>
+                  {isSuperAdmin && (
+                    <button
+                      onClick={() => removeUser(u)}
+                      className="text-red-600 hover:underline"
+                    >
+                      Sil
+                    </button>
+                  )}
                 </td>
               </tr>
             ))}
@@ -319,6 +344,7 @@ function AssignmentsTab() {
         .from("profiles")
         .select("*")
         .eq("approval_status", "approved")
+        .neq("role", "super_admin")
         .order("full_name"),
       supabase.from("firms").select("id, name").order("name"),
       supabase.from("user_firms").select("*"),

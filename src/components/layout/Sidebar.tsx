@@ -18,7 +18,8 @@ const menu = [
 
 export default function Sidebar() {
   const pathname = usePathname();
-  const { isSuperAdmin } = useUser();
+  const { isSuperAdmin, profile } = useUser();
+  const isAdmin = profile?.role === "admin";
 
   return (
     <aside className="w-60 border-r min-h-screen p-4 shrink-0">
@@ -41,8 +42,8 @@ export default function Sidebar() {
           );
         })}
 
-        {/* Sadece süper admin görür */}
-        {isSuperAdmin && (
+        {/* Süper admin veya yönetici görür */}
+        {(isSuperAdmin || isAdmin) && (
           <Link
             href="/admin"
             className={
