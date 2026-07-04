@@ -67,3 +67,36 @@ drop policy if exists user_firms_admin_all on public.user_firms;
 create policy user_firms_admin_all on public.user_firms for all using (
     public.is_admin()
 );
+
+
+-- ---------------------------------------------------------------------
+-- 4) FIRMS + alt tablolar SELECT — admin tümünü görür
+-- ---------------------------------------------------------------------
+
+-- Firms: super_admin ve admin tüm firmaları görür;
+--        diğerleri yalnızca atandıkları firmaları görür
+drop policy if exists firms_select on public.firms;
+create policy firms_select on public.firms for select using (
+    public.is_admin()           -- super_admin + admin → tümünü görür
+    or public.is_assigned(firms.id)  -- diğerleri → yalnızca atandığı firma
+);
+
+-- Alt tablolar: admin tüm firmalardaki kayıtları görür
+do $$
+declare
+    t text;
+    tbls text[] := array[
+        'vehicles','drivers','employees','visits',
+        'tasks','documents','files'
+    ];
+begin
+    foreach t in array tbls loop
+        execute format('drop policy if exists %I_select on public.%I', t, t);
+        execute format($f$
+            create policy %1$I_select on public.%1$I for select using (
+                public.is_admin()
+                or public.is_assigned(%1$I.firm_id)
+            )
+        $f$, t);
+    end loop;
+end $$;
