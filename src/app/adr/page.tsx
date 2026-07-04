@@ -285,6 +285,52 @@ function statusBadge(s: string) {
 
 type Tab = "search"|"muafiyet"|"karisik";
 
+// ── Arama kutusu — ana component DIŞINDA tanımlanmalı ────────────────────
+// İçeride tanımlanırsa her render'da yeniden oluşur → input focus kaybeder.
+type SearchBoxProps = {
+  q: string; setQ: (s: string) => void;
+  res: UnRow[]; load: boolean;
+  showDd: boolean; setShowDd: (b: boolean) => void;
+  dropRef: React.RefObject<HTMLDivElement | null>;
+  onSel: (r: UnRow) => void;
+  extra?: React.ReactNode;
+  placeholder?: string;
+};
+
+function SearchBox({ q, setQ, res, load, showDd, setShowDd, dropRef, onSel, extra, placeholder }: SearchBoxProps) {
+  return (
+    <div className="relative" ref={dropRef}>
+      <input
+        className="border p-3 w-full rounded-xl text-sm"
+        placeholder={placeholder ?? "UN numarası (örn: 1203) veya madde adı..."}
+        value={q}
+        onChange={e => { setQ(e.target.value); }}
+        onFocus={() => res.length > 0 && setShowDd(true)}
+      />
+      {load && <span className="absolute right-3 top-3 text-xs text-gray-400">Aranıyor...</span>}
+      {showDd && res.length > 0 && (
+        <div className="absolute top-full left-0 right-0 bg-white border rounded-xl shadow-xl z-40 max-h-64 overflow-y-auto mt-1">
+          {res.map(row => (
+            <button key={row.id + row.classification_code} onClick={() => onSel(row)}
+              className="w-full text-left px-4 py-2.5 hover:bg-gray-50 border-b last:border-b-0 text-sm">
+              <span className="font-bold">UN {row.un_number}</span>
+              <span className={`ml-2 text-xs px-1.5 py-0.5 rounded ${CLASS_COLOR[row.class] || "bg-gray-100"}`}>Sınıf {row.class}</span>
+              {row.classification_code && <span className="ml-1 text-xs text-gray-400">[{row.classification_code}]</span>}
+              <div className="text-gray-400 text-xs mt-0.5 truncate">{row.proper_shipping_name}</div>
+            </button>
+          ))}
+        </div>
+      )}
+      {showDd && !load && res.length === 0 && q.trim().length > 1 && (
+        <div className="absolute top-full left-0 right-0 bg-white border rounded-xl shadow mt-1 p-4 z-40 text-sm text-gray-400">
+          Sonuç bulunamadı.
+        </div>
+      )}
+      {extra}
+    </div>
+  );
+}
+
 export default function AdrPage() {
   const [tab, setTab] = useState<Tab>("search");
   const [query, setQuery] = useState("");
@@ -376,33 +422,7 @@ export default function AdrPage() {
     {key:"karisik",label:"Karışık Yükleme"},
   ];
 
-  function SearchBox({q,setQ,res,load,showDd,setShowDd,ref2,onSel,extra}:{
-    q:string;setQ:(s:string)=>void;res:UnRow[];load:boolean;showDd:boolean;setShowDd:(b:boolean)=>void;
-    ref2:React.RefObject<HTMLDivElement|null>;onSel:(r:UnRow)=>void;extra?:React.ReactNode
-  }) {
-    return (
-      <div className="relative" ref={ref2}>
-        <input className="border p-3 w-full rounded-xl text-sm" placeholder="UN numarası (örn: 1203) veya madde adı..."
-          value={q} onChange={e=>{setQ(e.target.value);}} onFocus={()=>res.length>0&&setShowDd(true)}/>
-        {load&&<span className="absolute right-3 top-3 text-xs text-gray-400">Aranıyor...</span>}
-        {showDd&&res.length>0&&(
-          <div className="absolute top-full left-0 right-0 bg-white border rounded-xl shadow-xl z-40 max-h-64 overflow-y-auto mt-1">
-            {res.map(row=>(
-              <button key={row.id} onClick={()=>onSel(row)} className="w-full text-left px-4 py-2.5 hover:bg-gray-50 border-b last:border-b-0 text-sm">
-                <span className="font-bold">UN {row.un_number}</span>
-                <span className={`ml-2 text-xs px-1.5 py-0.5 rounded ${CLASS_COLOR[row.class]||"bg-gray-100"}`}>Sınıf {row.class}</span>
-                <div className="text-gray-400 text-xs mt-0.5 truncate">{row.proper_shipping_name}</div>
-              </button>
-            ))}
-          </div>
-        )}
-        {showDd&&!load&&res.length===0&&q.trim().length>1&&(
-          <div className="absolute top-full left-0 right-0 bg-white border rounded-xl shadow mt-1 p-4 z-40 text-sm text-gray-400">Sonuç bulunamadı.</div>
-        )}
-        {extra}
-      </div>
-    );
-  }
+
 
   return (
     <div className="p-8 max-w-5xl">
@@ -425,7 +445,7 @@ export default function AdrPage() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div className="space-y-4">
             <SearchBox q={query} setQ={(s)=>{setQuery(s);setSelected(null);}} res={results} load={searching}
-              showDd={showDrop} setShowDd={setShowDrop} ref2={dropRef} onSel={selectRow}/>
+              showDd={showDrop} setShowDd={setShowDrop} dropRef={dropRef} onSel={selectRow}/>
             {selected&&(
               <div className="border rounded-xl p-5 space-y-3">
                 <div><div className="text-xs text-gray-400">UN NUMARASI</div><div className="text-2xl font-bold">UN {selected.un_number}</div></div>
@@ -480,7 +500,7 @@ export default function AdrPage() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div className="space-y-3">
             <SearchBox q={query} setQ={(s)=>{setQuery(s);setSelected(null);}} res={results} load={searching}
-              showDd={showDrop} setShowDd={setShowDrop} ref2={dropRef} onSel={selectRow}
+              showDd={showDrop} setShowDd={setShowDrop} dropRef={dropRef} onSel={selectRow}
               extra={selected&&(
                 <div className="mt-3 flex gap-2">
                   <input type="number" min="0.1" step="0.1" value={addQty} onChange={e=>setAddQty(e.target.value)} className="border rounded p-2 w-24 text-sm" placeholder="kg/L"/>
@@ -547,7 +567,7 @@ export default function AdrPage() {
         <div className="space-y-5">
           <div className="max-w-lg" ref={mixRef}>
             <SearchBox q={mixQuery} setQ={setMixQuery} res={mixResults} load={mixSearching}
-              showDd={showMixDrop} setShowDd={setShowMixDrop} ref2={mixRef} onSel={addToMix}/>
+              showDd={showMixDrop} setShowDd={setShowMixDrop} dropRef={mixRef} onSel={addToMix}/>
           </div>
 
           {mixItems.length>0&&(
