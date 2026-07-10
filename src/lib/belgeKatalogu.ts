@@ -148,11 +148,13 @@ const AY_ADLARI = [
   "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık",
 ];
 
-// Sözleşme başlangıcından (yoksa yıl başından) yıl sonuna kadar
-// aylık ziyaret raporu maddeleri üretir.
+// Sözleşme başlangıcından (yoksa yıl başından) İÇİNDE BULUNULAN AYA
+// kadar aylık ziyaret raporu maddeleri üretir. Gelecek aylar istenmez;
+// yeni ay girildikçe listeye otomatik eklenir.
 function ziyaretAylari(contractStart: string | null): ChecklistItem[] {
   const now = new Date();
   const year = now.getFullYear();
+  const currentMonth = now.getMonth(); // 0 = Ocak
   let startMonth = 0; // Ocak
 
   if (contractStart) {
@@ -162,7 +164,7 @@ function ziyaretAylari(contractStart: string | null): ChecklistItem[] {
   }
 
   const items: ChecklistItem[] = [];
-  for (let m = startMonth; m <= 11; m++) {
+  for (let m = startMonth; m <= currentMonth; m++) {
     items.push({
       code: "ZR",
       period: `${year}-${String(m + 1).padStart(2, "0")}`,
