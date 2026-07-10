@@ -9,6 +9,7 @@ const menu = [
   { title: "Firmalar", href: "/firms" },
   { title: "Görevler", href: "/tasks" },
   { title: "Belgeler", href: "/documents" },
+  { title: "Belge Oluştur", href: "/belge-olustur" },
   { title: "Araçlar", href: "/vehicles" },
   { title: "Sürücüler", href: "/drivers" },
   { title: "Personeller", href: "/employees" },

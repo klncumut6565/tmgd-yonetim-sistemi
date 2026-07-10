@@ -1,16 +1,22 @@
 "use client";
 
 // FİRMA DETAY — Sekmeli yapı (ROADMAP T-027)
-// ⚠️ DÜZELTME: Önceki sürüm server component içinde tarayıcı supabase
-// client'ını kullanıyordu; oturum çerezi server'a taşınmadığı için RLS
-// sorguyu anonim sayıyor ve firma detayı HER ZAMAN boş geliyordu.
-// Sayfa client component'e çevrildi, sorgular artık oturumla çalışıyor.
+// YENİ:
+//  - "Belge Takip" sekmesi: faaliyet konularına göre şekillenen, akordeon
+//    görünümlü belge/görev takip listesi + genel ilerleme yüzdesi
+//  - Genel sekmesi: faaliyet konuları (çoklu seçim), sözleşme tarihi, logo
 
-import { use, useCallback, useEffect, useState } from "react";
+import { use, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase/client";
 import { useUser } from "@/hooks/useUser";
 import { hataCevir } from "@/lib/hataCevir";
+import {
+  ACTIVITIES,
+  ACTIVITY_LABELS,
+  buildChecklist,
+  ChecklistSection,
+} from "@/lib/belgeKatalogu";
 
 type Firm = {
   id: string;
@@ -23,12 +29,23 @@ type Firm = {
   email: string | null;
   notes: string | null;
   status: string;
+  activities: string[] | null;
+  contract_start: string | null;
+  logo_url: string | null;
 };
 
 type Row = Record<string, unknown> & { id: string };
 
+type BelgeRow = {
+  id: string;
+  code: string;
+  period: string;
+  done: boolean;
+};
+
 const TABS = [
   { key: "genel", label: "Genel" },
+  { key: "belge_takip", label: "Belge Takip" },
   { key: "tasks", label: "Görevler" },
   { key: "documents", label: "Belgeler" },
   { key: "vehicles", label: "Araçlar" },
@@ -127,10 +144,17 @@ export default function FirmDetailPage({
   const [form, setForm] = useState<Partial<Firm>>({});
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState("");
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [logoUploading, setLogoUploading] = useState(false);
 
   // Liste sekmeleri
   const [rows, setRows] = useState<Row[]>([]);
   const [rowsLoading, setRowsLoading] = useState(false);
+
+  // Belge Takip
+  const [belgeler, setBelgeler] = useState<BelgeRow[]>([]);
+  const [belgeLoading, setBelgeLoading] = useState(false);
+  const [openSection, setOpenSection] = useState<string | null>(null);
 
   const loadFirm = useCallback(async () => {
     setLoading(true);
@@ -140,9 +164,20 @@ export default function FirmDetailPage({
       .eq("id", id)
       .single();
 
-    setFirm((data as Firm) || null);
-    setForm((data as Firm) || {});
+    const f = (data as Firm) || null;
+    setFirm(f);
+    setForm(f || {});
     setLoading(false);
+
+    // Logo önizlemesi için imzalı URL üret
+    if (f?.logo_url) {
+      const { data: signed } = await supabase.storage
+        .from("firm-files")
+        .createSignedUrl(f.logo_url, 3600);
+      setLogoUrl(signed?.signedUrl || null);
+    } else {
+      setLogoUrl(null);
+    }
   }, [id]);
 
   const loadRows = useCallback(
@@ -161,13 +196,62 @@ export default function FirmDetailPage({
     [id]
   );
 
+  const loadBelgeler = useCallback(async () => {
+    setBelgeLoading(true);
+    const { data } = await supabase
+      .from("firm_belgeleri")
+      .select("id, code, period, done")
+      .eq("firm_id", id);
+    setBelgeler((data as BelgeRow[]) || []);
+    setBelgeLoading(false);
+  }, [id]);
+
   useEffect(() => {
     loadFirm();
   }, [loadFirm]);
 
   useEffect(() => {
-    if (tab !== "genel") loadRows(tab);
-  }, [tab, loadRows]);
+    if (tab === "belge_takip") loadBelgeler();
+    else if (tab !== "genel") loadRows(tab);
+  }, [tab, loadRows, loadBelgeler]);
+
+  // Takip bölümleri — firma faaliyetlerine göre
+  const sections: ChecklistSection[] = useMemo(() => {
+    if (!firm) return [];
+    return buildChecklist(firm.activities || [], firm.contract_start);
+  }, [firm]);
+
+  const doneSet = useMemo(() => {
+    const s = new Set<string>();
+    belgeler.forEach((b) => {
+      if (b.done) s.add(`${b.code}|${b.period}`);
+    });
+    return s;
+  }, [belgeler]);
+
+  const totals = useMemo(() => {
+    let total = 0;
+    let done = 0;
+    sections.forEach((sec) =>
+      sec.items.forEach((it) => {
+        total++;
+        if (doneSet.has(`${it.code}|${it.period}`)) done++;
+      })
+    );
+    return { total, done, pct: total ? Math.round((done / total) * 100) : 0 };
+  }, [sections, doneSet]);
+
+  async function toggleItem(code: string, period: string) {
+    if (!canWrite) return;
+    const key = `${code}|${period}`;
+    const isDone = doneSet.has(key);
+
+    const { error } = await supabase.from("firm_belgeleri").upsert(
+      { firm_id: id, code, period, done: !isDone },
+      { onConflict: "firm_id,code,period" }
+    );
+    if (!error) loadBelgeler();
+  }
 
   async function saveFirm() {
     setSaving(true);
@@ -185,12 +269,32 @@ export default function FirmDetailPage({
         email: form.email,
         notes: form.notes,
         status: form.status,
+        activities: form.activities || [],
+        contract_start: form.contract_start || null,
       })
       .eq("id", id);
 
     setSaving(false);
     setSaveMsg(error ? "Kaydedilemedi: " + hataCevir(error) : "✓ Kaydedildi");
     if (!error) loadFirm();
+  }
+
+  async function uploadLogo(file: File) {
+    setLogoUploading(true);
+    const safeName = file.name.replace(/[^a-zA-Z0-9_.-]/g, "_");
+    const path = `${id}/logo/${Date.now()}_${safeName}`;
+    const { error: upErr } = await supabase.storage
+      .from("firm-files")
+      .upload(path, file, { upsert: true });
+
+    if (upErr) {
+      setSaveMsg("Logo yüklenemedi: " + hataCevir(upErr));
+    } else {
+      await supabase.from("firms").update({ logo_url: path }).eq("id", id);
+      await loadFirm();
+      setSaveMsg("✓ Logo güncellendi");
+    }
+    setLogoUploading(false);
   }
 
   if (loading) {
@@ -213,19 +317,46 @@ export default function FirmDetailPage({
   const set = (key: keyof Firm) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
     setForm((f) => ({ ...f, [key]: e.target.value }));
 
+  function toggleFormActivity(key: string) {
+    setForm((f) => {
+      const cur = (f.activities as string[]) || [];
+      return {
+        ...f,
+        activities: cur.includes(key)
+          ? cur.filter((a) => a !== key)
+          : [...cur, key],
+      };
+    });
+  }
+
   return (
     <div className="p-8">
       <div className="flex items-center justify-between mb-1">
-        <h1 className="text-3xl font-bold">{firm.name}</h1>
+        <div className="flex items-center gap-3">
+          {logoUrl && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={logoUrl} alt="logo" className="h-10 w-10 object-contain rounded" />
+          )}
+          <h1 className="text-3xl font-bold">{firm.name}</h1>
+        </div>
         <Link href="/firms" className="text-sm text-gray-500 hover:underline">
           ← Firmalar
         </Link>
       </div>
-      <p className="text-gray-500 mb-6">
+      <p className="text-gray-500 mb-2">
         {[firm.city, firm.district].filter(Boolean).join(" / ") || "Konum girilmemiş"}
         {" · "}
         <span className="text-gray-700">{display(firm.status)}</span>
       </p>
+      {(firm.activities || []).length > 0 && (
+        <div className="flex flex-wrap gap-1 mb-4">
+          {(firm.activities || []).map((a) => (
+            <span key={a} className="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded">
+              {ACTIVITY_LABELS[a] || a}
+            </span>
+          ))}
+        </div>
+      )}
 
       {/* Sekmeler */}
       <div className="flex gap-1 border-b mb-6 overflow-x-auto">
@@ -273,6 +404,66 @@ export default function FirmDetailPage({
               <span className="text-sm text-gray-600">E-posta</span>
               <input className="border p-2 w-full rounded mt-1" value={form.email || ""} onChange={set("email")} />
             </label>
+
+            {/* Faaliyet konuları */}
+            <div className="col-span-2">
+              <span className="text-sm text-gray-600">
+                Faaliyet konuları <span className="text-gray-400">(birden fazla seçebilirsiniz)</span>
+              </span>
+              <div className="grid grid-cols-4 gap-2 mt-1">
+                {ACTIVITIES.map((a) => {
+                  const selected = ((form.activities as string[]) || []).includes(a.key);
+                  return (
+                    <button
+                      key={a.key}
+                      type="button"
+                      disabled={!canWrite}
+                      onClick={() => toggleFormActivity(a.key)}
+                      className={
+                        "border rounded px-2 py-1.5 text-sm transition " +
+                        (selected
+                          ? "bg-blue-600 text-white border-blue-600"
+                          : "hover:bg-gray-50") +
+                        (!canWrite ? " opacity-60 cursor-not-allowed" : "")
+                      }
+                    >
+                      {a.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <label className="block">
+              <span className="text-sm text-gray-600">
+                Sözleşme / Başlangıç Tarihi <span className="text-gray-400">(boş = yıl başından)</span>
+              </span>
+              <input
+                type="date"
+                className="border p-2 w-full rounded mt-1"
+                value={form.contract_start || ""}
+                onChange={set("contract_start")}
+              />
+            </label>
+
+            {/* Logo */}
+            <label className="block">
+              <span className="text-sm text-gray-600">Firma logosu</span>
+              <input
+                type="file"
+                accept="image/png,image/jpeg"
+                disabled={!canWrite || logoUploading}
+                className="border p-2 w-full rounded mt-1 text-sm"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) uploadLogo(f);
+                }}
+              />
+              {logoUploading && (
+                <span className="text-xs text-gray-500">Logo yükleniyor...</span>
+              )}
+            </label>
+
             <label className="block col-span-2">
               <span className="text-sm text-gray-600">Adres</span>
               <input className="border p-2 w-full rounded mt-1" value={form.address || ""} onChange={set("address")} />
@@ -310,8 +501,111 @@ export default function FirmDetailPage({
         </div>
       )}
 
+      {/* BELGE TAKİP — faaliyete göre şekillenen akordeon liste */}
+      {tab === "belge_takip" && (
+        <div className="max-w-4xl">
+          {/* Genel ilerleme */}
+          <div className="flex items-center justify-between border rounded-xl p-4 mb-4">
+            <div>
+              <p className="font-semibold">Genel İlerleme</p>
+              <p className="text-sm text-gray-500">
+                {totals.done} / {totals.total} madde tamamlandı
+              </p>
+            </div>
+            <div className="text-right">
+              <span
+                className={
+                  "text-3xl font-bold " +
+                  (totals.pct >= 80
+                    ? "text-green-600"
+                    : totals.pct >= 40
+                    ? "text-amber-600"
+                    : "text-red-500")
+                }
+              >
+                {totals.pct}%
+              </span>
+            </div>
+          </div>
+
+          {(firm.activities || []).length === 0 && (
+            <p className="text-sm text-gray-700 bg-amber-50 border border-amber-200 rounded p-3 mb-4">
+              Bu firma için faaliyet konusu seçilmemiş — liste yalnızca ortak
+              belgeleri gösteriyor. Genel sekmesinden faaliyet konularını seç.
+            </p>
+          )}
+
+          {belgeLoading && <p className="text-gray-500 mb-2">Yükleniyor...</p>}
+
+          <div className="space-y-2">
+            {sections.map((sec, idx) => {
+              const secDone = sec.items.filter((it) =>
+                doneSet.has(`${it.code}|${it.period}`)
+              ).length;
+              const open = openSection === sec.key;
+              return (
+                <div key={sec.key} className="border rounded-xl overflow-hidden">
+                  <button
+                    onClick={() => setOpenSection(open ? null : sec.key)}
+                    className="w-full flex items-center justify-between p-3 hover:bg-gray-50"
+                  >
+                    <span className="flex items-center gap-3">
+                      <span className="w-6 h-6 rounded-full bg-gray-100 text-gray-600 text-xs flex items-center justify-center font-semibold">
+                        {idx + 1}
+                      </span>
+                      <span className="font-medium text-sm">{sec.title}</span>
+                    </span>
+                    <span className="flex items-center gap-3">
+                      <span
+                        className={
+                          "text-xs font-semibold px-2 py-0.5 rounded " +
+                          (secDone === sec.items.length
+                            ? "bg-green-100 text-green-700"
+                            : "bg-red-50 text-red-500")
+                        }
+                      >
+                        {secDone}/{sec.items.length}
+                      </span>
+                      <span className="text-gray-400">{open ? "▲" : "▼"}</span>
+                    </span>
+                  </button>
+
+                  {open && (
+                    <div className="border-t divide-y">
+                      {sec.items.map((it) => {
+                        const done = doneSet.has(`${it.code}|${it.period}`);
+                        return (
+                          <label
+                            key={`${it.code}|${it.period}`}
+                            className={
+                              "flex items-center gap-3 px-4 py-2 text-sm " +
+                              (canWrite ? "cursor-pointer hover:bg-gray-50" : "")
+                            }
+                          >
+                            <input
+                              type="checkbox"
+                              checked={done}
+                              disabled={!canWrite}
+                              onChange={() => toggleItem(it.code, it.period)}
+                              className="w-4 h-4"
+                            />
+                            <span className={done ? "line-through text-gray-400" : ""}>
+                              {it.label}
+                            </span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* LİSTE SEKMELERİ */}
-      {tab !== "genel" && (
+      {tab !== "genel" && tab !== "belge_takip" && (
         <div className="border rounded-xl overflow-hidden">
           <table className="w-full text-sm">
             <thead className="bg-gray-50">
