@@ -436,7 +436,7 @@ export default function FirmDetailPage({
 
             <label className="block">
               <span className="text-sm text-gray-600">
-                Sözleşme / Başlangıç Tarihi <span className="text-gray-400">(boş = yıl başından)</span>
+                Sözleşme / Başlangıç Tarihi
               </span>
               <input
                 type="date"

@@ -302,8 +302,7 @@ export default function FirmsPage() {
             {/* Sözleşme / başlangıç tarihi */}
             <label className="block mb-3">
               <span className="text-sm text-gray-600">
-                Sözleşme / Başlangıç Tarihi{" "}
-                <span className="text-gray-400">(boş = yıl başından)</span>
+                Sözleşme / Başlangıç Tarihi
               </span>
               <input
                 type="date"
