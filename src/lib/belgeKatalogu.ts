@@ -183,6 +183,18 @@ function katalogMaddeleri(
     .map((c) => ({ code: c.code, period: "", label: `${c.code} — ${c.name}` }));
 }
 
+// Firma faaliyeti YALNIZCA Taşımacı ve/veya Tank İşletmecisi ise kimyasal
+// envanter listesi istenmez — bu firmalar tehlikeli maddeyi stoklamaz,
+// yalnızca taşır. Envanter yalnızca fiili elleçleme/depolama faaliyeti
+// (alıcı, boşaltan, yükleyen, dolduran, paketleyen, gönderen) olan
+// firmalardan istenir.
+const TASIMA_ODAKLI: ActivityKey[] = ["tasimaci", "tank_isletmecisi"];
+
+function envanterGerekli(activities: string[]): boolean {
+  if (activities.length === 0) return true; // faaliyet seçilmemişse varsayılan: iste
+  return activities.some((a) => !TASIMA_ODAKLI.includes(a as ActivityKey));
+}
+
 // Firma faaliyetleri + sözleşme tarihine göre tüm takip bölümleri
 export function buildChecklist(
   activities: string[],
@@ -219,11 +231,15 @@ export function buildChecklist(
         { code: "YFR", period: "", label: "Yıllık Faaliyet Raporu (ADR 1.8.3.3)" },
       ],
     },
-    {
-      key: "envanter",
-      title: "ADR Envanter Listesi",
-      items: [{ code: "L1", period: "", label: "L1 — Tehlikeli Madde Envanter Listesi" }],
-    },
+    ...(envanterGerekli(activities)
+      ? [
+          {
+            key: "envanter",
+            title: "ADR Envanter Listesi",
+            items: [{ code: "L1", period: "", label: "L1 — Tehlikeli Madde Envanter Listesi" }],
+          },
+        ]
+      : []),
     {
       key: "prosedurler",
       title: "ADR Prosedürleri (P)",
