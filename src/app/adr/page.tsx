@@ -304,8 +304,8 @@ function SearchBox({ q, setQ, res, load, showDd, setShowDd, dropRef, onSel, extr
         className="border p-3 w-full rounded-xl text-sm"
         placeholder={placeholder ?? "UN numarası (örn: 1203) veya madde adı..."}
         value={q}
-        onChange={e => { setQ(e.target.value); }}
-        onFocus={() => res.length > 0 && setShowDd(true)}
+        onChange={e => { setQ(e.target.value); setShowDd(true); }}
+        onFocus={() => (res.length > 0 || q.trim().length > 0) && setShowDd(true)}
       />
       {load && <span className="absolute right-3 top-3 text-xs text-gray-400">Aranıyor...</span>}
       {showDd && res.length > 0 && (
