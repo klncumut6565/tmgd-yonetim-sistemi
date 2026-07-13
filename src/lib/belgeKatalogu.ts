@@ -115,12 +115,17 @@ export const CATALOG: CatalogItem[] = [
 ];
 
 // Faaliyete göre katalog filtresi
+// NOT: L1 (Kimyasal/Tehlikeli Madde Envanter Listesi) özel durum — firma
+// faaliyeti yalnızca Taşımacı ve/veya Tank İşletmecisi ise gizlenir,
+// çünkü bu firmalar tehlikeli maddeyi stoklamaz, yalnızca taşır.
 export function catalogForActivities(activities: string[]): CatalogItem[] {
-  return CATALOG.filter(
-    (item) =>
+  return CATALOG.filter((item) => {
+    if (item.code === "L1") return envanterGerekli(activities);
+    return (
       item.activities.length === 0 ||
       item.activities.some((a) => activities.includes(a))
-  );
+    );
+  });
 }
 
 export function catalogItem(code: string): CatalogItem | undefined {
