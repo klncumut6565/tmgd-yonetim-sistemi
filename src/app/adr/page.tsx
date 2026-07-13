@@ -384,7 +384,22 @@ export default function AdrPage() {
     return {...item,cat,mul,pts};
   });
   const hasNonEx = calcRows.some(r=>r.pts===null);
-  const totalPts = calcRows.reduce((a,r)=>a+(r.pts??9999),0);
+
+  // ADR 1.1.3.6.4 formülü — kategori bazlı toplanıp SONRA çarpılır,
+  // işlem önceliği belirsizliğine yer bırakmamak için parantezli:
+  // (Kat.1 toplam miktarı × 50) + (Kat.2 toplam miktarı × 3) + (Kat.3 toplam miktarı × 1)
+  // Kat.4 tamamen serbesttir, toplama dahil edilmez.
+  const catQty = calcRows.reduce((acc, r) => {
+    if (r.cat === "1" || r.cat === "2" || r.cat === "3") {
+      acc[r.cat] = (acc[r.cat] ?? 0) + r.quantity;
+    }
+    return acc;
+  }, {} as Record<string, number>);
+  const totalPts =
+    ((catQty["1"] ?? 0) * 50) +
+    ((catQty["2"] ?? 0) * 3) +
+    ((catQty["3"] ?? 0) * 1);
+
   const isExempt = !hasNonEx && totalPts<=1000;
 
   async function downloadPdf() {
