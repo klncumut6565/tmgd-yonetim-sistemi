@@ -29,6 +29,7 @@ export default function DriversPage() {
       title="Sürücüler"
       fields={fields}
       searchKeys={["first_name", "last_name", "phone", "national_id"]}
+      requireActivity="tasimaci"
     />
   );
 }

@@ -215,6 +215,23 @@ export default function FirmDetailPage({
     else if (tab !== "genel") loadRows(tab);
   }, [tab, loadRows, loadBelgeler]);
 
+  // Araçlar / Sürücüler yalnızca Taşımacı faaliyeti olan firmalarda anlamlı —
+  // taşımacılık faaliyeti olmayan firmalarda bu sekmeler gizlenir.
+  const isTasimaci = (firm?.activities || []).includes("tasimaci");
+  const TASIMACI_SEKMELERI: TabKey[] = ["vehicles", "drivers"];
+  const visibleTabs = TABS.filter(
+    (t) => isTasimaci || !TASIMACI_SEKMELERI.includes(t.key)
+  );
+
+  // Firma yüklendiğinde/faaliyeti değiştiğinde, o an gizli bir sekmedeysek
+  // (örn. Taşımacı işaretini kaldırdıysak) otomatik olarak Genel'e dön.
+  useEffect(() => {
+    if (firm && !isTasimaci && TASIMACI_SEKMELERI.includes(tab)) {
+      setTab("genel");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [firm, isTasimaci]);
+
   // Takip bölümleri — firma faaliyetlerine göre
   const sections: ChecklistSection[] = useMemo(() => {
     if (!firm) return [];
@@ -360,7 +377,7 @@ export default function FirmDetailPage({
 
       {/* Sekmeler */}
       <div className="flex gap-1 border-b mb-6 overflow-x-auto">
-        {TABS.map((t) => (
+        {visibleTabs.map((t) => (
           <button
             key={t.key}
             onClick={() => setTab(t.key)}

@@ -27,7 +27,7 @@ export type FieldDef = {
   inTable?: boolean;           // listede sütun olarak gösterilsin mi (varsayılan true)
 };
 
-type Firm = { id: string; name: string };
+type Firm = { id: string; name: string; activities?: string[] | null };
 type Row = Record<string, unknown> & { id: string };
 
 type Props = {
@@ -36,6 +36,7 @@ type Props = {
   fields: FieldDef[];          // form + tablo alanları
   searchKeys: string[];        // arama hangi alanlarda yapılsın
   orderBy?: string;            // sıralama alanı (varsayılan created_at)
+  requireActivity?: string;    // yalnızca bu faaliyet konusuna sahip firmalar listelenir (örn. "tasimaci")
 };
 
 const STATUS_LABELS: Record<string, string> = {
@@ -50,6 +51,7 @@ export default function FirmScopedCrud({
   fields,
   searchKeys,
   orderBy = "created_at",
+  requireActivity,
 }: Props) {
   const { canWrite } = useUser();
   const [firms, setFirms] = useState<Firm[]>([]);
@@ -67,19 +69,36 @@ export default function FirmScopedCrud({
   const tableFields = fields.filter((f) => f.inTable !== false);
 
   async function loadFirms() {
-    const { data, error } = await supabase
+    let { data, error } = await supabase
       .from("firms")
-      .select("id, name")
+      .select("id, name, activities")
       .order("name");
 
-    if (error) {
+    // "activities" kolonu henüz eklenmemişse (migration 010 çalıştırılmadıysa)
+    // filtre uygulanamaz — tüm firmaları göster, kullanıcıyı bilgilendir.
+    if (error && /does not exist/i.test(error.message || "")) {
+      const retry = await supabase.from("firms").select("id, name").order("name");
+      data = (retry.data || []).map((f) => ({ ...f, activities: null })) as typeof data;
+      error = retry.error;
+      if (!retry.error && requireActivity) {
+        setError(
+          "Faaliyet filtresi uygulanamadı — veritabanı güncellemesi (migration 010) henüz çalıştırılmamış."
+        );
+      }
+    } else if (error) {
       setError("Firmalar yüklenemedi: " + hataCevir(error));
       return;
     }
 
-    setFirms(data || []);
-    if (data && data.length > 0) {
-      setFirmId((prev) => prev || data[0].id);
+    const list = requireActivity
+      ? (data || []).filter((f) => (f.activities || []).includes(requireActivity))
+      : data || [];
+
+    setFirms(list);
+    if (list.length > 0) {
+      setFirmId((prev) => (prev && list.some((f) => f.id === prev) ? prev : list[0].id));
+    } else {
+      setFirmId("");
     }
   }
 
@@ -240,7 +259,11 @@ export default function FirmScopedCrud({
             onChange={(e) => setFirmId(e.target.value)}
             className="border p-2 rounded min-w-[220px]"
           >
-            {firms.length === 0 && <option value="">Firma yok</option>}
+            {firms.length === 0 && (
+              <option value="">
+                {requireActivity ? "Uygun faaliyette firma yok" : "Firma yok"}
+              </option>
+            )}
             {firms.map((firm) => (
               <option key={firm.id} value={firm.id}>
                 {firm.name}
@@ -294,7 +317,9 @@ export default function FirmScopedCrud({
               <tr>
                 <td colSpan={tableFields.length + (canWrite ? 1 : 0)} className="p-4 text-gray-500">
                   {!firmId
-                    ? "Önce bir firma seç."
+                    ? requireActivity && firms.length === 0
+                      ? "Bu faaliyet konusuna sahip firma bulunamadı. Firma faaliyet konularını Firmalar sayfasından düzenleyebilirsin."
+                      : "Önce bir firma seç."
                     : canWrite
                       ? "Kayıt bulunamadı. Sağ üstten yeni ekleyebilirsin."
                       : "Kayıt bulunamadı."}

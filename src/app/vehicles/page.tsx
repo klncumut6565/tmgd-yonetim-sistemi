@@ -30,6 +30,7 @@ export default function VehiclesPage() {
       title="Araçlar"
       fields={fields}
       searchKeys={["plate_number", "brand", "model", "vehicle_type"]}
+      requireActivity="tasimaci"
     />
   );
 }
