@@ -43,12 +43,28 @@ export default function BelgeOlusturPage() {
 
   useEffect(() => {
     (async () => {
-      const { data, error } = await supabase
+      let { data, error } = await supabase
         .from("firms")
         .select("id, name, activities, contract_start, logo_url")
         .eq("status", "active")
         .order("name");
-      if (error) setError("Firmalar yüklenemedi: " + hataCevir(error));
+
+      if (error && /does not exist/i.test(error.message || "")) {
+        const retry = await supabase
+          .from("firms")
+          .select("id, name, logo_url")
+          .eq("status", "active")
+          .order("name");
+        data = (retry.data || []).map((f) => ({ ...f, activities: [], contract_start: null })) as typeof data;
+        error = retry.error;
+        if (!retry.error) {
+          setError(
+            "Faaliyet konuları görünmüyor — veritabanı güncellemesi (migration 010) henüz çalıştırılmamış."
+          );
+        }
+      } else if (error) {
+        setError("Firmalar yüklenemedi: " + hataCevir(error));
+      }
       setFirms((data as Firm[]) || []);
     })();
   }, []);

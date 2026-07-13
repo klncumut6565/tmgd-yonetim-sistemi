@@ -51,12 +51,30 @@ export default function FirmsPage() {
 
   async function loadFirms() {
     setError("");
-    const { data, error } = await supabase
+    let { data, error } = await supabase
       .from("firms")
       .select("id, name, city, district, phone, status, activities")
       .order("name");
 
-    if (error) setError("Firmalar yüklenemedi: " + hataCevir(error));
+    // "activities" kolonu henüz eklenmemişse (migration 010 çalıştırılmadıysa)
+    // firmaları yine de göster — kolon olmadan sorguyu tekrar dene.
+    if (error && /column.*(activities).*does not exist|activities.*does not exist/i.test(error.message || "")) {
+      const retry = await supabase
+        .from("firms")
+        .select("id, name, city, district, phone, status")
+        .order("name");
+      data = (retry.data || []).map((f) => ({ ...f, activities: [] })) as typeof data;
+      error = retry.error;
+      if (!retry.error) {
+        setError(
+          "Faaliyet konuları görünmüyor — veritabanı güncellemesi (migration 010) henüz çalıştırılmamış. " +
+            "Supabase → SQL Editor'de database/010_faaliyet_ve_belge_takip.sql dosyasını çalıştır."
+        );
+      }
+    } else if (error) {
+      setError("Firmalar yüklenemedi: " + hataCevir(error));
+    }
+
     setFirms((data as Firm[]) || []);
     setLoading(false);
   }
