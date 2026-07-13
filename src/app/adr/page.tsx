@@ -29,8 +29,11 @@ type UnRow = {
 type CalcItem = { row: UnRow; quantity: number };
 type MixItem  = { row: UnRow };
 
-// ── ADR 1.1.3.6 Muafiyet çarpanları ──────────────────────────────────────
-const CAT_MUL: Record<string, number> = { "1":50, "2":333, "3":1000, "4":Infinity };
+// ── ADR 1.1.3.6.4 Muafiyet formülü ───────────────────────────────────────
+// DOĞRU KURAL: Toplam = (Kat.1 miktarı × 50) + (Kat.2 miktarı × 3) + (Kat.3 miktarı × 1)
+// Kat.4 tamamen serbesttir (hesaba dahil edilmez, çarpan 0).
+// ÇARPILIR, bölünmez — miktar arttıkça puan da artar.
+const CAT_MUL: Record<string, number> = { "1":50, "2":3, "3":1, "4":0 };
 
 // ── Etiket yardımcıları (utils.py'den) ───────────────────────────────────
 // Etiket normalizasyonu: alt sınıf etiketleri ana sınıfa indirgenir
@@ -377,7 +380,7 @@ export default function AdrPage() {
 
   const calcRows = calcItems.map(item => {
     const cat=item.row.transport_category||""; const mul=CAT_MUL[cat]??null;
-    const pts=mul===null?null:mul===Infinity?0:item.quantity/mul;
+    const pts=mul===null?null:item.quantity*mul;
     return {...item,cat,mul,pts};
   });
   const hasNonEx = calcRows.some(r=>r.pts===null);
@@ -398,7 +401,7 @@ export default function AdrPage() {
     let y=36; doc.setTextColor(0,0,0); doc.setFontSize(11); doc.setFont("helvetica","bold"); doc.text("Hesaplanan Maddeler",M,y); y+=2;
     autoTable(doc,{startY:y,margin:{left:M,right:M},headStyles:{fillColor:[30,30,30]},
       head:[["UN No","Madde","Sınıf","AG","Kat.","Çarpan","Miktar","Puan"]],
-      body:calcRows.map(r=>[`UN ${r.row.un_number}`,r.row.proper_shipping_name.slice(0,40),r.row.class||"—",r.row.packing_group||"—",r.cat||"—",r.mul===null?"Muaf değil":r.mul===Infinity?"∞":r.mul,`${r.quantity.toFixed(2)} kg/L`,r.pts===null?"Muaf değil":r.mul===Infinity?"0":r.pts!==null?r.pts.toFixed(2):"—"]),
+      body:calcRows.map(r=>[`UN ${r.row.un_number}`,r.row.proper_shipping_name.slice(0,40),r.row.class||"—",r.row.packing_group||"—",r.cat||"—",r.mul===null?"Muaf değil":`×${r.mul}`,`${r.quantity.toFixed(2)} kg/L`,r.pts===null?"Muaf değil":r.pts.toFixed(2)]),
       foot:[[{content:`TOPLAM PUAN: ${hasNonEx?"Hesaplanamadı":totalPts.toFixed(2)}`,colSpan:8,styles:{fontStyle:"bold",fillColor:isExempt?[220,252,231]:[254,226,226]}}]],
       styles:{fontSize:8}});
     y=(doc as unknown as {lastAutoTable:{finalY:number}}).lastAutoTable.finalY+8;
@@ -510,7 +513,7 @@ export default function AdrPage() {
           </div>
           <div className="border rounded-xl p-5">
             <h2 className="font-bold mb-1">ADR 1.1.3.6 Muafiyet Hesabı</h2>
-            <p className="text-xs text-gray-400 mb-3">Kat.1→÷50 · Kat.2→÷333 · Kat.3→÷1000 · Kat.4→serbest · Toplam ≤1000 → muafiyet</p>
+            <p className="text-xs text-gray-400 mb-3">Kat.1→×50 · Kat.2→×3 · Kat.3→×1 · Kat.4→serbest (0) · Toplam ≤1000 → muafiyet (ADR 1.1.3.6.4)</p>
             {calcItems.length===0&&<p className="text-sm text-gray-400 text-center py-8">Soldan madde seçip ekleyin.</p>}
             <div className="space-y-2">
               {calcRows.map(r=>(
@@ -530,8 +533,7 @@ export default function AdrPage() {
                     <span className="text-xs text-gray-400 flex-1">kg/L</span>
                     <span className="text-sm font-bold">
                       {r.pts===null?<span className="text-red-500">Muaf değil</span>
-                        :r.mul===Infinity?<span className="text-green-500">0 puan</span>
-                        :<span>{(r.pts as number).toFixed(2)} puan</span>}
+                        :<span className={r.mul===0?"text-green-500":""}>{(r.pts as number).toFixed(2)} puan</span>}
                     </span>
                   </div>
                 </div>
