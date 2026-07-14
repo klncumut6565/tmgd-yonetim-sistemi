@@ -117,10 +117,18 @@ export default function DocumentsPage() {
     setFirms(firmList);
     if (firmList.length > 0 && !firmId) setFirmId(firmList[0].id);
 
+    if (typeRes.error) {
+      setError((prev) =>
+        (prev ? prev + " · " : "") + "Belge türleri yüklenemedi: " + hataCevir(typeRes.error)
+      );
+    }
     setDocTypes((typeRes.data as DocType[]) || []);
     if (typeRes.data && typeRes.data.length > 0 && !fTypeId)
       setFTypeId(typeRes.data[0].id);
 
+    if (docRes.error) {
+      setError((prev) => (prev ? prev + " · " : "") + hataCevir(docRes.error));
+    }
     setDocs((docRes.data as unknown as Doc[]) || []);
     setLoading(false);
   }
