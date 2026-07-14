@@ -72,7 +72,7 @@ const TABS = [
   { key: "drivers", label: "Sürücüler" },
   { key: "employees", label: "Personeller" },
   { key: "visits", label: "Ziyaretler" },
-  { key: "genel", label: "Düzenle" },
+  { key: "genel", label: "Firma Bilgileri" },
 ] as const;
 
 type TabKey = (typeof TABS)[number]["key"];
@@ -157,8 +157,15 @@ export default function FirmDetailPage({
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<TabKey>("belge_takip");
 
+  // Firma Bilgileri sekmesinden ayrılınca düzenleme modu sıfırlanır —
+  // sekmeye her dönüşte güvenli (salt okunur) görünümle başlanır.
+  useEffect(() => {
+    if (tab !== "genel") setEditMode(false);
+  }, [tab]);
+
   // Genel sekmesi form durumu
   const [form, setForm] = useState<Partial<Firm>>({});
+  const [editMode, setEditMode] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState("");
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
@@ -430,7 +437,10 @@ export default function FirmDetailPage({
 
     setSaving(false);
     setSaveMsg(error ? "Kaydedilemedi: " + hataCevir(error) : "✓ Kaydedildi");
-    if (!error) loadFirm();
+    if (!error) {
+      setEditMode(false);
+      loadFirm();
+    }
   }
 
   async function uploadLogo(file: File) {
@@ -531,7 +541,78 @@ export default function FirmDetailPage({
       </div>
 
       {/* GENEL — düzenlenebilir form */}
-      {tab === "genel" && (
+      {tab === "genel" && !editMode && (
+        <div className="max-w-3xl">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold">Firma Bilgileri</h2>
+            {canWrite && (
+              <button
+                onClick={() => setEditMode(true)}
+                className="px-4 py-2 rounded border text-sm hover:bg-gray-50"
+              >
+                ✎ Düzenle
+              </button>
+            )}
+          </div>
+
+          <div className="grid grid-cols-2 gap-4 text-sm">
+            <Bilgi label="Firma Adı" value={firm.name} />
+            <Bilgi label="Vergi No" value={firm.tax_number} />
+            <Bilgi label="Şehir" value={firm.city} />
+            <Bilgi label="İlçe" value={firm.district} />
+            <Bilgi label="Telefon" value={firm.phone} />
+            <Bilgi label="E-posta" value={firm.email} />
+
+            <div className="col-span-2">
+              <span className="text-gray-500">Faaliyet konuları</span>
+              <div className="flex flex-wrap gap-1 mt-1">
+                {(firm.activities || []).length === 0 && (
+                  <span className="text-gray-400">—</span>
+                )}
+                {(firm.activities || []).map((a) => (
+                  <span key={a} className="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded">
+                    {ACTIVITY_LABELS[a] || a}
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            <Bilgi
+              label="Sözleşme / Başlangıç Tarihi"
+              value={firm.contract_start ? new Date(firm.contract_start).toLocaleDateString("tr-TR") : null}
+            />
+            <div>
+              <span className="text-gray-500">Firma logosu</span>
+              <div className="mt-1">
+                {logoUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={logoUrl} alt="logo" className="h-10 w-10 object-contain rounded border bg-white" />
+                ) : (
+                  <span className="text-gray-400">—</span>
+                )}
+              </div>
+            </div>
+
+            <div className="col-span-2">
+              <span className="text-gray-500">Adres</span>
+              <p className="mt-1">{firm.address || "—"}</p>
+            </div>
+            <div className="col-span-2">
+              <span className="text-gray-500">Notlar</span>
+              <p className="mt-1 whitespace-pre-wrap">{firm.notes || "—"}</p>
+            </div>
+            <Bilgi label="Durum" value={display(firm.status)} />
+          </div>
+
+          {!canWrite && (
+            <p className="mt-6 text-sm text-gray-400">
+              Hesabın salt okunur — firma bilgilerini görüntüleyebilir ama değiştiremezsin.
+            </p>
+          )}
+        </div>
+      )}
+
+      {tab === "genel" && editMode && (
         <div className="max-w-3xl">
           <div className="grid grid-cols-2 gap-4">
             <label className="block">
@@ -636,22 +717,27 @@ export default function FirmDetailPage({
             </label>
           </div>
 
-          {canWrite ? (
-            <div className="mt-6 flex items-center gap-3">
-              <button
-                onClick={saveFirm}
-                disabled={saving}
-                className="px-5 py-2 rounded bg-black text-white disabled:opacity-50"
-              >
-                {saving ? "Kaydediliyor..." : "Kaydet"}
-              </button>
-              {saveMsg && <span className="text-sm text-gray-600">{saveMsg}</span>}
-            </div>
-          ) : (
-            <p className="mt-6 text-sm text-gray-400">
-              Hesabın salt okunur — firma bilgilerini görüntüleyebilir ama değiştiremezsin.
-            </p>
-          )}
+          <div className="mt-6 flex items-center gap-3">
+            <button
+              onClick={saveFirm}
+              disabled={saving}
+              className="px-5 py-2 rounded bg-black text-white disabled:opacity-50"
+            >
+              {saving ? "Kaydediliyor..." : "Kaydet"}
+            </button>
+            <button
+              onClick={() => {
+                setForm(firm || {});
+                setEditMode(false);
+                setSaveMsg("");
+              }}
+              disabled={saving}
+              className="px-5 py-2 rounded border"
+            >
+              Vazgeç
+            </button>
+            {saveMsg && <span className="text-sm text-gray-600">{saveMsg}</span>}
+          </div>
         </div>
       )}
 
@@ -1009,6 +1095,16 @@ export default function FirmDetailPage({
           notepadTemplate={VISIT_REPORT_TEMPLATE}
         />
       )}
+    </div>
+  );
+}
+
+// Firma Bilgileri sekmesinin salt-okunur görünümünde tek bir etiket/değer satırı
+function Bilgi({ label, value }: { label: string; value: string | null | undefined }) {
+  return (
+    <div>
+      <span className="text-gray-500">{label}</span>
+      <p className="mt-1">{value || "—"}</p>
     </div>
   );
 }
