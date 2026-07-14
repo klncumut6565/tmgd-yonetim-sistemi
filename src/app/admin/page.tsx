@@ -190,8 +190,11 @@ function UsersTab() {
     if (
       !window.confirm(
         `${u.email} kullanıcısının profilini KALICI olarak silmek istiyor musun?\n\n` +
-          "Not: Bu işlem profili siler. Giriş hesabını (auth) tamamen kaldırmak " +
-          "için Supabase panelinden de silmen gerekebilir."
+          "ÖNEMLİ: Bu işlem yalnızca profili siler. Kullanıcının giriş hesabı " +
+          "(e-posta/şifre) Supabase Auth'ta kalmaya devam eder — o e-posta ile " +
+          "tekrar kayıt olamaz. Giriş hesabını tamamen kaldırmak veya şifresini " +
+          "sıfırlamak için Supabase Dashboard → Authentication → Users ekranını " +
+          "kullanman gerekir."
       )
     )
       return;
