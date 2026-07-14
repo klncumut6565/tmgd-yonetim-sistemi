@@ -44,6 +44,14 @@ type BelgeRow = {
   file_path: string | null;
 };
 
+type Attachment = {
+  id: string;
+  code: string;
+  period: string;
+  file_path: string;
+  file_name: string;
+};
+
 const TABS = [
   { key: "genel", label: "Genel" },
   { key: "belge_takip", label: "Belge Takip" },
@@ -158,6 +166,7 @@ export default function FirmDetailPage({
   const [openSection, setOpenSection] = useState<string | null>(null);
   const [uploadingKey, setUploadingKey] = useState<string | null>(null);
   const [fileMsg, setFileMsg] = useState("");
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
 
   const loadFirm = useCallback(async () => {
     setLoading(true);
@@ -201,11 +210,30 @@ export default function FirmDetailPage({
 
   const loadBelgeler = useCallback(async () => {
     setBelgeLoading(true);
-    const { data } = await supabase
-      .from("firm_belgeleri")
-      .select("id, code, period, done, file_path")
-      .eq("firm_id", id);
-    setBelgeler((data as BelgeRow[]) || []);
+    const [belgelerRes, ekRes] = await Promise.all([
+      supabase
+        .from("firm_belgeleri")
+        .select("id, code, period, done, file_path")
+        .eq("firm_id", id),
+      supabase
+        .from("firm_belge_dosyalari")
+        .select("id, code, period, file_path, file_name")
+        .eq("firm_id", id)
+        .order("uploaded_at", { ascending: true }),
+    ]);
+    setBelgeler((belgelerRes.data as BelgeRow[]) || []);
+
+    if (ekRes.error) {
+      setAttachments([]);
+      if (/does not exist|not find the table/i.test(ekRes.error.message || "")) {
+        setFileMsg(
+          "Çoklu dosya eki özelliği için veritabanı güncellemesi (migration 011) henüz çalıştırılmamış. " +
+            "Supabase → SQL Editor'de database/011_belge_dosya_ekleri.sql dosyasını çalıştır."
+        );
+      }
+    } else {
+      setAttachments((ekRes.data as Attachment[]) || []);
+    }
     setBelgeLoading(false);
   }, [id]);
 
@@ -249,53 +277,73 @@ export default function FirmDetailPage({
     return s;
   }, [belgeler]);
 
-  // Her madde için yüklenmiş dosyanın yolu (varsa)
-  const fileMap = useMemo(() => {
-    const m = new Map<string, string>();
-    belgeler.forEach((b) => {
-      if (b.file_path) m.set(`${b.code}|${b.period}`, b.file_path);
+  // Her madde için yüklenmiş dosyalar (birden fazla olabilir)
+  const attachmentsByItem = useMemo(() => {
+    const m = new Map<string, Attachment[]>();
+    attachments.forEach((a) => {
+      const key = `${a.code}|${a.period}`;
+      const list = m.get(key) || [];
+      list.push(a);
+      m.set(key, list);
     });
     return m;
-  }, [belgeler]);
+  }, [attachments]);
 
   const ALLOWED_EXT = [".pdf", ".doc", ".docx", ".jpg", ".jpeg", ".png"];
 
-  async function uploadItemFile(code: string, period: string, file: File) {
-    if (!canWrite) return;
+  // Birden fazla dosya seçilebilir — her biri ayrı bir ek olarak yüklenir.
+  async function uploadItemFiles(code: string, period: string, fileList: FileList) {
+    if (!canWrite || fileList.length === 0) return;
     const key = `${code}|${period}`;
-    const ext = "." + (file.name.split(".").pop() || "").toLowerCase();
-    if (!ALLOWED_EXT.includes(ext)) {
-      setFileMsg(`Desteklenmeyen dosya türü (${ext}). İzin verilenler: PDF, Word, JPEG, PNG.`);
+    const files = Array.from(fileList);
+
+    const invalid = files.find((f) => {
+      const ext = "." + (f.name.split(".").pop() || "").toLowerCase();
+      return !ALLOWED_EXT.includes(ext);
+    });
+    if (invalid) {
+      setFileMsg(
+        `Desteklenmeyen dosya türü: "${invalid.name}". İzin verilenler: PDF, Word, JPEG, PNG.`
+      );
       return;
     }
 
     setUploadingKey(key);
     setFileMsg("");
-    const safeName = file.name.replace(/[^a-zA-Z0-9_.-]/g, "_");
-    const path = `${id}/belge-takip/${code}_${period || "genel"}/${Date.now()}_${safeName}`;
 
-    const { error: upErr } = await supabase.storage
-      .from("firm-files")
-      .upload(path, file, { upsert: true });
+    for (const file of files) {
+      const safeName = file.name.replace(/[^a-zA-Z0-9_.-]/g, "_");
+      const path = `${id}/belge-takip/${code}_${period || "genel"}/${Date.now()}_${safeName}`;
 
-    if (upErr) {
-      setFileMsg("Dosya yüklenemedi: " + hataCevir(upErr));
-      setUploadingKey(null);
-      return;
+      const { error: upErr } = await supabase.storage
+        .from("firm-files")
+        .upload(path, file, { upsert: true });
+
+      if (upErr) {
+        setFileMsg(`"${file.name}" yüklenemedi: ` + hataCevir(upErr));
+        continue;
+      }
+
+      const { error: dbErr } = await supabase.from("firm_belge_dosyalari").insert({
+        firm_id: id,
+        code,
+        period,
+        file_path: path,
+        file_name: file.name,
+      });
+      if (dbErr) {
+        setFileMsg(`"${file.name}" kaydedilemedi: ` + hataCevir(dbErr));
+      }
     }
 
-    // Dosya yüklendiğinde madde otomatik "tamamlandı" işaretlenir —
-    // dosyanın varlığı zaten maddenin karşılandığının kanıtıdır.
-    const { error: dbErr } = await supabase.from("firm_belgeleri").upsert(
-      { firm_id: id, code, period, file_path: path, done: true },
+    // En az bir dosya eklendiyse madde otomatik "tamamlandı" işaretlenir —
+    // dosyaların varlığı zaten maddenin karşılandığının kanıtıdır.
+    await supabase.from("firm_belgeleri").upsert(
+      { firm_id: id, code, period, done: true },
       { onConflict: "firm_id,code,period" }
     );
 
     setUploadingKey(null);
-    if (dbErr) {
-      setFileMsg("Dosya yüklendi ama kayıt güncellenemedi: " + hataCevir(dbErr));
-      return;
-    }
     loadBelgeler();
   }
 
@@ -310,17 +358,15 @@ export default function FirmDetailPage({
     window.open(data.signedUrl, "_blank");
   }
 
-  async function removeItemFile(code: string, period: string) {
+  async function removeAttachment(attachmentId: string) {
     if (!canWrite) return;
-    const ok = window.confirm("Bu maddeden dosya bağlantısını kaldırmak istiyor musun?");
+    const ok = window.confirm("Bu dosyayı listeden kaldırmak istiyor musun?");
     if (!ok) return;
 
     const { error } = await supabase
-      .from("firm_belgeleri")
-      .update({ file_path: null })
-      .eq("firm_id", id)
-      .eq("code", code)
-      .eq("period", period);
+      .from("firm_belge_dosyalari")
+      .delete()
+      .eq("id", attachmentId);
 
     if (error) {
       setFileMsg("Kaldırılamadı: " + hataCevir(error));
@@ -681,92 +727,95 @@ export default function FirmDetailPage({
                       {sec.items.map((it) => {
                         const itemKey = `${it.code}|${it.period}`;
                         const done = doneSet.has(itemKey);
-                        const filePath = fileMap.get(itemKey);
+                        const itemFiles = attachmentsByItem.get(itemKey) || [];
                         const uploading = uploadingKey === itemKey;
                         const inputId = `dosya-${sec.key}-${it.code}-${it.period}`;
 
                         return (
-                          <div
-                            key={itemKey}
-                            className="flex items-center gap-3 px-4 py-2 text-sm hover:bg-gray-50"
-                          >
-                            <label className={"flex items-center gap-3 flex-1 min-w-0 " + (canWrite ? "cursor-pointer" : "")}>
-                              <input
-                                type="checkbox"
-                                checked={done}
-                                disabled={!canWrite}
-                                onChange={() => toggleItem(it.code, it.period)}
-                                className="w-4 h-4 shrink-0"
-                              />
-                              <span className={"truncate " + (done ? "line-through text-gray-400" : "")}>
-                                {it.label}
-                              </span>
-                            </label>
-
-                            {/* Dosya alanı — PDF, Word, JPEG, PNG */}
-                            <div className="flex items-center gap-1 shrink-0">
-                              {uploading && (
-                                <span className="text-xs text-gray-400">Yükleniyor...</span>
-                              )}
-
-                              {!uploading && filePath && (
-                                <>
-                                  <button
-                                    onClick={() => downloadItemFile(filePath)}
-                                    title="Dosyayı indir"
-                                    className="text-xs px-2 py-1 rounded bg-blue-50 text-blue-700 hover:bg-blue-100"
-                                  >
-                                    ⬇ İndir
-                                  </button>
-                                  {canWrite && (
-                                    <label
-                                      htmlFor={inputId}
-                                      title="Dosyayı değiştir"
-                                      className="text-xs px-2 py-1 rounded border text-gray-500 hover:bg-gray-100 cursor-pointer"
-                                    >
-                                      🔄
-                                    </label>
-                                  )}
-                                  {canWrite && (
-                                    <button
-                                      onClick={() => removeItemFile(it.code, it.period)}
-                                      title="Dosya bağlantısını kaldır"
-                                      className="text-xs px-1.5 py-1 rounded text-gray-400 hover:text-red-500 hover:bg-red-50"
-                                    >
-                                      ✕
-                                    </button>
-                                  )}
-                                </>
-                              )}
-
-                              {!uploading && !filePath && canWrite && (
-                                <label
-                                  htmlFor={inputId}
-                                  title="PDF, Word, JPEG veya PNG yükle"
-                                  className="text-xs px-2 py-1 rounded border text-gray-500 hover:bg-gray-100 cursor-pointer"
-                                >
-                                  📎 Dosya Ekle
-                                </label>
-                              )}
-
-                              {!uploading && !filePath && !canWrite && (
-                                <span className="text-xs text-gray-300">Dosya yok</span>
-                              )}
-
-                              {canWrite && (
+                          <div key={itemKey} className="px-4 py-2 text-sm hover:bg-gray-50">
+                            <div className="flex items-center gap-3">
+                              <label className={"flex items-center gap-3 flex-1 min-w-0 " + (canWrite ? "cursor-pointer" : "")}>
                                 <input
-                                  id={inputId}
-                                  type="file"
-                                  accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,image/png,image/jpeg,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                                  className="hidden"
-                                  onChange={(e) => {
-                                    const f = e.target.files?.[0];
-                                    if (f) uploadItemFile(it.code, it.period, f);
-                                    e.target.value = "";
-                                  }}
+                                  type="checkbox"
+                                  checked={done}
+                                  disabled={!canWrite}
+                                  onChange={() => toggleItem(it.code, it.period)}
+                                  className="w-4 h-4 shrink-0"
                                 />
-                              )}
+                                <span className={"truncate " + (done ? "line-through text-gray-400" : "")}>
+                                  {it.label}
+                                </span>
+                                {itemFiles.length > 0 && (
+                                  <span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded-full shrink-0">
+                                    {itemFiles.length} dosya
+                                  </span>
+                                )}
+                              </label>
+
+                              {/* Dosya ekleme — çoklu seçim, PDF/Word/JPEG/PNG */}
+                              <div className="flex items-center gap-1 shrink-0">
+                                {uploading && (
+                                  <span className="text-xs text-gray-400">Yükleniyor...</span>
+                                )}
+
+                                {!uploading && canWrite && (
+                                  <label
+                                    htmlFor={inputId}
+                                    title="PDF, Word, JPEG veya PNG yükle (birden fazla dosya seçilebilir)"
+                                    className="text-xs px-2 py-1 rounded border text-gray-500 hover:bg-gray-100 cursor-pointer"
+                                  >
+                                    📎 Dosya Ekle
+                                  </label>
+                                )}
+
+                                {!uploading && !canWrite && itemFiles.length === 0 && (
+                                  <span className="text-xs text-gray-300">Dosya yok</span>
+                                )}
+
+                                {canWrite && (
+                                  <input
+                                    id={inputId}
+                                    type="file"
+                                    multiple
+                                    accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,image/png,image/jpeg,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                                    className="hidden"
+                                    onChange={(e) => {
+                                      if (e.target.files && e.target.files.length > 0) {
+                                        uploadItemFiles(it.code, it.period, e.target.files);
+                                      }
+                                      e.target.value = "";
+                                    }}
+                                  />
+                                )}
+                              </div>
                             </div>
+
+                            {/* Yüklenmiş dosyaların listesi */}
+                            {itemFiles.length > 0 && (
+                              <div className="mt-1.5 ml-7 space-y-1">
+                                {itemFiles.map((f) => (
+                                  <div key={f.id} className="flex items-center gap-2 text-xs text-gray-500">
+                                    <span className="truncate flex-1 min-w-0">📄 {f.file_name}</span>
+                                    <button
+                                      onClick={() => downloadItemFile(f.file_path)}
+                                      title="İndir"
+                                      className="shrink-0 px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 hover:bg-blue-100"
+                                    >
+                                      ⬇
+                                    </button>
+                                    {canWrite && (
+                                      <button
+                                        onClick={() => removeAttachment(f.id)}
+                                        title="Kaldır"
+                                        className="shrink-0 px-1.5 py-0.5 rounded text-gray-400 hover:text-red-500 hover:bg-red-50"
+                                      >
+                                        ✕
+                                      </button>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
                           </div>
                         );
                       })}
