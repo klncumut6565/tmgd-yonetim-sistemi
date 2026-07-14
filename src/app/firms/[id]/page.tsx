@@ -41,6 +41,7 @@ type BelgeRow = {
   code: string;
   period: string;
   done: boolean;
+  file_path: string | null;
 };
 
 const TABS = [
@@ -155,6 +156,8 @@ export default function FirmDetailPage({
   const [belgeler, setBelgeler] = useState<BelgeRow[]>([]);
   const [belgeLoading, setBelgeLoading] = useState(false);
   const [openSection, setOpenSection] = useState<string | null>(null);
+  const [uploadingKey, setUploadingKey] = useState<string | null>(null);
+  const [fileMsg, setFileMsg] = useState("");
 
   const loadFirm = useCallback(async () => {
     setLoading(true);
@@ -200,7 +203,7 @@ export default function FirmDetailPage({
     setBelgeLoading(true);
     const { data } = await supabase
       .from("firm_belgeleri")
-      .select("id, code, period, done")
+      .select("id, code, period, done, file_path")
       .eq("firm_id", id);
     setBelgeler((data as BelgeRow[]) || []);
     setBelgeLoading(false);
@@ -245,6 +248,86 @@ export default function FirmDetailPage({
     });
     return s;
   }, [belgeler]);
+
+  // Her madde için yüklenmiş dosyanın yolu (varsa)
+  const fileMap = useMemo(() => {
+    const m = new Map<string, string>();
+    belgeler.forEach((b) => {
+      if (b.file_path) m.set(`${b.code}|${b.period}`, b.file_path);
+    });
+    return m;
+  }, [belgeler]);
+
+  const ALLOWED_EXT = [".pdf", ".doc", ".docx", ".jpg", ".jpeg", ".png"];
+
+  async function uploadItemFile(code: string, period: string, file: File) {
+    if (!canWrite) return;
+    const key = `${code}|${period}`;
+    const ext = "." + (file.name.split(".").pop() || "").toLowerCase();
+    if (!ALLOWED_EXT.includes(ext)) {
+      setFileMsg(`Desteklenmeyen dosya türü (${ext}). İzin verilenler: PDF, Word, JPEG, PNG.`);
+      return;
+    }
+
+    setUploadingKey(key);
+    setFileMsg("");
+    const safeName = file.name.replace(/[^a-zA-Z0-9_.-]/g, "_");
+    const path = `${id}/belge-takip/${code}_${period || "genel"}/${Date.now()}_${safeName}`;
+
+    const { error: upErr } = await supabase.storage
+      .from("firm-files")
+      .upload(path, file, { upsert: true });
+
+    if (upErr) {
+      setFileMsg("Dosya yüklenemedi: " + hataCevir(upErr));
+      setUploadingKey(null);
+      return;
+    }
+
+    // Dosya yüklendiğinde madde otomatik "tamamlandı" işaretlenir —
+    // dosyanın varlığı zaten maddenin karşılandığının kanıtıdır.
+    const { error: dbErr } = await supabase.from("firm_belgeleri").upsert(
+      { firm_id: id, code, period, file_path: path, done: true },
+      { onConflict: "firm_id,code,period" }
+    );
+
+    setUploadingKey(null);
+    if (dbErr) {
+      setFileMsg("Dosya yüklendi ama kayıt güncellenemedi: " + hataCevir(dbErr));
+      return;
+    }
+    loadBelgeler();
+  }
+
+  async function downloadItemFile(path: string) {
+    const { data, error } = await supabase.storage
+      .from("firm-files")
+      .createSignedUrl(path, 300);
+    if (error || !data?.signedUrl) {
+      setFileMsg("İndirme bağlantısı oluşturulamadı: " + hataCevir(error));
+      return;
+    }
+    window.open(data.signedUrl, "_blank");
+  }
+
+  async function removeItemFile(code: string, period: string) {
+    if (!canWrite) return;
+    const ok = window.confirm("Bu maddeden dosya bağlantısını kaldırmak istiyor musun?");
+    if (!ok) return;
+
+    const { error } = await supabase
+      .from("firm_belgeleri")
+      .update({ file_path: null })
+      .eq("firm_id", id)
+      .eq("code", code)
+      .eq("period", period);
+
+    if (error) {
+      setFileMsg("Kaldırılamadı: " + hataCevir(error));
+      return;
+    }
+    loadBelgeler();
+  }
 
   const totals = useMemo(() => {
     let total = 0;
@@ -554,6 +637,12 @@ export default function FirmDetailPage({
 
           {belgeLoading && <p className="text-gray-500 mb-2">Yükleniyor...</p>}
 
+          {fileMsg && (
+            <p className="text-sm text-gray-700 bg-amber-50 border border-amber-200 rounded p-3 mb-4">
+              {fileMsg}
+            </p>
+          )}
+
           <div className="space-y-2">
             {sections.map((sec, idx) => {
               const secDone = sec.items.filter((it) =>
@@ -590,26 +679,95 @@ export default function FirmDetailPage({
                   {open && (
                     <div className="border-t divide-y">
                       {sec.items.map((it) => {
-                        const done = doneSet.has(`${it.code}|${it.period}`);
+                        const itemKey = `${it.code}|${it.period}`;
+                        const done = doneSet.has(itemKey);
+                        const filePath = fileMap.get(itemKey);
+                        const uploading = uploadingKey === itemKey;
+                        const inputId = `dosya-${sec.key}-${it.code}-${it.period}`;
+
                         return (
-                          <label
-                            key={`${it.code}|${it.period}`}
-                            className={
-                              "flex items-center gap-3 px-4 py-2 text-sm " +
-                              (canWrite ? "cursor-pointer hover:bg-gray-50" : "")
-                            }
+                          <div
+                            key={itemKey}
+                            className="flex items-center gap-3 px-4 py-2 text-sm hover:bg-gray-50"
                           >
-                            <input
-                              type="checkbox"
-                              checked={done}
-                              disabled={!canWrite}
-                              onChange={() => toggleItem(it.code, it.period)}
-                              className="w-4 h-4"
-                            />
-                            <span className={done ? "line-through text-gray-400" : ""}>
-                              {it.label}
-                            </span>
-                          </label>
+                            <label className={"flex items-center gap-3 flex-1 min-w-0 " + (canWrite ? "cursor-pointer" : "")}>
+                              <input
+                                type="checkbox"
+                                checked={done}
+                                disabled={!canWrite}
+                                onChange={() => toggleItem(it.code, it.period)}
+                                className="w-4 h-4 shrink-0"
+                              />
+                              <span className={"truncate " + (done ? "line-through text-gray-400" : "")}>
+                                {it.label}
+                              </span>
+                            </label>
+
+                            {/* Dosya alanı — PDF, Word, JPEG, PNG */}
+                            <div className="flex items-center gap-1 shrink-0">
+                              {uploading && (
+                                <span className="text-xs text-gray-400">Yükleniyor...</span>
+                              )}
+
+                              {!uploading && filePath && (
+                                <>
+                                  <button
+                                    onClick={() => downloadItemFile(filePath)}
+                                    title="Dosyayı indir"
+                                    className="text-xs px-2 py-1 rounded bg-blue-50 text-blue-700 hover:bg-blue-100"
+                                  >
+                                    ⬇ İndir
+                                  </button>
+                                  {canWrite && (
+                                    <label
+                                      htmlFor={inputId}
+                                      title="Dosyayı değiştir"
+                                      className="text-xs px-2 py-1 rounded border text-gray-500 hover:bg-gray-100 cursor-pointer"
+                                    >
+                                      🔄
+                                    </label>
+                                  )}
+                                  {canWrite && (
+                                    <button
+                                      onClick={() => removeItemFile(it.code, it.period)}
+                                      title="Dosya bağlantısını kaldır"
+                                      className="text-xs px-1.5 py-1 rounded text-gray-400 hover:text-red-500 hover:bg-red-50"
+                                    >
+                                      ✕
+                                    </button>
+                                  )}
+                                </>
+                              )}
+
+                              {!uploading && !filePath && canWrite && (
+                                <label
+                                  htmlFor={inputId}
+                                  title="PDF, Word, JPEG veya PNG yükle"
+                                  className="text-xs px-2 py-1 rounded border text-gray-500 hover:bg-gray-100 cursor-pointer"
+                                >
+                                  📎 Dosya Ekle
+                                </label>
+                              )}
+
+                              {!uploading && !filePath && !canWrite && (
+                                <span className="text-xs text-gray-300">Dosya yok</span>
+                              )}
+
+                              {canWrite && (
+                                <input
+                                  id={inputId}
+                                  type="file"
+                                  accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,image/png,image/jpeg,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                                  className="hidden"
+                                  onChange={(e) => {
+                                    const f = e.target.files?.[0];
+                                    if (f) uploadItemFile(it.code, it.period, f);
+                                    e.target.value = "";
+                                  }}
+                                />
+                              )}
+                            </div>
+                          </div>
                         );
                       })}
                     </div>
