@@ -221,7 +221,7 @@ export function buildChecklist(
       items: [
         { code: "S1", period: "", label: "TMGD Hizmet Sözleşmesi" },
         { code: "S2", period: "", label: "TMGD Sertifikası" },
-        { code: "S3", period: "", label: "U-Net Yetkilendirme Kaydı" },
+        { code: "S3", period: "", label: "U-Net Yetkilendirme Kaydı (SİAM TMGDK Sertifikası)" },
       ],
     },
     {

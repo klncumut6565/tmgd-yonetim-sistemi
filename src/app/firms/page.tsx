@@ -47,6 +47,7 @@ export default function FirmsPage() {
   const [contractStart, setContractStart] = useState("");
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
+  const [showAddForm, setShowAddForm] = useState(false);
   const logoRef = useRef<HTMLInputElement>(null);
 
   async function loadFirms() {
@@ -133,6 +134,7 @@ export default function FirmsPage() {
     setContractStart("");
     setLogoFile(null);
     if (logoRef.current) logoRef.current.value = "";
+    setShowAddForm(false);
     loadFirms();
   }
 
@@ -167,7 +169,17 @@ export default function FirmsPage() {
 
   return (
     <div className="p-8">
-      <h1 className="text-3xl font-bold mb-6">Firmalar</h1>
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-3xl font-bold">Firmalar</h1>
+        {canWrite && !showAddForm && (
+          <button
+            onClick={() => setShowAddForm(true)}
+            className="px-4 py-2 rounded bg-blue-600 text-white text-sm hover:bg-blue-700"
+          >
+            ➕ Yeni Firma Ekle
+          </button>
+        )}
+      </div>
 
       {error && (
         <p className="text-sm text-gray-700 bg-amber-50 border border-amber-200 rounded p-3 mb-4">
@@ -175,9 +187,9 @@ export default function FirmsPage() {
         </p>
       )}
 
-      {/* Yan yana: solda liste, sağda yeni firma */}
-      <div className={canWrite ? "grid grid-cols-1 lg:grid-cols-3 gap-6" : ""}>
-        <div className={canWrite ? "lg:col-span-2" : ""}>
+      {/* Yan yana: solda liste, sağda yeni firma (yalnızca panel açıkken) */}
+      <div className={canWrite && showAddForm ? "grid grid-cols-1 lg:grid-cols-3 gap-6" : ""}>
+        <div className={canWrite && showAddForm ? "lg:col-span-2" : ""}>
           <input
             className="border p-2 w-full rounded mb-4"
             placeholder="Ara: firma adı, şehir, ilçe..."
@@ -259,10 +271,19 @@ export default function FirmsPage() {
           </p>
         </div>
 
-        {canWrite && (
+        {canWrite && showAddForm && (
         <div>
           <div className="border rounded-xl p-4">
-            <h2 className="font-bold mb-4">➕ Yeni Firma Ekle</h2>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-bold">➕ Yeni Firma Ekle</h2>
+              <button
+                onClick={() => setShowAddForm(false)}
+                title="Kapat"
+                className="text-gray-400 hover:text-gray-700 text-sm"
+              >
+                ✕
+              </button>
+            </div>
 
             <label className="block mb-3">
               <span className="text-sm text-gray-600">Firma adı *</span>
