@@ -245,11 +245,25 @@ function envanterGerekli(activities: string[]): boolean {
   return activities.some((a) => !TASIMA_ODAKLI.includes(a as ActivityKey));
 }
 
+// Firma faaliyeti YALNIZCA Taşımacı ve/veya Tank İşletmecisi ise (başka hiçbir
+// elleçleme faaliyeti yoksa) aşağıdaki maddeler de gösterilmez:
+//   - Emniyet Planı / Değerlendirme Kaydı (D1)
+//   - Güvenlik Bilgi Formları (GBF/SDS) Dosyası (D2)
+//   - Eğitimler bölümünün tamamı (E1, E2)
+// Bu firmalar tehlikeli maddeyi elleçlemediği/depolamadığı için bu belgeler
+// TMGD kapsamında istenmez.
+function sadeceTasimaVeyaTankIsletmecisi(activities: string[]): boolean {
+  if (activities.length === 0) return false; // faaliyet seçilmemişse varsayılan: göster
+  return activities.every((a) => TASIMA_ODAKLI.includes(a as ActivityKey));
+}
+
 // Firma faaliyetleri + sözleşme tarihine göre tüm takip bölümleri
 export function buildChecklist(
   activities: string[],
   contractStart: string | null
 ): ChecklistSection[] {
+  const gizliTasimaTank = sadeceTasimaVeyaTankIsletmecisi(activities);
+
   return [
     {
       key: "tmfb",
@@ -313,17 +327,23 @@ export function buildChecklist(
     {
       key: "egitimler",
       title: "Eğitimler",
-      items: [
-        { code: "E1", period: "", label: "ADR 1.3 Genel Bilinçlendirme Eğitimi Kayıtları" },
-        { code: "E2", period: "", label: "Göreve Özgü ve Emniyet Eğitimi Kayıtları" },
-      ],
+      items: gizliTasimaTank
+        ? []
+        : [
+            { code: "E1", period: "", label: "ADR 1.3 Genel Bilinçlendirme Eğitimi Kayıtları" },
+            { code: "E2", period: "", label: "Göreve Özgü ve Emniyet Eğitimi Kayıtları" },
+          ],
     },
     {
       key: "diger",
       title: "Emniyet Planı · GBF · Diğer",
       items: [
-        { code: "D1", period: "", label: "Emniyet Planı (ADR 1.10.3.2 kapsamındaysa) / Değerlendirme Kaydı" },
-        { code: "D2", period: "", label: "Güvenlik Bilgi Formları (GBF/SDS) Dosyası" },
+        ...(gizliTasimaTank
+          ? []
+          : [
+              { code: "D1", period: "", label: "Emniyet Planı (ADR 1.10.3.2 kapsamındaysa) / Değerlendirme Kaydı" },
+              { code: "D2", period: "", label: "Güvenlik Bilgi Formları (GBF/SDS) Dosyası" },
+            ]),
         { code: "D3", period: "", label: "Kaza / Olay Bildirim Raporları (ADR 1.8.5.3 — varsa)" },
       ],
     },
