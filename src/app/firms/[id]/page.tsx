@@ -26,6 +26,7 @@ import {
   DRIVER_FIELDS,
   EMPLOYEE_FIELDS,
   VISIT_FIELDS,
+  VISIT_REPORT_TEMPLATE,
 } from "@/lib/firmScopedFields";
 
 type Firm = {
@@ -1003,6 +1004,9 @@ export default function FirmDetailPage({
           orderBy="visit_date"
           fixedFirmId={id}
           compact
+          notepadField="report_content"
+          notepadLabel="Rapor İçeriği (Planlanan / Gerçekleşen Faaliyet)"
+          notepadTemplate={VISIT_REPORT_TEMPLATE}
         />
       )}
     </div>

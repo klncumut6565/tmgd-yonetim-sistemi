@@ -43,6 +43,10 @@ type Props = {
                                 // (firma detay sayfasındaki sekmelerden gömülü kullanım için)
   compact?: boolean;           // true ise başlık (h1) ve firma seçici satırı gizlenir — üst düzey
                                 // sayfa (örn. firma detay) kendi başlığını zaten gösteriyorsa kullan
+  notepadField?: string;       // verilirse bu alan Ekle/Düzenle modalından ÇIKARILIR ve
+                                // ekranın sağında bağımsız bir not defteri paneli olarak gösterilir
+  notepadLabel?: string;       // not defteri panelinin başlığı
+  notepadTemplate?: string;    // yeni kayıt oluşturulduğunda not defterine ön dolu gelecek şablon
 };
 
 const STATUS_LABELS: Record<string, string> = {
@@ -60,6 +64,9 @@ export default function FirmScopedCrud({
   requireActivity,
   fixedFirmId,
   compact = false,
+  notepadField,
+  notepadLabel,
+  notepadTemplate,
 }: Props) {
   const { canWrite } = useUser();
   const [firms, setFirms] = useState<Firm[]>([]);
@@ -69,12 +76,19 @@ export default function FirmScopedCrud({
   const [search, setSearch] = useState("");
   const [error, setError] = useState("");
 
-  // Form durumu
+  // Form durumu (not defteri alanı hariç — o ayrı bir panelde yönetilir)
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<Record<string, string>>({});
 
-  const tableFields = fields.filter((f) => f.inTable !== false);
+  // Not defteri paneli durumu
+  const [notepadRowId, setNotepadRowId] = useState<string | null>(null);
+  const [notepadText, setNotepadText] = useState("");
+  const [notepadSaving, setNotepadSaving] = useState(false);
+  const [notepadMsg, setNotepadMsg] = useState("");
+
+  const tableFields = fields.filter((f) => f.inTable !== false && f.key !== notepadField);
+  const modalFields = fields.filter((f) => f.key !== notepadField);
 
   async function loadFirms() {
     let { data, error } = await supabase
@@ -137,6 +151,11 @@ export default function FirmScopedCrud({
 
   useEffect(() => {
     if (firmId) loadRows(firmId);
+    if (notepadField) {
+      setNotepadRowId(null);
+      setNotepadText("");
+      setNotepadMsg("");
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [firmId]);
 
@@ -155,7 +174,7 @@ export default function FirmScopedCrud({
   function openCreateForm() {
     setEditingId(null);
     const initial: Record<string, string> = {};
-    fields.forEach((f) => {
+    modalFields.forEach((f) => {
       if (f.defaultValue) initial[f.key] = f.defaultValue;
     });
     setForm(initial);
@@ -165,12 +184,40 @@ export default function FirmScopedCrud({
   function openEditForm(row: Row) {
     setEditingId(row.id);
     const filled: Record<string, string> = {};
-    fields.forEach((f) => {
+    modalFields.forEach((f) => {
       const v = row[f.key];
       filled[f.key] = v == null ? "" : String(v);
     });
     setForm(filled);
     setShowForm(true);
+  }
+
+  // Not defterini bir kayda açar — soldaki listeden bir satıra tıklanınca
+  // ya da "📝 Not" düğmesine basılınca çağrılır.
+  function openNotepad(row: Row) {
+    if (!notepadField) return;
+    setNotepadRowId(row.id);
+    setNotepadText(row[notepadField] == null ? "" : String(row[notepadField]));
+    setNotepadMsg("");
+  }
+
+  async function saveNotepad() {
+    if (!notepadRowId || !notepadField) return;
+    setNotepadSaving(true);
+    setNotepadMsg("");
+
+    const { error } = await supabase
+      .from(table)
+      .update({ [notepadField]: notepadText || null })
+      .eq("id", notepadRowId);
+
+    setNotepadSaving(false);
+    if (error) {
+      setNotepadMsg("Kaydedilemedi: " + hataCevir(error));
+      return;
+    }
+    setNotepadMsg("✓ Kaydedildi");
+    loadRows(firmId);
   }
 
   function closeForm() {
@@ -183,7 +230,7 @@ export default function FirmScopedCrud({
     setError("");
 
     // Zorunlu alan kontrolü
-    for (const f of fields) {
+    for (const f of modalFields) {
       if (f.required && !form[f.key]?.trim()) {
         setError(`"${f.label}" alanı zorunlu.`);
         return;
@@ -192,7 +239,7 @@ export default function FirmScopedCrud({
 
     // Boş stringleri null'a çevir, sayıları dönüştür
     const payload: Record<string, unknown> = { firm_id: firmId };
-    for (const f of fields) {
+    for (const f of modalFields) {
       const raw = form[f.key];
       if (raw === undefined || raw === "") {
         payload[f.key] = null;
@@ -212,16 +259,29 @@ export default function FirmScopedCrud({
         setError("Güncellenemedi: " + hataCevir(error));
         return;
       }
+      closeForm();
+      loadRows(firmId);
     } else {
-      const { error } = await supabase.from(table).insert(payload);
+      const { data, error } = await supabase
+        .from(table)
+        .insert(payload)
+        .select()
+        .single();
       if (error) {
         setError("Kaydedilemedi: " + hataCevir(error));
         return;
       }
-    }
+      closeForm();
+      loadRows(firmId);
 
-    closeForm();
-    loadRows(firmId);
+      // Yeni kayıt oluşturulunca, varsa not defterini bu kayda açar ve
+      // şablonla ön doldurur — ayrıca kaydedilmesi gerekir.
+      if (notepadField && data) {
+        setNotepadRowId(data.id as string);
+        setNotepadText(notepadTemplate || "");
+        setNotepadMsg("");
+      }
+    }
   }
 
   async function deleteRow(row: Row) {
@@ -232,6 +292,11 @@ export default function FirmScopedCrud({
     if (error) {
       setError("Silinemedi: " + hataCevir(error));
       return;
+    }
+    if (notepadRowId === row.id) {
+      setNotepadRowId(null);
+      setNotepadText("");
+      setNotepadMsg("");
     }
     loadRows(firmId);
   }
@@ -249,129 +314,209 @@ export default function FirmScopedCrud({
 
   return (
     <div className={compact ? "" : "p-6"}>
-      <div className="flex items-center justify-between mb-4">
-        {!compact && <h1 className="text-3xl font-bold">{title}</h1>}
-        {canWrite && (
-          <button
-            onClick={openCreateForm}
-            disabled={!firmId}
-            className={
-              "bg-black text-white px-4 py-2 rounded disabled:opacity-40" +
-              (compact ? " ml-auto" : "")
-            }
-          >
-            + Yeni Ekle
-          </button>
-        )}
-      </div>
-
-      {/* Firma seçimi (sabit firmaya gömülüyse gizli) + arama */}
-      <div className="flex flex-wrap gap-3 mb-4">
-        {!fixedFirmId && (
-          <div>
-            <label className="block text-sm text-gray-600 mb-1">Firma</label>
-            <select
-              value={firmId}
-              onChange={(e) => setFirmId(e.target.value)}
-              className="border p-2 rounded min-w-[220px]"
-            >
-              {firms.length === 0 && (
-                <option value="">
-                  {requireActivity ? "Uygun faaliyette firma yok" : "Firma yok"}
-                </option>
-              )}
-              {firms.map((firm) => (
-                <option key={firm.id} value={firm.id}>
-                  {firm.name}
-                </option>
-              ))}
-            </select>
+      <div className={notepadField ? "lg:flex lg:gap-6 lg:items-start" : ""}>
+        <div className={notepadField ? "flex-1 min-w-0" : ""}>
+          <div className="flex items-center justify-between mb-4">
+            {!compact && <h1 className="text-3xl font-bold">{title}</h1>}
+            {canWrite && (
+              <button
+                onClick={openCreateForm}
+                disabled={!firmId}
+                className={
+                  "bg-black text-white px-4 py-2 rounded disabled:opacity-40" +
+                  (compact ? " ml-auto" : "")
+                }
+              >
+                + Yeni Ekle
+              </button>
+            )}
           </div>
-        )}
 
-        <div className="flex-1 min-w-[220px]">
-          {!compact && <label className="block text-sm text-gray-600 mb-1">Ara</label>}
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Listede ara..."
-            className="border p-2 rounded w-full"
-          />
-        </div>
-      </div>
-
-      {error && (
-        <div className="mb-4 p-3 rounded bg-red-50 text-red-700 text-sm">
-          {error}
-        </div>
-      )}
-
-      {/* Tablo */}
-      <div className="border rounded-xl overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b bg-gray-50">
-              {tableFields.map((f) => (
-                <th key={f.key} className="text-left p-3 font-medium">
-                  {f.label}
-                </th>
-              ))}
-              {canWrite && (
-                <th className="text-right p-3 font-medium">İşlemler</th>
-              )}
-            </tr>
-          </thead>
-          <tbody>
-            {loading && (
-              <tr>
-                <td colSpan={tableFields.length + (canWrite ? 1 : 0)} className="p-4 text-gray-500">
-                  Yükleniyor...
-                </td>
-              </tr>
-            )}
-
-            {!loading && filteredRows.length === 0 && (
-              <tr>
-                <td colSpan={tableFields.length + (canWrite ? 1 : 0)} className="p-4 text-gray-500">
-                  {!firmId
-                    ? requireActivity && firms.length === 0
-                      ? "Bu faaliyet konusuna sahip firma bulunamadı. Firma faaliyet konularını Firmalar sayfasından düzenleyebilirsin."
-                      : "Önce bir firma seç."
-                    : canWrite
-                      ? "Kayıt bulunamadı. Sağ üstten yeni ekleyebilirsin."
-                      : "Kayıt bulunamadı."}
-                </td>
-              </tr>
-            )}
-
-            {!loading &&
-              filteredRows.map((row) => (
-                <tr key={row.id} className="border-b last:border-0">
-                  {tableFields.map((f) => (
-                    <td key={f.key} className="p-3">
-                      {renderCell(row, f)}
-                    </td>
+          {/* Firma seçimi (sabit firmaya gömülüyse gizli) + arama */}
+          <div className="flex flex-wrap gap-3 mb-4">
+            {!fixedFirmId && (
+              <div>
+                <label className="block text-sm text-gray-600 mb-1">Firma</label>
+                <select
+                  value={firmId}
+                  onChange={(e) => setFirmId(e.target.value)}
+                  className="border p-2 rounded min-w-[220px]"
+                >
+                  {firms.length === 0 && (
+                    <option value="">
+                      {requireActivity ? "Uygun faaliyette firma yok" : "Firma yok"}
+                    </option>
+                  )}
+                  {firms.map((firm) => (
+                    <option key={firm.id} value={firm.id}>
+                      {firm.name}
+                    </option>
                   ))}
-                  {canWrite && (
-                    <td className="p-3 text-right whitespace-nowrap">
-                      <button
-                        onClick={() => openEditForm(row)}
-                        className="text-blue-600 hover:underline mr-3"
-                      >
-                        Düzenle
-                      </button>
-                      <button
-                        onClick={() => deleteRow(row)}
-                        className="text-red-600 hover:underline"
-                      >
-                        Sil
-                      </button>
-                    </td>
+                </select>
+              </div>
+            )}
+
+            <div className="flex-1 min-w-[220px]">
+              {!compact && <label className="block text-sm text-gray-600 mb-1">Ara</label>}
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Listede ara..."
+                className="border p-2 rounded w-full"
+              />
+            </div>
+          </div>
+
+          {error && (
+            <div className="mb-4 p-3 rounded bg-red-50 text-red-700 text-sm">
+              {error}
+            </div>
+          )}
+
+          {notepadField && filteredRows.length > 0 && (
+            <p className="text-xs text-gray-400 mb-2">
+              Bir kayda tıklayınca sağdaki not defteri o kayıt için açılır.
+            </p>
+          )}
+
+          {/* Tablo */}
+          <div className="border rounded-xl overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b bg-gray-50">
+                  {tableFields.map((f) => (
+                    <th key={f.key} className="text-left p-3 font-medium">
+                      {f.label}
+                    </th>
+                  ))}
+                  {(canWrite || notepadField) && (
+                    <th className="text-right p-3 font-medium">İşlemler</th>
                   )}
                 </tr>
-              ))}
-          </tbody>
-        </table>
+              </thead>
+              <tbody>
+                {loading && (
+                  <tr>
+                    <td colSpan={tableFields.length + (canWrite ? 1 : 0)} className="p-4 text-gray-500">
+                      Yükleniyor...
+                    </td>
+                  </tr>
+                )}
+
+                {!loading && filteredRows.length === 0 && (
+                  <tr>
+                    <td colSpan={tableFields.length + (canWrite ? 1 : 0)} className="p-4 text-gray-500">
+                      {!firmId
+                        ? requireActivity && firms.length === 0
+                          ? "Bu faaliyet konusuna sahip firma bulunamadı. Firma faaliyet konularını Firmalar sayfasından düzenleyebilirsin."
+                          : "Önce bir firma seç."
+                        : canWrite
+                          ? "Kayıt bulunamadı. Sağ üstten yeni ekleyebilirsin."
+                          : "Kayıt bulunamadı."}
+                    </td>
+                  </tr>
+                )}
+
+                {!loading &&
+                  filteredRows.map((row) => (
+                    <tr
+                      key={row.id}
+                      onClick={() => notepadField && openNotepad(row)}
+                      className={
+                        "border-b last:border-0" +
+                        (notepadField ? " cursor-pointer hover:bg-gray-50" : "") +
+                        (notepadField && notepadRowId === row.id ? " bg-blue-50" : "")
+                      }
+                    >
+                      {tableFields.map((f) => (
+                        <td key={f.key} className="p-3">
+                          {renderCell(row, f)}
+                        </td>
+                      ))}
+                      {(canWrite || notepadField) && (
+                        <td className="p-3 text-right whitespace-nowrap">
+                          {notepadField && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openNotepad(row);
+                              }}
+                              title={notepadLabel || "Not defteri"}
+                              className="text-gray-500 hover:underline mr-3"
+                            >
+                              📝 Not
+                            </button>
+                          )}
+                          {canWrite && (
+                            <>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  openEditForm(row);
+                                }}
+                                className="text-blue-600 hover:underline mr-3"
+                              >
+                                Düzenle
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  deleteRow(row);
+                                }}
+                                className="text-red-600 hover:underline"
+                              >
+                                Sil
+                              </button>
+                            </>
+                          )}
+                        </td>
+                      )}
+                    </tr>
+                  ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* NOT DEFTERİ — modaldan bağımsız, ekranın sağında sabit panel */}
+        {notepadField && (
+          <div className="lg:w-96 shrink-0 mt-6 lg:mt-0">
+            <div className="border rounded-xl p-4 lg:sticky lg:top-4">
+              <h3 className="font-bold mb-1">{notepadLabel || "Not Defteri"}</h3>
+
+              {!notepadRowId && (
+                <p className="text-sm text-gray-400 mt-2">
+                  Not defterini açmak için soldaki listeden bir kayda tıkla, ya da{" "}
+                  {canWrite ? "yeni bir kayıt ekle." : "bir kayıt seçilmesini bekle."}
+                </p>
+              )}
+
+              {notepadRowId && (
+                <>
+                  <textarea
+                    rows={18}
+                    value={notepadText}
+                    onChange={(e) => setNotepadText(e.target.value)}
+                    disabled={!canWrite}
+                    className="border p-2 rounded w-full font-mono text-xs mt-2"
+                  />
+                  <div className="flex items-center gap-2 mt-2">
+                    {canWrite && (
+                      <button
+                        onClick={saveNotepad}
+                        disabled={notepadSaving}
+                        className="px-3 py-1.5 rounded bg-black text-white text-sm disabled:opacity-50"
+                      >
+                        {notepadSaving ? "Kaydediliyor..." : "Kaydet"}
+                      </button>
+                    )}
+                    {notepadMsg && <span className="text-xs text-gray-500">{notepadMsg}</span>}
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Ekle/Düzenle formu (basit modal) */}
@@ -383,7 +528,7 @@ export default function FirmScopedCrud({
             </h2>
 
             <div className="space-y-3">
-              {fields.map((f) => (
+              {modalFields.map((f) => (
                 <div key={f.key}>
                   <label className="block text-sm text-gray-600 mb-1">
                     {f.label}

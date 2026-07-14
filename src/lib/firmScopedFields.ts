@@ -101,12 +101,4 @@ export const VISIT_FIELDS: FieldDef[] = [
   },
   { key: "summary", label: "Özet", type: "text" },
   { key: "next_visit_date", label: "Sonraki Ziyaret", type: "date" },
-  {
-    key: "report_content",
-    label: "Rapor İçeriği (Planlanan / Gerçekleşen Faaliyet)",
-    type: "textarea",
-    inTable: false,
-    defaultValue: VISIT_REPORT_TEMPLATE,
-    textareaRows: 16,
-  },
 ];
