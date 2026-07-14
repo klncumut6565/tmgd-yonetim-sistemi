@@ -8,6 +8,7 @@
 //    firmanın Belge Takip listesinde ilgili maddeyi tamamlandı işaretler
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { supabase } from "@/lib/supabase/client";
 import { useUser } from "@/hooks/useUser";
 import { hataCevir } from "@/lib/hataCevir";
@@ -40,7 +41,9 @@ export default function BelgeOlusturPage() {
   const [msg, setMsg] = useState("");
   const [error, setError] = useState("");
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
-  const [logoUploading, setLogoUploading] = useState(false);
+  const [tempLogoFile, setTempLogoFile] = useState<File | null>(null);
+  const [tempLogoPreview, setTempLogoPreview] = useState<string | null>(null);
+  const [useTempLogo, setUseTempLogo] = useState(false);
   const logoInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -98,9 +101,12 @@ export default function BelgeOlusturPage() {
     setSelected([]);
     setMsg("");
     setError("");
+    clearTempLogo();
   }
 
-  // Seçili firmanın logosu için küçük önizleme (imzalı URL)
+  // Seçili firmanın KAYITLI logosu için küçük önizleme (imzalı URL) —
+  // bu, firma kaydı sırasında yüklenen ve tüm belgelerde varsayılan
+  // olarak kullanılan logodur. Bu sayfa bu logoyu DEĞİŞTİRMEZ.
   useEffect(() => {
     (async () => {
       if (!firm?.logo_url) {
@@ -114,38 +120,32 @@ export default function BelgeOlusturPage() {
     })();
   }, [firm?.logo_url]);
 
-  async function uploadFirmLogo(file: File) {
-    if (!firm) return;
-    setLogoUploading(true);
-    setError("");
+  // Geçici logo seçildiğinde yalnızca ekranda önizleme + oluşturulacak
+  // PDF'lerde kullanılır; firma kaydına (firms.logo_url) hiç yazılmaz.
+  function selectTempLogo(file: File) {
+    setTempLogoFile(file);
+    const reader = new FileReader();
+    reader.onload = () => setTempLogoPreview(reader.result as string);
+    reader.readAsDataURL(file);
+    setUseTempLogo(true);
+  }
 
-    const safeName = file.name.replace(/[^a-zA-Z0-9_.-]/g, "_");
-    const path = `${firm.id}/logo/${Date.now()}_${safeName}`;
+  function clearTempLogo() {
+    setTempLogoFile(null);
+    setTempLogoPreview(null);
+    setUseTempLogo(false);
+  }
 
-    const { error: upErr } = await supabase.storage
-      .from("firm-files")
-      .upload(path, file, { upsert: true });
-
-    if (upErr) {
-      setError("Logo yüklenemedi: " + hataCevir(upErr));
-      setLogoUploading(false);
-      return;
-    }
-
-    const { error: dbErr } = await supabase
-      .from("firms")
-      .update({ logo_url: path })
-      .eq("id", firm.id);
-
-    setLogoUploading(false);
-    if (dbErr) {
-      setError("Logo yüklendi ama kaydedilemedi: " + hataCevir(dbErr));
-      return;
-    }
-
-    // Yerel listeyi güncelle (sayfayı yeniden yüklemeye gerek kalmadan)
-    setFirms((prev) => prev.map((f) => (f.id === firm.id ? { ...f, logo_url: path } : f)));
-    setMsg("✓ Firma logosu güncellendi.");
+  // Bir File nesnesini doğrudan (storage'a yüklemeden) jsPDF için dataURL'e çevirir
+  async function fileToLogoData(file: File): Promise<{ data: string; fmt: "PNG" | "JPEG" }> {
+    const fmt: "PNG" | "JPEG" = file.type.includes("png") ? "PNG" : "JPEG";
+    const data = await new Promise<string>((resolve, reject) => {
+      const r = new FileReader();
+      r.onload = () => resolve(r.result as string);
+      r.onerror = reject;
+      r.readAsDataURL(file);
+    });
+    return { data, fmt };
   }
 
   // Logo'yu imzalı URL üzerinden dataURL'e çevir (jsPDF için)
@@ -179,7 +179,13 @@ export default function BelgeOlusturPage() {
 
     try {
       const { jsPDF } = await import("jspdf");
-      const logo = firm.logo_url ? await logoDataUrl(firm.logo_url) : null;
+      // Öncelik: bu oturum için geçici logo seçildiyse o kullanılır,
+      // aksi halde firmanın kayıtlı (varsayılan) logosu kullanılır.
+      const logo = useTempLogo && tempLogoFile
+        ? await fileToLogoData(tempLogoFile)
+        : firm.logo_url
+          ? await logoDataUrl(firm.logo_url)
+          : null;
       const bugun = new Date().toLocaleDateString("tr-TR");
 
       for (const code of selected) {
@@ -344,13 +350,13 @@ export default function BelgeOlusturPage() {
           )}
 
           <div className="mb-4 text-sm">
-            <span className="text-gray-600">Logo (isteğe bağlı)</span>
+            <span className="text-gray-600">Logo</span>
 
             {!firm && (
               <p className="mt-1 text-gray-400">Önce firma seçin.</p>
             )}
 
-            {firm && (
+            {firm && !useTempLogo && (
               <div className="mt-1 flex items-center gap-3">
                 {logoPreview ? (
                   // eslint-disable-next-line @next/next/no-img-element
@@ -367,35 +373,69 @@ export default function BelgeOlusturPage() {
 
                 <div className="flex-1 min-w-0">
                   {firm.logo_url ? (
-                    <p className="text-green-700 text-xs">✓ Firma logosu belgeye eklenecek</p>
+                    <p className="text-green-700 text-xs">
+                      ✓ Firmanın kayıtlı logosu kullanılacak (varsayılan)
+                    </p>
                   ) : (
-                    <p className="text-gray-500 text-xs">Logo yok — belgeler logosuz oluşturulur</p>
+                    <p className="text-gray-500 text-xs">
+                      Bu firma için kayıtlı logo yok — belgeler logosuz oluşturulur.{" "}
+                      <Link href={`/firms/${firm.id}`} className="text-blue-600 underline">
+                        Firma kaydına logo ekle
+                      </Link>
+                    </p>
                   )}
 
                   {canWrite && (
                     <button
                       type="button"
                       onClick={() => logoInputRef.current?.click()}
-                      disabled={logoUploading}
-                      className="text-xs text-blue-600 underline disabled:opacity-50"
+                      className="text-xs text-gray-400 underline hover:text-gray-600"
                     >
-                      {logoUploading ? "Yükleniyor..." : firm.logo_url ? "Logoyu değiştir" : "Logo yükle"}
+                      Bu belge(ler) için farklı/geçici logo kullan
                     </button>
                   )}
                 </div>
-
-                <input
-                  ref={logoInputRef}
-                  type="file"
-                  accept="image/png,image/jpeg"
-                  className="hidden"
-                  onChange={(e) => {
-                    const f = e.target.files?.[0];
-                    if (f) uploadFirmLogo(f);
-                    e.target.value = "";
-                  }}
-                />
               </div>
+            )}
+
+            {firm && useTempLogo && (
+              <div className="mt-1 flex items-center gap-3">
+                {tempLogoPreview && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={tempLogoPreview}
+                    alt="Geçici logo"
+                    className="h-10 w-10 object-contain rounded border bg-white shrink-0"
+                  />
+                )}
+                <div className="flex-1 min-w-0">
+                  <p className="text-amber-700 text-xs">
+                    ⚠ Geçici logo seçildi — yalnızca bu oluşturmada kullanılır, firma
+                    kaydına kaydedilmez.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={clearTempLogo}
+                    className="text-xs text-blue-600 underline"
+                  >
+                    Vazgeç, firmanın kayıtlı logosunu kullan
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {canWrite && (
+              <input
+                ref={logoInputRef}
+                type="file"
+                accept="image/png,image/jpeg"
+                className="hidden"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) selectTempLogo(f);
+                  e.target.value = "";
+                }}
+              />
             )}
           </div>
 
