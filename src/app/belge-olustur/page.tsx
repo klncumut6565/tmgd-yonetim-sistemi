@@ -7,8 +7,7 @@
 //  - "Belgeyi Oluştur": her seçim için logolu A4 PDF indirir ve
 //    firmanın Belge Takip listesinde ilgili maddeyi tamamlandı işaretler
 
-import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase/client";
 import { useUser } from "@/hooks/useUser";
 import { hataCevir } from "@/lib/hataCevir";
@@ -40,6 +39,9 @@ export default function BelgeOlusturPage() {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
   const [error, setError] = useState("");
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [logoUploading, setLogoUploading] = useState(false);
+  const logoInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     (async () => {
@@ -96,6 +98,54 @@ export default function BelgeOlusturPage() {
     setSelected([]);
     setMsg("");
     setError("");
+  }
+
+  // Seçili firmanın logosu için küçük önizleme (imzalı URL)
+  useEffect(() => {
+    (async () => {
+      if (!firm?.logo_url) {
+        setLogoPreview(null);
+        return;
+      }
+      const { data } = await supabase.storage
+        .from("firm-files")
+        .createSignedUrl(firm.logo_url, 3600);
+      setLogoPreview(data?.signedUrl || null);
+    })();
+  }, [firm?.logo_url]);
+
+  async function uploadFirmLogo(file: File) {
+    if (!firm) return;
+    setLogoUploading(true);
+    setError("");
+
+    const safeName = file.name.replace(/[^a-zA-Z0-9_.-]/g, "_");
+    const path = `${firm.id}/logo/${Date.now()}_${safeName}`;
+
+    const { error: upErr } = await supabase.storage
+      .from("firm-files")
+      .upload(path, file, { upsert: true });
+
+    if (upErr) {
+      setError("Logo yüklenemedi: " + hataCevir(upErr));
+      setLogoUploading(false);
+      return;
+    }
+
+    const { error: dbErr } = await supabase
+      .from("firms")
+      .update({ logo_url: path })
+      .eq("id", firm.id);
+
+    setLogoUploading(false);
+    if (dbErr) {
+      setError("Logo yüklendi ama kaydedilemedi: " + hataCevir(dbErr));
+      return;
+    }
+
+    // Yerel listeyi güncelle (sayfayı yeniden yüklemeye gerek kalmadan)
+    setFirms((prev) => prev.map((f) => (f.id === firm.id ? { ...f, logo_url: path } : f)));
+    setMsg("✓ Firma logosu güncellendi.");
   }
 
   // Logo'yu imzalı URL üzerinden dataURL'e çevir (jsPDF için)
@@ -295,22 +345,58 @@ export default function BelgeOlusturPage() {
 
           <div className="mb-4 text-sm">
             <span className="text-gray-600">Logo (isteğe bağlı)</span>
-            <p className="mt-1">
-              {firm?.logo_url ? (
-                <span className="text-green-700">✓ Firma logosu belgeye eklenecek</span>
-              ) : (
-                <span className="text-gray-500">
-                  Logo yok —{" "}
-                  {firm ? (
-                    <Link href={`/firms/${firm.id}`} className="text-blue-600 underline">
-                      Logo Yönetimine Git
-                    </Link>
+
+            {!firm && (
+              <p className="mt-1 text-gray-400">Önce firma seçin.</p>
+            )}
+
+            {firm && (
+              <div className="mt-1 flex items-center gap-3">
+                {logoPreview ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={logoPreview}
+                    alt="Firma logosu"
+                    className="h-10 w-10 object-contain rounded border bg-white shrink-0"
+                  />
+                ) : (
+                  <div className="h-10 w-10 rounded border border-dashed flex items-center justify-center text-gray-300 text-xs shrink-0">
+                    Logo
+                  </div>
+                )}
+
+                <div className="flex-1 min-w-0">
+                  {firm.logo_url ? (
+                    <p className="text-green-700 text-xs">✓ Firma logosu belgeye eklenecek</p>
                   ) : (
-                    "önce firma seçin"
+                    <p className="text-gray-500 text-xs">Logo yok — belgeler logosuz oluşturulur</p>
                   )}
-                </span>
-              )}
-            </p>
+
+                  {canWrite && (
+                    <button
+                      type="button"
+                      onClick={() => logoInputRef.current?.click()}
+                      disabled={logoUploading}
+                      className="text-xs text-blue-600 underline disabled:opacity-50"
+                    >
+                      {logoUploading ? "Yükleniyor..." : firm.logo_url ? "Logoyu değiştir" : "Logo yükle"}
+                    </button>
+                  )}
+                </div>
+
+                <input
+                  ref={logoInputRef}
+                  type="file"
+                  accept="image/png,image/jpeg"
+                  className="hidden"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) uploadFirmLogo(f);
+                    e.target.value = "";
+                  }}
+                />
+              </div>
+            )}
           </div>
 
           <label className="block mb-4">
