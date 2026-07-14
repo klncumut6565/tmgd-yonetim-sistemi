@@ -57,7 +57,7 @@ export default function LoginPage() {
       return;
     }
 
-    router.push("/dashboard");
+    router.push("/firms");
   }
 
   async function register() {

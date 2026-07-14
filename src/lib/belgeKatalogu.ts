@@ -133,6 +133,51 @@ export function catalogItem(code: string): CatalogItem | undefined {
 }
 
 // ---------------------------------------------------------------------
+// Katalog dışı (özel) maddeler için sabit etiket/bölüm bilgisi.
+// "Belgeler" sekmesi gibi tüm ekleri tek listede gösteren yerlerde,
+// hangi faaliyet filtresi uygulanırsa uygulansın herhangi bir koddan
+// okunabilir isim/kategori üretebilmek için kullanılır.
+// ---------------------------------------------------------------------
+const SPECIAL_ITEMS: Record<string, { label: string; section: string }> = {
+  G1: { label: "Tehlikeli Madde Faaliyet Belgesi (TMFB)", section: "TMFB · EK-3 · Görevli Listesi" },
+  G2: { label: "Tehlikeli Madde Faaliyet Tespit Raporu (Ek-3 ve Eki)", section: "TMFB · EK-3 · Görevli Listesi" },
+  G3: { label: "Tehlikeli Madde İş ve İşlemlerinde Görevli Personel Listesi", section: "TMFB · EK-3 · Görevli Listesi" },
+  S1: { label: "TMGD Hizmet Sözleşmesi", section: "TMGD Sözleşme · Sertifika · Yetki" },
+  S2: { label: "TMGD Sertifikası", section: "TMGD Sözleşme · Sertifika · Yetki" },
+  S3: { label: "U-Net Yetkilendirme Kaydı (SİAM TMGDK Sertifikası)", section: "TMGD Sözleşme · Sertifika · Yetki" },
+  YFR: { label: "Yıllık Faaliyet Raporu", section: "Yıllık Faaliyet Raporu" },
+  L1: { label: "Tehlikeli Madde Envanter Listesi", section: "ADR Envanter Listesi" },
+  E1: { label: "ADR 1.3 Genel Bilinçlendirme Eğitimi Kayıtları", section: "Eğitimler" },
+  E2: { label: "Göreve Özgü ve Emniyet Eğitimi Kayıtları", section: "Eğitimler" },
+  D1: { label: "Emniyet Planı / Değerlendirme Kaydı", section: "Emniyet Planı · GBF · Diğer" },
+  D2: { label: "Güvenlik Bilgi Formları (GBF/SDS) Dosyası", section: "Emniyet Planı · GBF · Diğer" },
+  D3: { label: "Kaza / Olay Bildirim Raporları", section: "Emniyet Planı · GBF · Diğer" },
+};
+
+// Herhangi bir madde kodu (+ dönem) için okunabilir isim döndürür.
+export function codeLabel(code: string, period?: string): string {
+  if (code === "ZR" && period) {
+    const [y, m] = period.split("-");
+    const idx = parseInt(m, 10) - 1;
+    const ay = AY_ADLARI[idx] || m;
+    return `${ay} ${y} Ziyaret Raporu`;
+  }
+  if (SPECIAL_ITEMS[code]) return SPECIAL_ITEMS[code].label;
+  const item = catalogItem(code);
+  if (item) return `${item.code} — ${item.name}`;
+  return code;
+}
+
+// Herhangi bir madde kodu için ait olduğu bölüm/kategori başlığını döndürür.
+export function codeSection(code: string): string {
+  if (code === "ZR") return "Ziyaret Raporları (Aylık)";
+  if (SPECIAL_ITEMS[code]) return SPECIAL_ITEMS[code].section;
+  const item = catalogItem(code);
+  if (item) return CATEGORY_LABELS[item.category];
+  return "Diğer";
+}
+
+// ---------------------------------------------------------------------
 // BELGE TAKİP bölümleri (firma detay → Belge Takip sekmesi)
 // Genelge "İçindekiler" sayfasındaki maddelerle uyumlu.
 // ---------------------------------------------------------------------

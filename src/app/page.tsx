@@ -11,7 +11,7 @@ export default function HomePage() {
   useEffect(() => {
     if (loading) return;
     if (!authed) router.replace("/login");
-    else if (isApproved) router.replace("/dashboard");
+    else if (isApproved) router.replace("/firms");
     // onaylı değilse AuthGuard kilit ekranını gösterir
   }, [loading, authed, isApproved, router]);
 

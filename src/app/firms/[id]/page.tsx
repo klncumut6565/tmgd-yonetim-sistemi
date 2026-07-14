@@ -16,6 +16,8 @@ import {
   ACTIVITY_LABELS,
   buildChecklist,
   ChecklistSection,
+  codeLabel,
+  codeSection,
 } from "@/lib/belgeKatalogu";
 
 type Firm = {
@@ -53,7 +55,6 @@ type Attachment = {
 };
 
 const TABS = [
-  { key: "genel", label: "Genel" },
   { key: "belge_takip", label: "Belge Takip" },
   { key: "tasks", label: "Görevler" },
   { key: "documents", label: "Belgeler" },
@@ -61,22 +62,20 @@ const TABS = [
   { key: "drivers", label: "Sürücüler" },
   { key: "employees", label: "Personeller" },
   { key: "visits", label: "Ziyaretler" },
+  { key: "genel", label: "Düzenle" },
 ] as const;
 
 type TabKey = (typeof TABS)[number]["key"];
 
 // Her sekmenin listede göstereceği kolonlar
+// NOT: "documents" artık genel tablo yerine firm_belge_dosyalari'ndan
+// birleştirilmiş özel bir görünüm kullanıyor (aşağıda ayrıca render edilir).
 const TAB_COLUMNS: Record<string, { key: string; label: string }[]> = {
   tasks: [
     { key: "title", label: "Görev" },
     { key: "status", label: "Durum" },
     { key: "priority", label: "Öncelik" },
     { key: "due_date", label: "Termin" },
-  ],
-  documents: [
-    { key: "title", label: "Belge" },
-    { key: "status", label: "Durum" },
-    { key: "current_version", label: "Versiyon" },
   ],
   vehicles: [
     { key: "plate_number", label: "Plaka" },
@@ -106,7 +105,6 @@ const TAB_COLUMNS: Record<string, { key: string; label: string }[]> = {
 
 const ORDER_BY: Record<string, string> = {
   tasks: "created_at",
-  documents: "created_at",
   vehicles: "created_at",
   drivers: "created_at",
   employees: "created_at",
@@ -147,7 +145,7 @@ export default function FirmDetailPage({
 
   const [firm, setFirm] = useState<Firm | null>(null);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<TabKey>("genel");
+  const [tab, setTab] = useState<TabKey>("belge_takip");
 
   // Genel sekmesi form durumu
   const [form, setForm] = useState<Partial<Firm>>({});
@@ -242,7 +240,7 @@ export default function FirmDetailPage({
   }, [loadFirm]);
 
   useEffect(() => {
-    if (tab === "belge_takip") loadBelgeler();
+    if (tab === "belge_takip" || tab === "documents") loadBelgeler();
     else if (tab !== "genel") loadRows(tab);
   }, [tab, loadRows, loadBelgeler]);
 
@@ -255,10 +253,10 @@ export default function FirmDetailPage({
   );
 
   // Firma yüklendiğinde/faaliyeti değiştiğinde, o an gizli bir sekmedeysek
-  // (örn. Taşımacı işaretini kaldırdıysak) otomatik olarak Genel'e dön.
+  // (örn. Taşımacı işaretini kaldırdıysak) otomatik olarak Belge Takip'e dön.
   useEffect(() => {
     if (firm && !isTasimaci && TASIMACI_SEKMELERI.includes(tab)) {
-      setTab("genel");
+      setTab("belge_takip");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [firm, isTasimaci]);
@@ -828,8 +826,78 @@ export default function FirmDetailPage({
         </div>
       )}
 
-      {/* LİSTE SEKMELERİ */}
-      {tab !== "genel" && tab !== "belge_takip" && (
+      {/* BELGELER — firmanın Belge Takip üzerinden yüklediği TÜM dosyaların
+          birleştirilmiş görünümü (firm_belge_dosyalari). Bu, firma için asıl
+          belge deposu — buradaki her kayıt Belge Takip'teki bir maddeye bağlı. */}
+      {tab === "documents" && (
+        <div>
+          {belgeLoading && <p className="text-gray-500 mb-2">Yükleniyor...</p>}
+
+          {fileMsg && (
+            <p className="text-sm text-gray-700 bg-amber-50 border border-amber-200 rounded p-3 mb-4">
+              {fileMsg}
+            </p>
+          )}
+
+          {!belgeLoading && attachments.length === 0 && !fileMsg && (
+            <div className="border rounded-xl p-8 text-center text-gray-400">
+              <p>Bu firmaya henüz hiç belge yüklenmemiş.</p>
+              <button
+                onClick={() => setTab("belge_takip")}
+                className="mt-2 text-sm text-blue-600 underline"
+              >
+                Belge Takip sekmesinden dosya ekle
+              </button>
+            </div>
+          )}
+
+          {attachments.length > 0 && (
+            <div className="border rounded-xl overflow-hidden">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="text-left p-3 font-medium text-gray-600">Dosya</th>
+                    <th className="text-left p-3 font-medium text-gray-600">İlgili Madde</th>
+                    <th className="text-left p-3 font-medium text-gray-600">Kategori</th>
+                    {canWrite && <th className="p-3" />}
+                  </tr>
+                </thead>
+                <tbody>
+                  {[...attachments]
+                    .sort((a, b) => (a.file_name > b.file_name ? 1 : -1))
+                    .map((f) => (
+                      <tr key={f.id} className="border-t hover:bg-gray-50">
+                        <td className="p-3">
+                          <button
+                            onClick={() => downloadItemFile(f.file_path)}
+                            className="text-blue-600 hover:underline text-left"
+                          >
+                            📄 {f.file_name}
+                          </button>
+                        </td>
+                        <td className="p-3 text-gray-600">{codeLabel(f.code, f.period)}</td>
+                        <td className="p-3 text-gray-400 text-xs">{codeSection(f.code)}</td>
+                        {canWrite && (
+                          <td className="p-3 text-right">
+                            <button
+                              onClick={() => removeAttachment(f.id)}
+                              className="text-xs text-gray-400 hover:text-red-500"
+                            >
+                              Kaldır
+                            </button>
+                          </td>
+                        )}
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* LİSTE SEKMELERİ (Görevler / Araçlar / Sürücüler / Personeller / Ziyaretler) */}
+      {tab !== "genel" && tab !== "belge_takip" && tab !== "documents" && (
         <div className="border rounded-xl overflow-hidden">
           <table className="w-full text-sm">
             <thead className="bg-gray-50">
