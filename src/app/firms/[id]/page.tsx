@@ -8,6 +8,7 @@
 
 import { use, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
 import { useUser } from "@/hooks/useUser";
 import { hataCevir } from "@/lib/hataCevir";
@@ -19,6 +20,13 @@ import {
   codeLabel,
   codeSection,
 } from "@/lib/belgeKatalogu";
+import FirmScopedCrud from "@/components/FirmScopedCrud";
+import {
+  VEHICLE_FIELDS,
+  DRIVER_FIELDS,
+  EMPLOYEE_FIELDS,
+  VISIT_FIELDS,
+} from "@/lib/firmScopedFields";
 
 type Firm = {
   id: string;
@@ -58,6 +66,7 @@ const TABS = [
   { key: "belge_takip", label: "Belge Takip" },
   { key: "tasks", label: "Görevler" },
   { key: "documents", label: "Belgeler" },
+  { key: "belge_olustur", label: "Belge Oluştur" },
   { key: "vehicles", label: "Araçlar" },
   { key: "drivers", label: "Sürücüler" },
   { key: "employees", label: "Personeller" },
@@ -66,6 +75,13 @@ const TABS = [
 ] as const;
 
 type TabKey = (typeof TABS)[number]["key"];
+
+// "Belge Oluştur" bu sayfada bir sekme değil, /belge-olustur sayfasına
+// firma ön seçili olarak yönlendiren bir kısayoldur (o sayfadaki PDF
+// oluşturma mantığını burada tekrar etmemek için).
+const NAVIGATE_TABS: Partial<Record<TabKey, (firmId: string) => string>> = {
+  belge_olustur: (firmId) => `/belge-olustur?firm=${firmId}`,
+};
 
 // Her sekmenin listede göstereceği kolonlar
 // NOT: "documents" artık genel tablo yerine firm_belge_dosyalari'ndan
@@ -142,6 +158,7 @@ export default function FirmDetailPage({
 }) {
   const { id } = use(params);
   const { canWrite } = useUser();
+  const router = useRouter();
 
   const [firm, setFirm] = useState<Firm | null>(null);
   const [loading, setLoading] = useState(true);
@@ -241,7 +258,7 @@ export default function FirmDetailPage({
 
   useEffect(() => {
     if (tab === "belge_takip" || tab === "documents") loadBelgeler();
-    else if (tab !== "genel") loadRows(tab);
+    else if (tab === "tasks") loadRows(tab);
   }, [tab, loadRows, loadBelgeler]);
 
   // Araçlar / Sürücüler yalnızca Taşımacı faaliyeti olan firmalarda anlamlı —
@@ -504,20 +521,25 @@ export default function FirmDetailPage({
 
       {/* Sekmeler */}
       <div className="flex gap-1 border-b mb-6 overflow-x-auto">
-        {visibleTabs.map((t) => (
-          <button
-            key={t.key}
-            onClick={() => setTab(t.key)}
-            className={
-              "px-4 py-2 rounded-t whitespace-nowrap " +
-              (tab === t.key
-                ? "bg-black text-white"
-                : "hover:bg-gray-100 text-gray-600")
-            }
-          >
-            {t.label}
-          </button>
-        ))}
+        {visibleTabs.map((t) => {
+          const navigateTo = NAVIGATE_TABS[t.key];
+          return (
+            <button
+              key={t.key}
+              onClick={() =>
+                navigateTo ? router.push(navigateTo(id)) : setTab(t.key)
+              }
+              className={
+                "px-4 py-2 rounded-t whitespace-nowrap " +
+                (tab === t.key && !navigateTo
+                  ? "bg-black text-white"
+                  : "hover:bg-gray-100 text-gray-600")
+              }
+            >
+              {t.label}
+            </button>
+          );
+        })}
       </div>
 
       {/* GENEL — düzenlenebilir form */}
@@ -896,13 +918,13 @@ export default function FirmDetailPage({
         </div>
       )}
 
-      {/* LİSTE SEKMELERİ (Görevler / Araçlar / Sürücüler / Personeller / Ziyaretler) */}
-      {tab !== "genel" && tab !== "belge_takip" && tab !== "documents" && (
+      {/* GÖREVLER — basit salt okunur liste (görev CRUD'u /tasks Kanban ekranında) */}
+      {tab === "tasks" && (
         <div className="border rounded-xl overflow-hidden">
           <table className="w-full text-sm">
             <thead className="bg-gray-50">
               <tr>
-                {TAB_COLUMNS[tab].map((c) => (
+                {TAB_COLUMNS.tasks.map((c) => (
                   <th key={c.key} className="text-left p-3 font-medium text-gray-600">
                     {c.label}
                   </th>
@@ -912,14 +934,14 @@ export default function FirmDetailPage({
             <tbody>
               {rowsLoading && (
                 <tr>
-                  <td colSpan={TAB_COLUMNS[tab].length} className="p-4 text-gray-500">
+                  <td colSpan={TAB_COLUMNS.tasks.length} className="p-4 text-gray-500">
                     Yükleniyor...
                   </td>
                 </tr>
               )}
               {!rowsLoading && rows.length === 0 && (
                 <tr>
-                  <td colSpan={TAB_COLUMNS[tab].length} className="p-4 text-gray-500">
+                  <td colSpan={TAB_COLUMNS.tasks.length} className="p-4 text-gray-500">
                     Bu firmaya ait kayıt yok.
                   </td>
                 </tr>
@@ -927,7 +949,7 @@ export default function FirmDetailPage({
               {!rowsLoading &&
                 rows.map((row) => (
                   <tr key={row.id} className="border-t">
-                    {TAB_COLUMNS[tab].map((c) => (
+                    {TAB_COLUMNS.tasks.map((c) => (
                       <td key={c.key} className="p-3">
                         {display(row[c.key])}
                       </td>
@@ -936,7 +958,61 @@ export default function FirmDetailPage({
                 ))}
             </tbody>
           </table>
+          <p className="text-xs text-gray-400 p-3 border-t">
+            Görev eklemek/düzenlemek için{" "}
+            <Link href="/tasks" className="text-blue-600 underline">
+              Görevler
+            </Link>{" "}
+            ekranını kullan.
+          </p>
         </div>
+      )}
+
+      {/* ARAÇLAR / SÜRÜCÜLER / PERSONELLER / ZİYARETLER — bu firmaya sabitlenmiş,
+          tam CRUD (ekle/düzenle/sil) destekli gömülü bileşenler. */}
+      {tab === "vehicles" && (
+        <FirmScopedCrud
+          table="vehicles"
+          title="Araçlar"
+          fields={VEHICLE_FIELDS}
+          searchKeys={["plate_number", "brand", "model", "vehicle_type"]}
+          fixedFirmId={id}
+          compact
+        />
+      )}
+
+      {tab === "drivers" && (
+        <FirmScopedCrud
+          table="drivers"
+          title="Sürücüler"
+          fields={DRIVER_FIELDS}
+          searchKeys={["first_name", "last_name", "phone", "national_id"]}
+          fixedFirmId={id}
+          compact
+        />
+      )}
+
+      {tab === "employees" && (
+        <FirmScopedCrud
+          table="employees"
+          title="Personeller"
+          fields={EMPLOYEE_FIELDS}
+          searchKeys={["first_name", "last_name", "department", "position"]}
+          fixedFirmId={id}
+          compact
+        />
+      )}
+
+      {tab === "visits" && (
+        <FirmScopedCrud
+          table="visits"
+          title="Ziyaretler"
+          fields={VISIT_FIELDS}
+          searchKeys={["visit_type", "summary"]}
+          orderBy="visit_date"
+          fixedFirmId={id}
+          compact
+        />
       )}
     </div>
   );

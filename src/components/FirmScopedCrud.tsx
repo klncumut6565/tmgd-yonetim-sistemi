@@ -16,7 +16,7 @@ import { supabase } from "@/lib/supabase/client";
 import { useUser } from "@/hooks/useUser";
 import { hataCevir } from "@/lib/hataCevir";
 
-export type FieldType = "text" | "number" | "date" | "select";
+export type FieldType = "text" | "number" | "date" | "select" | "textarea";
 
 export type FieldDef = {
   key: string;                 // veritabanı sütun adı
@@ -25,6 +25,8 @@ export type FieldDef = {
   required?: boolean;          // zorunlu alan mı
   options?: { value: string; label: string }[]; // type=select için
   inTable?: boolean;           // listede sütun olarak gösterilsin mi (varsayılan true)
+  defaultValue?: string;       // yeni kayıt formu açıldığında alanın ön dolu geleceği metin (örn. rapor şablonu)
+  textareaRows?: number;       // type=textarea için satır sayısı (varsayılan 4)
 };
 
 type Firm = { id: string; name: string; activities?: string[] | null };
@@ -37,6 +39,10 @@ type Props = {
   searchKeys: string[];        // arama hangi alanlarda yapılsın
   orderBy?: string;            // sıralama alanı (varsayılan created_at)
   requireActivity?: string;    // yalnızca bu faaliyet konusuna sahip firmalar listelenir (örn. "tasimaci")
+  fixedFirmId?: string;        // verilirse firma seçici gizlenir, kayıtlar sabit bu firmaya bağlanır
+                                // (firma detay sayfasındaki sekmelerden gömülü kullanım için)
+  compact?: boolean;           // true ise başlık (h1) ve firma seçici satırı gizlenir — üst düzey
+                                // sayfa (örn. firma detay) kendi başlığını zaten gösteriyorsa kullan
 };
 
 const STATUS_LABELS: Record<string, string> = {
@@ -52,10 +58,12 @@ export default function FirmScopedCrud({
   searchKeys,
   orderBy = "created_at",
   requireActivity,
+  fixedFirmId,
+  compact = false,
 }: Props) {
   const { canWrite } = useUser();
   const [firms, setFirms] = useState<Firm[]>([]);
-  const [firmId, setFirmId] = useState("");
+  const [firmId, setFirmId] = useState(fixedFirmId || "");
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
@@ -123,7 +131,7 @@ export default function FirmScopedCrud({
   }
 
   useEffect(() => {
-    loadFirms();
+    if (!fixedFirmId) loadFirms();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -146,7 +154,11 @@ export default function FirmScopedCrud({
 
   function openCreateForm() {
     setEditingId(null);
-    setForm({});
+    const initial: Record<string, string> = {};
+    fields.forEach((f) => {
+      if (f.defaultValue) initial[f.key] = f.defaultValue;
+    });
+    setForm(initial);
     setShowForm(true);
   }
 
@@ -236,44 +248,49 @@ export default function FirmScopedCrud({
   }
 
   return (
-    <div className="p-6">
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-3xl font-bold">{title}</h1>
+    <div className={compact ? "" : "p-6"}>
+      <div className="flex items-center justify-between mb-4">
+        {!compact && <h1 className="text-3xl font-bold">{title}</h1>}
         {canWrite && (
           <button
             onClick={openCreateForm}
             disabled={!firmId}
-            className="bg-black text-white px-4 py-2 rounded disabled:opacity-40"
+            className={
+              "bg-black text-white px-4 py-2 rounded disabled:opacity-40" +
+              (compact ? " ml-auto" : "")
+            }
           >
             + Yeni Ekle
           </button>
         )}
       </div>
 
-      {/* Firma seçimi + arama */}
+      {/* Firma seçimi (sabit firmaya gömülüyse gizli) + arama */}
       <div className="flex flex-wrap gap-3 mb-4">
-        <div>
-          <label className="block text-sm text-gray-600 mb-1">Firma</label>
-          <select
-            value={firmId}
-            onChange={(e) => setFirmId(e.target.value)}
-            className="border p-2 rounded min-w-[220px]"
-          >
-            {firms.length === 0 && (
-              <option value="">
-                {requireActivity ? "Uygun faaliyette firma yok" : "Firma yok"}
-              </option>
-            )}
-            {firms.map((firm) => (
-              <option key={firm.id} value={firm.id}>
-                {firm.name}
-              </option>
-            ))}
-          </select>
-        </div>
+        {!fixedFirmId && (
+          <div>
+            <label className="block text-sm text-gray-600 mb-1">Firma</label>
+            <select
+              value={firmId}
+              onChange={(e) => setFirmId(e.target.value)}
+              className="border p-2 rounded min-w-[220px]"
+            >
+              {firms.length === 0 && (
+                <option value="">
+                  {requireActivity ? "Uygun faaliyette firma yok" : "Firma yok"}
+                </option>
+              )}
+              {firms.map((firm) => (
+                <option key={firm.id} value={firm.id}>
+                  {firm.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
 
         <div className="flex-1 min-w-[220px]">
-          <label className="block text-sm text-gray-600 mb-1">Ara</label>
+          {!compact && <label className="block text-sm text-gray-600 mb-1">Ara</label>}
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -388,6 +405,15 @@ export default function FirmScopedCrud({
                         </option>
                       ))}
                     </select>
+                  ) : f.type === "textarea" ? (
+                    <textarea
+                      rows={f.textareaRows || 10}
+                      value={form[f.key] || ""}
+                      onChange={(e) =>
+                        setForm({ ...form, [f.key]: e.target.value })
+                      }
+                      className="border p-2 rounded w-full font-mono text-xs"
+                    />
                   ) : (
                     <input
                       type={

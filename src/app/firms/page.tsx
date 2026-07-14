@@ -12,7 +12,7 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
 import { useUser } from "@/hooks/useUser";
 import { hataCevir } from "@/lib/hataCevir";
-import { ACTIVITIES, ACTIVITY_LABELS } from "@/lib/belgeKatalogu";
+import { ACTIVITIES, ACTIVITY_LABELS, buildChecklist } from "@/lib/belgeKatalogu";
 
 type Firm = {
   id: string;
@@ -22,7 +22,10 @@ type Firm = {
   phone: string | null;
   status: string;
   activities: string[] | null;
+  contract_start: string | null;
 };
+
+type Progress = { total: number; done: number; pct: number };
 
 const STATUS_TR: Record<string, string> = {
   active: "Aktif",
@@ -38,6 +41,7 @@ export default function FirmsPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [error, setError] = useState("");
+  const [progressByFirm, setProgressByFirm] = useState<Record<string, Progress>>({});
 
   // Yeni firma formu
   const [name, setName] = useState("");
@@ -54,7 +58,7 @@ export default function FirmsPage() {
     setError("");
     let { data, error } = await supabase
       .from("firms")
-      .select("id, name, city, district, phone, status, activities")
+      .select("id, name, city, district, phone, status, activities, contract_start")
       .order("name");
 
     // "activities" kolonu henüz eklenmemişse (migration 010 çalıştırılmadıysa)
@@ -64,7 +68,7 @@ export default function FirmsPage() {
         .from("firms")
         .select("id, name, city, district, phone, status")
         .order("name");
-      data = (retry.data || []).map((f) => ({ ...f, activities: [] })) as typeof data;
+      data = (retry.data || []).map((f) => ({ ...f, activities: [], contract_start: null })) as typeof data;
       error = retry.error;
       if (!retry.error) {
         setError(
@@ -76,8 +80,51 @@ export default function FirmsPage() {
       setError("Firmalar yüklenemedi: " + hataCevir(error));
     }
 
-    setFirms((data as Firm[]) || []);
+    const firmList = (data as Firm[]) || [];
+    setFirms(firmList);
     setLoading(false);
+    loadProgress(firmList);
+  }
+
+  // Her firma için Belge Takip ilerlemesini (tamamlanan / toplam madde) hesaplar.
+  // Tek bir sorgu ile tüm firmaların tamamlanmış (done=true) maddeleri çekilir,
+  // ardından her firmanın kendi faaliyet konularına göre toplam madde sayısı
+  // istemci tarafında (buildChecklist) hesaplanır.
+  async function loadProgress(firmList: Firm[]) {
+    if (firmList.length === 0) {
+      setProgressByFirm({});
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from("firm_belgeleri")
+      .select("firm_id, code, period, done")
+      .eq("done", true);
+
+    if (error) return; // sessizce vazgeç — sayfa yine de çalışır, sadece ilerleme gösterilmez
+
+    const doneByFirm = new Map<string, Set<string>>();
+    (data || []).forEach((row: { firm_id: string; code: string; period: string }) => {
+      const set = doneByFirm.get(row.firm_id) || new Set<string>();
+      set.add(`${row.code}|${row.period}`);
+      doneByFirm.set(row.firm_id, set);
+    });
+
+    const result: Record<string, Progress> = {};
+    firmList.forEach((f) => {
+      const sections = buildChecklist(f.activities || [], f.contract_start);
+      const doneSet = doneByFirm.get(f.id) || new Set<string>();
+      let total = 0;
+      let done = 0;
+      sections.forEach((sec) =>
+        sec.items.forEach((it) => {
+          total++;
+          if (doneSet.has(`${it.code}|${it.period}`)) done++;
+        })
+      );
+      result[f.id] = { total, done, pct: total ? Math.round((done / total) * 100) : 0 };
+    });
+    setProgressByFirm(result);
   }
 
   function toggleActivity(key: string) {
@@ -205,18 +252,19 @@ export default function FirmsPage() {
                   <th className="text-left p-3 font-medium text-gray-600">Faaliyet</th>
                   <th className="text-left p-3 font-medium text-gray-600">Şehir / İlçe</th>
                   <th className="text-left p-3 font-medium text-gray-600">Durum</th>
+                  <th className="text-left p-3 font-medium text-gray-600">Belge Durumu</th>
                   {isSuperAdmin && <th className="p-3" />}
                 </tr>
               </thead>
               <tbody>
                 {loading && (
                   <tr>
-                    <td colSpan={5} className="p-4 text-gray-500">Yükleniyor...</td>
+                    <td colSpan={6} className="p-4 text-gray-500">Yükleniyor...</td>
                   </tr>
                 )}
                 {!loading && filtered.length === 0 && (
                   <tr>
-                    <td colSpan={5} className="p-4 text-gray-500">
+                    <td colSpan={6} className="p-4 text-gray-500">
                       {search ? "Aramaya uyan firma yok." : "Henüz firma eklenmemiş."}
                     </td>
                   </tr>
@@ -247,6 +295,29 @@ export default function FirmsPage() {
                       {[firm.city, firm.district].filter(Boolean).join(" / ") || "—"}
                     </td>
                     <td className="p-3">{STATUS_TR[firm.status] || firm.status}</td>
+                    <td className="p-3">
+                      {(() => {
+                        const p = progressByFirm[firm.id];
+                        if (!p || p.total === 0) {
+                          return <span className="text-gray-300 text-xs">—</span>;
+                        }
+                        const eksik = p.total - p.done;
+                        const cls =
+                          p.pct >= 100
+                            ? "bg-green-50 text-green-700"
+                            : p.pct >= 60
+                              ? "bg-amber-50 text-amber-700"
+                              : "bg-red-50 text-red-700";
+                        return (
+                          <span
+                            title={`${p.done} / ${p.total} madde tamamlandı`}
+                            className={"text-xs px-2 py-0.5 rounded whitespace-nowrap " + cls}
+                          >
+                            {p.done}/{p.total} (%{p.pct}){eksik > 0 && ` · ${eksik} eksik`}
+                          </span>
+                        );
+                      })()}
+                    </td>
                     {isSuperAdmin && (
                       <td className="p-3 text-right">
                         <button

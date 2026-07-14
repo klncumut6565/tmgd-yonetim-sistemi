@@ -9,6 +9,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
 import { useUser } from "@/hooks/useUser";
 import { hataCevir } from "@/lib/hataCevir";
@@ -32,6 +33,8 @@ const CATEGORY_ORDER: CatalogCategory[] = ["P", "T", "K", "L", "SA"];
 
 export default function BelgeOlusturPage() {
   const { canWrite } = useUser();
+  const searchParams = useSearchParams();
+  const preselectFirmId = searchParams.get("firm") || "";
 
   const [firms, setFirms] = useState<Firm[]>([]);
   const [firmId, setFirmId] = useState("");
@@ -73,6 +76,15 @@ export default function BelgeOlusturPage() {
       setFirms((data as Firm[]) || []);
     })();
   }, []);
+
+  // Firma detay sayfasındaki "Belge Oluştur" sekmesinden ?firm=<id> ile
+  // gelindiyse, firmalar yüklendikten sonra otomatik olarak seçili yap.
+  useEffect(() => {
+    if (preselectFirmId && firms.some((f) => f.id === preselectFirmId)) {
+      setFirmId(preselectFirmId);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [preselectFirmId, firms]);
 
   const firm = useMemo(
     () => firms.find((f) => f.id === firmId) || null,

@@ -342,6 +342,7 @@ create table if not exists public.visits (
     visit_type text,
     summary text,
     next_visit_date date,
+    report_content text,
     created_at timestamptz default now(),
     updated_at timestamptz default now()
 );
