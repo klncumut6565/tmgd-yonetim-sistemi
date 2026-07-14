@@ -8,7 +8,6 @@
 
 import { use, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
 import { useUser } from "@/hooks/useUser";
 import { hataCevir } from "@/lib/hataCevir";
@@ -21,6 +20,7 @@ import {
   codeSection,
 } from "@/lib/belgeKatalogu";
 import FirmScopedCrud from "@/components/FirmScopedCrud";
+import BelgeOlusturForm from "@/components/BelgeOlusturForm";
 import {
   VEHICLE_FIELDS,
   DRIVER_FIELDS,
@@ -75,13 +75,6 @@ const TABS = [
 ] as const;
 
 type TabKey = (typeof TABS)[number]["key"];
-
-// "Belge Oluştur" bu sayfada bir sekme değil, /belge-olustur sayfasına
-// firma ön seçili olarak yönlendiren bir kısayoldur (o sayfadaki PDF
-// oluşturma mantığını burada tekrar etmemek için).
-const NAVIGATE_TABS: Partial<Record<TabKey, (firmId: string) => string>> = {
-  belge_olustur: (firmId) => `/belge-olustur?firm=${firmId}`,
-};
 
 // Her sekmenin listede göstereceği kolonlar
 // NOT: "documents" artık genel tablo yerine firm_belge_dosyalari'ndan
@@ -158,7 +151,6 @@ export default function FirmDetailPage({
 }) {
   const { id } = use(params);
   const { canWrite } = useUser();
-  const router = useRouter();
 
   const [firm, setFirm] = useState<Firm | null>(null);
   const [loading, setLoading] = useState(true);
@@ -521,25 +513,20 @@ export default function FirmDetailPage({
 
       {/* Sekmeler */}
       <div className="flex gap-1 border-b mb-6 overflow-x-auto">
-        {visibleTabs.map((t) => {
-          const navigateTo = NAVIGATE_TABS[t.key];
-          return (
-            <button
-              key={t.key}
-              onClick={() =>
-                navigateTo ? router.push(navigateTo(id)) : setTab(t.key)
-              }
-              className={
-                "px-4 py-2 rounded-t whitespace-nowrap " +
-                (tab === t.key && !navigateTo
-                  ? "bg-black text-white"
-                  : "hover:bg-gray-100 text-gray-600")
-              }
-            >
-              {t.label}
-            </button>
-          );
-        })}
+        {visibleTabs.map((t) => (
+          <button
+            key={t.key}
+            onClick={() => setTab(t.key)}
+            className={
+              "px-4 py-2 rounded-t whitespace-nowrap " +
+              (tab === t.key
+                ? "bg-black text-white"
+                : "hover:bg-gray-100 text-gray-600")
+            }
+          >
+            {t.label}
+          </button>
+        ))}
       </div>
 
       {/* GENEL — düzenlenebilir form */}
@@ -966,6 +953,10 @@ export default function FirmDetailPage({
             ekranını kullan.
           </p>
         </div>
+      )}
+
+      {tab === "belge_olustur" && (
+        <BelgeOlusturForm fixedFirmId={id} compact />
       )}
 
       {/* ARAÇLAR / SÜRÜCÜLER / PERSONELLER / ZİYARETLER — bu firmaya sabitlenmiş,
