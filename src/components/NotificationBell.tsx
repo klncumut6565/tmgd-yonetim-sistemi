@@ -129,42 +129,68 @@ export default function NotificationBell() {
       setExpiringBelgeTakip([]);
     }
 
-    // 4) ADR sertifika uyarıları (sürücü + araç, ayara göre)
+    // 4) Sürücü + araç belge uyarıları (ayara göre): ADR/SRC-5, Muayene, Ehliyet
     if (s.adr_expiry_days > 0) {
-      const [drvRes, vehRes] = await Promise.all([
+      const [drvAdrRes, vehAdrRes, vehInspRes, drvLicRes] = await Promise.all([
         supabase
           .from("adr_expiring_drivers")
-          .select("id, first_name, last_name, adr_valid_until, firm_name")
+          .select("id, first_name, last_name, firm_name, days_left, adr_valid_until")
           .lte("days_left", s.adr_expiry_days)
-          .order("adr_valid_until"),
+          .order("days_left"),
         supabase
           .from("adr_expiring_vehicles")
-          .select("id, plate_number, adr_valid_until, firm_name")
+          .select("id, plate_number, firm_name, days_left, adr_valid_until")
           .lte("days_left", s.adr_expiry_days)
-          .order("adr_valid_until"),
+          .order("days_left"),
+        supabase
+          .from("expiring_vehicle_inspections")
+          .select("id, plate_number, firm_name, days_left, inspection_valid_until")
+          .lte("days_left", s.adr_expiry_days)
+          .order("days_left"),
+        supabase
+          .from("expiring_driver_licenses")
+          .select("id, first_name, last_name, firm_name, days_left, driving_license_valid_until")
+          .lte("days_left", s.adr_expiry_days)
+          .order("days_left"),
       ]);
 
-      const drvDocs: ExpiringDoc[] = (drvRes.data || []).map((d: Record<string, unknown>) => ({
-        id: String(d.id),
-        title: `${d.first_name} ${d.last_name} — ADR Sertifikası`,
+      const drvDocs: ExpiringDoc[] = (drvAdrRes.data || []).map((d: Record<string, unknown>) => ({
+        id: `drv-adr-${d.id}`,
+        title: `${d.first_name} ${d.last_name} — SRC-5`,
         firm_name: String(d.firm_name),
-        days_left: Math.round(
-          (new Date(String(d.adr_valid_until)).getTime() - Date.now()) / 86400000
-        ),
+        days_left: Number(d.days_left),
         expiry_date: String(d.adr_valid_until),
       }));
 
-      const vehDocs: ExpiringDoc[] = (vehRes.data || []).map((v: Record<string, unknown>) => ({
-        id: String(v.id),
+      const vehDocs: ExpiringDoc[] = (vehAdrRes.data || []).map((v: Record<string, unknown>) => ({
+        id: `veh-adr-${v.id}`,
         title: `${v.plate_number} — ADR Belgesi`,
         firm_name: String(v.firm_name),
-        days_left: Math.round(
-          (new Date(String(v.adr_valid_until)).getTime() - Date.now()) / 86400000
-        ),
+        days_left: Number(v.days_left),
         expiry_date: String(v.adr_valid_until),
       }));
 
-      setExpiringAdrs([...drvDocs, ...vehDocs].sort((a, b) => a.days_left - b.days_left));
+      const vehInspDocs: ExpiringDoc[] = (vehInspRes.data || []).map((v: Record<string, unknown>) => ({
+        id: `veh-insp-${v.id}`,
+        title: `${v.plate_number} — Muayene`,
+        firm_name: String(v.firm_name),
+        days_left: Number(v.days_left),
+        expiry_date: String(v.inspection_valid_until),
+      }));
+
+      const drvLicDocs: ExpiringDoc[] = (drvLicRes.data || []).map((d: Record<string, unknown>) => ({
+        id: `drv-lic-${d.id}`,
+        title: `${d.first_name} ${d.last_name} — Ehliyet`,
+        firm_name: String(d.firm_name),
+        days_left: Number(d.days_left),
+        expiry_date: String(d.driving_license_valid_until),
+      }));
+
+      setExpiringAdrs(
+        [...drvDocs, ...vehDocs, ...vehInspDocs, ...drvLicDocs].sort(
+          (a, b) => a.days_left - b.days_left
+        )
+      );
     } else {
       setExpiringAdrs([]);
     }

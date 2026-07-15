@@ -32,9 +32,10 @@ export const DRIVER_FIELDS: FieldDef[] = [
   { key: "national_id", label: "T.C. Kimlik No", type: "text", inTable: false },
   { key: "phone", label: "Telefon", type: "text" },
   { key: "email", label: "E-posta", type: "text", inTable: false },
-  { key: "adr_certificate_no", label: "ADR Belge No", type: "text", inTable: false },
-  { key: "adr_valid_until", label: "ADR Geçerlilik", type: "date" },
+  { key: "adr_certificate_no", label: "SRC-5 Belge No", type: "text", inTable: false },
+  { key: "adr_valid_until", label: "SRC-5 Geçerlilik", type: "date" },
   { key: "driving_license_class", label: "Ehliyet Sınıfı", type: "text" },
+  { key: "driving_license_valid_until", label: "Ehliyet Geçerlilik", type: "date" },
   {
     key: "status",
     label: "Durum",

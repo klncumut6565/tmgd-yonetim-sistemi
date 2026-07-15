@@ -19,18 +19,12 @@ type Counts = {
   vehicles: number;
 };
 
-type ExpiringDriver = {
+type ExpiringItem = {
   id: string;
-  first_name: string;
-  last_name: string;
-  adr_valid_until: string;
-  firm_name: string;
-};
-
-type ExpiringVehicle = {
-  id: string;
-  plate_number: string;
-  adr_valid_until: string;
+  label: string;     // "Ad Soyad" ya da "Plaka"
+  docType: string;    // "SRC-5", "ADR Belgesi", "Muayene", "Ehliyet"
+  valid_until: string;
+  days_left: number;
   firm_name: string;
 };
 
@@ -79,38 +73,61 @@ function DaysBadge({ date }: { date: string }) {
 
 export default function DashboardPage() {
   const [counts, setCounts] = useState<Counts>({ firms: 0, openTasks: 0, documents: 0, vehicles: 0 });
-  const [drivers, setDrivers] = useState<ExpiringDriver[]>([]);
-  const [vehicles, setVehicles] = useState<ExpiringVehicle[]>([]);
+  const [drivers, setDrivers] = useState<ExpiringItem[]>([]);
+  const [vehicles, setVehicles] = useState<ExpiringItem[]>([]);
   const [tasks, setTasks] = useState<RecentTask[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function load() {
-      const [firmRes, taskRes, docRes, vehRes, expDrvRes, expVehRes, recentRes] =
-        await Promise.all([
-          supabase.from("firms").select("*", { count: "exact", head: true }),
-          supabase
-            .from("tasks")
-            .select("*", { count: "exact", head: true })
-            .in("status", ["todo", "in_progress", "review"]),
-          supabase.from("documents").select("*", { count: "exact", head: true }),
-          supabase.from("vehicles").select("*", { count: "exact", head: true }),
-          supabase
-            .from("adr_expiring_drivers")
-            .select("*")
-            .order("adr_valid_until")
-            .limit(8),
-          supabase
-            .from("adr_expiring_vehicles")
-            .select("*")
-            .order("adr_valid_until")
-            .limit(8),
-          supabase
-            .from("tasks")
-            .select("id, title, status, priority, due_date, firms ( name )")
-            .order("updated_at", { ascending: false })
-            .limit(6),
-        ]);
+      const [
+        firmRes,
+        taskRes,
+        docRes,
+        vehRes,
+        expDrvAdrRes,
+        expVehAdrRes,
+        expVehInspRes,
+        expDrvLicRes,
+        recentRes,
+      ] = await Promise.all([
+        supabase.from("firms").select("*", { count: "exact", head: true }),
+        supabase
+          .from("tasks")
+          .select("*", { count: "exact", head: true })
+          .in("status", ["todo", "in_progress", "review"]),
+        supabase.from("documents").select("*", { count: "exact", head: true }),
+        supabase.from("vehicles").select("*", { count: "exact", head: true }),
+        supabase
+          .from("adr_expiring_drivers")
+          .select("id, first_name, last_name, adr_valid_until, firm_name, days_left")
+          .lte("days_left", 30)
+          .order("days_left")
+          .limit(8),
+        supabase
+          .from("adr_expiring_vehicles")
+          .select("id, plate_number, adr_valid_until, firm_name, days_left")
+          .lte("days_left", 30)
+          .order("days_left")
+          .limit(8),
+        supabase
+          .from("expiring_vehicle_inspections")
+          .select("id, plate_number, inspection_valid_until, firm_name, days_left")
+          .lte("days_left", 30)
+          .order("days_left")
+          .limit(8),
+        supabase
+          .from("expiring_driver_licenses")
+          .select("id, first_name, last_name, driving_license_valid_until, firm_name, days_left")
+          .lte("days_left", 30)
+          .order("days_left")
+          .limit(8),
+        supabase
+          .from("tasks")
+          .select("id, title, status, priority, due_date, firms ( name )")
+          .order("updated_at", { ascending: false })
+          .limit(6),
+      ]);
 
       setCounts({
         firms: firmRes.count || 0,
@@ -118,8 +135,42 @@ export default function DashboardPage() {
         documents: docRes.count || 0,
         vehicles: vehRes.count || 0,
       });
-      setDrivers((expDrvRes.data as ExpiringDriver[]) || []);
-      setVehicles((expVehRes.data as ExpiringVehicle[]) || []);
+
+      const drvAdr: ExpiringItem[] = (expDrvAdrRes.data || []).map((d: Record<string, unknown>) => ({
+        id: `drv-adr-${d.id}`,
+        label: `${d.first_name} ${d.last_name}`,
+        docType: "SRC-5",
+        valid_until: String(d.adr_valid_until),
+        days_left: Number(d.days_left),
+        firm_name: String(d.firm_name),
+      }));
+      const drvLic: ExpiringItem[] = (expDrvLicRes.data || []).map((d: Record<string, unknown>) => ({
+        id: `drv-lic-${d.id}`,
+        label: `${d.first_name} ${d.last_name}`,
+        docType: "Ehliyet",
+        valid_until: String(d.driving_license_valid_until),
+        days_left: Number(d.days_left),
+        firm_name: String(d.firm_name),
+      }));
+      const vehAdr: ExpiringItem[] = (expVehAdrRes.data || []).map((v: Record<string, unknown>) => ({
+        id: `veh-adr-${v.id}`,
+        label: String(v.plate_number),
+        docType: "ADR Belgesi",
+        valid_until: String(v.adr_valid_until),
+        days_left: Number(v.days_left),
+        firm_name: String(v.firm_name),
+      }));
+      const vehInsp: ExpiringItem[] = (expVehInspRes.data || []).map((v: Record<string, unknown>) => ({
+        id: `veh-insp-${v.id}`,
+        label: String(v.plate_number),
+        docType: "Muayene",
+        valid_until: String(v.inspection_valid_until),
+        days_left: Number(v.days_left),
+        firm_name: String(v.firm_name),
+      }));
+
+      setDrivers([...drvAdr, ...drvLic].sort((a, b) => a.days_left - b.days_left));
+      setVehicles([...vehAdr, ...vehInsp].sort((a, b) => a.days_left - b.days_left));
       setTasks((recentRes.data as unknown as RecentTask[]) || []);
       setLoading(false);
     }
@@ -158,30 +209,30 @@ export default function DashboardPage() {
         ))}
       </div>
 
-      {/* Yaklaşan ADR süreleri — yan yana iki kolon */}
-      <h2 className="text-xl font-bold mb-3">Yaklaşan ADR Süreleri (30 gün)</h2>
+      {/* Yaklaşan belge süreleri — yan yana iki kolon */}
+      <h2 className="text-xl font-bold mb-3">Yaklaşan Belge Süreleri (30 gün)</h2>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-8">
         <div className="border rounded-xl p-4">
-          <h3 className="font-medium text-gray-600 mb-3">Sürücü Sertifikaları</h3>
+          <h3 className="font-medium text-gray-600 mb-3">Sürücü Belgeleri (SRC-5 · Ehliyet)</h3>
           {loading && <p className="text-sm text-gray-500">Yükleniyor...</p>}
           {!loading && drivers.length === 0 && (
-            <p className="text-sm text-gray-500">30 gün içinde süresi dolan sürücü sertifikası yok. ✓</p>
+            <p className="text-sm text-gray-500">30 gün içinde süresi dolan sürücü belgesi yok. ✓</p>
           )}
           <ul className="space-y-2">
             {drivers.map((d) => (
               <li key={d.id} className="flex items-center justify-between gap-2 text-sm">
                 <span>
-                  {d.first_name} {d.last_name}
-                  <span className="text-gray-400"> · {d.firm_name}</span>
+                  {d.label}
+                  <span className="text-gray-400"> · {d.docType} · {d.firm_name}</span>
                 </span>
-                <DaysBadge date={d.adr_valid_until} />
+                <DaysBadge date={d.valid_until} />
               </li>
             ))}
           </ul>
         </div>
 
         <div className="border rounded-xl p-4">
-          <h3 className="font-medium text-gray-600 mb-3">Araç ADR Belgeleri</h3>
+          <h3 className="font-medium text-gray-600 mb-3">Araç Belgeleri (ADR · Muayene)</h3>
           {loading && <p className="text-sm text-gray-500">Yükleniyor...</p>}
           {!loading && vehicles.length === 0 && (
             <p className="text-sm text-gray-500">30 gün içinde süresi dolan araç belgesi yok. ✓</p>
@@ -190,10 +241,10 @@ export default function DashboardPage() {
             {vehicles.map((v) => (
               <li key={v.id} className="flex items-center justify-between gap-2 text-sm">
                 <span>
-                  {v.plate_number}
-                  <span className="text-gray-400"> · {v.firm_name}</span>
+                  {v.label}
+                  <span className="text-gray-400"> · {v.docType} · {v.firm_name}</span>
                 </span>
-                <DaysBadge date={v.adr_valid_until} />
+                <DaysBadge date={v.valid_until} />
               </li>
             ))}
           </ul>
