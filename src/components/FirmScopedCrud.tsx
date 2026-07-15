@@ -29,7 +29,7 @@ export type FieldDef = {
   textareaRows?: number;       // type=textarea için satır sayısı (varsayılan 4)
 };
 
-type Firm = { id: string; name: string; activities?: string[] | null };
+type Firm = { id: string; name: string; activities?: string[] | null; orphan?: boolean };
 type Row = Record<string, unknown> & { id: string };
 
 type Props = {
@@ -112,9 +112,25 @@ export default function FirmScopedCrud({
       return;
     }
 
-    const list = requireActivity
+    const activityMatch = requireActivity
       ? (data || []).filter((f) => (f.activities || []).includes(requireActivity))
       : data || [];
+
+    let list: Firm[] = activityMatch;
+
+    // Faaliyet filtresi varsa: bu filtreye UYMAYAN ama tabloda (örn. vehicles)
+    // hâlâ kaydı olan firmalar da listeye eklenir — böylece bir firmanın
+    // faaliyeti sonradan değiştirildiğinde (örn. Taşımacı işareti kaldırıldığında)
+    // ona bağlı kayıtlar "hayalet" (görünmez, silinemez) hâle gelmez.
+    if (requireActivity) {
+      const { data: ownerRows } = await supabase.from(table).select("firm_id");
+      const ownerFirmIds = new Set((ownerRows || []).map((r: { firm_id: string }) => r.firm_id));
+      const matchedIds = new Set(activityMatch.map((f) => f.id));
+      const orphanFirms: Firm[] = (data || [])
+        .filter((f) => ownerFirmIds.has(f.id) && !matchedIds.has(f.id))
+        .map((f) => ({ ...f, orphan: true }));
+      list = [...activityMatch, ...orphanFirms];
+    }
 
     setFirms(list);
     if (list.length > 0) {
@@ -349,7 +365,7 @@ export default function FirmScopedCrud({
                   )}
                   {firms.map((firm) => (
                     <option key={firm.id} value={firm.id}>
-                      {firm.name}
+                      {firm.orphan ? `⚠ ${firm.name} (faaliyeti uymuyor)` : firm.name}
                     </option>
                   ))}
                 </select>
@@ -366,6 +382,15 @@ export default function FirmScopedCrud({
               />
             </div>
           </div>
+
+          {/* Seçili firma faaliyet filtresine uymuyor ama kaydı var — uyar */}
+          {firms.find((f) => f.id === firmId)?.orphan && (
+            <div className="mb-4 p-3 rounded bg-amber-50 text-amber-800 text-sm">
+              ⚠ Bu firmanın faaliyet konuları arasında artık {requireActivity === "tasimaci" ? "Taşımacı" : requireActivity}{" "}
+              yok, ama aşağıda hâlâ kayıtları görünüyor. İstersen kayıtları burada silebilir,
+              ya da firmanın Genel bilgilerinden faaliyet konusunu tekrar ekleyebilirsin.
+            </div>
+          )}
 
           {error && (
             <div className="mb-4 p-3 rounded bg-red-50 text-red-700 text-sm">
