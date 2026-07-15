@@ -42,6 +42,7 @@ export default function FirmsPage() {
   const [search, setSearch] = useState("");
   const [error, setError] = useState("");
   const [progressByFirm, setProgressByFirm] = useState<Record<string, Progress>>({});
+  const [lastVisitByFirm, setLastVisitByFirm] = useState<Record<string, string>>({});
 
   // Yeni firma formu
   const [name, setName] = useState("");
@@ -84,6 +85,51 @@ export default function FirmsPage() {
     setFirms(firmList);
     setLoading(false);
     loadProgress(firmList);
+    loadLastVisits();
+  }
+
+  // Tüm firmaların en son ziyaret tarihini tek sorguyla çeker
+  // (istemci tarafında firma bazında en yeni tarihe indirgenir).
+  async function loadLastVisits() {
+    const { data, error } = await supabase
+      .from("visits")
+      .select("firm_id, visit_date")
+      .order("visit_date", { ascending: false });
+
+    if (error) return; // sessizce vazgeç — sayfa yine de çalışır
+
+    const result: Record<string, string> = {};
+    (data || []).forEach((v: { firm_id: string; visit_date: string }) => {
+      if (!result[v.firm_id]) result[v.firm_id] = v.visit_date; // ilk görülen = en yeni (zaten sıralı)
+    });
+    setLastVisitByFirm(result);
+  }
+
+  // Son ziyaret tarihine göre rozet: bulunulan ay içinde ziyaret edilmişse
+  // yeşil, edilmemişse kırmızı — ay farkı arttıkça ton koyulaşır.
+  function visitBadge(dateStr: string | undefined): { label: string; className: string } {
+    if (!dateStr) {
+      return { label: "Hiç ziyaret yok", className: "bg-red-600 text-white" };
+    }
+    const d = new Date(dateStr);
+    const now = new Date();
+    const monthDiff =
+      (now.getFullYear() * 12 + now.getMonth()) - (d.getFullYear() * 12 + d.getMonth());
+    const label = d.toLocaleDateString("tr-TR");
+
+    if (monthDiff <= 0) {
+      return { label, className: "bg-green-100 text-green-800" };
+    }
+    const shades = [
+      "bg-red-100 text-red-700",
+      "bg-red-200 text-red-800",
+      "bg-red-300 text-red-900",
+      "bg-red-400 text-white",
+      "bg-red-500 text-white",
+      "bg-red-600 text-white",
+    ];
+    const cls = shades[Math.min(monthDiff - 1, shades.length - 1)];
+    return { label, className: cls };
   }
 
   // Her firma için Belge Takip ilerlemesini (tamamlanan / toplam madde) hesaplar.
@@ -252,6 +298,7 @@ export default function FirmsPage() {
                   <th className="text-left p-3 font-medium text-gray-600">Faaliyet</th>
                   <th className="text-left p-3 font-medium text-gray-600">Şehir / İlçe</th>
                   <th className="text-left p-3 font-medium text-gray-600">Durum</th>
+                  <th className="text-left p-3 font-medium text-gray-600">Son Ziyaret</th>
                   <th className="text-left p-3 font-medium text-gray-600">Belge Durumu</th>
                   {isSuperAdmin && <th className="p-3" />}
                 </tr>
@@ -259,12 +306,12 @@ export default function FirmsPage() {
               <tbody>
                 {loading && (
                   <tr>
-                    <td colSpan={6} className="p-4 text-gray-500">Yükleniyor...</td>
+                    <td colSpan={7} className="p-4 text-gray-500">Yükleniyor...</td>
                   </tr>
                 )}
                 {!loading && filtered.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="p-4 text-gray-500">
+                    <td colSpan={7} className="p-4 text-gray-500">
                       {search ? "Aramaya uyan firma yok." : "Henüz firma eklenmemiş."}
                     </td>
                   </tr>
@@ -295,6 +342,16 @@ export default function FirmsPage() {
                       {[firm.city, firm.district].filter(Boolean).join(" / ") || "—"}
                     </td>
                     <td className="p-3">{STATUS_TR[firm.status] || firm.status}</td>
+                    <td className="p-3">
+                      {(() => {
+                        const v = visitBadge(lastVisitByFirm[firm.id]);
+                        return (
+                          <span className={"text-xs px-2 py-0.5 rounded whitespace-nowrap " + v.className}>
+                            {v.label}
+                          </span>
+                        );
+                      })()}
+                    </td>
                     <td className="p-3">
                       {(() => {
                         const p = progressByFirm[firm.id];

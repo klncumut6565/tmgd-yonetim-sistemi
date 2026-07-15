@@ -108,7 +108,7 @@ export default function DashboardPage() {
           supabase
             .from("tasks")
             .select("id, title, status, priority, due_date, firms ( name )")
-            .order("created_at", { ascending: false })
+            .order("updated_at", { ascending: false })
             .limit(6),
         ]);
 
@@ -125,6 +125,12 @@ export default function DashboardPage() {
     }
 
     load();
+    // Sayfa arka planda kalıp tekrar odaklanıldığında (örn. Görevler'de bir
+    // görevü tamamlayıp Dashboard'a dönüldüğünde) veriler tazelenir —
+    // NotificationBell'deki aynı çalışan desen.
+    const onFocus = () => load();
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
   }, []);
 
   const kpis = [
