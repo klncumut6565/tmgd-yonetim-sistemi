@@ -53,7 +53,7 @@ type BelgeRow = {
   period: string;
   done: boolean;
   file_path: string | null;
-  valid_until: string | null;
+  expiry_date: string | null;
 };
 
 type Attachment = {
@@ -63,23 +63,6 @@ type Attachment = {
   file_path: string;
   file_name: string;
 };
-
-// Geçerlilik tarihine göre küçük durum rozeti — bildirim zilindeki mantıkla tutarlı.
-function expiryBadge(validUntil: string): { text: string; className: string } {
-  const days = Math.round(
-    (new Date(validUntil).getTime() - new Date().setHours(0, 0, 0, 0)) / 86400000
-  );
-  if (days < 0) {
-    return { text: `${Math.abs(days)} gün geçti`, className: "bg-red-100 text-red-700" };
-  }
-  if (days <= 7) {
-    return { text: `${days} gün kaldı`, className: "bg-red-50 text-red-600" };
-  }
-  if (days <= 30) {
-    return { text: `${days} gün kaldı`, className: "bg-amber-50 text-amber-700" };
-  }
-  return { text: `${days} gün kaldı`, className: "bg-gray-100 text-gray-500" };
-}
 
 const TABS = [
   { key: "belge_takip", label: "Belge Takip" },
@@ -246,7 +229,7 @@ export default function FirmDetailPage({
     const [belgelerRes, ekRes] = await Promise.all([
       supabase
         .from("firm_belgeleri")
-        .select("id, code, period, done, file_path, valid_until")
+        .select("id, code, period, done, file_path, expiry_date")
         .eq("firm_id", id),
       supabase
         .from("firm_belge_dosyalari")
@@ -254,29 +237,7 @@ export default function FirmDetailPage({
         .eq("firm_id", id)
         .order("uploaded_at", { ascending: true }),
     ]);
-
-    if (
-      belgelerRes.error &&
-      /column.*valid_until.*does not exist/i.test(belgelerRes.error.message || "")
-    ) {
-      // migration 013 henüz çalıştırılmamış — geçerlilik tarihi olmadan devam et
-      const retry = await supabase
-        .from("firm_belgeleri")
-        .select("id, code, period, done, file_path")
-        .eq("firm_id", id);
-      setBelgeler(
-        ((retry.data as Omit<BelgeRow, "valid_until">[]) || []).map((b) => ({
-          ...b,
-          valid_until: null,
-        }))
-      );
-      setFileMsg(
-        "Geçerlilik tarihi alanı için veritabanı güncellemesi (migration 013) henüz çalıştırılmamış. " +
-          "Supabase → SQL Editor'de database/013_belge_takip_gecerlilik_tarihi.sql dosyasını çalıştır."
-      );
-    } else {
-      setBelgeler((belgelerRes.data as BelgeRow[]) || []);
-    }
+    setBelgeler((belgelerRes.data as BelgeRow[]) || []);
 
     if (ekRes.error) {
       setAttachments([]);
@@ -332,14 +293,6 @@ export default function FirmDetailPage({
     return s;
   }, [belgeler]);
 
-  const validUntilMap = useMemo(() => {
-    const m = new Map<string, string>();
-    belgeler.forEach((b) => {
-      if (b.valid_until) m.set(`${b.code}|${b.period}`, b.valid_until);
-    });
-    return m;
-  }, [belgeler]);
-
   // Her madde için yüklenmiş dosyalar (birden fazla olabilir)
   const attachmentsByItem = useMemo(() => {
     const m = new Map<string, Attachment[]>();
@@ -351,6 +304,44 @@ export default function FirmDetailPage({
     });
     return m;
   }, [attachments]);
+
+  // Her madde için (varsa) girilmiş geçerlilik tarihi
+  const expiryMap = useMemo(() => {
+    const m = new Map<string, string>();
+    belgeler.forEach((b) => {
+      if (b.expiry_date) m.set(`${b.code}|${b.period}`, b.expiry_date);
+    });
+    return m;
+  }, [belgeler]);
+
+  async function updateExpiry(code: string, period: string, date: string) {
+    if (!canWrite) return;
+    const { error } = await supabase.from("firm_belgeleri").upsert(
+      { firm_id: id, code, period, expiry_date: date || null },
+      { onConflict: "firm_id,code,period" }
+    );
+    if (error) {
+      setFileMsg("Geçerlilik tarihi kaydedilemedi: " + hataCevir(error));
+      return;
+    }
+    loadBelgeler();
+  }
+
+  function expiryBadge(dateStr: string): { label: string; className: string } {
+    const days = Math.round(
+      (new Date(dateStr).getTime() - new Date(new Date().toDateString()).getTime()) / 86400000
+    );
+    const label = days < 0 ? `${Math.abs(days)} gün geçti` : days === 0 ? "Bugün doluyor" : `${days} gün kaldı`;
+    const className =
+      days < 0
+        ? "bg-gray-700 text-gray-100"
+        : days <= 7
+          ? "bg-red-100 text-red-700"
+          : days <= 30
+            ? "bg-amber-100 text-amber-800"
+            : "bg-green-50 text-green-700";
+    return { label, className };
+  }
 
   const ALLOWED_EXT = [".pdf", ".doc", ".docx", ".jpg", ".jpeg", ".png"];
 
@@ -460,23 +451,6 @@ export default function FirmDetailPage({
       { onConflict: "firm_id,code,period" }
     );
     if (!error) loadBelgeler();
-  }
-
-  // Maddenin isteğe bağlı geçerlilik/son kullanma tarihini kaydeder ya da
-  // (boş bırakılırsa) tamamen kaldırır. Girildiğinde tarih yaklaştıkça
-  // bildirim ziline otomatik olarak düşer (bkz. expiring_documents view'ı).
-  async function setValidUntil(code: string, period: string, value: string) {
-    if (!canWrite) return;
-    const { error } = await supabase.from("firm_belgeleri").upsert(
-      { firm_id: id, code, period, valid_until: value || null },
-      { onConflict: "firm_id,code,period" }
-    );
-    if (!error) loadBelgeler();
-    else if (/column.*valid_until.*does not exist/i.test(error.message || "")) {
-      setFileMsg(
-        "Geçerlilik tarihi kaydedilemedi — veritabanı güncellemesi (migration 013) henüz çalıştırılmamış."
-      );
-    }
   }
 
   async function saveFirm() {
@@ -889,6 +863,8 @@ export default function FirmDetailPage({
                         const itemFiles = attachmentsByItem.get(itemKey) || [];
                         const uploading = uploadingKey === itemKey;
                         const inputId = `dosya-${sec.key}-${it.code}-${it.period}`;
+                        const expiryDate = expiryMap.get(itemKey) || "";
+                        const expiryInfo = expiryDate ? expiryBadge(expiryDate) : null;
 
                         return (
                           <div key={itemKey} className="px-4 py-2 text-sm hover:bg-gray-50">
@@ -909,7 +885,24 @@ export default function FirmDetailPage({
                                     {itemFiles.length} dosya
                                   </span>
                                 )}
+                                {expiryInfo && (
+                                  <span className={"text-[10px] px-1.5 py-0.5 rounded-full shrink-0 " + expiryInfo.className}>
+                                    {expiryInfo.label}
+                                  </span>
+                                )}
                               </label>
+
+                              {/* Geçerlilik tarihi — isteğe bağlı */}
+                              <div className="flex items-center gap-1 shrink-0 text-xs text-gray-400">
+                                <span title="Geçerlilik tarihi (isteğe bağlı)">📅</span>
+                                <input
+                                  type="date"
+                                  value={expiryDate}
+                                  disabled={!canWrite}
+                                  onChange={(e) => updateExpiry(it.code, it.period, e.target.value)}
+                                  className="border rounded px-1 py-0.5 text-xs disabled:bg-gray-50 disabled:text-gray-400"
+                                />
+                              </div>
 
                               {/* Dosya ekleme — çoklu seçim, PDF/Word/JPEG/PNG */}
                               <div className="flex items-center gap-1 shrink-0">
@@ -947,35 +940,6 @@ export default function FirmDetailPage({
                                   />
                                 )}
                               </div>
-                            </div>
-
-                            {/* İsteğe bağlı geçerlilik tarihi — girilirse tarih yaklaştıkça/
-                                geçtikçe bildirim zilinde otomatik uyarı çıkar. */}
-                            <div className="flex items-center gap-2 mt-1.5 ml-7">
-                              <span className="text-xs text-gray-400 shrink-0">
-                                Geçerlilik Tarihi:
-                              </span>
-                              <input
-                                type="date"
-                                value={validUntilMap.get(itemKey) || ""}
-                                disabled={!canWrite}
-                                onChange={(e) => setValidUntil(it.code, it.period, e.target.value)}
-                                className="text-xs border rounded px-1.5 py-0.5 text-gray-600 disabled:bg-gray-50"
-                              />
-                              {validUntilMap.has(itemKey) &&
-                                (() => {
-                                  const badge = expiryBadge(validUntilMap.get(itemKey)!);
-                                  return (
-                                    <span
-                                      className={
-                                        "text-[10px] px-1.5 py-0.5 rounded-full shrink-0 " +
-                                        badge.className
-                                      }
-                                    >
-                                      {badge.text}
-                                    </span>
-                                  );
-                                })()}
                             </div>
 
                             {/* Yüklenmiş dosyaların listesi */}
