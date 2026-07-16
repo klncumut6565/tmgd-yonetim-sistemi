@@ -22,8 +22,11 @@ import {
   CATALOG,
   CATEGORY_LABELS,
   CatalogCategory,
+  CatalogItem,
   catalogForActivities,
 } from "@/lib/belgeKatalogu";
+import { belgeSablonu, BelgeSablonu } from "@/lib/belgeSablonlari";
+import type { jsPDF as JsPDFType } from "jspdf";
 
 type Firm = {
   id: string;
@@ -211,81 +214,13 @@ export default function BelgeOlusturForm({ fixedFirmId, initialFirmId, compact =
         if (!item) continue;
 
         const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
-        const W = 210;
+        const sablon = belgeSablonu(item.code);
 
-        // Üst şerit
-        doc.setFillColor(30, 64, 175);
-        doc.rect(0, 0, W, 4, "F");
-
-        // Logo
-        if (logo) {
-          try {
-            doc.addImage(logo.data, logo.fmt, 15, 12, 24, 24);
-          } catch {
-            /* logo eklenemezse belge yine üretilsin */
-          }
+        if (sablon) {
+          renderYapilandirilmisBelge(doc, firm.name, item.code, item.name, sablon, logo, notes);
+        } else {
+          renderBasitBelge(doc, firm, item, logo, notes, bugun);
         }
-
-        // Başlık bloğu
-        doc.setFontSize(16);
-        doc.setFont("helvetica", "bold");
-        doc.text(firm.name, logo ? 45 : 15, 20);
-
-        doc.setFontSize(10);
-        doc.setFont("helvetica", "normal");
-        doc.setTextColor(90, 90, 90);
-        doc.text(`Belge Kodu: ${item.code}`, logo ? 45 : 15, 27);
-        doc.text(`Tarih: ${bugun}`, logo ? 45 : 15, 32);
-        doc.setTextColor(0, 0, 0);
-
-        // Belge adı
-        doc.setFontSize(13);
-        doc.setFont("helvetica", "bold");
-        const nameLines = doc.splitTextToSize(`${item.code} — ${item.name}`, W - 30);
-        doc.text(nameLines, 15, 48);
-
-        let y = 48 + nameLines.length * 6 + 4;
-        doc.setDrawColor(200, 200, 200);
-        doc.line(15, y, W - 15, y);
-        y += 8;
-
-        // Kategori + faaliyet bilgisi
-        doc.setFontSize(9);
-        doc.setFont("helvetica", "normal");
-        doc.setTextColor(90, 90, 90);
-        const acts =
-          item.activities.length === 0
-            ? "Tüm faaliyet konuları"
-            : item.activities.map((a) => ACTIVITY_LABELS[a] || a).join(", ");
-        doc.text(`Kategori: ${CATEGORY_LABELS[item.category]}   ·   Faaliyet: ${acts}`, 15, y);
-        y += 10;
-        doc.setTextColor(0, 0, 0);
-
-        // Ek notlar / içerik
-        if (notes.trim()) {
-          doc.setFontSize(11);
-          doc.setFont("helvetica", "bold");
-          doc.text("Notlar / İçerik", 15, y);
-          y += 6;
-          doc.setFont("helvetica", "normal");
-          doc.setFontSize(10);
-          const noteLines = doc.splitTextToSize(notes.trim(), W - 30);
-          doc.text(noteLines, 15, y);
-          y += noteLines.length * 5 + 8;
-        }
-
-        // İçerik alanı çerçevesi (elle doldurma / revizyon için)
-        doc.setDrawColor(220, 220, 220);
-        doc.rect(15, y, W - 30, Math.max(40, 240 - y));
-
-        // Alt bilgi
-        doc.setFontSize(8);
-        doc.setTextColor(120, 120, 120);
-        doc.text(
-          `${firm.name} · ${item.code} · TMGD Yönetim Sistemi tarafından ${bugun} tarihinde oluşturuldu`,
-          15,
-          290
-        );
 
         doc.save(`${firm.name}_${item.code}.pdf`);
 
@@ -546,4 +481,326 @@ export default function BelgeOlusturForm({ fixedFirmId, initialFirmId, compact =
       </div>
     </div>
   );
+}
+
+type LogoData = { data: string; fmt: "PNG" | "JPEG" } | null;
+
+// ŞABLONU OLMAYAN kodlar için eski/basit tek sayfalık çerçeve (değişmedi).
+function renderBasitBelge(
+  doc: JsPDFType,
+  firm: { name: string },
+  item: CatalogItem,
+  logo: LogoData,
+  notes: string,
+  bugun: string
+) {
+  const W = 210;
+
+  doc.setFillColor(30, 64, 175);
+  doc.rect(0, 0, W, 4, "F");
+
+  if (logo) {
+    try {
+      doc.addImage(logo.data, logo.fmt, 15, 12, 24, 24);
+    } catch {
+      /* logo eklenemezse belge yine üretilsin */
+    }
+  }
+
+  doc.setFontSize(16);
+  doc.setFont("helvetica", "bold");
+  doc.text(firm.name, logo ? 45 : 15, 20);
+
+  doc.setFontSize(10);
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(90, 90, 90);
+  doc.text(`Belge Kodu: ${item.code}`, logo ? 45 : 15, 27);
+  doc.text(`Tarih: ${bugun}`, logo ? 45 : 15, 32);
+  doc.setTextColor(0, 0, 0);
+
+  doc.setFontSize(13);
+  doc.setFont("helvetica", "bold");
+  const nameLines = doc.splitTextToSize(`${item.code} — ${item.name}`, W - 30);
+  doc.text(nameLines, 15, 48);
+
+  let y = 48 + nameLines.length * 6 + 4;
+  doc.setDrawColor(200, 200, 200);
+  doc.line(15, y, W - 15, y);
+  y += 8;
+
+  doc.setFontSize(9);
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(90, 90, 90);
+  const acts =
+    item.activities.length === 0
+      ? "Tüm faaliyet konuları"
+      : item.activities.map((a) => ACTIVITY_LABELS[a] || a).join(", ");
+  doc.text(`Kategori: ${CATEGORY_LABELS[item.category]}   ·   Faaliyet: ${acts}`, 15, y);
+  y += 10;
+  doc.setTextColor(0, 0, 0);
+
+  if (notes.trim()) {
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "bold");
+    doc.text("Notlar / İçerik", 15, y);
+    y += 6;
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    const noteLines = doc.splitTextToSize(notes.trim(), W - 30);
+    doc.text(noteLines, 15, y);
+    y += noteLines.length * 5 + 8;
+  }
+
+  doc.setDrawColor(220, 220, 220);
+  doc.rect(15, y, W - 30, Math.max(40, 240 - y));
+
+  doc.setFontSize(8);
+  doc.setTextColor(120, 120, 120);
+  doc.text(
+    `${firm.name} · ${item.code} · TMGD Yönetim Sistemi tarafından ${bugun} tarihinde oluşturuldu`,
+    15,
+    290
+  );
+}
+
+// ---------------------------------------------------------------------
+// ŞABLONU OLAN kodlar için çok sayfalı, gerçek TMGDK belge formatında
+// (Doküman No / Yayın-Revizyon Tarihi / Sayfa No başlık tablosu +
+// Amaç/Kapsam/Tanımlar/bölümler + Hazırlayan/Kontrol Eden/Onaylayan alt
+// tablosu her sayfada tekrarlanır) PDF üretir.
+// ---------------------------------------------------------------------
+
+type Satir =
+  | { tur: "baslik"; metin: string }
+  | { tur: "altbaslik"; metin: string }
+  | { tur: "paragraf"; metin: string }
+  | { tur: "madde"; metin: string; numara?: number };
+
+const M = 15;
+const W = 210;
+const H = 297;
+const HEADER_ALT = 40; // içerik başlangıcı
+const FOOTER_UST = 270; // içerik bitişi (alt tablo öncesi)
+const SATIR_YUKSEKLIGI: Record<Satir["tur"], number> = {
+  baslik: 7,
+  altbaslik: 6.5,
+  paragraf: 4.6,
+  madde: 4.6,
+};
+
+function duzMetneCevir(doc: JsPDFType, sablon: BelgeSablonu, belgeAdi: string): Satir[] {
+  const genislik = W - 2 * M;
+  const satirlar: Satir[] = [];
+
+  satirlar.push({ tur: "baslik", metin: belgeAdi });
+
+  if (sablon.amac) {
+    satirlar.push({ tur: "altbaslik", metin: "Amaç" });
+    doc.setFontSize(9.5);
+    doc.splitTextToSize(sablon.amac, genislik).forEach((t: string) =>
+      satirlar.push({ tur: "paragraf", metin: t })
+    );
+  }
+  if (sablon.kapsam) {
+    satirlar.push({ tur: "altbaslik", metin: "Kapsam" });
+    doc.setFontSize(9.5);
+    doc.splitTextToSize(sablon.kapsam, genislik).forEach((t: string) =>
+      satirlar.push({ tur: "paragraf", metin: t })
+    );
+  }
+  if (sablon.tanimlar && sablon.tanimlar.length > 0) {
+    satirlar.push({ tur: "altbaslik", metin: "Tanımlar" });
+    doc.setFontSize(9.5);
+    sablon.tanimlar.forEach((t) => {
+      doc.splitTextToSize(`${t.terim}: ${t.tanim}`, genislik - 4).forEach((line: string) =>
+        satirlar.push({ tur: "madde", metin: line })
+      );
+    });
+  }
+
+  sablon.blocks.forEach((b) => {
+    if (b.type === "subheading") {
+      satirlar.push({ tur: "altbaslik", metin: b.text });
+    } else if (b.type === "paragraph") {
+      doc.setFontSize(9.5);
+      doc.splitTextToSize(b.text, genislik).forEach((t: string) =>
+        satirlar.push({ tur: "paragraf", metin: t })
+      );
+    } else if (b.type === "bullet") {
+      doc.setFontSize(9.5);
+      b.items.forEach((item) => {
+        doc.splitTextToSize(`•  ${item}`, genislik - 4).forEach((line: string) =>
+          satirlar.push({ tur: "madde", metin: line })
+        );
+      });
+    } else if (b.type === "numbered") {
+      doc.setFontSize(9.5);
+      b.items.forEach((item, i) => {
+        doc.splitTextToSize(`${i + 1}.  ${item}`, genislik - 4).forEach((line: string) =>
+          satirlar.push({ tur: "madde", metin: line })
+        );
+      });
+    }
+  });
+
+  return satirlar;
+}
+
+function sayfalaraBol(satirlar: Satir[]): Satir[][] {
+  const kullanilabilirYukseklik = FOOTER_UST - HEADER_ALT;
+  const sayfalar: Satir[][] = [];
+  let mevcutSayfa: Satir[] = [];
+  let mevcutYukseklik = 0;
+
+  for (const satir of satirlar) {
+    const yukseklik = SATIR_YUKSEKLIGI[satir.tur] + (satir.tur === "altbaslik" ? 2 : 0);
+    if (mevcutYukseklik + yukseklik > kullanilabilirYukseklik && mevcutSayfa.length > 0) {
+      sayfalar.push(mevcutSayfa);
+      mevcutSayfa = [];
+      mevcutYukseklik = 0;
+    }
+    mevcutSayfa.push(satir);
+    mevcutYukseklik += yukseklik;
+  }
+  if (mevcutSayfa.length > 0) sayfalar.push(mevcutSayfa);
+  return sayfalar.length > 0 ? sayfalar : [[]];
+}
+
+function baslikTablosuCiz(
+  doc: JsPDFType,
+  firmAdi: string,
+  code: string,
+  belgeAdi: string,
+  sablon: BelgeSablonu,
+  logo: LogoData,
+  bugun: string,
+  sayfaNo: number,
+  toplamSayfa: number
+) {
+  const ustY = 8;
+  const yukseklik = 24;
+
+  doc.setDrawColor(0, 0, 0);
+  doc.setLineWidth(0.3);
+  doc.rect(M, ustY, W - 2 * M, yukseklik);
+  doc.line(M + 38, ustY, M + 38, ustY + yukseklik);
+  doc.line(W - M - 45, ustY, W - M - 45, ustY + yukseklik);
+
+  // Sol: logo / firma adı
+  if (logo) {
+    try {
+      doc.addImage(logo.data, logo.fmt, M + 3, ustY + 3, 18, 18);
+    } catch {
+      /* yoksay */
+    }
+  } else {
+    doc.setFontSize(7);
+    doc.setFont("helvetica", "bold");
+    const firmLines = doc.splitTextToSize(firmAdi, 34);
+    doc.text(firmLines, M + 2, ustY + 12);
+  }
+
+  // Orta: doküman türü + belge adı
+  doc.setFontSize(12);
+  doc.setFont("helvetica", "bold");
+  doc.text(sablon.docType, M + 38 + (W - 2 * M - 38 - 45) / 2, ustY + 9, { align: "center" });
+  doc.setFontSize(8.5);
+  doc.setFont("helvetica", "normal");
+  const adLines = doc.splitTextToSize(belgeAdi, W - 2 * M - 38 - 45 - 6);
+  doc.text(adLines, M + 38 + (W - 2 * M - 38 - 45) / 2, ustY + 15, { align: "center" });
+
+  // Sağ: doküman no / tarihler / sayfa no
+  doc.setFontSize(7);
+  doc.setFont("helvetica", "normal");
+  const sagX = W - M - 43;
+  doc.text(`Doküman No: ${code}`, sagX, ustY + 5);
+  doc.text(`Yayın Tarihi: ${sablon.yayinTarihi}`, sagX, ustY + 10);
+  doc.text(`Revizyon Tarihi: ${bugun}`, sagX, ustY + 15);
+  doc.text(`Sayfa No: Sayfa ${sayfaNo} / ${toplamSayfa}`, sagX, ustY + 20);
+}
+
+function altTabloCiz(doc: JsPDFType) {
+  const y = 275;
+  const yukseklik = 18;
+  const kolonGenislik = (W - 2 * M) / 3;
+
+  doc.setDrawColor(0, 0, 0);
+  doc.setLineWidth(0.3);
+  doc.rect(M, y, W - 2 * M, yukseklik);
+  doc.line(M + kolonGenislik, y, M + kolonGenislik, y + yukseklik);
+  doc.line(M + kolonGenislik * 2, y, M + kolonGenislik * 2, y + yukseklik);
+
+  const basliklar = ["HAZIRLAYAN", "KONTROL EDEN", "ONAYLAYAN"];
+  const altBasliklar = ["Tehlikeli Madde Güvenlik Danışmanı", "Tehlikeli Madde Güvenlik Danışmanı Koordinatörü", "Sorumlu Kişi"];
+
+  basliklar.forEach((b, i) => {
+    const x = M + kolonGenislik * i + kolonGenislik / 2;
+    doc.setFontSize(7.5);
+    doc.setFont("helvetica", "bold");
+    doc.text(b, x, y + 5, { align: "center" });
+    doc.setFontSize(6.5);
+    doc.setFont("helvetica", "normal");
+    doc.text(altBasliklar[i], x, y + 9, { align: "center", maxWidth: kolonGenislik - 4 });
+    doc.text("……………………………", x, y + 16, { align: "center" });
+  });
+}
+
+function renderYapilandirilmisBelge(
+  doc: JsPDFType,
+  firmAdi: string,
+  code: string,
+  belgeAdi: string,
+  sablon: BelgeSablonu,
+  logo: LogoData,
+  notlar: string
+) {
+  const bugun = new Date().toLocaleDateString("tr-TR");
+  const tamBaslik = `${code} — ${belgeAdi}`;
+
+  let satirlar = duzMetneCevir(doc, sablon, tamBaslik);
+  if (notlar.trim()) {
+    satirlar.push({ tur: "altbaslik", metin: "Ek Notlar" });
+    doc.setFontSize(9.5);
+    doc.splitTextToSize(notlar.trim(), W - 2 * M).forEach((t: string) =>
+      satirlar.push({ tur: "paragraf", metin: t })
+    );
+  }
+
+  const sayfalar = sayfalaraBol(satirlar);
+  const toplamSayfa = sayfalar.length;
+
+  sayfalar.forEach((sayfaSatirlari, idx) => {
+    if (idx > 0) doc.addPage();
+
+    baslikTablosuCiz(doc, firmAdi, code, belgeAdi, sablon, logo, bugun, idx + 1, toplamSayfa);
+    altTabloCiz(doc);
+
+    let y = HEADER_ALT;
+    for (const satir of sayfaSatirlari) {
+      if (satir.tur === "baslik") {
+        doc.setFontSize(13);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(0, 0, 0);
+        doc.text(satir.metin, M, y);
+        y += SATIR_YUKSEKLIGI.baslik;
+      } else if (satir.tur === "altbaslik") {
+        doc.setFontSize(10.5);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(30, 64, 175);
+        doc.text(satir.metin, M, y + 2);
+        doc.setTextColor(0, 0, 0);
+        y += SATIR_YUKSEKLIGI.altbaslik + 2;
+      } else if (satir.tur === "paragraf") {
+        doc.setFontSize(9.5);
+        doc.setFont("helvetica", "normal");
+        doc.text(satir.metin, M, y);
+        y += SATIR_YUKSEKLIGI.paragraf;
+      } else {
+        doc.setFontSize(9.5);
+        doc.setFont("helvetica", "normal");
+        doc.text(satir.metin, M + 2, y);
+        y += SATIR_YUKSEKLIGI.madde;
+      }
+    }
+  });
 }
