@@ -12,7 +12,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
 import { useUser } from "@/hooks/useUser";
-import { codeLabel } from "@/lib/belgeKatalogu";
 
 type PendingUser = {
   id: string;
@@ -59,7 +58,6 @@ export default function NotificationBell() {
   const [pendingUsers, setPendingUsers] = useState<PendingUser[]>([]);
   const [expiringDocs, setExpiringDocs] = useState<ExpiringDoc[]>([]);
   const [expiringAdrs, setExpiringAdrs] = useState<ExpiringDoc[]>([]);
-  const [expiringBelgeTakip, setExpiringBelgeTakip] = useState<ExpiringDoc[]>([]);
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -91,7 +89,9 @@ export default function NotificationBell() {
       setPendingUsers((data as PendingUser[]) || []);
     }
 
-    // 3) Belge geçerlilik uyarıları (ayara göre)
+    // 3) Belge geçerlilik uyarıları (ayara göre) — expiring_documents view'ı
+    // artık firm_belgeleri (Belge Takip) maddelerini de UNION ile içeriyor
+    // (migration 019), ayrı bir sorguya gerek yok.
     if (s.doc_expiry_days > 0) {
       const { data } = await supabase
         .from("expiring_documents")
@@ -99,34 +99,8 @@ export default function NotificationBell() {
         .lte("days_left", s.doc_expiry_days)
         .order("days_left");
       setExpiringDocs((data as ExpiringDoc[]) || []);
-
-      // 3b) Belge Takip madde geçerlilikleri (örn. TMGD Sertifikası, TMFB,
-      // U-Net Yetkilendirme) — aynı eşiği (doc_expiry_days) kullanır.
-      const { data: btData } = await supabase
-        .from("expiring_firm_belgeleri")
-        .select("id, code, period, firm_name, days_left, expiry_date")
-        .lte("days_left", s.doc_expiry_days)
-        .order("days_left");
-
-      setExpiringBelgeTakip(
-        ((btData as {
-          id: string;
-          code: string;
-          period: string;
-          firm_name: string;
-          days_left: number;
-          expiry_date: string;
-        }[]) || []).map((b) => ({
-          id: b.id,
-          title: codeLabel(b.code, b.period),
-          firm_name: b.firm_name,
-          days_left: b.days_left,
-          expiry_date: b.expiry_date,
-        }))
-      );
     } else {
       setExpiringDocs([]);
-      setExpiringBelgeTakip([]);
     }
 
     // 4) Sürücü + araç belge uyarıları (ayara göre): ADR/SRC-5, Muayene, Ehliyet
@@ -217,9 +191,9 @@ export default function NotificationBell() {
   }, []);
 
   const total =
-    pendingUsers.length + expiringDocs.length + expiringAdrs.length + expiringBelgeTakip.length;
+    pendingUsers.length + expiringDocs.length + expiringAdrs.length;
 
-  const allDocs = [...expiringDocs, ...expiringBelgeTakip, ...expiringAdrs].sort(
+  const allDocs = [...expiringDocs, ...expiringAdrs].sort(
     (a, b) => a.days_left - b.days_left
   );
 

@@ -53,7 +53,7 @@ type BelgeRow = {
   period: string;
   done: boolean;
   file_path: string | null;
-  expiry_date: string | null;
+  valid_until: string | null;
 };
 
 type Attachment = {
@@ -229,7 +229,7 @@ export default function FirmDetailPage({
     const [belgelerRes, ekRes] = await Promise.all([
       supabase
         .from("firm_belgeleri")
-        .select("id, code, period, done, file_path, expiry_date")
+        .select("id, code, period, done, file_path, valid_until")
         .eq("firm_id", id),
       supabase
         .from("firm_belge_dosyalari")
@@ -309,7 +309,7 @@ export default function FirmDetailPage({
   const expiryMap = useMemo(() => {
     const m = new Map<string, string>();
     belgeler.forEach((b) => {
-      if (b.expiry_date) m.set(`${b.code}|${b.period}`, b.expiry_date);
+      if (b.valid_until) m.set(`${b.code}|${b.period}`, b.valid_until);
     });
     return m;
   }, [belgeler]);
@@ -317,7 +317,7 @@ export default function FirmDetailPage({
   async function updateExpiry(code: string, period: string, date: string) {
     if (!canWrite) return;
     const { error } = await supabase.from("firm_belgeleri").upsert(
-      { firm_id: id, code, period, expiry_date: date || null },
+      { firm_id: id, code, period, valid_until: date || null },
       { onConflict: "firm_id,code,period" }
     );
     if (error) {
@@ -894,7 +894,7 @@ export default function FirmDetailPage({
 
                               {/* Geçerlilik tarihi — isteğe bağlı */}
                               <div className="flex items-center gap-1 shrink-0 text-xs text-gray-400">
-                                <span title="Geçerlilik tarihi (isteğe bağlı)">📅</span>
+                                <span title="Belge Geçerlilik Tarihi (isteğe bağlı)">📅 Geçerlilik:</span>
                                 <input
                                   type="date"
                                   value={expiryDate}
