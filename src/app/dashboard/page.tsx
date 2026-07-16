@@ -77,6 +77,7 @@ export default function DashboardPage() {
   const [vehicles, setVehicles] = useState<ExpiringItem[]>([]);
   const [tasks, setTasks] = useState<RecentTask[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     async function load() {
@@ -136,6 +137,24 @@ export default function DashboardPage() {
         vehicles: vehRes.count || 0,
       });
 
+      // Bu 4 sorgudan biri hata verirse (örn. migration 017 henüz
+      // çalıştırılmadıysa) sessizce boş göstermek yerine kullanıcıyı
+      // bilgilendir — aksi halde "süresi dolan belge yok ✓" gerçekte
+      // "sorgu başarısız oldu" anlamına gelebilir, kafa karıştırır.
+      const expErrors = [expDrvAdrRes, expVehAdrRes, expVehInspRes, expDrvLicRes]
+        .map((r) => r.error)
+        .filter((e): e is NonNullable<typeof e> => !!e);
+      if (expErrors.length > 0) {
+        setError(
+          "Sürücü/Araç belge uyarıları hesaplanamadı — veritabanı güncellemesi (migration 017) " +
+            "henüz çalıştırılmamış olabilir. Supabase → SQL Editor'de " +
+            "database/017_arac_muayene_ehliyet_uyarilari.sql dosyasını çalıştır. " +
+            `(Teknik detay: ${expErrors[0].message})`
+        );
+      } else {
+        setError("");
+      }
+
       const drvAdr: ExpiringItem[] = (expDrvAdrRes.data || []).map((d: Record<string, unknown>) => ({
         id: `drv-adr-${d.id}`,
         label: `${d.first_name} ${d.last_name}`,
@@ -194,6 +213,12 @@ export default function DashboardPage() {
   return (
     <div className="p-8">
       <h1 className="text-3xl font-bold mb-6">Gösterge Paneli</h1>
+
+      {error && (
+        <p className="text-sm text-gray-700 bg-amber-50 border border-amber-200 rounded p-3 mb-6">
+          {error}
+        </p>
+      )}
 
       {/* KPI kartları */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
