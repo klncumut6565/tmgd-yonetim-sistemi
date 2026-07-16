@@ -185,8 +185,22 @@ export default function BelgeOlusturForm({ fixedFirmId, initialFirmId, compact =
     setUseTempLogo(false);
   }
 
+  // Bir dataURL'in gerçek piksel en/boy oranını okur (tarayıcının Image
+  // nesnesi üzerinden) — logo, PDF'teki kare kutuya ORANI KORUNARAK
+  // sığdırılabilsin diye (aksi halde geniş/dar logolar kutuya zorlanıp
+  // ezilir/gerilir).
+  function gorselEnBoyOrani(dataUrl: string): Promise<number> {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () =>
+        resolve(img.naturalWidth && img.naturalHeight ? img.naturalWidth / img.naturalHeight : 1);
+      img.onerror = () => resolve(1);
+      img.src = dataUrl;
+    });
+  }
+
   // Bir File nesnesini doğrudan (storage'a yüklemeden) jsPDF için dataURL'e çevirir
-  async function fileToLogoData(file: File): Promise<{ data: string; fmt: "PNG" | "JPEG" }> {
+  async function fileToLogoData(file: File): Promise<{ data: string; fmt: "PNG" | "JPEG"; enBoyOrani: number }> {
     const fmt: "PNG" | "JPEG" = file.type.includes("png") ? "PNG" : "JPEG";
     const data = await new Promise<string>((resolve, reject) => {
       const r = new FileReader();
@@ -194,11 +208,12 @@ export default function BelgeOlusturForm({ fixedFirmId, initialFirmId, compact =
       r.onerror = reject;
       r.readAsDataURL(file);
     });
-    return { data, fmt };
+    const enBoyOrani = await gorselEnBoyOrani(data);
+    return { data, fmt, enBoyOrani };
   }
 
   // Logo'yu imzalı URL üzerinden dataURL'e çevir (jsPDF için)
-  async function logoDataUrl(path: string): Promise<{ data: string; fmt: "PNG" | "JPEG" } | null> {
+  async function logoDataUrl(path: string): Promise<{ data: string; fmt: "PNG" | "JPEG"; enBoyOrani: number } | null> {
     try {
       const { data: signed } = await supabase.storage
         .from("firm-files")
@@ -214,7 +229,8 @@ export default function BelgeOlusturForm({ fixedFirmId, initialFirmId, compact =
         r.onerror = reject;
         r.readAsDataURL(blob);
       });
-      return { data: dataUrl, fmt };
+      const enBoyOrani = await gorselEnBoyOrani(dataUrl);
+      return { data: dataUrl, fmt, enBoyOrani };
     } catch {
       return null;
     }
@@ -555,7 +571,23 @@ export default function BelgeOlusturForm({ fixedFirmId, initialFirmId, compact =
   );
 }
 
-type LogoData = { data: string; fmt: "PNG" | "JPEG" } | null;
+type LogoData = { data: string; fmt: "PNG" | "JPEG"; enBoyOrani: number } | null;
+
+// Bir logoyu, verilen kare kutuya en/boy oranını BOZMADAN sığdırır (contain)
+// ve kutu içinde ortalar — geniş/dar logoların ezilip/gerilmesini önler.
+function logoKutusuHesapla(enBoyOrani: number, kutuX: number, kutuY: number, kutuBoyut: number) {
+  const oran = enBoyOrani > 0 ? enBoyOrani : 1;
+  let w = kutuBoyut;
+  let h = kutuBoyut;
+  if (oran > 1) {
+    // geniş logo: genişlik kutuyu doldurur, yükseklik oranla küçülür
+    h = kutuBoyut / oran;
+  } else if (oran < 1) {
+    // dar/uzun logo: yükseklik kutuyu doldurur, genişlik oranla küçülür
+    w = kutuBoyut * oran;
+  }
+  return { x: kutuX + (kutuBoyut - w) / 2, y: kutuY + (kutuBoyut - h) / 2, w, h };
+}
 
 // ŞABLONU OLMAYAN kodlar için eski/basit tek sayfalık çerçeve (değişmedi).
 function renderBasitBelge(
@@ -573,7 +605,8 @@ function renderBasitBelge(
 
   if (logo) {
     try {
-      doc.addImage(logo.data, logo.fmt, 15, 12, 24, 24);
+      const box = logoKutusuHesapla(logo.enBoyOrani, 15, 12, 24);
+      doc.addImage(logo.data, logo.fmt, box.x, box.y, box.w, box.h);
     } catch {
       /* logo eklenemezse belge yine üretilsin */
     }
@@ -916,7 +949,8 @@ function baslikTablosuCiz(
   // Sol: logo / firma adı
   if (logo) {
     try {
-      doc.addImage(logo.data, logo.fmt, M + 3, ustY + 3, 18, 18);
+      const box = logoKutusuHesapla(logo.enBoyOrani, M + 3, ustY + 3, 18);
+      doc.addImage(logo.data, logo.fmt, box.x, box.y, box.w, box.h);
     } catch {
       /* yoksay */
     }

@@ -11,7 +11,7 @@
 //
 // Her sayfa kendi alan tanımlarını (FieldDef[]) ve tablo adını verir.
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase/client";
 import { useUser } from "@/hooks/useUser";
 import { hataCevir } from "@/lib/hataCevir";
@@ -80,6 +80,14 @@ export default function FirmScopedCrud({
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<Record<string, string>>({});
+  // Tarayıcı otomatik doldurma (autofill) React'in onChange'ini tetiklemeden
+  // DOM'a değer yazabiliyor — bu durumda "form" state boş kalsa da ekranda
+  // alan dolu görünür ve kaydet'e basınca "alan zorunlu" hatası yanlışlıkla
+  // tetiklenir. saveForm() bu ref'ler üzerinden gerçek DOM değerini okuyup
+  // state ile karşılaştırarak bu senaryoyu da güvenceye alır (onBlur'un
+  // yakalayamadığı, örn. autofill'in birden fazla alanı aynı anda doldurduğu
+  // ve kullanıcının o alana hiç tek tek dokunmadığı durumlar için).
+  const fieldRefs = useRef<Record<string, HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | null>>({});
 
   // Not defteri paneli durumu
   const [notepadRowId, setNotepadRowId] = useState<string | null>(null);
@@ -245,9 +253,22 @@ export default function FirmScopedCrud({
   async function saveForm() {
     setError("");
 
+    // Kaydetmeden önce gerçek DOM değerleriyle senkronize ol — tarayıcı
+    // autofill'i React state'ini güncellemeden alanı doldurmuş olabilir.
+    const guncelForm: Record<string, string> = { ...form };
+    for (const f of modalFields) {
+      const el = fieldRefs.current[f.key];
+      if (el && el.value !== (form[f.key] || "")) {
+        guncelForm[f.key] = el.value;
+      }
+    }
+    if (JSON.stringify(guncelForm) !== JSON.stringify(form)) {
+      setForm(guncelForm);
+    }
+
     // Zorunlu alan kontrolü
     for (const f of modalFields) {
-      if (f.required && !form[f.key]?.trim()) {
+      if (f.required && !guncelForm[f.key]?.trim()) {
         setError(`"${f.label}" alanı zorunlu.`);
         return;
       }
@@ -256,7 +277,7 @@ export default function FirmScopedCrud({
     // Boş stringleri null'a çevir, sayıları dönüştür
     const payload: Record<string, unknown> = { firm_id: firmId };
     for (const f of modalFields) {
-      const raw = form[f.key];
+      const raw = guncelForm[f.key];
       if (raw === undefined || raw === "") {
         payload[f.key] = null;
       } else if (f.type === "number") {
@@ -563,6 +584,9 @@ export default function FirmScopedCrud({
                   {f.type === "select" ? (
                     <select
                       name={f.key}
+                      ref={(el) => {
+                        fieldRefs.current[f.key] = el;
+                      }}
                       value={form[f.key] || ""}
                       onChange={(e) =>
                         setForm({ ...form, [f.key]: e.target.value })
@@ -579,6 +603,9 @@ export default function FirmScopedCrud({
                   ) : f.type === "textarea" ? (
                     <textarea
                       name={f.key}
+                      ref={(el) => {
+                        fieldRefs.current[f.key] = el;
+                      }}
                       autoComplete="off"
                       rows={f.textareaRows || 10}
                       value={form[f.key] || ""}
@@ -590,6 +617,9 @@ export default function FirmScopedCrud({
                   ) : (
                     <input
                       name={f.key}
+                      ref={(el) => {
+                        fieldRefs.current[f.key] = el;
+                      }}
                       autoComplete="off"
                       type={
                         f.type === "date"
