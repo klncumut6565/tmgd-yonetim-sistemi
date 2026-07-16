@@ -530,6 +530,658 @@ export const BELGE_SABLONLARI: Record<string, BelgeSablonu> = {
       { type: "paragraph", text: "Bu liste düzenli olarak güncellenir; her sevkiyat sonrası ilgili satır doldurularak kayıt altına alınır ve en az 5 yıl saklanır." },
     ],
   },
+
+  K5: {
+    docType: "KONTROL FORMU",
+    yayinTarihi: "01.11.2024",
+    amac: "Bu form, boşaltılan ve temizlenen konteyner/tankların durumunun ve tekrar kullanıma hazır olup olmadığının takibi amacıyla kullanılır.",
+    kapsam: "Boşaltan faaliyeti kapsamında işlem gören tüm konteyner ve tanklar için geçerlidir.",
+    blocks: [
+      { type: "subheading", text: "Kayıt Bilgileri" },
+      { type: "bullet", items: ["Konteyner/Tank No: ……………", "Boşaltma Tarihi: ……………", "Önceki Madde / UN No: ……………"] },
+      { type: "subheading", text: "Kontrol Alanları (Evet / Hayır)" },
+      { type: "bullet", items: [
+        "Konteyner/tank tamamen boşaltıldı mı?",
+        "İç yüzey temizliği ve dezenfeksiyonu yapıldı mı?",
+        "Kalan kimyasal kalıntı kontrolü yapıldı mı?",
+        "ADR Bölüm 5.3 tehlike ikaz levhaları kaldırıldı mı (temizse) veya \"BOŞ, TEMİZLENMEMİŞ\" olarak mı işaretlendi?",
+        "Konteyner/tank tekrar kullanıma (bir sonraki dolum/yükleme) hazır mı?",
+        "Hasar/tahribat tespit edildi mi? (Evet ise T4/T3 talimatına göre işlem yapılır.)",
+      ]},
+      { type: "subheading", text: "Durum" },
+      { type: "bullet", items: ["Kullanıma Hazır / Beklemede / Hizmet Dışı", "Kontrolü Yapan: ……………", "Tarih: ……………"] },
+    ],
+  },
+
+  // ═══════════════════════════ YÜKLEYEN (P5, T6-T8, K4) ═══════════════════════════
+
+  P5: {
+    docType: "PROSEDÜR",
+    yayinTarihi: "01.01.2020",
+    amac: "Bu prosedür, ADR kapsamında tehlikeli maddelerin araca/konteynere güvenli, ADR uyumluluk kurallarına ve karışık yükleme yasaklarına uygun şekilde yüklenmesini sağlamak amacıyla hazırlanmıştır.",
+    kapsam: "Bu prosedür, ambalajlı, dökme ve tank yüklerinin yüklenmesi işleminde görev alan tüm personel ve kullanılan ekipmanlar için geçerlidir.",
+    blocks: [
+      { type: "subheading", text: "1. Yükleme Öncesi Önlemler" },
+      { type: "numbered", items: [
+        "Araç/konteynerin ADR'ye uygunluğu (taşıt uygunluk belgesi, temizlik durumu, dış yüzey hasar kontrolü) doğrulanır.",
+        "Yüklenecek maddenin ADR sınıfı, UN numarası ve ambalaj grubu taşıma evrakıyla karşılaştırılarak teyit edilir.",
+        "Ambalajların/konteynerlerin fiziksel bütünlüğü (hasar, sızıntı, deformasyon) kontrol edilir; hasarlı ambalaj yüklenmez.",
+        "Karışık yükleme yapılacaksa ADR 7.5'teki uyumluluk tablosuna göre farklı sınıfların bir arada taşınabilirliği kontrol edilir.",
+        "Personelin gerekli KKD'yi (eldiven, gözlük, koruyucu giysi) kullandığı doğrulanır.",
+      ]},
+      { type: "subheading", text: "2. Yükleme Sırasında Önlemler" },
+      { type: "numbered", items: [
+        "Yükler, taşıma sırasında kaymayı/devrilmeyi önleyecek şekilde sabitlenir.",
+        "Sıvı yükler sızıntı ihtimaline karşı alt katmanlara, yanıcı/reaktif maddeler ayrı bölmelere yerleştirilir.",
+        "Yükleme sırasında araç motoru kapalı tutulur, açık alev ve sigara kullanımı yasaktır.",
+        "Yükleme esnasında sızıntı, dökülme veya hasar tespit edilirse işlem derhal durdurulur ve sorumlu kişi bilgilendirilir.",
+      ]},
+      { type: "subheading", text: "3. Yükleme Sonrası Önlemler" },
+      { type: "numbered", items: [
+        "Araç/konteynerin dış yüzeyindeki etiket, levha ve turuncu plakaların ADR'ye uygun ve görünür olduğu kontrol edilir.",
+        "Kapılar/kapaklar güvenli şekilde kapatılır ve mühürlenir.",
+        "Yükleme kontrol formu (K4) doldurularak imza altına alınır.",
+        "Taşıma evrakının araçta bulunduğu ve sürücüye teslim edildiği teyit edilir.",
+      ]},
+    ],
+  },
+
+  T6: {
+    docType: "TALİMAT",
+    yayinTarihi: "01.11.2024",
+    amac: "Bu talimat, farklı ADR sınıflarındaki tehlikeli maddelerin aynı araçta/konteynerde birlikte taşınmasına ilişkin yasak ve ayırım kurallarını (ADR 7.5.2) belirler.",
+    kapsam: "Birden fazla tehlikeli madde türünün aynı sevkiyatta yükleneceği tüm durumlar için geçerlidir.",
+    blocks: [
+      { type: "subheading", text: "Genel Kurallar" },
+      { type: "bullet", items: [
+        "Farklı ADR sınıflarındaki maddeler yalnızca ADR 7.5.2'deki karışık yükleme (uyumluluk) tablosunda izin verilen kombinasyonlarla bir arada taşınabilir.",
+        "Tablo'da açıkça izin verilmeyen veya yasaklanan sınıf çiftleri asla birlikte yüklenmez.",
+        "1. Sınıf (patlayıcılar) için ayrıca ADR 7.5.2.1'deki özel ayırım/uyumluluk grubu kuralları uygulanır.",
+        "Gıda, yem veya tüketim maddeleriyle belirli tehlikeli madde sınıflarının birlikte taşınması ADR 7.5.4 uyarınca yasaktır; bu maddeler ayrı yüklenir veya araya koruyucu bariyer konur.",
+      ]},
+      { type: "subheading", text: "Uygulama" },
+      { type: "numbered", items: [
+        "Yükleme öncesi taşınacak tüm maddelerin sınıf ve UN numaraları listelenir.",
+        "Uyumluluk tablosu kontrol edilerek karışık yüklemenin izinli olup olmadığı belirlenir.",
+        "İzinli değilse sevkiyat ayrı araçlara bölünür veya yükleme ertelenir; uygunsuz yükleme durumunda sevkiyat yapılmaz.",
+        "Karışık yükleme kararı ve gerekçesi taşıma evrakında/kontrol formunda belgelenir.",
+      ]},
+    ],
+  },
+
+  T7: {
+    docType: "TALİMAT",
+    yayinTarihi: "01.11.2024",
+    amac: "Bu talimat, yükleme öncesi ve sonrası araç/konteyner üzerindeki tehlike ikaz etiketlerinin, levhaların ve turuncu plakaların ADR'ye uygunluğunun kontrolünü düzenler.",
+    kapsam: "ADR kapsamında yüklenen tüm ambalajlı, dökme ve tank yükleri için geçerlidir.",
+    blocks: [
+      { type: "subheading", text: "Kontrol Edilecek Hususlar" },
+      { type: "bullet", items: [
+        "Her ambalaj/konteyner üzerinde ilgili ADR sınıfına ait tehlike ikaz etiketi ve UN numarası bulunmalıdır.",
+        "Ambalajlı taşımada araç önünde/arkasında boş turuncu plaka bulunur.",
+        "Tank ve dökme taşımada araç önünde/arkasında yazılı turuncu plaka (Kemler No. + UN No.) ve aracın her iki yanı ile arkasında tehlike ikaz işareti bulunur.",
+        "Konteyner ile taşımada, konteynerin dört tarafında tehlike ikaz işareti ve UN numarası bulunur.",
+        "Levha ve etiketler temiz, okunabilir, suya/darbeye/aşınmaya dayanıklı ve aracın hareketi sırasında görünür durumda olmalıdır.",
+      ]},
+      { type: "subheading", text: "Uygulama" },
+      { type: "numbered", items: [
+        "Yükleme tamamlandıktan sonra tüm etiket/levha/plaka kontrolü yapılır ve K4 kontrol formuna işlenir.",
+        "Eksik, hasarlı veya yanlış levha/etiket tespit edilirse araç sevke çıkarılmaz; düzeltme yapılana kadar bekletilir.",
+        "Boş ancak temizlenmemiş taşıma birimlerinde de (varsa) uygun işaretleme sürdürülür.",
+      ]},
+    ],
+  },
+
+  T8: {
+    docType: "TALİMAT",
+    yayinTarihi: "01.11.2024",
+    amac: "Bu talimat, hasarlı veya sızdıran ambalajların araca yüklenmesinin önlenmesi ve yükleme sırasında genel emniyet kurallarının (ADR 7.5) uygulanmasını düzenler.",
+    kapsam: "Ambalajlı yüklerin araç/konteynere yüklendiği tüm işlemler için geçerlidir.",
+    blocks: [
+      { type: "subheading", text: "Ambalaj Kontrolü" },
+      { type: "bullet", items: [
+        "Yükleme öncesi her ambalaj dış yüzeyinden sızıntı, yırtılma, ezilme veya deformasyon açısından kontrol edilir.",
+        "Hasarlı veya sızdıran ambalaj tespit edilirse yüklenmez; ayrı bir alanda izole edilir ve sorumlu kişiye/TMGD'ye bildirilir.",
+        "Sızıntı tespit edilen ambalajlar için ADR'ye uygun acil müdahale (izolasyon, absorban malzeme kullanımı) uygulanır.",
+      ]},
+      { type: "subheading", text: "Yükleme Emniyeti (ADR 7.5)" },
+      { type: "numbered", items: [
+        "Yükler kayma, devrilme veya hasar görmeyi önleyecek şekilde sabitlenir (ADR 7.5.7).",
+        "Araç taşıma kapasitesi aşılmaz; yük dağılımı dengeli yapılır.",
+        "Elleçleme sırasında ani hareketlerden, düşürmeden ve darbelerden kaçınılır.",
+        "Yükleme alanında iş sağlığı ve güvenliği kurallarına (KKD kullanımı, ateşle çalışma yasağı vb.) uyulur.",
+      ]},
+    ],
+  },
+
+  K4: {
+    docType: "KONTROL FORMU",
+    yayinTarihi: "01.11.2024",
+    blocks: [
+      { type: "subheading", text: "Sevkiyat Bilgileri" },
+      { type: "bullet", items: ["Tarih: ……………", "Araç Plaka No: ……………", "Yükleyen İşletme Unvanı: ……………", "Taşıma Türü: Ambalajlı / Dökme / Tank"] },
+      { type: "subheading", text: "Kontrol Alanları (Evet / Hayır)" },
+      { type: "bullet", items: [
+        "Birlikte yükleme, karışık yükleme kurallarına (ADR 7.5) uygun mu?",
+        "Yüklenecek mallarda hasar, sızdırma kontrolü yapıldı mı?",
+        "Araç levha/etiket kontrolü yapıldı mı?",
+        "Yükleme sırasında çevrede güvenlik önlemleri alındı mı?",
+        "Yükler kayma/devrilmeye karşı sabitlendi mi?",
+        "Araçta bulunması gereken donanım, teçhizat, yangın tüpü mevcut mu?",
+        "Taşıma evrakı ve etiketleme eksiksiz mi?",
+        "SRC5 belgeli şoför mevcut mu?",
+      ]},
+      { type: "subheading", text: "Kontrolü Yapan" },
+      { type: "bullet", items: ["Adı: ……………", "İmzası: ……………", "Tarih: ……………"] },
+    ],
+  },
+
+  // ═══════════════════════════ PAKETLEYEN (P6, T9-T12, K6) ═══════════════════════════
+
+  P6: {
+    docType: "PROSEDÜR",
+    yayinTarihi: "01.01.2020",
+    amac: "Bu prosedür, tehlikeli maddelerin ADR Bölüm 4.1'deki paketleme talimatlarına uygun şekilde ambalajlanmasını sağlamak amacıyla hazırlanmıştır.",
+    kapsam: "Tehlikeli maddelerin paketleme, ambalajlama ve etiketleme işlemlerinde görev alan tüm personel için geçerlidir.",
+    tanimlar: [
+      { terim: "UN Sertifikalı Ambalaj", tanim: "ADR Bölüm 6'daki test ve onay kriterlerini karşılayarak UN kodu almış ambalajdır." },
+      { terim: "Karışık Paketleme", tanim: "Birden fazla iç ambalajın tek bir dış ambalaj içinde birlikte paketlenmesidir." },
+    ],
+    blocks: [
+      { type: "subheading", text: "1. Paketleme Öncesi Hazırlık" },
+      { type: "numbered", items: [
+        "Maddenin ADR sınıfı, ambalaj grubu ve ilgili paketleme talimatı (P-kodu, ADR 4.1.4) SDS üzerinden belirlenir.",
+        "Kullanılacak ambalajın UN sertifikalı ve maddeye uygun (kimyasal uyumluluk, basınç dayanımı) olduğu doğrulanır.",
+        "Ambalaj dış yüzeyi hasar, çatlak veya deformasyon açısından kontrol edilir; hasarlı ambalaj kullanılmaz.",
+      ]},
+      { type: "subheading", text: "2. Paketleme İşlemi" },
+      { type: "numbered", items: [
+        "Madde, ADR 4.1'deki genel ve özel paketleme talimatlarına uygun olarak ambalaja yerleştirilir.",
+        "Karışık paketleme yapılacaksa ADR 4.1.10'daki uyumluluk kısıtlamalarına uyulur; reaktif maddeler bir arada paketlenmez.",
+        "Ambalaj, taşıma sırasında sızıntı veya dökülmeyi önleyecek şekilde sıkıca kapatılır.",
+      ]},
+      { type: "subheading", text: "3. Etiketleme ve Belgeleme" },
+      { type: "numbered", items: [
+        "Her ambalaj üzerine ADR'ye uygun tehlike sınıf etiketi, UN numarası ve gerekiyorsa yönlendirme işareti (\"Yukarı Bu Taraf\") yapıştırılır.",
+        "Paketleme işlemi, kullanılan ambalaj bilgileri ve kontrol sonucu K6 kontrol formuna kaydedilir.",
+      ]},
+    ],
+  },
+
+  T9: {
+    docType: "TALİMAT",
+    yayinTarihi: "01.11.2024",
+    amac: "Bu talimat, tehlikeli madde paketlemesinde kullanılan basınçlı ekipmanların (basınçlı kaplar, taşınabilir tanklar vb.) periyodik test ve muayenelerinin takibini düzenler.",
+    kapsam: "Paketleme sürecinde kullanılan tüm basınçlı ekipmanlar için geçerlidir.",
+    blocks: [
+      { type: "subheading", text: "Muayene Takibi" },
+      { type: "bullet", items: [
+        "Her basınçlı ekipmanın periyodik muayene ve test tarihleri (ADR standartlarına göre) bir takip listesinde tutulur.",
+        "Muayene süresi dolmuş veya dolmak üzere olan ekipmanlar kullanım dışı bırakılır; kullanılmaz.",
+        "Basınç testi, sızdırmazlık testi ve dış yüzey kontrolü sonuçları belgelenir ve arşivlenir.",
+      ]},
+      { type: "subheading", text: "Uygulama Adımları" },
+      { type: "numbered", items: [
+        "Ekipman envanteri çıkarılır; her ekipmana benzersiz bir tanımlama numarası verilir.",
+        "Muayene tarihi yaklaşan ekipmanlar için önceden yetkili muayene kuruluşuyla randevu planlanır.",
+        "Muayene sonucu \"uygun\" çıkmayan ekipman derhal hizmet dışı bırakılır ve T10 talimatına göre bertaraf/iade süreci başlatılır.",
+      ]},
+    ],
+  },
+
+  T10: {
+    docType: "TALİMAT",
+    yayinTarihi: "01.11.2024",
+    amac: "Bu talimat, periyodik muayene süresi geçmiş veya muayeneden \"uygunsuz\" çıkan basınçlı ekipmanların güvenli şekilde hizmet dışı bırakılması ve bertaraf edilmesini düzenler.",
+    kapsam: "Muayene süresi dolmuş, hasarlı veya uygunsuz bulunan tüm basınçlı ekipmanlar için geçerlidir.",
+    blocks: [
+      { type: "subheading", text: "Uygulama" },
+      { type: "numbered", items: [
+        "Muayenesi geçmiş/uygunsuz ekipman derhal kullanımdan çekilir ve \"KULLANILAMAZ\" etiketiyle işaretlenir.",
+        "İçinde tehlikeli madde kalıntısı varsa, ADR ve yerel mevzuata uygun şekilde boşaltılır ve arındırılır.",
+        "Ekipman, tamir/yeniden muayene için yetkili kuruluşa gönderilir ya da geri dönüşü olmayacak şekilde bertaraf edilir.",
+        "Bertaraf işlemi lisanslı atık yönetim firması aracılığıyla yapılır ve bertaraf belgesi arşivlenir.",
+        "Hizmet dışı bırakılan ekipman, envanterden düşülür ve takip kaydına işlenir.",
+      ]},
+    ],
+  },
+
+  T11: {
+    docType: "TALİMAT",
+    yayinTarihi: "01.11.2024",
+    amac: "Bu talimat, farklı tehlikeli maddelerin tek bir dış ambalaj içinde birlikte paketlenmesine (karışık paketleme) ilişkin ADR 4.1.10 kurallarını belirler.",
+    kapsam: "Birden fazla iç ambalajın aynı dış ambalajda paketleneceği tüm durumlar için geçerlidir.",
+    blocks: [
+      { type: "subheading", text: "Genel Kurallar" },
+      { type: "bullet", items: [
+        "Farklı tehlikeli maddeler, ADR 4.1.10.4'teki uyumluluk tablosunda izin verilmedikçe aynı dış ambalajda birlikte paketlenemez.",
+        "Birbiriyle tehlikeli reaksiyona girebilecek maddeler (yanma, ısı/gaz üretimi, patlama vb.) kesinlikle bir arada paketlenmez.",
+        "İç ambalajlar, dış ambalaj içinde hareket etmeyecek ve birbirine temas etmeyecek şekilde sabitlenir/ayrılır.",
+      ]},
+      { type: "subheading", text: "Uygulama" },
+      { type: "numbered", items: [
+        "Karışık paketleme öncesi tüm maddelerin SDS'leri incelenerek kimyasal uyumluluk teyit edilir.",
+        "Uyumluluk tablosu kontrol edilir; izin verilmeyen kombinasyon tespit edilirse maddeler ayrı ambalajlanır.",
+        "Karışık paket dış yüzeyine, içerdiği tüm maddelerin etiket ve UN numaraları eksiksiz işlenir.",
+      ]},
+    ],
+  },
+
+  T12: {
+    docType: "TALİMAT",
+    yayinTarihi: "01.11.2024",
+    amac: "Bu talimat, paketlenen tehlikeli maddelerin ambalaj işaretleme ve etiketleme uygunluğunun kontrolünü düzenler.",
+    kapsam: "Paketleme sonrası tüm ambalajlı ürünler için geçerlidir.",
+    blocks: [
+      { type: "subheading", text: "Kontrol Edilecek Hususlar" },
+      { type: "bullet", items: [
+        "Her ambalaj üzerinde tehlike sınıf etiketi, UN numarası ve varsa yönlendirme/çevresel tehlike işaretleri bulunmalıdır.",
+        "Etiketler suya, darbeye ve aşınmaya dayanıklı malzemeden olmalı ve ambalaj üzerinde görünür şekilde konumlandırılmalıdır.",
+        "Ambalaj üzerindeki UN kodlaması (ör. \"UN 4G/X...\"), kullanılan ambalajın test/onay bilgisini doğru şekilde yansıtmalıdır.",
+        "Sınırlı miktar (LQ) veya istisna miktar (EQ) kapsamında paketleme yapılıyorsa ilgili özel işaretleme (LQ elması, EQ işareti) uygulanmalıdır.",
+      ]},
+      { type: "subheading", text: "Uygulama" },
+      { type: "numbered", items: [
+        "Paketleme tamamlandıktan sonra her ambalaj tek tek kontrol edilir ve K6 kontrol formuna işlenir.",
+        "Etiketleme eksik/hatalı bulunan ambalajlar sevke çıkarılmadan düzeltilir.",
+      ]},
+    ],
+  },
+
+  K6: {
+    docType: "KONTROL FORMU",
+    yayinTarihi: "01.11.2024",
+    blocks: [
+      { type: "subheading", text: "Paketleme Bilgileri" },
+      { type: "bullet", items: ["Tarih: ……………", "Madde Adı / UN No: ……………", "Ambalaj Türü ve UN Kodu: ……………", "Paketleyen İşletme: ……………"] },
+      { type: "subheading", text: "Kontrol Alanları (Evet / Hayır)" },
+      { type: "bullet", items: [
+        "Ambalaj UN sertifikalı ve maddeye uygun mu?",
+        "Ambalaj dış yüzeyinde hasar/çatlak/deformasyon var mı?",
+        "Basınçlı ekipman kullanıldıysa muayene/test tarihi geçerli mi?",
+        "Karışık paketleme yapıldıysa uyumluluk tablosuna uygun mu?",
+        "Etiketleme ve UN numarası eksiksiz mi?",
+        "Sınırlı/istisna miktar işaretlemesi (varsa) doğru mu?",
+        "Ambalaj sıkıca kapatıldı, sızıntı riski yok mu?",
+      ]},
+      { type: "subheading", text: "Kontrolü Yapan" },
+      { type: "bullet", items: ["Adı: ……………", "İmzası: ……………", "Tarih: ……………"] },
+    ],
+  },
+
+  // ═══════════════════════════ DOLDURAN (P7, T13-T17, K7) ═══════════════════════════
+
+  P7: {
+    docType: "PROSEDÜR",
+    yayinTarihi: "01.01.2020",
+    amac: "Bu prosedür, tehlikeli maddelerin tank/YTB (Yük Taşıma Birimi) içine güvenli şekilde doldurulmasını sağlamak amacıyla hazırlanmıştır.",
+    kapsam: "Tank, tanker ve taşınabilir tankların doldurulması işleminde görev alan tüm personel için geçerlidir.",
+    tanimlar: [
+      { terim: "YTB (Yük Taşıma Birimi)", tanim: "Tank, tanker, batarya araç veya çok elemanlı gaz konteyneri gibi dökme/tank yük taşıma üniteleridir." },
+      { terim: "Azami Doldurma Derecesi", tanim: "Tankın, taşınan maddenin genleşmesine izin verecek şekilde doldurulabileceği azami hacim oranıdır (ADR 4.3.2)." },
+    ],
+    blocks: [
+      { type: "subheading", text: "1. Dolum Öncesi Önlemler" },
+      { type: "numbered", items: [
+        "YTB'nin periyodik muayene ve test tarihlerinin geçerli olduğu, tankın maddeye uygun olduğu doğrulanır.",
+        "Tank iç yüzeyinin temiz olduğu ve önceki yükten kalıntı bulunmadığı kontrol edilir.",
+        "Doldurulacak maddenin ADR sınıfı ve tankın onaylı taşıma kodu karşılaştırılır.",
+        "Vana, conta ve bağlantı noktalarının sızdırmazlığı test edilir.",
+      ]},
+      { type: "subheading", text: "2. Dolum Sırasında Önlemler" },
+      { type: "numbered", items: [
+        "Dolum, ADR 4.3.2'deki azami doldurma derecesi sınırları içinde yapılır; taşma önlenir.",
+        "Bölmeli tanklarda her bölme ayrı ayrı kontrol edilerek dolum yapılır (bkz. T15).",
+        "Dolum sırasında sızıntı, taşma veya anormal basınç artışı tespit edilirse işlem derhal durdurulur.",
+        "Statik elektrik riski olan maddelerde topraklama önlemleri alınır.",
+      ]},
+      { type: "subheading", text: "3. Dolum Sonrası Önlemler" },
+      { type: "numbered", items: [
+        "Vanalar ve kapaklar güvenli şekilde kapatılır, sızdırmazlık kontrolü yapılır.",
+        "Tankın dış yüzeyine bulaşan madde kalıntıları temizlenir (arındırma).",
+        "Etiket, levha ve turuncu plaka kontrolü yapılır ve dolum kontrol formu (K7) doldurulur.",
+      ]},
+    ],
+  },
+
+  T13: {
+    docType: "TALİMAT",
+    yayinTarihi: "01.11.2024",
+    amac: "Bu talimat, dolum öncesi YTB muayene kontrolünün yapılmasını ve maddenin uygun tanka doldurulmasını düzenler.",
+    kapsam: "Dolum yapılacak tüm tank ve taşınabilir tanklar için geçerlidir.",
+    blocks: [
+      { type: "subheading", text: "Uygulama" },
+      { type: "numbered", items: [
+        "Tankın periyodik muayene plakası kontrol edilir; muayene süresi geçmiş tanka dolum yapılmaz.",
+        "Tankın onaylı taşıma kodu (ör. \"L4BN\") ile doldurulacak maddenin ADR gereksinimi karşılaştırılır; uyumsuzluk varsa dolum yapılmaz.",
+        "Tank iç yüzeyi önceki yükten kaynaklı kalıntı, uyumsuz madde artığı açısından kontrol edilir.",
+        "Kontrol sonucu ve tank bilgileri dolum kontrol formuna (K7) işlenir.",
+      ]},
+    ],
+  },
+
+  T14: {
+    docType: "TALİMAT",
+    yayinTarihi: "01.11.2024",
+    amac: "Bu talimat, dolum öncesi tank/araç üzerindeki etiket, levha ve turuncu plakaların kontrolünü ve doğru şekilde takılmasını düzenler.",
+    kapsam: "Dolum yapılacak tüm tank ve tanker araçları için geçerlidir.",
+    blocks: [
+      { type: "subheading", text: "Uygulama" },
+      { type: "bullet", items: [
+        "Dolum öncesi tank/araç üzerinde önceki yüke ait etiket/levha/plaka varsa kaldırılır veya güncellenir.",
+        "Doldurulacak maddeye uygun turuncu plaka (Kemler No. + UN No.) araç önü/arkasına takılır.",
+        "İlgili ADR sınıf etiketleri aracın her iki yanına ve arkasına yapıştırılır.",
+        "Levha ve etiketlerin okunabilir, sağlam ve doğru bilgileri yansıttığı doğrulanır.",
+      ]},
+    ],
+  },
+
+  T15: {
+    docType: "TALİMAT",
+    yayinTarihi: "01.11.2024",
+    amac: "Bu talimat, bölmeli tankların dolumunda her bölmenin azami doldurma derecesine (ADR 4.3.2) uygun şekilde doldurulmasını düzenler.",
+    kapsam: "Birden fazla bölmesi olan tank/tanker araçları için geçerlidir.",
+    blocks: [
+      { type: "subheading", text: "Uygulama" },
+      { type: "numbered", items: [
+        "Her bölmeye doldurulacak madde önceden planlanır; farklı bölmelerdeki maddelerin birbiriyle uyumluluğu (kaza anında karışma riski) değerlendirilir.",
+        "Her bölme, maddenin sıcaklığa bağlı genleşmesine izin verecek şekilde ADR 4.3.2'deki azami doldurma derecesi sınırları içinde doldurulur.",
+        "Dolum sırasında her bölme ayrı ayrı seviye kontrolüne tabi tutulur; taşma kesinlikle önlenir.",
+        "Dolum tamamlandığında her bölmenin vanası/kapağı ayrı ayrı kontrol edilip kapatılır.",
+      ]},
+    ],
+  },
+
+  T16: {
+    docType: "TALİMAT",
+    yayinTarihi: "01.11.2024",
+    amac: "Bu talimat, dolum sonrası tankın sızdırmazlığının ve dış yüzeye bulaşma olup olmadığının kontrolünü düzenler.",
+    kapsam: "Dolumu tamamlanmış tüm tank ve tanker araçları için geçerlidir.",
+    blocks: [
+      { type: "subheading", text: "Uygulama" },
+      { type: "bullet", items: [
+        "Dolum sonrası tüm vana, conta ve bağlantı noktalarında sızdırmazlık kontrolü yapılır.",
+        "Tankın dış yüzeyi, doldurma ağzı çevresi ve alt kısmı bulaşma/damlama açısından kontrol edilir.",
+        "Bulaşma tespit edilirse ADR'ye uygun şekilde derhal temizlik ve arındırma yapılır.",
+        "Kontrol sonucu dolum kontrol formuna (K7) işlenir; sızıntı riski olan araç sevke çıkarılmaz.",
+      ]},
+    ],
+  },
+
+  T17: {
+    docType: "TALİMAT",
+    yayinTarihi: "01.11.2024",
+    amac: "Bu talimat, dökme dolum işlemlerinde (ADR Bölüm 7.3) uyulması gereken kuralları ve taşımacının Tehlikeli Madde Faaliyet Belgesi (TMFB) kontrolünü düzenler.",
+    kapsam: "Dökme yük taşıyan araçlara yapılan tüm dolum işlemleri için geçerlidir.",
+    blocks: [
+      { type: "subheading", text: "Dökme Dolum Kuralları (ADR 7.3)" },
+      { type: "bullet", items: [
+        "Dökme yük, yalnızca ADR 7.3.1'de o madde için özel olarak izin verilmişse dökme halde taşınabilir.",
+        "Dökme yük taşıma birimi (konteyner, araç kasası vb.) maddeye uygun ve sızdırmaz olmalıdır.",
+        "Dolum ve boşaltma sırasında tozuma, saçılma ve çevreye yayılmayı önleyecek önlemler alınır.",
+      ]},
+      { type: "subheading", text: "Taşımacı TMFB Kontrolü" },
+      { type: "bullet", items: [
+        "Dolum yapılmadan önce taşımacı firmanın geçerli Tehlikeli Madde Faaliyet Belgesi (TMFB) kontrol edilir.",
+        "TMFB'si bulunmayan veya süresi dolmuş taşımacıya dolum/teslim yapılmaz.",
+        "Kontrol sonucu dolum kontrol formuna (K7) işlenir.",
+      ]},
+    ],
+  },
+
+  K7: {
+    docType: "KONTROL FORMU",
+    yayinTarihi: "01.11.2024",
+    blocks: [
+      { type: "subheading", text: "Dolum Bilgileri" },
+      { type: "bullet", items: ["Tarih: ……………", "Araç/Tank Plaka No: ……………", "Madde Adı / UN No: ……………", "Dolduran İşletme: ……………"] },
+      { type: "subheading", text: "Kontrol Alanları (Evet / Hayır)" },
+      { type: "bullet", items: [
+        "Tank muayene/test tarihi geçerli mi?",
+        "Tank taşınacak maddeye uygun (onaylı taşıma kodu) mu?",
+        "Dolum öncesi etiket/levha/turuncu plaka kontrolü yapıldı mı?",
+        "Azami doldurma derecesine uyuldu mu? (bölmeli tanklarda her bölme ayrı kontrol edildi mi?)",
+        "Dolum sonrası sızdırmazlık ve bulaşma kontrolü yapıldı mı?",
+        "Taşımacının TMFB'si geçerli mi? (dökme dolumda)",
+        "Vanalar/kapaklar güvenli şekilde kapatıldı mı?",
+      ]},
+      { type: "subheading", text: "Kontrolü Yapan" },
+      { type: "bullet", items: ["Adı: ……………", "İmzası: ……………", "Tarih: ……………"] },
+    ],
+  },
+
+  // ═══════════════════════════ TAŞIMACI (P8, T18-T20, K8-K9) ═══════════════════════════
+
+  P8: {
+    docType: "PROSEDÜR",
+    yayinTarihi: "01.01.2020",
+    amac: "Bu prosedür, tehlikeli madde taşımacılığı yapan firmanın sevkiyat öncesi, sırası ve sonrasında uyması gereken ADR yükümlülüklerini tanımlar.",
+    kapsam: "Tehlikeli madde taşıması yapan tüm araçlar, sürücüler ve lojistik süreçler için geçerlidir.",
+    blocks: [
+      { type: "subheading", text: "1. Taşıma Öncesi Önlemler" },
+      { type: "numbered", items: [
+        "Aracın ADR/Taşıt Uygunluk Belgesi ve periyodik muayenelerinin geçerli olduğu kontrol edilir.",
+        "Sürücünün SRC5 (ADR şoför) belgesinin geçerli olduğu doğrulanır.",
+        "Araçta bulunması gereken teçhizat (yangın söndürücü, KKD, dökülme önleme seti, ilk yardım çantası, uyarı üçgeni vb.) ADR 8.1.4/8.1.5 uyarınca eksiksiz kontrol edilir.",
+        "Taşıma evrakı, TMFB ve gerekli diğer belgeler (K9) araçta bulundurulur.",
+        "Yüklenen malın etiket, levha ve plakalarının uygunluğu teyit edilir.",
+      ]},
+      { type: "subheading", text: "2. Taşıma Sırasında Önlemler" },
+      { type: "numbered", items: [
+        "Araç yalnızca belirlenen güzergahlarda ve hız sınırlarına uygun kullanılır.",
+        "Sürücü, mola ve park kurallarına (ADR 8.4/8.5) uyar; kalabalık yerlerde gereksiz bekleme yapılmaz.",
+        "Sızıntı, kaza veya acil durumda ADR 5.4.3 taşıma yazılı talimatlarına göre hareket edilir.",
+      ]},
+      { type: "subheading", text: "3. Taşıma Sonrası Önlemler" },
+      { type: "numbered", items: [
+        "Teslimat sonrası araç/konteyner boşaltılmış ve temizlenmişse ADR 5.3 uyarınca tehlike ikaz levhaları kaldırılır.",
+        "Sevkiyata dair kayıtlar (taşıma evrakı, kontrol formları) arşivlenir.",
+        "Herhangi bir ihlal, kaza veya olağandışı durum raporlanır ve TMGD'ye bildirilir.",
+      ]},
+    ],
+  },
+
+  T18: {
+    docType: "TALİMAT",
+    yayinTarihi: "01.11.2024",
+    amac: "Bu talimat, taşıma öncesi ve sırasında araç üzerindeki etiket, levha, plaka kontrolü ile sızıntı/hasar kontrolünü düzenler.",
+    kapsam: "Tehlikeli madde taşıyan tüm araçlar için geçerlidir.",
+    blocks: [
+      { type: "subheading", text: "Uygulama" },
+      { type: "bullet", items: [
+        "Sevkiyat öncesi aracın ön, arka ve yan taraflarındaki turuncu plaka ve tehlike ikaz levhalarının doğru ve eksiksiz olduğu kontrol edilir.",
+        "Aracın dış yüzeyinde sızıntı, hasar veya deformasyon olup olmadığı kontrol edilir; tespit edilirse araç sevke çıkarılmaz.",
+        "Yük bağlama/sabitleme ekipmanlarının sağlam olduğu doğrulanır.",
+        "Kontrol sonucu K9 formuna işlenir.",
+      ]},
+    ],
+  },
+
+  T19: {
+    docType: "TALİMAT",
+    yayinTarihi: "01.11.2024",
+    amac: "Bu talimat, ADR 8.1.4 ve 8.1.5 uyarınca araçta bulundurulması zorunlu olan genel ve sınıfa özel teçhizatın kontrolünü düzenler.",
+    kapsam: "Tehlikeli madde taşıyan tüm araçlar için geçerlidir.",
+    blocks: [
+      { type: "subheading", text: "Genel Teçhizat (ADR 8.1.4)" },
+      { type: "bullet", items: [
+        "Her araç için en az bir adet takoz (araç ağırlığına ve tekerlek çapına uygun).",
+        "İki adet kendinden ayakta durabilen uyarı işareti.",
+        "Göz durulama sıvısı (belirli yük sınıfları için).",
+        "Her araç mürettebatı üyesi için uyarı yeleği, taşınabilir aydınlatma cihazı, koruyucu eldiven ve göz koruması.",
+      ]},
+      { type: "subheading", text: "Sınıfa Özel Teçhizat (ADR 8.1.5)" },
+      { type: "bullet", items: [
+        "Yazılı talimatlarda belirtilen her araç mürettebatı üyesi için acil durum maskesi (belirli sınıflar için).",
+        "Küreğe benzer ekipman, kanalizasyon örtüsü, toplama kabı (dökülme durumları için).",
+        "Sınıfa özel ek koruyucu ekipman (SDS/yazılı talimatta belirtildiği şekilde).",
+      ]},
+      { type: "subheading", text: "Uygulama" },
+      { type: "paragraph", text: "Sevkiyat öncesi tüm teçhizatın araçta eksiksiz ve kullanılabilir durumda olduğu kontrol edilir ve K8 formuna işlenir. Eksik teçhizatla sevkiyat yapılmaz." },
+    ],
+  },
+
+  T20: {
+    docType: "TALİMAT",
+    yayinTarihi: "01.11.2024",
+    amac: "Bu talimat; karışık yükleme kontrolü, tespit edilen ihlal durumlarında izlenecek yol ve boş YTB (yük taşıma birimi) taşınırken gerekli taşıma evrakı kurallarını belirler.",
+    kapsam: "Tehlikeli madde taşıyan tüm araçlar ve boş/temizlenmemiş YTB taşımaları için geçerlidir.",
+    blocks: [
+      { type: "subheading", text: "Karışık Yükleme Kontrolü" },
+      { type: "paragraph", text: "Sevkiyat öncesi araca yüklenen tüm maddelerin ADR 7.5.2 uyumluluk tablosuna göre birlikte taşınabilir olduğu doğrulanır (bkz. T6)." },
+      { type: "subheading", text: "İhlal Durumunda İzlenecek Yol" },
+      { type: "bullet", items: [
+        "Sevkiyat sırasında bir ADR ihlali (eksik belge, yanlış etiketleme, uygunsuz yükleme vb.) tespit edilirse taşıma derhal durdurulur.",
+        "İhlal, TMGD'ye ve ilgili sorumlu kişiye bildirilir; giderilmeden sevkiyata devam edilmez.",
+        "İhlalin niteliğine göre gerekiyorsa yetkili mercilere (İl Müdürlüğü vb.) bilgi verilir.",
+      ]},
+      { type: "subheading", text: "Boş YTB Taşıma Evrakı" },
+      { type: "bullet", items: [
+        "Temizlenmemiş boş YTB, önceki yükün taşıma evrakı ve etiketleriyle (veya \"BOŞ, TEMİZLENMEMİŞ\" ibaresiyle) taşınmaya devam eder; ADR kuralları uygulanmaya devam eder.",
+        "Boş taşımada da SRC5 belgeli sürücü ve araç teçhizatı zorunluluğu geçerlidir.",
+      ]},
+    ],
+  },
+
+  K8: {
+    docType: "KONTROL FORMU",
+    yayinTarihi: "01.11.2024",
+    blocks: [
+      { type: "subheading", text: "Araç ve Sürücü Bilgileri" },
+      { type: "bullet", items: ["Tarih: ……………", "Araç Plaka No: ……………", "Sürücü Adı Soyadı: ……………", "SRC5 Belge No: ……………"] },
+      { type: "subheading", text: "Teçhizat Kontrolü (Evet / Hayır)" },
+      { type: "bullet", items: [
+        "Takozlar mevcut mu?",
+        "Uyarı işaretleri (2 adet, kendinden ayakta duran) mevcut mu?",
+        "Uyarı yeleği, aydınlatma cihazı, koruyucu eldiven, göz koruması mürettebat sayısınca mevcut mu?",
+        "Yangın söndürücüler (araç ve yük sınıfına uygun sayı/kapasitede) mevcut mu?",
+        "Sınıfa özel ek ekipman (acil durum maskesi, dökülme müdahale seti vb.) mevcut mu?",
+        "Tüm ekipmanın son kullanma/muayene tarihleri geçerli mi?",
+      ]},
+      { type: "subheading", text: "Kontrolü Yapan" },
+      { type: "bullet", items: ["Adı: ……………", "İmzası: ……………", "Tarih: ……………"] },
+    ],
+  },
+
+  K9: {
+    docType: "KONTROL FORMU",
+    yayinTarihi: "01.11.2024",
+    blocks: [
+      { type: "subheading", text: "Belge Kontrolü (Evet / Hayır)" },
+      { type: "bullet", items: [
+        "ADR/Taşıt Uygunluk Belgesi geçerli mi?",
+        "Araç periyodik muayenesi güncel mi?",
+        "Sürücü SRC5 belgesi geçerli mi?",
+        "Taşıma evrakı (ADR 5.4.1) eksiksiz mi?",
+        "Yazılı talimatlar (ADR 5.4.3) araçta mevcut mu?",
+        "Tehlikeli Madde Faaliyet Belgesi (Taşımacı) mevcut mu?",
+        "Araç levha/etiket/plaka kontrolü yapıldı mı?",
+      ]},
+      { type: "subheading", text: "Kayıt Bilgileri" },
+      { type: "bullet", items: ["Tarih: ……………", "Araç Plaka No: ……………", "Sürücü Adı Soyadı: ……………", "Kontrolü Yapan: ……………"] },
+    ],
+  },
+
+  // ═══════════════════════════ LİSTELER (L1, L3, L4) ═══════════════════════════
+
+  L1: {
+    docType: "LİSTE",
+    yayinTarihi: "01.11.2024",
+    amac: "Bu liste, işletmede bulunan/iştigal edilen tüm tehlikeli maddelerin ADR sınıf, UN numarası ve miktar bilgileriyle güncel şekilde envanterinin tutulmasını sağlar.",
+    kapsam: "İşletmenin faaliyet konusuna giren tüm tehlikeli maddeler için geçerlidir.",
+    blocks: [
+      { type: "paragraph", text: "Envanterde her madde için aşağıdaki bilgiler tutulur:" },
+      { type: "bullet", items: [
+        "Madde Adı / Ticari Adı", "UN Numarası", "ADR Sınıfı", "Ambalaj Grubu (PG)",
+        "Yıllık Ortalama/Azami Miktar", "Depolama/Kullanım Yeri", "Güvenlik Bilgi Formu (SDS) Mevcudiyeti",
+        "Muafiyet Kapsamında Olup Olmadığı (ADR 1.1.3.6)",
+      ]},
+      { type: "paragraph", text: "Envanter, yeni madde eklendiğinde/çıkarıldığında güncellenir ve en az yılda bir kez TMGD tarafından gözden geçirilir." },
+    ],
+  },
+
+  L3: {
+    docType: "LİSTE",
+    yayinTarihi: "01.11.2024",
+    amac: "Bu liste, işletme adına tehlikeli madde taşıyan sürücülerin bilgilerinin ve ADR/SRC5 eğitim durumlarının takip edilmesi amacıyla tutulur.",
+    kapsam: "Tehlikeli madde taşıma faaliyetinde görev alan tüm sürücüler için geçerlidir.",
+    blocks: [
+      { type: "paragraph", text: "Listede her sürücü için aşağıdaki bilgiler tutulur:" },
+      { type: "bullet", items: [
+        "Ad Soyad", "T.C. Kimlik No", "Ehliyet Sınıfı ve Geçerlilik Tarihi",
+        "SRC5 Belge No ve Geçerlilik Tarihi", "Bağlı Olduğu Araç Plakası",
+        "Giriş/Çıkış (İşe Başlama/Ayrılış) Tarihi",
+      ]},
+      { type: "paragraph", text: "SRC5 veya ehliyet geçerlilik süresi dolan sürücüler, yenileme sağlanana kadar tehlikeli madde taşıma görevinde çalıştırılmaz. Liste düzenli olarak güncellenir." },
+    ],
+  },
+
+  L4: {
+    docType: "LİSTE",
+    yayinTarihi: "01.11.2024",
+    amac: "Bu liste, paketleme ve dolum süreçlerinde kullanılan ambalaj/ekipman envanterinin ve muayene durumlarının takibi amacıyla tutulur.",
+    kapsam: "Paketleyen ve dolduran faaliyetlerinde kullanılan tüm ambalaj ve basınçlı ekipmanlar için geçerlidir.",
+    blocks: [
+      { type: "paragraph", text: "Listede her ekipman/ambalaj türü için aşağıdaki bilgiler tutulur:" },
+      { type: "bullet", items: [
+        "Ekipman/Ambalaj Tanımlama No", "Türü (ambalaj / basınçlı kap / tank)", "UN Sertifika No (varsa)",
+        "Son Muayene/Test Tarihi", "Bir Sonraki Muayene Tarihi", "Durum (Kullanımda / Hizmet Dışı / Bertaraf Edildi)",
+      ]},
+      { type: "paragraph", text: "Muayene tarihi yaklaşan veya geçen ekipmanlar bu listeden takip edilerek T9/T10 talimatlarına göre işlem yapılır." },
+    ],
+  },
+
+  // ═══════════════════════════ SEFER / AKTARIM (SA1-SA3) ═══════════════════════════
+
+  SA1: {
+    docType: "LİSTE",
+    yayinTarihi: "01.11.2024",
+    amac: "Bu form, tehlikeli madde sevkiyatı yapan her seferin (aracın çıkış-varış sürecinin) takip edilmesi amacıyla kullanılır.",
+    kapsam: "Taşımacı faaliyeti kapsamındaki tüm seferler için geçerlidir.",
+    blocks: [
+      { type: "subheading", text: "Sefer Bilgileri" },
+      { type: "bullet", items: [
+        "Sefer Tarihi", "Araç Plaka No", "Sürücü Adı Soyadı", "Çıkış Noktası", "Varış Noktası",
+        "Taşınan Madde / UN No / Miktar", "Çıkış Saati", "Varış Saati (Gerçekleşen)", "Sefer Durumu (Tamamlandı / Devam Ediyor / İptal)",
+      ]},
+      { type: "paragraph", text: "Her sefer tamamlandığında ilgili satır doldurularak kayıt altına alınır; olağandışı bir durum (gecikme, kaza, ihlal) varsa açıklama bölümüne not düşülür." },
+    ],
+  },
+
+  SA2: {
+    docType: "LİSTE",
+    yayinTarihi: "01.11.2024",
+    amac: "Bu kayıt, bir taşıma biriminden diğerine yapılan tehlikeli madde aktarım işlemlerinin (örn. araçtan araca, tanktan tanka) belgelenmesi amacıyla tutulur.",
+    kapsam: "Boşaltan ve Yükleyen faaliyetleri kapsamında gerçekleştirilen tüm aktarım işlemleri için geçerlidir.",
+    blocks: [
+      { type: "subheading", text: "Aktarım Bilgileri" },
+      { type: "bullet", items: [
+        "Aktarım Tarihi", "Madde Adı / UN No", "Kaynak Taşıma Birimi (Plaka/Tank No)",
+        "Hedef Taşıma Birimi (Plaka/Tank No)", "Aktarılan Miktar", "Aktarımı Yapan Personel",
+        "Sızıntı/Dökülme Yaşandı mı? (Evet/Hayır — açıklama)",
+      ]},
+      { type: "paragraph", text: "Aktarım öncesi her iki taşıma biriminin de maddeye uygunluğu ve sızdırmazlığı kontrol edilir; aktarım sonrası kayıt bu forma işlenir." },
+    ],
+  },
+
+  SA3: {
+    docType: "LİSTE",
+    yayinTarihi: "01.11.2024",
+    amac: "Bu kayıt, firmanın ADR kapsamındaki tüm belgelerinin (TMFB, sözleşme, sertifikalar, muayene belgeleri vb.) tek bir yerden takip edilmesi amacıyla tutulur.",
+    kapsam: "İşletmenin ADR mevzuatı kapsamında sahip olması gereken tüm belgeler için geçerlidir.",
+    blocks: [
+      { type: "subheading", text: "Takip Edilecek Belgeler" },
+      { type: "bullet", items: [
+        "Tehlikeli Madde Faaliyet Belgesi (TMFB) ve geçerlilik tarihi",
+        "TMGD Hizmet Sözleşmesi ve TMGD Sertifikası",
+        "Araç ADR/Taşıt Uygunluk Belgeleri ve muayene tarihleri",
+        "Sürücü SRC5 belgeleri ve geçerlilik tarihleri",
+        "Basınçlı ekipman/tank muayene belgeleri",
+        "Yıllık Faaliyet Raporları ve Ziyaret Raporları",
+      ]},
+      { type: "paragraph", text: "Bu kayıt, Belge Takip modülündeki verilerle tutarlı olacak şekilde düzenli olarak güncellenir; süresi yaklaşan/geçen belgeler öncelikli olarak takip edilir." },
+    ],
+  },
 };
 
 export function belgeSablonu(code: string): BelgeSablonu | undefined {
