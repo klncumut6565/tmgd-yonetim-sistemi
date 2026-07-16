@@ -34,7 +34,6 @@ type Firm = {
   activities: string[] | null;
   contract_start: string | null;
   logo_url: string | null;
-  tmgd_assigned?: string | null;
 };
 
 const CATEGORY_ORDER: CatalogCategory[] = ["P", "T", "K", "L", "SA"];
@@ -53,7 +52,8 @@ export default function BelgeOlusturForm({ fixedFirmId, initialFirmId, compact =
   const [selected, setSelected] = useState<string[]>([]);
   const [notes, setNotes] = useState("");
   const [onaylayanAdi, setOnaylayanAdi] = useState("");
-  const [tmgdNameMap, setTmgdNameMap] = useState<Record<string, string>>({});
+  const [hazirlayanAdi, setHazirlayanAdi] = useState("");
+  const [hazirlayanDurum, setHazirlayanDurum] = useState<"yok" | "bulundu" | "yükleniyor">("yok");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
   const [error, setError] = useState("");
@@ -69,7 +69,7 @@ export default function BelgeOlusturForm({ fixedFirmId, initialFirmId, compact =
       // yoksa aktif firmaların tamamını çekip seçiciye doldur.
       let query = supabase
         .from("firms")
-        .select("id, name, activities, contract_start, logo_url, tmgd_assigned");
+        .select("id, name, activities, contract_start, logo_url");
 
       query = fixedFirmId
         ? query.eq("id", fixedFirmId)
@@ -78,58 +78,23 @@ export default function BelgeOlusturForm({ fixedFirmId, initialFirmId, compact =
       let { data, error } = await query;
 
       if (error && /does not exist/i.test(error.message || "")) {
-        // tmgd_assigned kolonu henüz yoksa (migration çalıştırılmamışsa) onsuz dene
-        let retryQuery = supabase
-          .from("firms")
-          .select("id, name, activities, contract_start, logo_url");
+        let retryQuery = supabase.from("firms").select("id, name, logo_url");
         retryQuery = fixedFirmId
           ? retryQuery.eq("id", fixedFirmId)
           : retryQuery.eq("status", "active").order("name");
         const retry = await retryQuery;
-        data = (retry.data || []).map((f) => ({ ...f, tmgd_assigned: null })) as typeof data;
+        data = (retry.data || []).map((f) => ({ ...f, activities: [], contract_start: null })) as typeof data;
         error = retry.error;
-
-        if (error && /does not exist/i.test(error.message || "")) {
-          let retry2Query = supabase.from("firms").select("id, name, logo_url");
-          retry2Query = fixedFirmId
-            ? retry2Query.eq("id", fixedFirmId)
-            : retry2Query.eq("status", "active").order("name");
-          const retry2 = await retry2Query;
-          data = (retry2.data || []).map((f) => ({
-            ...f,
-            activities: [],
-            contract_start: null,
-            tmgd_assigned: null,
-          })) as typeof data;
-          error = retry2.error;
-          if (!retry2.error) {
-            setError(
-              "Faaliyet konuları görünmüyor — veritabanı güncellemesi (migration 010) henüz çalıştırılmamış."
-            );
-          }
+        if (!retry.error) {
+          setError(
+            "Faaliyet konuları görünmüyor — veritabanı güncellemesi (migration 010) henüz çalıştırılmamış."
+          );
         }
       } else if (error) {
         setError("Firmalar yüklenemedi: " + hataCevir(error));
       }
       setFirms((data as Firm[]) || []);
       if (fixedFirmId) setFirmId(fixedFirmId);
-
-      // Atanmış TMGD'lerin adlarını ayrı bir sorguyla getir (embedding/RLS
-      // belirsizliğinden kaçınmak için firms.tmgd_assigned → profiles.full_name eşlemesi).
-      const tmgdIds = Array.from(
-        new Set(((data as Firm[]) || []).map((f) => f.tmgd_assigned).filter((v): v is string => !!v))
-      );
-      if (tmgdIds.length > 0) {
-        const { data: profs } = await supabase
-          .from("profiles")
-          .select("id, full_name")
-          .in("id", tmgdIds);
-        const map: Record<string, string> = {};
-        (profs || []).forEach((p: { id: string; full_name: string }) => {
-          map[p.id] = p.full_name;
-        });
-        setTmgdNameMap(map);
-      }
     })();
   }, [fixedFirmId]);
 
@@ -137,6 +102,31 @@ export default function BelgeOlusturForm({ fixedFirmId, initialFirmId, compact =
     () => firms.find((f) => f.id === firmId) || null,
     [firms, firmId]
   );
+
+  // Seçili firmaya atanmış TMGD'nin adını güvenli bir RPC ile getir
+  // (public.get_firm_tmgd_name — yalnızca çağıranın erişimi olan firmalar
+  // için isim döner, user_firms/profiles tablolarının RLS'ini genişletmeye
+  // gerek kalmadan). Atama, Yönetim → Firma Atamaları'ndan yapılır.
+  useEffect(() => {
+    if (!firm) {
+      setHazirlayanAdi("");
+      setHazirlayanDurum("yok");
+      return;
+    }
+    setHazirlayanDurum("yükleniyor");
+    (async () => {
+      const { data, error } = await supabase.rpc("get_firm_tmgd_name", {
+        p_firm_id: firm.id,
+      });
+      if (error) {
+        setHazirlayanAdi("");
+        setHazirlayanDurum("yok");
+        return;
+      }
+      setHazirlayanAdi((data as string) || "");
+      setHazirlayanDurum(data ? "bulundu" : "yok");
+    })();
+  }, [firm]);
 
   // Firma faaliyetlerine göre filtrelenmiş katalog, kategoriye göre gruplu
   const grouped = useMemo(() => {
@@ -255,7 +245,6 @@ export default function BelgeOlusturForm({ fixedFirmId, initialFirmId, compact =
         const sablon = belgeSablonu(item.code);
 
         if (sablon) {
-          const hazirlayanAdi = firm.tmgd_assigned ? tmgdNameMap[firm.tmgd_assigned] || "" : "";
           await renderYapilandirilmisBelge(
             doc,
             firm.name,
@@ -354,28 +343,20 @@ export default function BelgeOlusturForm({ fixedFirmId, initialFirmId, compact =
             </div>
           )}
 
-          {firm && (
+          {firm && hazirlayanDurum !== "yükleniyor" && (
             <div className="mb-4 text-xs">
-              {!firm.tmgd_assigned && (
+              {hazirlayanDurum === "yok" && (
                 <p className="text-amber-700 bg-amber-50 border border-amber-200 rounded p-2">
-                  ⚠ Bu firmaya TMGD ataması yapılmamış — belgelerde &quot;HAZIRLAYAN&quot;
-                  altında isim yazılmayacak.{" "}
-                  <Link href={`/firms/${firm.id}`} className="underline">
-                    Firma Bilgileri&apos;nden ata
-                  </Link>
+                  ⚠ Bu firmaya atanmış bir TMGD bulunamadı (veya bu belgeyi
+                  oluşturan hesabın bu firmaya erişimi yok) — belgelerde
+                  &quot;HAZIRLAYAN&quot; altında isim yazılmayacak. Atama,
+                  Yönetim → Firma Atamaları sekmesinden (yalnızca yönetici)
+                  yapılır.
                 </p>
               )}
-              {firm.tmgd_assigned && !tmgdNameMap[firm.tmgd_assigned] && (
-                <p className="text-red-700 bg-red-50 border border-red-200 rounded p-2">
-                  ⚠ Firmaya bir TMGD atanmış ama adı getirilemedi — muhtemelen veritabanı
-                  erişim izni (RLS) engelliyor. Supabase&apos;de
-                  021_profiles_ad_gorunurlugu.sql migration&apos;ının çalıştırıldığından
-                  emin ol.
-                </p>
-              )}
-              {firm.tmgd_assigned && tmgdNameMap[firm.tmgd_assigned] && (
+              {hazirlayanDurum === "bulundu" && (
                 <p className="text-green-700 bg-green-50 border border-green-200 rounded p-2">
-                  ✓ HAZIRLAYAN: {tmgdNameMap[firm.tmgd_assigned]}
+                  ✓ HAZIRLAYAN: {hazirlayanAdi}
                 </p>
               )}
             </div>

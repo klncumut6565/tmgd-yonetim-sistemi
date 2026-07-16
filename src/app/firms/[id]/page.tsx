@@ -43,10 +43,7 @@ type Firm = {
   activities: string[] | null;
   contract_start: string | null;
   logo_url: string | null;
-  tmgd_assigned: string | null;
 };
-
-type TmgdProfil = { id: string; full_name: string };
 
 type Row = Record<string, unknown> & { id: string };
 
@@ -174,21 +171,6 @@ export default function FirmDetailPage({
   const [saveMsg, setSaveMsg] = useState("");
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [logoUploading, setLogoUploading] = useState(false);
-  const [tmgdList, setTmgdList] = useState<TmgdProfil[]>([]);
-
-  // Atanabilecek TMGD'lerin listesi (Belge Oluştur'daki HAZIRLAYAN alanı için
-  // firmaya bir TMGD ataması yapılabilmesi amacıyla).
-  useEffect(() => {
-    (async () => {
-      const { data } = await supabase
-        .from("profiles")
-        .select("id, full_name")
-        .in("role", ["tmgd", "admin", "super_admin"])
-        .eq("is_active", true)
-        .order("full_name");
-      setTmgdList((data as TmgdProfil[]) || []);
-    })();
-  }, []);
 
   // Liste sekmeleri
   const [rows, setRows] = useState<Row[]>([]);
@@ -569,7 +551,6 @@ export default function FirmDetailPage({
         status: form.status,
         activities: form.activities || [],
         contract_start: form.contract_start || null,
-        tmgd_assigned: form.tmgd_assigned || null,
       })
       .eq("id", id);
 
@@ -719,10 +700,6 @@ export default function FirmDetailPage({
               label="Sözleşme / Başlangıç Tarihi"
               value={firm.contract_start ? new Date(firm.contract_start).toLocaleDateString("tr-TR") : null}
             />
-            <Bilgi
-              label="Atanmış TMGD (Belge Oluştur'da Hazırlayan)"
-              value={tmgdList.find((t) => t.id === firm.tmgd_assigned)?.full_name || null}
-            />
             <div>
               <span className="text-gray-500">Firma logosu</span>
               <div className="mt-1">
@@ -823,23 +800,10 @@ export default function FirmDetailPage({
               />
             </label>
 
-            <label className="block">
-              <span className="text-sm text-gray-600">
-                Atanmış TMGD <span className="text-gray-400">(Belge Oluştur&apos;da Hazırlayan)</span>
-              </span>
-              <select
-                className="border p-2 w-full rounded mt-1"
-                value={form.tmgd_assigned || ""}
-                onChange={set("tmgd_assigned")}
-              >
-                <option value="">— Atama yok —</option>
-                {tmgdList.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.full_name}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <p className="text-xs text-gray-400 md:col-span-2">
+              TMGD ataması bu ekrandan yapılmaz — Yönetim → Firma Atamaları
+              sekmesinden (yalnızca yönetici) yapılır.
+            </p>
 
             {/* Logo */}
             <label className="block">
