@@ -562,6 +562,7 @@ export default function FirmScopedCrud({
 
                   {f.type === "select" ? (
                     <select
+                      name={f.key}
                       value={form[f.key] || ""}
                       onChange={(e) =>
                         setForm({ ...form, [f.key]: e.target.value })
@@ -577,6 +578,8 @@ export default function FirmScopedCrud({
                     </select>
                   ) : f.type === "textarea" ? (
                     <textarea
+                      name={f.key}
+                      autoComplete="off"
                       rows={f.textareaRows || 10}
                       value={form[f.key] || ""}
                       onChange={(e) =>
@@ -586,6 +589,8 @@ export default function FirmScopedCrud({
                     />
                   ) : (
                     <input
+                      name={f.key}
+                      autoComplete="off"
                       type={
                         f.type === "date"
                           ? "date"
@@ -597,6 +602,18 @@ export default function FirmScopedCrud({
                       onChange={(e) =>
                         setForm({ ...form, [f.key]: e.target.value })
                       }
+                      onBlur={(e) => {
+                        // Tarayıcı otomatik doldurma (autofill) bazı durumlarda
+                        // değeri React'in onChange'ini tetiklemeden DOM'a
+                        // yazabiliyor; bu da state'te alan boş kalsa da
+                        // ekranda dolu görünmesine ve "alan zorunlu" hatasının
+                        // yanlışlıkla tetiklenmesine yol açabiliyor. Odaktan
+                        // çıkışta gerçek DOM değeriyle senkronize ederek bunu
+                        // güvenceye alıyoruz.
+                        if (e.target.value !== (form[f.key] || "")) {
+                          setForm({ ...form, [f.key]: e.target.value });
+                        }
+                      }}
                       className="border p-2 rounded w-full"
                     />
                   )}
