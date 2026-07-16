@@ -34,6 +34,7 @@ type Firm = {
   activities: string[] | null;
   contract_start: string | null;
   logo_url: string | null;
+  tmgd_assigned?: string | null;
 };
 
 const CATEGORY_ORDER: CatalogCategory[] = ["P", "T", "K", "L", "SA"];
@@ -51,6 +52,8 @@ export default function BelgeOlusturForm({ fixedFirmId, initialFirmId, compact =
   const [firmId, setFirmId] = useState(fixedFirmId || initialFirmId || "");
   const [selected, setSelected] = useState<string[]>([]);
   const [notes, setNotes] = useState("");
+  const [onaylayanAdi, setOnaylayanAdi] = useState("");
+  const [tmgdNameMap, setTmgdNameMap] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
   const [error, setError] = useState("");
@@ -66,7 +69,7 @@ export default function BelgeOlusturForm({ fixedFirmId, initialFirmId, compact =
       // yoksa aktif firmaların tamamını çekip seçiciye doldur.
       let query = supabase
         .from("firms")
-        .select("id, name, activities, contract_start, logo_url");
+        .select("id, name, activities, contract_start, logo_url, tmgd_assigned");
 
       query = fixedFirmId
         ? query.eq("id", fixedFirmId)
@@ -75,23 +78,58 @@ export default function BelgeOlusturForm({ fixedFirmId, initialFirmId, compact =
       let { data, error } = await query;
 
       if (error && /does not exist/i.test(error.message || "")) {
-        let retryQuery = supabase.from("firms").select("id, name, logo_url");
+        // tmgd_assigned kolonu henüz yoksa (migration çalıştırılmamışsa) onsuz dene
+        let retryQuery = supabase
+          .from("firms")
+          .select("id, name, activities, contract_start, logo_url");
         retryQuery = fixedFirmId
           ? retryQuery.eq("id", fixedFirmId)
           : retryQuery.eq("status", "active").order("name");
         const retry = await retryQuery;
-        data = (retry.data || []).map((f) => ({ ...f, activities: [], contract_start: null })) as typeof data;
+        data = (retry.data || []).map((f) => ({ ...f, tmgd_assigned: null })) as typeof data;
         error = retry.error;
-        if (!retry.error) {
-          setError(
-            "Faaliyet konuları görünmüyor — veritabanı güncellemesi (migration 010) henüz çalıştırılmamış."
-          );
+
+        if (error && /does not exist/i.test(error.message || "")) {
+          let retry2Query = supabase.from("firms").select("id, name, logo_url");
+          retry2Query = fixedFirmId
+            ? retry2Query.eq("id", fixedFirmId)
+            : retry2Query.eq("status", "active").order("name");
+          const retry2 = await retry2Query;
+          data = (retry2.data || []).map((f) => ({
+            ...f,
+            activities: [],
+            contract_start: null,
+            tmgd_assigned: null,
+          })) as typeof data;
+          error = retry2.error;
+          if (!retry2.error) {
+            setError(
+              "Faaliyet konuları görünmüyor — veritabanı güncellemesi (migration 010) henüz çalıştırılmamış."
+            );
+          }
         }
       } else if (error) {
         setError("Firmalar yüklenemedi: " + hataCevir(error));
       }
       setFirms((data as Firm[]) || []);
       if (fixedFirmId) setFirmId(fixedFirmId);
+
+      // Atanmış TMGD'lerin adlarını ayrı bir sorguyla getir (embedding/RLS
+      // belirsizliğinden kaçınmak için firms.tmgd_assigned → profiles.full_name eşlemesi).
+      const tmgdIds = Array.from(
+        new Set(((data as Firm[]) || []).map((f) => f.tmgd_assigned).filter((v): v is string => !!v))
+      );
+      if (tmgdIds.length > 0) {
+        const { data: profs } = await supabase
+          .from("profiles")
+          .select("id, full_name")
+          .in("id", tmgdIds);
+        const map: Record<string, string> = {};
+        (profs || []).forEach((p: { id: string; full_name: string }) => {
+          map[p.id] = p.full_name;
+        });
+        setTmgdNameMap(map);
+      }
     })();
   }, [fixedFirmId]);
 
@@ -217,7 +255,18 @@ export default function BelgeOlusturForm({ fixedFirmId, initialFirmId, compact =
         const sablon = belgeSablonu(item.code);
 
         if (sablon) {
-          await renderYapilandirilmisBelge(doc, firm.name, item.code, item.name, sablon, logo, notes);
+          const hazirlayanAdi = firm.tmgd_assigned ? tmgdNameMap[firm.tmgd_assigned] || "" : "";
+          await renderYapilandirilmisBelge(
+            doc,
+            firm.name,
+            item.code,
+            item.name,
+            sablon,
+            logo,
+            notes,
+            hazirlayanAdi,
+            onaylayanAdi.trim()
+          );
         } else {
           await fontuKaydet(doc);
           renderBasitBelge(doc, firm, item, logo, notes, bugun);
@@ -411,6 +460,20 @@ export default function BelgeOlusturForm({ fixedFirmId, initialFirmId, compact =
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
             />
+          </label>
+
+          <label className="block mb-4">
+            <span className="text-sm text-gray-600">Onaylayan (opsiyonel)</span>
+            <input
+              type="text"
+              className="border p-2 w-full rounded mt-1"
+              placeholder="Boş bırakılırsa 'Sorumlu Kişi' yazılır"
+              value={onaylayanAdi}
+              onChange={(e) => setOnaylayanAdi(e.target.value)}
+            />
+            <span className="text-xs text-gray-400">
+              Belge alt tablosundaki &quot;ONAYLAYAN&quot; kutusuna yazılacak isim.
+            </span>
           </label>
 
           <button
@@ -877,10 +940,13 @@ function baslikTablosuCiz(
   doc.text(`Sayfa No: Sayfa ${sayfaNo} / ${toplamSayfa}`, sagX, ustY + 20);
 }
 
-function altTabloCiz(doc: JsPDFType) {
+function altTabloCiz(doc: JsPDFType, hazirlayanAdi: string, onaylayanAdi: string) {
   const y = 275;
   const yukseklik = 18;
   const kolonGenislik = (W - 2 * M) / 3;
+
+  // KONTROL EDEN kutusu firma/atamadan bağımsız her zaman sabit TMGD Koordinatörü'dür.
+  const isimler = [hazirlayanAdi.trim(), "YAKUP ATAŞ", onaylayanAdi.trim()];
 
   doc.setDrawColor(0, 0, 0);
   doc.setLineWidth(0.3);
@@ -893,12 +959,30 @@ function altTabloCiz(doc: JsPDFType) {
 
   basliklar.forEach((b, i) => {
     const x = M + kolonGenislik * i + kolonGenislik / 2;
+    const isim = isimler[i];
+
     doc.setFontSize(7.5);
     doc.setFont(FONT, "bold");
-    doc.text(b, x, y + 5, { align: "center" });
-    doc.setFontSize(6.5);
+    doc.text(b, x, y + 4, { align: "center" });
+
+    if (isim) {
+      // İsim varsa: kalın isim satırı + altında rol/unvan, imza çizgisi en altta.
+      doc.setFontSize(7);
+      doc.setFont(FONT, "bold");
+      doc.text(isim.toLocaleUpperCase("tr-TR"), x, y + 8.5, { align: "center", maxWidth: kolonGenislik - 4 });
+      doc.setFontSize(6);
+      doc.setFont(FONT, "normal");
+      doc.text(altBasliklar[i], x, y + 12.3, { align: "center", maxWidth: kolonGenislik - 4 });
+    } else {
+      // İsim bilinmiyorsa (ör. firmaya TMGD ataması yapılmamış / onaylayan girilmemiş):
+      // yalnızca rol adı gösterilir — eski davranışla aynı.
+      doc.setFontSize(6.5);
+      doc.setFont(FONT, "normal");
+      doc.text(altBasliklar[i], x, y + 9, { align: "center", maxWidth: kolonGenislik - 4 });
+    }
+
+    doc.setFontSize(7);
     doc.setFont(FONT, "normal");
-    doc.text(altBasliklar[i], x, y + 9, { align: "center", maxWidth: kolonGenislik - 4 });
     doc.text("……………………………", x, y + 16, { align: "center" });
   });
 }
@@ -910,7 +994,9 @@ async function renderYapilandirilmisBelge(
   belgeAdi: string,
   sablon: BelgeSablonu,
   logo: LogoData,
-  notlar: string
+  notlar: string,
+  hazirlayanAdi: string,
+  onaylayanAdi: string
 ) {
   await fontuKaydet(doc);
 
@@ -939,7 +1025,7 @@ async function renderYapilandirilmisBelge(
     if (idx > 0) doc.addPage();
 
     baslikTablosuCiz(doc, firmAdi, code, belgeAdi, sablon, logo, bugun, idx + 1, toplamSayfa, baslikYukseklik, adLines);
-    altTabloCiz(doc);
+    altTabloCiz(doc, hazirlayanAdi, onaylayanAdi);
 
     let y = headerAlt;
     for (const satir of sayfaSatirlari) {
