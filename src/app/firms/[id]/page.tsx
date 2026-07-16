@@ -371,10 +371,27 @@ export default function FirmDetailPage({
       return;
     }
 
-    const { error } = await supabase.from("visits").upsert(
-      { firm_id: id, period, visit_date: date, visit_type: "periyodik" },
-      { onConflict: "firm_id,period" }
-    );
+    // Kısmi index (WHERE period <> '') kullanıldığı için Supabase'in
+    // upsert(onConflict:...) kısayolu bunu eşleştiremiyor — önce mevcut
+    // kaydı kontrol edip ona göre update/insert yapıyoruz.
+    const { data: existing, error: findErr } = await supabase
+      .from("visits")
+      .select("id")
+      .eq("firm_id", id)
+      .eq("period", period)
+      .maybeSingle();
+
+    if (findErr) {
+      setFileMsg("Ziyaret tarihi kaydedilemedi: " + hataCevir(findErr));
+      return;
+    }
+
+    const { error } = existing
+      ? await supabase.from("visits").update({ visit_date: date }).eq("id", existing.id)
+      : await supabase
+          .from("visits")
+          .insert({ firm_id: id, period, visit_date: date, visit_type: "periyodik" });
+
     if (error) {
       setFileMsg("Ziyaret tarihi kaydedilemedi: " + hataCevir(error));
       return;
