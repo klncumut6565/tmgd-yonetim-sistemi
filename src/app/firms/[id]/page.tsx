@@ -183,6 +183,7 @@ export default function FirmDetailPage({
   const [uploadingKey, setUploadingKey] = useState<string | null>(null);
   const [fileMsg, setFileMsg] = useState("");
   const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [visitByPeriod, setVisitByPeriod] = useState<Record<string, string>>({});
 
   const loadFirm = useCallback(async () => {
     setLoading(true);
@@ -226,7 +227,7 @@ export default function FirmDetailPage({
 
   const loadBelgeler = useCallback(async () => {
     setBelgeLoading(true);
-    const [belgelerRes, ekRes] = await Promise.all([
+    const [belgelerRes, ekRes, visitRes] = await Promise.all([
       supabase
         .from("firm_belgeleri")
         .select("id, code, period, done, file_path, valid_until")
@@ -236,6 +237,11 @@ export default function FirmDetailPage({
         .select("id, code, period, file_path, file_name")
         .eq("firm_id", id)
         .order("uploaded_at", { ascending: true }),
+      supabase
+        .from("visits")
+        .select("id, period, visit_date")
+        .eq("firm_id", id)
+        .neq("period", ""),
     ]);
     setBelgeler((belgelerRes.data as BelgeRow[]) || []);
 
@@ -250,6 +256,23 @@ export default function FirmDetailPage({
     } else {
       setAttachments((ekRes.data as Attachment[]) || []);
     }
+
+    if (visitRes.error) {
+      setVisitByPeriod({});
+      if (/does not exist/i.test(visitRes.error.message || "")) {
+        setFileMsg(
+          "Ziyaret tarihi bağlantısı için veritabanı güncellemesi (migration 020) henüz çalıştırılmamış. " +
+            "Supabase → SQL Editor'de database/020_ziyaret_donem_baglantisi.sql dosyasını çalıştır."
+        );
+      }
+    } else {
+      const map: Record<string, string> = {};
+      (visitRes.data || []).forEach((v: { period: string; visit_date: string }) => {
+        map[v.period] = v.visit_date;
+      });
+      setVisitByPeriod(map);
+    }
+
     setBelgeLoading(false);
   }, [id]);
 
@@ -324,6 +347,46 @@ export default function FirmDetailPage({
       setFileMsg("Geçerlilik tarihi kaydedilemedi: " + hataCevir(error));
       return;
     }
+    loadBelgeler();
+  }
+
+  // Ziyaret Raporu (ZR) maddeleri için — Ziyaretler özelliğiyle bağlantılı:
+  // tarih seçildiğinde o ay için GERÇEK bir visits kaydı oluşturulur/
+  // güncellenir (Ziyaretler sekmesinde görünür, Firmalar listesindeki
+  // "Son Ziyaret" rengini de besler). Boş bırakılırsa bağlantı kaldırılır.
+  async function updateVisitDate(period: string, date: string) {
+    if (!canWrite) return;
+
+    if (!date) {
+      const { error } = await supabase
+        .from("visits")
+        .delete()
+        .eq("firm_id", id)
+        .eq("period", period);
+      if (error) {
+        setFileMsg("Ziyaret tarihi kaldırılamadı: " + hataCevir(error));
+        return;
+      }
+      loadBelgeler();
+      return;
+    }
+
+    const { error } = await supabase.from("visits").upsert(
+      { firm_id: id, period, visit_date: date, visit_type: "periyodik" },
+      { onConflict: "firm_id,period" }
+    );
+    if (error) {
+      setFileMsg("Ziyaret tarihi kaydedilemedi: " + hataCevir(error));
+      return;
+    }
+
+    // Ziyaret tarihi girildiyse o ayın raporu fiilen yapılmış demektir —
+    // madde otomatik tamamlandı işaretlenir (dosya yüklemedeki gibi).
+    await supabase.from("firm_belgeleri").upsert(
+      { firm_id: id, code: "ZR", period, done: true },
+      { onConflict: "firm_id,code,period" }
+    );
+
     loadBelgeler();
   }
 
@@ -865,6 +928,8 @@ export default function FirmDetailPage({
                         const inputId = `dosya-${sec.key}-${it.code}-${it.period}`;
                         const expiryDate = expiryMap.get(itemKey) || "";
                         const expiryInfo = expiryDate ? expiryBadge(expiryDate) : null;
+                        const isZiyaret = it.code === "ZR";
+                        const visitDate = isZiyaret ? visitByPeriod[it.period] || "" : "";
 
                         return (
                           <div key={itemKey} className="px-4 py-2 text-sm hover:bg-gray-50">
@@ -885,24 +950,44 @@ export default function FirmDetailPage({
                                     {itemFiles.length} dosya
                                   </span>
                                 )}
-                                {expiryInfo && (
+                                {!isZiyaret && expiryInfo && (
                                   <span className={"text-[10px] px-1.5 py-0.5 rounded-full shrink-0 " + expiryInfo.className}>
                                     {expiryInfo.label}
                                   </span>
                                 )}
+                                {isZiyaret && visitDate && (
+                                  <span className="text-[10px] px-1.5 py-0.5 rounded-full shrink-0 bg-green-100 text-green-700">
+                                    ✓ Ziyaretler'de kayıtlı
+                                  </span>
+                                )}
                               </label>
 
-                              {/* Geçerlilik tarihi — isteğe bağlı */}
-                              <div className="flex items-center gap-1 shrink-0 text-xs text-gray-400">
-                                <span title="Belge Geçerlilik Tarihi (isteğe bağlı)">📅 Geçerlilik:</span>
-                                <input
-                                  type="date"
-                                  value={expiryDate}
-                                  disabled={!canWrite}
-                                  onChange={(e) => updateExpiry(it.code, it.period, e.target.value)}
-                                  className="border rounded px-1 py-0.5 text-xs disabled:bg-gray-50 disabled:text-gray-400"
-                                />
-                              </div>
+                              {isZiyaret ? (
+                                /* Ziyaret Tarihi — Ziyaretler özelliğiyle bağlantılı: girilen
+                                   tarih gerçek bir visits kaydı oluşturur/günceller. */
+                                <div className="flex items-center gap-1 shrink-0 text-xs text-gray-400">
+                                  <span title="Ziyaret Tarihi — Ziyaretler sekmesiyle bağlantılıdır">📅 Ziyaret Tarihi:</span>
+                                  <input
+                                    type="date"
+                                    value={visitDate}
+                                    disabled={!canWrite}
+                                    onChange={(e) => updateVisitDate(it.period, e.target.value)}
+                                    className="border rounded px-1 py-0.5 text-xs disabled:bg-gray-50 disabled:text-gray-400"
+                                  />
+                                </div>
+                              ) : (
+                                /* Geçerlilik tarihi — isteğe bağlı */
+                                <div className="flex items-center gap-1 shrink-0 text-xs text-gray-400">
+                                  <span title="Belge Geçerlilik Tarihi (isteğe bağlı)">📅 Geçerlilik:</span>
+                                  <input
+                                    type="date"
+                                    value={expiryDate}
+                                    disabled={!canWrite}
+                                    onChange={(e) => updateExpiry(it.code, it.period, e.target.value)}
+                                    className="border rounded px-1 py-0.5 text-xs disabled:bg-gray-50 disabled:text-gray-400"
+                                  />
+                                </div>
+                              )}
 
                               {/* Dosya ekleme — çoklu seçim, PDF/Word/JPEG/PNG */}
                               <div className="flex items-center gap-1 shrink-0">
