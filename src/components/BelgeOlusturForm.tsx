@@ -354,6 +354,20 @@ export default function BelgeOlusturForm({ fixedFirmId, initialFirmId, compact =
             </div>
           )}
 
+          <label className="block mb-4">
+            <span className="text-sm text-gray-600">Onaylayan (opsiyonel)</span>
+            <input
+              type="text"
+              className="border p-2 w-full rounded mt-1"
+              placeholder="Boş bırakılırsa 'Sorumlu Kişi' yazılır"
+              value={onaylayanAdi}
+              onChange={(e) => setOnaylayanAdi(e.target.value)}
+            />
+            <span className="text-xs text-gray-400">
+              Belge alt tablosundaki &quot;ONAYLAYAN&quot; kutusuna yazılacak isim.
+            </span>
+          </label>
+
           <div className="mb-4 text-sm">
             <span className="text-gray-600">Logo</span>
 
@@ -460,20 +474,6 @@ export default function BelgeOlusturForm({ fixedFirmId, initialFirmId, compact =
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
             />
-          </label>
-
-          <label className="block mb-4">
-            <span className="text-sm text-gray-600">Onaylayan (opsiyonel)</span>
-            <input
-              type="text"
-              className="border p-2 w-full rounded mt-1"
-              placeholder="Boş bırakılırsa 'Sorumlu Kişi' yazılır"
-              value={onaylayanAdi}
-              onChange={(e) => setOnaylayanAdi(e.target.value)}
-            />
-            <span className="text-xs text-gray-400">
-              Belge alt tablosundaki &quot;ONAYLAYAN&quot; kutusuna yazılacak isim.
-            </span>
           </label>
 
           <button
