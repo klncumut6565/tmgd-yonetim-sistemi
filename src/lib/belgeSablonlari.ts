@@ -29,7 +29,7 @@ export const BELGE_SABLONLARI: Record<string, BelgeSablonu> = {
   // ============================= P1 — ALICI PROSEDÜRÜ =============================
   P1: {
     docType: "PROSEDÜR",
-    yayinTarihi: "01.01.2020",
+    yayinTarihi: "01.01.2026",
     amac: "Bu prosedür, ADR kapsamında tehlikeli maddelerin alıcı firma tarafından güvenli ve düzenli bir şekilde teslim alınmasını, depolanmasını ve işlenmesini sağlamak amacıyla hazırlanmıştır.",
     kapsam: "Bu prosedür, ADR kapsamında taşınan tehlikeli maddelerin alıcı firmaya ulaştığı andan itibaren geçerlidir ve tüm ilgili personel tarafından uygulanmalıdır.",
     blocks: [
@@ -90,7 +90,7 @@ export const BELGE_SABLONLARI: Record<string, BelgeSablonu> = {
   // ============================= P2 — BOŞALTAN PROSEDÜRÜ =============================
   P2: {
     docType: "PROSEDÜR",
-    yayinTarihi: "01.01.2020",
+    yayinTarihi: "01.01.2026",
     amac: "Bu prosedür, tehlikeli maddelerin karayolu ile taşınması ve boşaltılması sırasında güvenlik, çevre koruma ve iş sağlığı güvenliği önlemlerini belirlemek ve uygun işlem adımlarını tanımlamaktadır. Bu prosedür, ADR ve Tehlikeli Maddelerin Karayoluyla Taşınması Hakkında Yönetmelik hükümlerine dayanmaktadır.",
     kapsam: "Ambalajlı, dökme ve tank yüklerinin taşındığı taşıtlar, tanklar, konteynerler ve diğer taşıma araçları için geçerlidir.",
     tanimlar: [
@@ -137,7 +137,7 @@ export const BELGE_SABLONLARI: Record<string, BelgeSablonu> = {
   // ========================= P3 — SEVKİYAT UYGUNLUK KONTROL PROSEDÜRÜ =========================
   P3: {
     docType: "PROSEDÜR",
-    yayinTarihi: "01.11.2024",
+    yayinTarihi: "01.11.2026",
     amac: "Bu prosedürün amacı, işletmenin iştigal ettiği tehlikeli maddelerin sevkiyatı sırasında uyulması gereken tüm düzenlemeleri tanımlamak, güvenli ve yasalara uygun taşımacılığı sağlamak, çevre ve insan sağlığı üzerindeki riskleri en aza indirmektir.",
     kapsam: "Bu prosedür; tehlikeli maddelerin sevkiyatı için kullanılan taşıt, ambalaj ve yük taşıma birimlerini, taşıma araçlarının uygunluk belgeleri ve test/muayene süreçlerini, işaretleme/etiketleme/levha zorunluluklarını, karışık ambalajlama ve yükleme kurallarını, tehlikeli maddelerin tanımlama ve sınıflandırma yöntemlerini kapsar.",
     tanimlar: [
@@ -189,7 +189,7 @@ export const BELGE_SABLONLARI: Record<string, BelgeSablonu> = {
   // ==================== P4 — TEHLİKELİ MADDE TANIMLAMA VE SINIFLANDIRMA PROSEDÜRÜ ====================
   P4: {
     docType: "PROSEDÜR",
-    yayinTarihi: "01.11.2024",
+    yayinTarihi: "01.11.2026",
     amac: "Bu prosedür, işletme tarafından taşınacak veya sevk edilecek tehlikeli maddelerin ADR ve Tehlikeli Maddelerin Karayoluyla Taşınması Hakkında Yönetmelik hükümlerine uygun olarak doğru bir şekilde tanımlanması ve sınıflandırılması için izlenecek yöntemleri belirler.",
     kapsam: "Bu prosedür; işletme bünyesinde bulunan veya sevkiyatı yapılacak tehlikeli maddelerin tanımlanması, UN numarasının belirlenmesi, tehlike sınıfı/ambalaj grubu/uygun taşımacılık kategorisinin atanması ve ADR kapsamındaki belgelerinin hazırlanması işlemlerini kapsar.",
     tanimlar: [
@@ -233,7 +233,7 @@ export const BELGE_SABLONLARI: Record<string, BelgeSablonu> = {
   // ============================= T1 — ALICI (BOŞALTMA) TALİMATI =============================
   T1: {
     docType: "TALİMAT",
-    yayinTarihi: "01.11.2024",
+    yayinTarihi: "01.11.2026",
     amac: "Bu talimat, tehlikeli maddelerin ADR Sözleşmesi ve Türkiye Cumhuriyeti Tehlikeli Maddelerin Karayoluyla Taşınması Yönetmeliği hükümlerine uygun şekilde, güvenli ve çevreye zarar vermeden boşaltılmasını sağlamak için gereken prosedürleri belirler.",
     kapsam: "Bu talimat, ADR kapsamında taşınan ambalajlı, dökme ve tank konteynerler içindeki tehlikeli maddelerin boşaltılması işlemlerinde uygulanır.",
     tanimlar: [
@@ -274,7 +274,7 @@ export const BELGE_SABLONLARI: Record<string, BelgeSablonu> = {
   // ==================== T2 — BOŞALTMA SONRASI ARINDIRMA / KAPATMA KONTROL TALİMATI ====================
   T2: {
     docType: "TALİMAT",
-    yayinTarihi: "01.11.2024",
+    yayinTarihi: "01.11.2026",
     amac: "Bu talimat, ambalajlı, dökme ve tank yükleriyle taşınan tehlikeli maddelerin boşaltılmasından sonra taşıt, tank veya konteynerin temizlenmesi, dezenfekte edilmesi ve güvenli bir şekilde kontrol edilmesi işlemlerini düzenler.",
     kapsam: "Ambalajlı, dökme ve tank yüklerinin taşındığı taşıtlar, tanklar, konteynerler ve diğer taşıma araçları için geçerlidir.",
     blocks: [
@@ -306,7 +306,7 @@ export const BELGE_SABLONLARI: Record<string, BelgeSablonu> = {
   // ==================== T3 — TAŞIT/KONTEYNER TEMİZLİK VE DEZENFEKSİYON + TAHRİBAT KONTROLÜ ====================
   T3: {
     docType: "TALİMAT",
-    yayinTarihi: "01.11.2024",
+    yayinTarihi: "01.11.2026",
     amac: "Bu talimat, ambalajlı, dökme ve tank yükleriyle taşınan tehlikeli maddelerin boşaltılmasından sonra taşıt/konteynerin tahribat kontrolü ile temizlik ve güvenlik önlemlerinin alınmasını düzenler.",
     kapsam: "Ambalajlı, dökme ve tank yüklerinin taşındığı taşıtlar, tanklar, konteynerler ve diğer taşıma araçları için geçerlidir.",
     blocks: [
@@ -335,7 +335,7 @@ export const BELGE_SABLONLARI: Record<string, BelgeSablonu> = {
   // ==================== T4 — BOŞALTMA ÖNCESİ TAHRİBAT / HASAR KONTROL TALİMATI ====================
   T4: {
     docType: "TALİMAT",
-    yayinTarihi: "01.11.2024",
+    yayinTarihi: "01.11.2026",
     amac: "Bu doküman, tehlikeli maddelerin taşınması sırasında, boşaltma öncesi ve sırasında pakette, tankta, taşıtta veya konteynerde oluşabilecek herhangi bir tahribatın kontrol edilmesi ve olumsuz bir durumla karşılaşıldığında alınacak önlemleri tanımlar. Amaç, taşıma sırasında güvenli bir işlem sağlamak ve herhangi bir kaza, sızıntı veya çevreye zarar vermeyi önlemektir.",
     kapsam: "Ambalajlı, dökme ve tank yükleriyle taşınan tüm tehlikeli maddelerin taşınması sırasında meydana gelebilecek tahribatlara karşı alınacak önlemleri kapsar.",
     blocks: [
@@ -365,7 +365,7 @@ export const BELGE_SABLONLARI: Record<string, BelgeSablonu> = {
   // ============================= T5 — SEVKİYAT UYGUNLUK TALİMATI =============================
   T5: {
     docType: "TALİMAT",
-    yayinTarihi: "01.11.2024",
+    yayinTarihi: "01.11.2026",
     amac: "Bu talimat, tehlikeli maddelerin taşınması sırasında ulusal ve uluslararası yasal düzenlemelere uygun olarak güvenli ve çevreye duyarlı bir süreç yürütülmesini sağlamak amacıyla, taşıma araçlarının, ambalajların, yükleme ve boşaltma işlemlerinin detaylı kurallarını belirler.",
     kapsam: "Bu talimat; işletmede iştigal edilen tehlikeli maddelerin taşınmasında kullanılan taşıtlar, ambalajlar ve yük taşıma birimlerini, işaretleme/etiketleme/levha düzenlemelerini, test/muayene/bakım süreçlerini, sevkiyat öncesi/sırası/sonrası uyulması gereken kuralları kapsar.",
     blocks: [
@@ -406,7 +406,7 @@ export const BELGE_SABLONLARI: Record<string, BelgeSablonu> = {
   // ============================= K1 — ALICI KONTROL FORMU (Konteyner Yükleme/Boşaltma) =============================
   K1: {
     docType: "KONTROL FORMU",
-    yayinTarihi: "01.11.2024",
+    yayinTarihi: "01.11.2026",
     blocks: [
       { type: "subheading", text: "1. Konteyner Bilgileri" },
       { type: "bullet", items: ["Konteyner Numarası: ……………", "Konteyner Tipi: ……………", "Taşıyıcı Firma: ……………", "Teslim Tarihi: ……………"] },
@@ -449,7 +449,7 @@ export const BELGE_SABLONLARI: Record<string, BelgeSablonu> = {
   // ============================= K2 — BOŞALTMA SONRASI ARINDIRMA / KAPATMA KONTROL FORMU =============================
   K2: {
     docType: "KONTROL FORMU",
-    yayinTarihi: "01.11.2024",
+    yayinTarihi: "01.11.2026",
     blocks: [
       { type: "paragraph", text: "Bu kontrol listesi, boşaltma öncesi ve sonrasında tahribat tespiti, temizlik/dezenfekte işlemleri ve güvenlik önlemlerinin kayıt altına alınması için kullanılır." },
       { type: "subheading", text: "Kontrol Alanları (Evet / Hayır)" },
@@ -472,7 +472,7 @@ export const BELGE_SABLONLARI: Record<string, BelgeSablonu> = {
   // ==================== K3 — SEVKİYAT UYGUNLUK KONTROL FORMU (GÖNDEREN) ====================
   K3: {
     docType: "KONTROL FORMU",
-    yayinTarihi: "01.11.2024",
+    yayinTarihi: "01.11.2026",
     blocks: [
       { type: "subheading", text: "Levha ve İşaret Kontrolleri (Evet / Hayır / İlgili Değil)" },
       { type: "bullet", items: [
@@ -517,7 +517,7 @@ export const BELGE_SABLONLARI: Record<string, BelgeSablonu> = {
   // ============================= L2 — ARAÇ / TAŞIMACI LİSTESİ VE TAŞIMA EVRAKI KAYITLARI =============================
   L2: {
     docType: "LİSTE",
-    yayinTarihi: "01.11.2024",
+    yayinTarihi: "01.11.2026",
     amac: "Bu liste, tehlikeli madde sevkiyatlarında kullanılan taşıma evrakı, işletme bilgileri, ADR/Taşıt uygunluk belgesi ve ambalaj sertifikası bilgilerinin firma bazında takip edilmesi amacıyla tutulur.",
     blocks: [
       { type: "paragraph", text: "Aşağıdaki alanlar her sevkiyat için ayrı bir satırda kayıt altına alınır:" },
@@ -534,7 +534,7 @@ export const BELGE_SABLONLARI: Record<string, BelgeSablonu> = {
 
   K5: {
     docType: "KONTROL FORMU",
-    yayinTarihi: "01.11.2024",
+    yayinTarihi: "01.11.2026",
     amac: "Bu form, boşaltılan ve temizlenen konteyner/tankların durumunun ve tekrar kullanıma hazır olup olmadığının takibi amacıyla kullanılır.",
     kapsam: "Boşaltan faaliyeti kapsamında işlem gören tüm konteyner ve tanklar için geçerlidir.",
     blocks: [
@@ -558,7 +558,7 @@ export const BELGE_SABLONLARI: Record<string, BelgeSablonu> = {
 
   P5: {
     docType: "PROSEDÜR",
-    yayinTarihi: "01.01.2020",
+    yayinTarihi: "01.01.2026",
     amac: "Bu prosedür, ADR ve Tehlikeli Maddelerin Karayoluyla Taşınması Hakkında Yönetmelik kapsamında tehlikeli maddelerin taşınması sırasında yükleme öncesi, sırası ve sonrasında alınması gereken önlemleri ve ADR Bölüm 7.5'te belirtilen yükleme emniyet kurallarını detaylı bir şekilde açıklamayı amaçlar.",
     kapsam: "Bu prosedür; işletmenin sevkiyat süreçlerinde kullanılan araçları, yükleme/taşıma/boşaltma süreçlerini, tüm işaretleme, sabitleme, belge düzenleme ve güvenlik kontrollerini kapsar.",
     tanimlar: [
@@ -627,7 +627,7 @@ export const BELGE_SABLONLARI: Record<string, BelgeSablonu> = {
 
   T6: {
     docType: "TALİMAT",
-    yayinTarihi: "01.11.2024",
+    yayinTarihi: "01.11.2026",
     amac: "Bu talimat, işletmenin iştigal ettiği tehlikeli maddelerin ADR ve ilgili yönetmeliklere uygun şekilde yüklenmesi, karışık yükleme kurallarına uyulması, konteynerlerin işaretlenmesi, hasarlı ambalajların yönetimi ve yükleme emniyet kurallarının uygulanmasını sağlamayı amaçlar.",
     kapsam: "Bu talimat; tehlikeli maddelerin yüklenmesi/elleçlenmesi/karışık yüklenmesi, konteynerler üzerindeki işaretleme ve levhaların kontrolü, hasarlı/sızdırma riski taşıyan ambalajların yönetimi ve ADR Bölüm 7.5'te belirtilen yükleme emniyet kurallarını kapsar.",
     tanimlar: [
@@ -654,7 +654,7 @@ export const BELGE_SABLONLARI: Record<string, BelgeSablonu> = {
 
   T7: {
     docType: "TALİMAT",
-    yayinTarihi: "01.11.2024",
+    yayinTarihi: "01.11.2026",
     amac: "Bu talimat, konteyner ve ambalajların üzerindeki tehlike ikaz levhalarının kullanımını, araçların turuncu plaka kullanımını ve levhaların bakımını düzenler.",
     kapsam: "Tehlikeli maddelerin yüklendiği/taşındığı tüm konteyner, ambalaj ve araçlar için geçerlidir.",
     blocks: [
@@ -687,7 +687,7 @@ export const BELGE_SABLONLARI: Record<string, BelgeSablonu> = {
 
   T8: {
     docType: "TALİMAT",
-    yayinTarihi: "01.11.2024",
+    yayinTarihi: "01.11.2026",
     amac: "Bu talimat, hasarlı/sızdıran ambalajlar ile boş/temizlenmemiş ambalajların yönetimini ve ADR Bölüm 7.5 yükleme emniyet kurallarının uygulanmasını düzenler.",
     kapsam: "Yüklenen tüm ambalajlı, dökme ve tank yükleri için geçerlidir.",
     blocks: [
@@ -721,7 +721,7 @@ export const BELGE_SABLONLARI: Record<string, BelgeSablonu> = {
 
   K4: {
     docType: "KONTROL FORMU",
-    yayinTarihi: "01.11.2024",
+    yayinTarihi: "01.11.2026",
     blocks: [
       { type: "subheading", text: "Sevkiyat Bilgileri" },
       { type: "bullet", items: ["Tarih: ……………", "Araç Plaka No: ……………", "Yükleyen İşletme Unvanı: ……………", "Taşıma Türü: Ambalajlı / Dökme / Tank"] },
@@ -745,7 +745,7 @@ export const BELGE_SABLONLARI: Record<string, BelgeSablonu> = {
 
   P6: {
     docType: "PROSEDÜR",
-    yayinTarihi: "01.01.2020",
+    yayinTarihi: "01.01.2026",
     amac: "Bu prosedür, tehlikeli maddelerin ADR Bölüm 4.1'deki paketleme talimatlarına uygun şekilde ambalajlanmasını sağlamak amacıyla hazırlanmıştır.",
     kapsam: "Tehlikeli maddelerin paketleme, ambalajlama ve etiketleme işlemlerinde görev alan tüm personel için geçerlidir.",
     tanimlar: [
@@ -775,7 +775,7 @@ export const BELGE_SABLONLARI: Record<string, BelgeSablonu> = {
 
   T9: {
     docType: "TALİMAT",
-    yayinTarihi: "01.11.2024",
+    yayinTarihi: "01.11.2026",
     amac: "Bu talimat, tehlikeli madde paketlemesinde kullanılan basınçlı ekipmanların (basınçlı kaplar, taşınabilir tanklar vb.) periyodik test ve muayenelerinin takibini düzenler.",
     kapsam: "Paketleme sürecinde kullanılan tüm basınçlı ekipmanlar için geçerlidir.",
     blocks: [
@@ -796,7 +796,7 @@ export const BELGE_SABLONLARI: Record<string, BelgeSablonu> = {
 
   T10: {
     docType: "TALİMAT",
-    yayinTarihi: "01.11.2024",
+    yayinTarihi: "01.11.2026",
     amac: "Bu talimat, periyodik muayene süresi geçmiş veya muayeneden \"uygunsuz\" çıkan basınçlı ekipmanların güvenli şekilde hizmet dışı bırakılması ve bertaraf edilmesini düzenler.",
     kapsam: "Muayene süresi dolmuş, hasarlı veya uygunsuz bulunan tüm basınçlı ekipmanlar için geçerlidir.",
     blocks: [
@@ -813,7 +813,7 @@ export const BELGE_SABLONLARI: Record<string, BelgeSablonu> = {
 
   T11: {
     docType: "TALİMAT",
-    yayinTarihi: "01.11.2024",
+    yayinTarihi: "01.11.2026",
     amac: "Bu talimat, farklı tehlikeli maddelerin tek bir dış ambalaj içinde birlikte paketlenmesine (karışık paketleme) ilişkin ADR 4.1.10 kurallarını belirler.",
     kapsam: "Birden fazla iç ambalajın aynı dış ambalajda paketleneceği tüm durumlar için geçerlidir.",
     blocks: [
@@ -834,7 +834,7 @@ export const BELGE_SABLONLARI: Record<string, BelgeSablonu> = {
 
   T12: {
     docType: "TALİMAT",
-    yayinTarihi: "01.11.2024",
+    yayinTarihi: "01.11.2026",
     amac: "Bu talimat, paketlenen tehlikeli maddelerin ambalaj işaretleme ve etiketleme uygunluğunun kontrolünü düzenler.",
     kapsam: "Paketleme sonrası tüm ambalajlı ürünler için geçerlidir.",
     blocks: [
@@ -855,7 +855,7 @@ export const BELGE_SABLONLARI: Record<string, BelgeSablonu> = {
 
   K6: {
     docType: "KONTROL FORMU",
-    yayinTarihi: "01.11.2024",
+    yayinTarihi: "01.11.2026",
     blocks: [
       { type: "subheading", text: "Paketleme Bilgileri" },
       { type: "bullet", items: ["Tarih: ……………", "Madde Adı / UN No: ……………", "Ambalaj Türü ve UN Kodu: ……………", "Paketleyen İşletme: ……………"] },
@@ -878,7 +878,7 @@ export const BELGE_SABLONLARI: Record<string, BelgeSablonu> = {
 
   P7: {
     docType: "PROSEDÜR",
-    yayinTarihi: "01.01.2020",
+    yayinTarihi: "01.01.2026",
     amac: "Bu prosedür, tehlikeli maddelerin tank/YTB (Yük Taşıma Birimi) içine güvenli şekilde doldurulmasını sağlamak amacıyla hazırlanmıştır.",
     kapsam: "Tank, tanker ve taşınabilir tankların doldurulması işleminde görev alan tüm personel için geçerlidir.",
     tanimlar: [
@@ -911,7 +911,7 @@ export const BELGE_SABLONLARI: Record<string, BelgeSablonu> = {
 
   T13: {
     docType: "TALİMAT",
-    yayinTarihi: "01.11.2024",
+    yayinTarihi: "01.11.2026",
     amac: "Bu talimat, dolum öncesi YTB muayene kontrolünün yapılmasını ve maddenin uygun tanka doldurulmasını düzenler.",
     kapsam: "Dolum yapılacak tüm tank ve taşınabilir tanklar için geçerlidir.",
     blocks: [
@@ -927,7 +927,7 @@ export const BELGE_SABLONLARI: Record<string, BelgeSablonu> = {
 
   T14: {
     docType: "TALİMAT",
-    yayinTarihi: "01.11.2024",
+    yayinTarihi: "01.11.2026",
     amac: "Bu talimat, dolum öncesi tank/araç üzerindeki etiket, levha ve turuncu plakaların kontrolünü ve doğru şekilde takılmasını düzenler.",
     kapsam: "Dolum yapılacak tüm tank ve tanker araçları için geçerlidir.",
     blocks: [
@@ -943,7 +943,7 @@ export const BELGE_SABLONLARI: Record<string, BelgeSablonu> = {
 
   T15: {
     docType: "TALİMAT",
-    yayinTarihi: "01.11.2024",
+    yayinTarihi: "01.11.2026",
     amac: "Bu talimat, bölmeli tankların dolumunda her bölmenin azami doldurma derecesine (ADR 4.3.2) uygun şekilde doldurulmasını düzenler.",
     kapsam: "Birden fazla bölmesi olan tank/tanker araçları için geçerlidir.",
     blocks: [
@@ -959,7 +959,7 @@ export const BELGE_SABLONLARI: Record<string, BelgeSablonu> = {
 
   T16: {
     docType: "TALİMAT",
-    yayinTarihi: "01.11.2024",
+    yayinTarihi: "01.11.2026",
     amac: "Bu talimat, dolum sonrası tankın sızdırmazlığının ve dış yüzeye bulaşma olup olmadığının kontrolünü düzenler.",
     kapsam: "Dolumu tamamlanmış tüm tank ve tanker araçları için geçerlidir.",
     blocks: [
@@ -975,7 +975,7 @@ export const BELGE_SABLONLARI: Record<string, BelgeSablonu> = {
 
   T17: {
     docType: "TALİMAT",
-    yayinTarihi: "01.11.2024",
+    yayinTarihi: "01.11.2026",
     amac: "Bu talimat, dökme dolum işlemlerinde (ADR Bölüm 7.3) uyulması gereken kuralları ve taşımacının Tehlikeli Madde Faaliyet Belgesi (TMFB) kontrolünü düzenler.",
     kapsam: "Dökme yük taşıyan araçlara yapılan tüm dolum işlemleri için geçerlidir.",
     blocks: [
@@ -996,7 +996,7 @@ export const BELGE_SABLONLARI: Record<string, BelgeSablonu> = {
 
   K7: {
     docType: "KONTROL FORMU",
-    yayinTarihi: "01.11.2024",
+    yayinTarihi: "01.11.2026",
     blocks: [
       { type: "subheading", text: "Dolum Bilgileri" },
       { type: "bullet", items: ["Tarih: ……………", "Araç/Tank Plaka No: ……………", "Madde Adı / UN No: ……………", "Dolduran İşletme: ……………"] },
@@ -1019,7 +1019,7 @@ export const BELGE_SABLONLARI: Record<string, BelgeSablonu> = {
 
   P8: {
     docType: "PROSEDÜR",
-    yayinTarihi: "01.01.2020",
+    yayinTarihi: "01.01.2026",
     amac: "Bu prosedürün amacı, tehlikeli maddelerin karayoluyla taşınması sırasında güvenliğin sağlanması, çevrenin korunması ve taşımacılık süreçlerinin yasal düzenlemelere uygun olarak gerçekleştirilmesi için gerekli önlemleri belirlemektir. Prosedür, tehlikeli madde taşımacılığı süreçlerinde olası riskleri minimize ederek insan sağlığına, çevreye ve mal varlıklarına gelebilecek zararları önlemeyi hedefler.",
     kapsam: "Bu prosedür, tehlikeli maddelerin karayolu ile taşınması işlemleriyle doğrudan veya dolaylı olarak ilgilenen taşıma firmalarını, sürücüleri ve ilgili diğer personeli kapsar; ADR düzenlemelerine uygun şekilde hareket edilmesi gerektiğini vurgular.",
     tanimlar: [
@@ -1094,7 +1094,7 @@ export const BELGE_SABLONLARI: Record<string, BelgeSablonu> = {
 
   T18: {
     docType: "TALİMAT",
-    yayinTarihi: "01.11.2024",
+    yayinTarihi: "01.11.2026",
     amac: "Bu talimat, tehlikeli madde taşımacılığında kullanılan araçların ADR/Taşıt Uygunluk Belgesi ve yük taşıma birimlerinin test/muayene süreçlerini, tehlike ikaz etiket/levha ve turuncu plaka kurallarını ve taşıma öncesi fiziksel kontrolleri düzenler.",
     kapsam: "Tehlikeli madde taşıyan tüm araçlar, tanklar ve yük taşıma birimleri (konteyner, IBC vb.) için geçerlidir.",
     blocks: [
@@ -1136,7 +1136,7 @@ export const BELGE_SABLONLARI: Record<string, BelgeSablonu> = {
 
   T19: {
     docType: "TALİMAT",
-    yayinTarihi: "01.11.2024",
+    yayinTarihi: "01.11.2026",
     amac: "Bu talimat, ADR Bölüm 8.1.4 ve 8.1.5 uyarınca araçta bulundurulması zorunlu olan genel ve kişisel koruyucu teçhizatın kapsamını ve kontrolünü düzenler.",
     kapsam: "Tehlikeli madde taşıyan tüm araçlar için geçerlidir.",
     blocks: [
@@ -1176,7 +1176,7 @@ export const BELGE_SABLONLARI: Record<string, BelgeSablonu> = {
 
   T20: {
     docType: "TALİMAT",
-    yayinTarihi: "01.11.2024",
+    yayinTarihi: "01.11.2026",
     amac: "Bu talimat; yükleme/karışık yükleme sınırlamalarını (ADR 7.5), taşıma sırasında tespit edilen güvenlik ihlallerinde izlenecek yolu (ADR 1.8.5 ve 8.3) ve boş/temizlenmemiş yük taşıma birimleri için gerekli taşıma evrakı kurallarını (ADR 5.4.1.1.6) belirler.",
     kapsam: "Tehlikeli madde taşıyan tüm araçlar ve boş/temizlenmemiş yük taşıma birimi (YTB) sevkiyatları için geçerlidir.",
     blocks: [
@@ -1210,7 +1210,7 @@ export const BELGE_SABLONLARI: Record<string, BelgeSablonu> = {
 
   K8: {
     docType: "KONTROL FORMU",
-    yayinTarihi: "01.11.2024",
+    yayinTarihi: "01.11.2026",
     blocks: [
       { type: "subheading", text: "Araç ve Sürücü Bilgileri" },
       { type: "bullet", items: ["Tarih: ……………", "Araç Plaka No: ……………", "Sürücü Adı Soyadı: ……………", "SRC5 Belge No: ……………"] },
@@ -1230,7 +1230,7 @@ export const BELGE_SABLONLARI: Record<string, BelgeSablonu> = {
 
   K9: {
     docType: "KONTROL FORMU",
-    yayinTarihi: "01.11.2024",
+    yayinTarihi: "01.11.2026",
     blocks: [
       { type: "subheading", text: "Belge Kontrolü (Evet / Hayır)" },
       { type: "bullet", items: [
@@ -1251,7 +1251,7 @@ export const BELGE_SABLONLARI: Record<string, BelgeSablonu> = {
 
   L1: {
     docType: "LİSTE",
-    yayinTarihi: "01.11.2024",
+    yayinTarihi: "01.11.2026",
     amac: "Bu liste, işletmede bulunan/iştigal edilen tüm tehlikeli maddelerin ADR sınıf, UN numarası ve miktar bilgileriyle güncel şekilde envanterinin tutulmasını sağlar.",
     kapsam: "İşletmenin faaliyet konusuna giren tüm tehlikeli maddeler için geçerlidir.",
     blocks: [
@@ -1267,7 +1267,7 @@ export const BELGE_SABLONLARI: Record<string, BelgeSablonu> = {
 
   L3: {
     docType: "LİSTE",
-    yayinTarihi: "01.11.2024",
+    yayinTarihi: "01.11.2026",
     amac: "Bu liste, işletme adına tehlikeli madde taşıyan sürücülerin bilgilerinin ve ADR/SRC5 eğitim durumlarının takip edilmesi amacıyla tutulur.",
     kapsam: "Tehlikeli madde taşıma faaliyetinde görev alan tüm sürücüler için geçerlidir.",
     blocks: [
@@ -1283,7 +1283,7 @@ export const BELGE_SABLONLARI: Record<string, BelgeSablonu> = {
 
   L4: {
     docType: "LİSTE",
-    yayinTarihi: "01.11.2024",
+    yayinTarihi: "01.11.2026",
     amac: "Bu liste, paketleme ve dolum süreçlerinde kullanılan ambalaj/ekipman envanterinin ve muayene durumlarının takibi amacıyla tutulur.",
     kapsam: "Paketleyen ve dolduran faaliyetlerinde kullanılan tüm ambalaj ve basınçlı ekipmanlar için geçerlidir.",
     blocks: [
@@ -1300,7 +1300,7 @@ export const BELGE_SABLONLARI: Record<string, BelgeSablonu> = {
 
   SA1: {
     docType: "LİSTE",
-    yayinTarihi: "01.11.2024",
+    yayinTarihi: "01.11.2026",
     amac: "Bu form, tehlikeli madde sevkiyatı yapan her seferin (aracın çıkış-varış sürecinin) takip edilmesi amacıyla kullanılır.",
     kapsam: "Taşımacı faaliyeti kapsamındaki tüm seferler için geçerlidir.",
     blocks: [
@@ -1315,7 +1315,7 @@ export const BELGE_SABLONLARI: Record<string, BelgeSablonu> = {
 
   SA2: {
     docType: "LİSTE",
-    yayinTarihi: "01.11.2024",
+    yayinTarihi: "01.11.2026",
     amac: "Bu kayıt, bir taşıma biriminden diğerine yapılan tehlikeli madde aktarım işlemlerinin (örn. araçtan araca, tanktan tanka) belgelenmesi amacıyla tutulur.",
     kapsam: "Boşaltan ve Yükleyen faaliyetleri kapsamında gerçekleştirilen tüm aktarım işlemleri için geçerlidir.",
     blocks: [
@@ -1331,7 +1331,7 @@ export const BELGE_SABLONLARI: Record<string, BelgeSablonu> = {
 
   SA3: {
     docType: "LİSTE",
-    yayinTarihi: "01.11.2024",
+    yayinTarihi: "01.11.2026",
     amac: "Bu kayıt, firmanın ADR kapsamındaki tüm belgelerinin (TMFB, sözleşme, sertifikalar, muayene belgeleri vb.) tek bir yerden takip edilmesi amacıyla tutulur.",
     kapsam: "İşletmenin ADR mevzuatı kapsamında sahip olması gereken tüm belgeler için geçerlidir.",
     blocks: [

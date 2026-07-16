@@ -354,6 +354,33 @@ export default function BelgeOlusturForm({ fixedFirmId, initialFirmId, compact =
             </div>
           )}
 
+          {firm && (
+            <div className="mb-4 text-xs">
+              {!firm.tmgd_assigned && (
+                <p className="text-amber-700 bg-amber-50 border border-amber-200 rounded p-2">
+                  ⚠ Bu firmaya TMGD ataması yapılmamış — belgelerde &quot;HAZIRLAYAN&quot;
+                  altında isim yazılmayacak.{" "}
+                  <Link href={`/firms/${firm.id}`} className="underline">
+                    Firma Bilgileri&apos;nden ata
+                  </Link>
+                </p>
+              )}
+              {firm.tmgd_assigned && !tmgdNameMap[firm.tmgd_assigned] && (
+                <p className="text-red-700 bg-red-50 border border-red-200 rounded p-2">
+                  ⚠ Firmaya bir TMGD atanmış ama adı getirilemedi — muhtemelen veritabanı
+                  erişim izni (RLS) engelliyor. Supabase&apos;de
+                  021_profiles_ad_gorunurlugu.sql migration&apos;ının çalıştırıldığından
+                  emin ol.
+                </p>
+              )}
+              {firm.tmgd_assigned && tmgdNameMap[firm.tmgd_assigned] && (
+                <p className="text-green-700 bg-green-50 border border-green-200 rounded p-2">
+                  ✓ HAZIRLAYAN: {tmgdNameMap[firm.tmgd_assigned]}
+                </p>
+              )}
+            </div>
+          )}
+
           <label className="block mb-4">
             <span className="text-sm text-gray-600">Onaylayan (opsiyonel)</span>
             <input
@@ -876,11 +903,11 @@ function sayfalaraBol(
 // hesaplar. Bu, uzun belge adlarının kutu dışına taşmasını önler.
 function baslikYuksekligiHesapla(doc: JsPDFType, belgeAdi: string): { yukseklik: number; adLines: string[] } {
   const ortaGenislik = W - 2 * M - 38 - 45 - 6;
-  doc.setFontSize(8.5);
-  doc.setFont(FONT, "normal");
+  doc.setFontSize(9.5);
+  doc.setFont(FONT, "bold");
   const adLines: string[] = doc.splitTextToSize(belgeAdi, ortaGenislik);
   const tabanYukseklik = 24; // logo/sağ blok için asgari
-  const adBlokYuksekligi = 9 + adLines.length * 4.4 + 3;
+  const adBlokYuksekligi = 9 + adLines.length * 4.8 + 3;
   return { yukseklik: Math.max(tabanYukseklik, adBlokYuksekligi), adLines };
 }
 
@@ -926,8 +953,8 @@ function baslikTablosuCiz(
   doc.setTextColor(...RENK_VURGU);
   doc.text(sablon.docType, ortaX, ustY + 8, { align: "center" });
   doc.setTextColor(0, 0, 0);
-  doc.setFontSize(8.5);
-  doc.setFont(FONT, "normal");
+  doc.setFontSize(9.5);
+  doc.setFont(FONT, "bold");
   doc.text(adLines, ortaX, ustY + 14, { align: "center" });
 
   // Sağ: doküman no / tarihler / sayfa no
@@ -960,30 +987,31 @@ function altTabloCiz(doc: JsPDFType, hazirlayanAdi: string, onaylayanAdi: string
   basliklar.forEach((b, i) => {
     const x = M + kolonGenislik * i + kolonGenislik / 2;
     const isim = isimler[i];
+    const roluHerZamanGoster = i !== 2; // ONAYLAYAN'daki "Sorumlu Kişi" yalnızca isim YOKSA gösterilir
 
     doc.setFontSize(7.5);
     doc.setFont(FONT, "bold");
-    doc.text(b, x, y + 4, { align: "center" });
+    doc.text(b, x, y + 5, { align: "center" });
 
     if (isim) {
-      // İsim varsa: kalın isim satırı + altında rol/unvan, imza çizgisi en altta.
-      doc.setFontSize(7);
+      // İsim varsa: kalın isim satırı ortada; HAZIRLAYAN/KONTROL EDEN için
+      // altında gerçek unvanı da gösterilir, ONAYLAYAN'da yalnızca isim kalır
+      // (aksi halde girilen isimle çelişen "Sorumlu Kişi" ibaresi kalırdı).
+      doc.setFontSize(7.5);
       doc.setFont(FONT, "bold");
-      doc.text(isim.toLocaleUpperCase("tr-TR"), x, y + 8.5, { align: "center", maxWidth: kolonGenislik - 4 });
-      doc.setFontSize(6);
-      doc.setFont(FONT, "normal");
-      doc.text(altBasliklar[i], x, y + 12.3, { align: "center", maxWidth: kolonGenislik - 4 });
+      doc.text(isim.toLocaleUpperCase("tr-TR"), x, y + 10.5, { align: "center", maxWidth: kolonGenislik - 4 });
+      if (roluHerZamanGoster) {
+        doc.setFontSize(6);
+        doc.setFont(FONT, "normal");
+        doc.text(altBasliklar[i], x, y + 14.3, { align: "center", maxWidth: kolonGenislik - 4 });
+      }
     } else {
       // İsim bilinmiyorsa (ör. firmaya TMGD ataması yapılmamış / onaylayan girilmemiş):
-      // yalnızca rol adı gösterilir — eski davranışla aynı.
+      // yalnızca rol adı gösterilir.
       doc.setFontSize(6.5);
       doc.setFont(FONT, "normal");
-      doc.text(altBasliklar[i], x, y + 9, { align: "center", maxWidth: kolonGenislik - 4 });
+      doc.text(altBasliklar[i], x, y + 10.5, { align: "center", maxWidth: kolonGenislik - 4 });
     }
-
-    doc.setFontSize(7);
-    doc.setFont(FONT, "normal");
-    doc.text("……………………………", x, y + 16, { align: "center" });
   });
 }
 
