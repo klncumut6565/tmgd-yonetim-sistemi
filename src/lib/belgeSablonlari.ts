@@ -13,7 +13,8 @@ export type TemplateBlock =
   | { type: "paragraph"; text: string }
   | { type: "subheading"; text: string }
   | { type: "bullet"; items: string[] }
-  | { type: "numbered"; items: string[] };
+  | { type: "numbered"; items: string[] }
+  | { type: "table"; headers?: string[]; rows: string[][]; note?: string };
 
 export type BelgeSablonu = {
   docType: "PROSEDÜR" | "TALİMAT" | "KONTROL FORMU" | "LİSTE";
@@ -1140,13 +1141,21 @@ export const BELGE_SABLONLARI: Record<string, BelgeSablonu> = {
     kapsam: "Tehlikeli madde taşıyan tüm araçlar için geçerlidir.",
     blocks: [
       { type: "subheading", text: "4.2. Yangınla Mücadele Teçhizatı (ADR Bölüm 8.1.4)" },
-      { type: "paragraph", text: "Araçların izin verilen azami kütlesine göre bulundurulması gereken asgari yangın söndürücü sayı/kapasitesi:" },
+      { type: "paragraph", text: "Araçların izin verilen azami kütlesine göre bulundurulması gereken asgari yangın söndürücü sayı/kapasitesi (ADR-2023 Bölüm 8.1.4.2):" },
+      { type: "table", headers: [
+        "Taşıma Ünitesinin\nAzami Kütlesi",
+        "Asgari Söndürücü\nSayısı",
+        "Toplam Asgari\nKapasite",
+        "Motor/Kabin İçin\nAsgari Kapasite",
+        "Ek Söndürücü\nAsgari Kapasite",
+      ], rows: [
+        ["≤ 3,5 ton", "2", "4 kg", "2 kg", "2 kg"],
+        ["> 3,5 ton – ≤ 7,5 ton", "2", "8 kg", "2 kg", "6 kg"],
+        ["> 7,5 ton", "2", "12 kg", "2 kg", "6 kg"],
+      ], note: "Kapasiteler kuru toz (veya söndürmede kullanılan diğer uygun eşdeğer malzemeler) cihazları içindir. Muafiyet kapsamındaki taşımalarda 2 kg'lık yangın söndürme cihazı yeterlidir." },
       { type: "bullet", items: [
-        "≤ 3,5 ton: 2 adet söndürücü, taşıma ünitesi asgari toplam kapasite 4 kg (motor/kabin için en az 2 kg).",
-        "> 3,5 ton ve ≤ 7,5 ton: 2 adet söndürücü, asgari toplam kapasite 8 kg (motor/kabin için en az 2 kg, ek söndürücü asgari 6 kg).",
-        "> 7,5 ton: 2 adet söndürücü, asgari toplam kapasite 12 kg (motor/kabin için en az 2 kg, ek söndürücü asgari 6 kg).",
-        "Muafiyet kapsamındaki taşımalarda 2 kg'lık yangın söndürme cihazı yeterlidir.",
-        "Söndürücülerin bakım ve kontrolleri düzenli yapılmalı, üzerinde kontrol tarihi bulunmalıdır.",
+        "Söndürücülerin periyodik bakım ve kontrolleri düzenli yapılmalı, üzerinde kontrol tarihi işlenmelidir.",
+        "Yangın söndürme tüpleri sabitlenmiş bir şekilde bulunmalıdır.",
       ]},
       { type: "subheading", text: "4.1. Kişisel Koruyucu Ekipman (ADR Bölüm 8.1.5)" },
       { type: "bullet", items: [

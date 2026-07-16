@@ -217,8 +217,9 @@ export default function BelgeOlusturForm({ fixedFirmId, initialFirmId, compact =
         const sablon = belgeSablonu(item.code);
 
         if (sablon) {
-          renderYapilandirilmisBelge(doc, firm.name, item.code, item.name, sablon, logo, notes);
+          await renderYapilandirilmisBelge(doc, firm.name, item.code, item.name, sablon, logo, notes);
         } else {
+          await fontuKaydet(doc);
           renderBasitBelge(doc, firm, item, logo, notes, bugun);
         }
 
@@ -508,18 +509,18 @@ function renderBasitBelge(
   }
 
   doc.setFontSize(16);
-  doc.setFont("helvetica", "bold");
+  doc.setFont(FONT, "bold");
   doc.text(firm.name, logo ? 45 : 15, 20);
 
   doc.setFontSize(10);
-  doc.setFont("helvetica", "normal");
+  doc.setFont(FONT, "normal");
   doc.setTextColor(90, 90, 90);
   doc.text(`Belge Kodu: ${item.code}`, logo ? 45 : 15, 27);
   doc.text(`Tarih: ${bugun}`, logo ? 45 : 15, 32);
   doc.setTextColor(0, 0, 0);
 
   doc.setFontSize(13);
-  doc.setFont("helvetica", "bold");
+  doc.setFont(FONT, "bold");
   const nameLines = doc.splitTextToSize(`${item.code} — ${item.name}`, W - 30);
   doc.text(nameLines, 15, 48);
 
@@ -529,7 +530,7 @@ function renderBasitBelge(
   y += 8;
 
   doc.setFontSize(9);
-  doc.setFont("helvetica", "normal");
+  doc.setFont(FONT, "normal");
   doc.setTextColor(90, 90, 90);
   const acts =
     item.activities.length === 0
@@ -541,10 +542,10 @@ function renderBasitBelge(
 
   if (notes.trim()) {
     doc.setFontSize(11);
-    doc.setFont("helvetica", "bold");
+    doc.setFont(FONT, "bold");
     doc.text("Notlar / İçerik", 15, y);
     y += 6;
-    doc.setFont("helvetica", "normal");
+    doc.setFont(FONT, "normal");
     doc.setFontSize(10);
     const noteLines = doc.splitTextToSize(notes.trim(), W - 30);
     doc.text(noteLines, 15, y);
@@ -574,19 +575,33 @@ type Satir =
   | { tur: "baslik"; metin: string }
   | { tur: "altbaslik"; metin: string }
   | { tur: "paragraf"; metin: string }
-  | { tur: "madde"; metin: string; numara?: number };
+  | { tur: "madde"; metin: string; numara?: number }
+  | { tur: "tablo"; headers?: string[]; rows: string[][]; note?: string };
 
 const M = 15;
 const W = 210;
 const H = 297;
-const HEADER_ALT = 40; // içerik başlangıcı
 const FOOTER_UST = 270; // içerik bitişi (alt tablo öncesi)
-const SATIR_YUKSEKLIGI: Record<Satir["tur"], number> = {
+const FONT = "LiberationSans"; // Türkçe karakter destekli gömülü font (bkz. pdfFonts.ts)
+const RENK_VURGU: [number, number, number] = [30, 64, 175]; // kurumsal mavi (subheading, çizgiler)
+const SATIR_YUKSEKLIGI: Record<"baslik" | "altbaslik" | "paragraf" | "madde", number> = {
   baslik: 7,
   altbaslik: 6.5,
   paragraf: 4.6,
   madde: 4.6,
 };
+
+// jsPDF'e gömülü TTF fontu bir kez tanıtır. Her doc örneği için ayrı çağrılmalı.
+async function fontuKaydet(doc: JsPDFType) {
+  const { LIBERATION_SANS_REGULAR_B64, LIBERATION_SANS_BOLD_B64 } = await import(
+    "@/lib/pdfFonts"
+  );
+  doc.addFileToVFS("LiberationSans-Regular.ttf", LIBERATION_SANS_REGULAR_B64);
+  doc.addFont("LiberationSans-Regular.ttf", FONT, "normal");
+  doc.addFileToVFS("LiberationSans-Bold.ttf", LIBERATION_SANS_BOLD_B64);
+  doc.addFont("LiberationSans-Bold.ttf", FONT, "bold");
+  doc.setFont(FONT, "normal");
+}
 
 function duzMetneCevir(doc: JsPDFType, sablon: BelgeSablonu, belgeAdi: string): Satir[] {
   const genislik = W - 2 * M;
@@ -640,20 +655,147 @@ function duzMetneCevir(doc: JsPDFType, sablon: BelgeSablonu, belgeAdi: string): 
           satirlar.push({ tur: "madde", metin: line })
         );
       });
+    } else if (b.type === "table") {
+      satirlar.push({ tur: "tablo", headers: b.headers, rows: b.rows, note: b.note });
     }
   });
 
   return satirlar;
 }
 
-function sayfalaraBol(satirlar: Satir[]): Satir[][] {
-  const kullanilabilirYukseklik = FOOTER_UST - HEADER_ALT;
+// ---- Tablo ölçümü + çizimi -------------------------------------------
+// Sütun genişlikleri: ilk sütun biraz daha geniş (etiket sütunu), kalanlar eşit paylaşır.
+function tabloKolonGenislikleri(genislik: number, kolonSayisi: number): number[] {
+  if (kolonSayisi <= 1) return [genislik];
+  const ilkOran = 1.3;
+  const toplamOran = ilkOran + (kolonSayisi - 1);
+  const birim = genislik / toplamOran;
+  return [birim * ilkOran, ...Array(kolonSayisi - 1).fill(birim)];
+}
+
+function tabloHucreSatirlari(
+  doc: JsPDFType,
+  metin: string,
+  genislik: number,
+  fontSize: number,
+  kalin: boolean
+): string[] {
+  doc.setFontSize(fontSize);
+  doc.setFont(FONT, kalin ? "bold" : "normal");
+  return metin.split("\n").flatMap((parca) => doc.splitTextToSize(parca, genislik - 3));
+}
+
+const TABLO_SATIR_YUKSEKLIGI = 4.6;
+const TABLO_PADDING = 1.6;
+
+function tabloYuksekligiHesapla(
+  doc: JsPDFType,
+  tablo: { headers?: string[]; rows: string[][]; note?: string },
+  genislik: number
+): number {
+  const kolonSayisi = (tablo.headers || tablo.rows[0] || []).length;
+  const kolonGenislikleri = tabloKolonGenislikleri(genislik, kolonSayisi);
+  let yukseklik = 0;
+
+  if (tablo.headers) {
+    const satirSayilari = tablo.headers.map(
+      (h, i) => tabloHucreSatirlari(doc, h, kolonGenislikleri[i], 7.5, true).length
+    );
+    yukseklik += Math.max(...satirSayilari) * TABLO_SATIR_YUKSEKLIGI + TABLO_PADDING * 2;
+  }
+  tablo.rows.forEach((row) => {
+    const satirSayilari = row.map(
+      (hucre, i) => tabloHucreSatirlari(doc, hucre, kolonGenislikleri[i], 8, false).length
+    );
+    yukseklik += Math.max(...satirSayilari) * TABLO_SATIR_YUKSEKLIGI + TABLO_PADDING * 2;
+  });
+  if (tablo.note) {
+    doc.setFontSize(7.5);
+    doc.setFont(FONT, "normal");
+    yukseklik += doc.splitTextToSize(tablo.note, genislik).length * 3.8 + 3;
+  }
+  return yukseklik + 2; // alt boşluk
+}
+
+function tabloCiz(
+  doc: JsPDFType,
+  tablo: { headers?: string[]; rows: string[][]; note?: string },
+  x: number,
+  yBaslangic: number,
+  genislik: number
+) {
+  const kolonSayisi = (tablo.headers || tablo.rows[0] || []).length;
+  const kolonGenislikleri = tabloKolonGenislikleri(genislik, kolonSayisi);
+  let y = yBaslangic;
+
+  const satirCiz = (
+    hucreler: string[],
+    fontSize: number,
+    kalin: boolean,
+    doluRenk: [number, number, number] | null
+  ) => {
+    const hucreSatirlari = hucreler.map((h, i) =>
+      tabloHucreSatirlari(doc, h, kolonGenislikleri[i], fontSize, kalin)
+    );
+    const satirYuksekligi =
+      Math.max(...hucreSatirlari.map((s) => s.length)) * TABLO_SATIR_YUKSEKLIGI + TABLO_PADDING * 2;
+
+    if (doluRenk) {
+      doc.setFillColor(...doluRenk);
+      doc.rect(x, y, genislik, satirYuksekligi, "F");
+    }
+    doc.setDrawColor(190, 190, 190);
+    doc.setLineWidth(0.2);
+
+    let kx = x;
+    hucreSatirlari.forEach((satirlar, i) => {
+      doc.setFontSize(fontSize);
+      doc.setFont(FONT, kalin ? "bold" : "normal");
+      doc.setTextColor(kalin && doluRenk ? 255 : 20, kalin && doluRenk ? 255 : 20, kalin && doluRenk ? 255 : 20);
+      doc.text(satirlar, kx + kolonGenislikleri[i] / 2, y + TABLO_PADDING + TABLO_SATIR_YUKSEKLIGI * 0.75, {
+        align: "center",
+        maxWidth: kolonGenislikleri[i] - 3,
+      });
+      doc.rect(kx, y, kolonGenislikleri[i], satirYuksekligi);
+      kx += kolonGenislikleri[i];
+    });
+    doc.setTextColor(0, 0, 0);
+    y += satirYuksekligi;
+  };
+
+  if (tablo.headers) satirCiz(tablo.headers, 7.5, true, RENK_VURGU);
+  tablo.rows.forEach((row, i) => satirCiz(row, 8, false, i % 2 === 1 ? [245, 247, 251] : null));
+
+  if (tablo.note) {
+    y += 2.5;
+    doc.setFontSize(7.5);
+    doc.setFont(FONT, "normal");
+    doc.setTextColor(110, 110, 110);
+    const noteLines = doc.splitTextToSize(tablo.note, genislik);
+    doc.text(noteLines, x, y);
+    doc.setTextColor(0, 0, 0);
+  }
+}
+
+// ---- Sayfalara bölme (dinamik başlık yüksekliğini dikkate alır) ------
+function satirYuksekligi(doc: JsPDFType, satir: Satir, genislik: number): number {
+  if (satir.tur === "tablo") return tabloYuksekligiHesapla(doc, satir, genislik);
+  return SATIR_YUKSEKLIGI[satir.tur] + (satir.tur === "altbaslik" ? 2 : 0);
+}
+
+function sayfalaraBol(
+  doc: JsPDFType,
+  satirlar: Satir[],
+  headerAlt: number
+): Satir[][] {
+  const genislik = W - 2 * M;
+  const kullanilabilirYukseklik = FOOTER_UST - headerAlt;
   const sayfalar: Satir[][] = [];
   let mevcutSayfa: Satir[] = [];
   let mevcutYukseklik = 0;
 
   for (const satir of satirlar) {
-    const yukseklik = SATIR_YUKSEKLIGI[satir.tur] + (satir.tur === "altbaslik" ? 2 : 0);
+    const yukseklik = satirYuksekligi(doc, satir, genislik);
     if (mevcutYukseklik + yukseklik > kullanilabilirYukseklik && mevcutSayfa.length > 0) {
       sayfalar.push(mevcutSayfa);
       mevcutSayfa = [];
@@ -666,6 +808,19 @@ function sayfalaraBol(satirlar: Satir[]): Satir[][] {
   return sayfalar.length > 0 ? sayfalar : [[]];
 }
 
+// Belge adının orta sütunda kaç satıra sarılacağını ölçüp başlık kutusunun
+// gerçek yüksekliğini (ve dolayısıyla içeriğin başlayacağı Y konumunu)
+// hesaplar. Bu, uzun belge adlarının kutu dışına taşmasını önler.
+function baslikYuksekligiHesapla(doc: JsPDFType, belgeAdi: string): { yukseklik: number; adLines: string[] } {
+  const ortaGenislik = W - 2 * M - 38 - 45 - 6;
+  doc.setFontSize(8.5);
+  doc.setFont(FONT, "normal");
+  const adLines: string[] = doc.splitTextToSize(belgeAdi, ortaGenislik);
+  const tabanYukseklik = 24; // logo/sağ blok için asgari
+  const adBlokYuksekligi = 9 + adLines.length * 4.4 + 3;
+  return { yukseklik: Math.max(tabanYukseklik, adBlokYuksekligi), adLines };
+}
+
 function baslikTablosuCiz(
   doc: JsPDFType,
   firmAdi: string,
@@ -675,10 +830,11 @@ function baslikTablosuCiz(
   logo: LogoData,
   bugun: string,
   sayfaNo: number,
-  toplamSayfa: number
+  toplamSayfa: number,
+  yukseklik: number,
+  adLines: string[]
 ) {
   const ustY = 8;
-  const yukseklik = 24;
 
   doc.setDrawColor(0, 0, 0);
   doc.setLineWidth(0.3);
@@ -695,23 +851,25 @@ function baslikTablosuCiz(
     }
   } else {
     doc.setFontSize(7);
-    doc.setFont("helvetica", "bold");
+    doc.setFont(FONT, "bold");
     const firmLines = doc.splitTextToSize(firmAdi, 34);
-    doc.text(firmLines, M + 2, ustY + 12);
+    doc.text(firmLines, M + 2, ustY + yukseklik / 2 - (firmLines.length - 1) * 2);
   }
 
-  // Orta: doküman türü + belge adı
+  // Orta: doküman türü + belge adı (dikey ortalanmış)
+  const ortaX = M + 38 + (W - 2 * M - 38 - 45) / 2;
   doc.setFontSize(12);
-  doc.setFont("helvetica", "bold");
-  doc.text(sablon.docType, M + 38 + (W - 2 * M - 38 - 45) / 2, ustY + 9, { align: "center" });
+  doc.setFont(FONT, "bold");
+  doc.setTextColor(...RENK_VURGU);
+  doc.text(sablon.docType, ortaX, ustY + 8, { align: "center" });
+  doc.setTextColor(0, 0, 0);
   doc.setFontSize(8.5);
-  doc.setFont("helvetica", "normal");
-  const adLines = doc.splitTextToSize(belgeAdi, W - 2 * M - 38 - 45 - 6);
-  doc.text(adLines, M + 38 + (W - 2 * M - 38 - 45) / 2, ustY + 15, { align: "center" });
+  doc.setFont(FONT, "normal");
+  doc.text(adLines, ortaX, ustY + 14, { align: "center" });
 
   // Sağ: doküman no / tarihler / sayfa no
   doc.setFontSize(7);
-  doc.setFont("helvetica", "normal");
+  doc.setFont(FONT, "normal");
   const sagX = W - M - 43;
   doc.text(`Doküman No: ${code}`, sagX, ustY + 5);
   doc.text(`Yayın Tarihi: ${sablon.yayinTarihi}`, sagX, ustY + 10);
@@ -736,16 +894,16 @@ function altTabloCiz(doc: JsPDFType) {
   basliklar.forEach((b, i) => {
     const x = M + kolonGenislik * i + kolonGenislik / 2;
     doc.setFontSize(7.5);
-    doc.setFont("helvetica", "bold");
+    doc.setFont(FONT, "bold");
     doc.text(b, x, y + 5, { align: "center" });
     doc.setFontSize(6.5);
-    doc.setFont("helvetica", "normal");
+    doc.setFont(FONT, "normal");
     doc.text(altBasliklar[i], x, y + 9, { align: "center", maxWidth: kolonGenislik - 4 });
     doc.text("……………………………", x, y + 16, { align: "center" });
   });
 }
 
-function renderYapilandirilmisBelge(
+async function renderYapilandirilmisBelge(
   doc: JsPDFType,
   firmAdi: string,
   code: string,
@@ -754,10 +912,12 @@ function renderYapilandirilmisBelge(
   logo: LogoData,
   notlar: string
 ) {
+  await fontuKaydet(doc);
+
   const bugun = new Date().toLocaleDateString("tr-TR");
   const tamBaslik = `${code} — ${belgeAdi}`;
 
-  let satirlar = duzMetneCevir(doc, sablon, tamBaslik);
+  const satirlar = duzMetneCevir(doc, sablon, tamBaslik);
   if (notlar.trim()) {
     satirlar.push({ tur: "altbaslik", metin: "Ek Notlar" });
     doc.setFontSize(9.5);
@@ -766,38 +926,53 @@ function renderYapilandirilmisBelge(
     );
   }
 
-  const sayfalar = sayfalaraBol(satirlar);
+  // Başlık kutusu yüksekliği belge adına göre değişir (uzun adlarda taşmayı önler);
+  // içerik başlangıç Y'si buna göre dinamik olarak ayarlanır.
+  const { yukseklik: baslikYukseklik, adLines } = baslikYuksekligiHesapla(doc, belgeAdi);
+  const headerAlt = 8 + baslikYukseklik + 8; // kutunun altı + boşluk
+
+  const sayfalar = sayfalaraBol(doc, satirlar, headerAlt);
   const toplamSayfa = sayfalar.length;
+  const genislik = W - 2 * M;
 
   sayfalar.forEach((sayfaSatirlari, idx) => {
     if (idx > 0) doc.addPage();
 
-    baslikTablosuCiz(doc, firmAdi, code, belgeAdi, sablon, logo, bugun, idx + 1, toplamSayfa);
+    baslikTablosuCiz(doc, firmAdi, code, belgeAdi, sablon, logo, bugun, idx + 1, toplamSayfa, baslikYukseklik, adLines);
     altTabloCiz(doc);
 
-    let y = HEADER_ALT;
+    let y = headerAlt;
     for (const satir of sayfaSatirlari) {
       if (satir.tur === "baslik") {
         doc.setFontSize(13);
-        doc.setFont("helvetica", "bold");
+        doc.setFont(FONT, "bold");
         doc.setTextColor(0, 0, 0);
         doc.text(satir.metin, M, y);
-        y += SATIR_YUKSEKLIGI.baslik;
+        // başlığın altına ince vurgu çizgisi — sayfaya "tasarlanmış belge" hissi katar
+        doc.setDrawColor(...RENK_VURGU);
+        doc.setLineWidth(0.6);
+        doc.line(M, y + 1.8, M + genislik, y + 1.8);
+        y += SATIR_YUKSEKLIGI.baslik + 1;
       } else if (satir.tur === "altbaslik") {
+        doc.setFillColor(...RENK_VURGU);
+        doc.rect(M, y - 3.2, 1.3, 5.4, "F"); // sol vurgu çubuğu
         doc.setFontSize(10.5);
-        doc.setFont("helvetica", "bold");
-        doc.setTextColor(30, 64, 175);
-        doc.text(satir.metin, M, y + 2);
+        doc.setFont(FONT, "bold");
+        doc.setTextColor(...RENK_VURGU);
+        doc.text(satir.metin, M + 3.5, y + 1.2);
         doc.setTextColor(0, 0, 0);
         y += SATIR_YUKSEKLIGI.altbaslik + 2;
       } else if (satir.tur === "paragraf") {
         doc.setFontSize(9.5);
-        doc.setFont("helvetica", "normal");
+        doc.setFont(FONT, "normal");
         doc.text(satir.metin, M, y);
         y += SATIR_YUKSEKLIGI.paragraf;
+      } else if (satir.tur === "tablo") {
+        tabloCiz(doc, satir, M, y, genislik);
+        y += tabloYuksekligiHesapla(doc, satir, genislik);
       } else {
         doc.setFontSize(9.5);
-        doc.setFont("helvetica", "normal");
+        doc.setFont(FONT, "normal");
         doc.text(satir.metin, M + 2, y);
         y += SATIR_YUKSEKLIGI.madde;
       }
