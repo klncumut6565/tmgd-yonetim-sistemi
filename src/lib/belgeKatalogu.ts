@@ -162,6 +162,9 @@ export function codeLabel(code: string, period?: string): string {
     const ay = AY_ADLARI[idx] || m;
     return `${ay} ${y} Ziyaret Raporu`;
   }
+  if (code === "YFR" && period) {
+    return `Yıllık Faaliyet Raporu ${period} (ADR 1.8.3.3)`;
+  }
   if (SPECIAL_ITEMS[code]) return SPECIAL_ITEMS[code].label;
   const item = catalogItem(code);
   if (item) return `${item.code} — ${item.name}`;
@@ -219,6 +222,40 @@ function ziyaretAylari(contractStart: string | null): ChecklistItem[] {
       code: "ZR",
       period: `${year}-${String(m + 1).padStart(2, "0")}`,
       label: `${AY_ADLARI[m]} ${year} Ziyaret Raporu`,
+    });
+  }
+  return items;
+}
+
+// Sözleşme başlangıç YILINDAN içinde bulunulan yıla kadar, her yıl için
+// ayrı bir Yıllık Faaliyet Raporu (ADR 1.8.3.3) maddesi üretir.
+//
+// İSTİSNA: Sözleşme, başlangıç yılının Mayıs ayı veya sonrasında
+// başladıysa, o ilk yılın raporu listeye DAHİL EDİLMEZ — çünkü rapor
+// son tarihi (içinde bulunduğu yılın Nisan sonu) sözleşme başlamadan
+// önce zaten geçmiş olur; bu, önceki TMGD firmasının sorumluluğudur.
+function yillikFaaliyetRaporlari(contractStart: string | null): ChecklistItem[] {
+  const now = new Date();
+  const currentYear = now.getFullYear();
+
+  let startYear = currentYear;
+  let ilkYiliHaricTut = false;
+
+  if (contractStart) {
+    const cs = new Date(contractStart);
+    startYear = cs.getFullYear();
+    if (cs.getMonth() >= 4) { // 0-indeksli: Mayıs = 4
+      ilkYiliHaricTut = true;
+    }
+  }
+
+  const items: ChecklistItem[] = [];
+  for (let y = startYear; y <= currentYear; y++) {
+    if (y === startYear && ilkYiliHaricTut) continue;
+    items.push({
+      code: "YFR",
+      period: String(y),
+      label: `Yıllık Faaliyet Raporu ${y} (ADR 1.8.3.3)`,
     });
   }
   return items;
@@ -291,9 +328,7 @@ export function buildChecklist(
     {
       key: "yfr",
       title: "Yıllık Faaliyet Raporu",
-      items: [
-        { code: "YFR", period: "", label: "Yıllık Faaliyet Raporu (ADR 1.8.3.3)" },
-      ],
+      items: yillikFaaliyetRaporlari(contractStart),
     },
     ...(envanterGerekli(activities)
       ? [
