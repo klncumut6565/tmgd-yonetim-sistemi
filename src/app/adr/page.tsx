@@ -319,7 +319,7 @@ function SearchBox({ q, setQ, res, load, showDd, setShowDd, dropRef, onSel, extr
               <span className="font-bold">UN {row.un_number}</span>
               <span className={`ml-2 text-xs px-1.5 py-0.5 rounded ${CLASS_COLOR[row.class] || "bg-gray-100"}`}>Sınıf {row.class}</span>
               {row.packing_group && (
-                <span className="ml-1 text-xs px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 font-medium">AG {row.packing_group}</span>
+                <span className="ml-1 text-xs px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 font-medium">PG {row.packing_group}</span>
               )}
               {row.classification_code && <span className="ml-1 text-xs text-gray-400">[{row.classification_code}]</span>}
               <div className="text-gray-400 text-xs mt-0.5 truncate">{row.proper_shipping_name}</div>
