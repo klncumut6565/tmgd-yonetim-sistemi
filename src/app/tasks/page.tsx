@@ -126,7 +126,24 @@ export default function TasksPage() {
 
     const { error } = await supabase.from("tasks").update(patch).eq("id", task.id);
     if (error) {
-      setError("Durum güncellenemedi: " + hataCevir(error));
+      // TEŞHİS: "yetkin yok" hatası tekrarlıyorsa, sebebi tam olarak görmek için
+      // is_super_admin()/is_admin() fonksiyonlarını ve profil satırını GEÇERLİ
+      // OTURUMLA (SQL Editor'de mümkün olmayan şekilde) sorgula.
+      let teshis = "";
+      try {
+        const { data: userData } = await supabase.auth.getUser();
+        const uid = userData?.user?.id;
+        const [{ data: isSuper }, { data: isAdm }, { data: profil }, { data: uf }] = await Promise.all([
+          supabase.rpc("is_super_admin"),
+          supabase.rpc("is_admin"),
+          uid ? supabase.from("profiles").select("id, role, approval_status, is_active").eq("id", uid).maybeSingle() : Promise.resolve({ data: null }),
+          supabase.from("user_firms").select("firm_id").eq("firm_id", task.firm_id),
+        ]);
+        teshis = ` [TEŞHİS: is_super_admin()=${isSuper} is_admin()=${isAdm} profil.role=${profil?.role ?? "?"} onay=${profil?.approval_status ?? "?"} aktif=${profil?.is_active ?? "?"} bu_firmaya_atanma_sayısı=${uf?.length ?? "?"}]`;
+      } catch {
+        teshis = " [TEŞHİS: teşhis sorguları da başarısız oldu]";
+      }
+      setError("Durum güncellenemedi: " + hataCevir(error) + teshis);
       return;
     }
     loadTasks();
