@@ -1320,13 +1320,21 @@ export const BELGE_SABLONLARI: Record<string, BelgeSablonu> = {
           ["1.5", "Araçta ADR 8.1.4/8.1.5 uyarınca zorunlu yangın söndürücü ve kişisel koruyucu teçhizat eksiksiz mi?", "[   ]", "[   ]", "T19 / K8"],
           ["1.6", "Turuncu plaka ve tehlike etiketleri taşınan maddenin sınıfına uygun şekilde takılmış mı?", "[   ]", "[   ]", "T18 / K9"],
         ], note: "UYGUN/RED sütunlarındaki her RED işareti için düzeltici eylem tamamlanmadan sefer başlatılmaz." },
-      { type: "subheading", text: "2. Sefer Sırası İzleme" },
+      { type: "subheading", text: "2. Araç ve Ekipman Emniyet Kontrolleri" },
+      { type: "table", headers: ["No", "Kontrol Edilen Fiziksel Adım", "UYGUN", "RED"],
+        colWidths: [0.45, 4.4, 0.7, 0.7],
+        rows: [
+          ["2.1", "Sürücü kabininde, sürücünün anladığı dilde hazırlanmış yasal Yazılı Talimat (Kaza Talimatı, ADR 5.4.3) mevcut mu?", "[   ]", "[   ]"],
+          ["2.2", "Araç tonajına uygun sayı ve kapasitede, son kullanma tarihi geçmemiş, mühürlü yangın söndürme cihazları araçta konuşlu mu? (bkz. T19)", "[   ]", "[   ]"],
+          ["2.3", "Her bir mürettebat üyesi için koruyucu gözlük, maske, reflektörlü yelek, kıvılcım çıkarmayan el feneri ve acil durum donanımları (ADR çantası) tam mı?", "[   ]", "[   ]"],
+        ]},
+      { type: "subheading", text: "3. Sefer Sırası İzleme" },
       { type: "bullet", items: [
         "Sürücünün AETR/sürüş-dinlenme sürelerine uyumu takip edilir.",
         "Rota üzerinde tünel kısıtlaması olan güzergâh bulunuyorsa (ADR 1.9.5) buna uygun geçiş planlanır.",
         "Sefer sırasında yaşanan kaza, sızıntı, arıza veya kontrol noktası ihlali derhal TMGD'ye ve saha sorumlusuna bildirilir.",
       ]},
-      { type: "subheading", text: "3. Sefer Sonu Kapanış" },
+      { type: "subheading", text: "4. Sefer Sonu Kapanış" },
       { type: "bullet", items: [
         "Varışta teslim tutanağı/CMR imzalatılır, gerçekleşen varış saati kaydedilir.",
         "Boşaltma sonrası araç ADR Bölüm 5.3 kapsamındaki işaret ve levhalar bakımından kontrol edilir (boşsa kaldırılır).",
