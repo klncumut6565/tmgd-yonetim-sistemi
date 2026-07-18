@@ -965,16 +965,29 @@ function baslikTablosuCiz(
     doc.text(firmLines, M + 2, ustY + yukseklik / 2 - (firmLines.length - 1) * 2);
   }
 
-  // Orta: doküman türü + belge adı (dikey ortalanmış)
+  // Orta: doküman türü + belge adı (dikey ortalanmış).
+  // KONTROL FORMU türünde tür yazısı basılmaz (belge adı zaten "... Kontrol
+  // Formu" içerir); belge adı kutu içinde dikey ortalanır.
   const ortaX = M + 38 + (W - 2 * M - 38 - 45) / 2;
-  doc.setFontSize(12);
-  doc.setFont(FONT, "bold");
-  doc.setTextColor(...RENK_VURGU);
-  doc.text(sablon.docType, ortaX, ustY + 8, { align: "center" });
-  doc.setTextColor(0, 0, 0);
-  doc.setFontSize(9.5);
-  doc.setFont(FONT, "bold");
-  doc.text(adLines, ortaX, ustY + 14, { align: "center" });
+  const turuGoster = sablon.docType !== "KONTROL FORMU";
+  if (turuGoster) {
+    doc.setFontSize(12);
+    doc.setFont(FONT, "bold");
+    doc.setTextColor(...RENK_VURGU);
+    doc.text(sablon.docType, ortaX, ustY + 8, { align: "center" });
+    doc.setTextColor(0, 0, 0);
+    doc.setFontSize(9.5);
+    doc.setFont(FONT, "bold");
+    doc.text(adLines, ortaX, ustY + 14, { align: "center" });
+  } else {
+    doc.setFontSize(11);
+    doc.setFont(FONT, "bold");
+    doc.setTextColor(...RENK_VURGU);
+    const adBlokYuksekligi = adLines.length * 4.8;
+    const adBaslangicY = ustY + yukseklik / 2 - adBlokYuksekligi / 2 + 3.4;
+    doc.text(adLines, ortaX, adBaslangicY, { align: "center" });
+    doc.setTextColor(0, 0, 0);
+  }
 
   // Sağ: doküman no / tarihler / sayfa no
   doc.setFontSize(7);
