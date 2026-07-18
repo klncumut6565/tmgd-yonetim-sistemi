@@ -886,9 +886,13 @@ function tabloCiz(
 }
 
 // ---- Sayfalara bölme (dinamik başlık yüksekliğini dikkate alır) ------
+// Bölüm başlıklarından önce bırakılan ek boşluk (~1 satır) — bölüm
+// başlıklarının bir önceki satırın hemen dibine yapışmasını önler.
+const ALTBASLIK_ON_BOSLUK = 4.6;
+
 function satirYuksekligi(doc: JsPDFType, satir: Satir, genislik: number): number {
   if (satir.tur === "tablo") return tabloYuksekligiHesapla(doc, satir, genislik);
-  return SATIR_YUKSEKLIGI[satir.tur] + (satir.tur === "altbaslik" ? 2 : 0);
+  return SATIR_YUKSEKLIGI[satir.tur] + (satir.tur === "altbaslik" ? 2 + ALTBASLIK_ON_BOSLUK : 0);
 }
 
 function sayfalaraBol(
@@ -1061,7 +1065,9 @@ async function renderYapilandirilmisBelge(
   await fontuKaydet(doc);
 
   const bugun = new Date().toLocaleDateString("tr-TR");
-  const tamBaslik = `${code} — ${belgeAdi}`;
+  // İçerik ana başlığında kod ön eki (SA1 — vb.) kullanılmaz; kod zaten
+  // başlık kutusundaki "Doküman No" alanında yer alır.
+  const tamBaslik = belgeAdi;
 
   const satirlar = duzMetneCevir(doc, sablon, tamBaslik);
   if (notlar.trim()) {
@@ -1100,6 +1106,7 @@ async function renderYapilandirilmisBelge(
         doc.line(M, y + 1.8, M + genislik, y + 1.8);
         y += SATIR_YUKSEKLIGI.baslik + 1;
       } else if (satir.tur === "altbaslik") {
+        y += ALTBASLIK_ON_BOSLUK; // bölüm başlığı öncesi ~1 satır nefes boşluğu
         doc.setFillColor(...RENK_VURGU);
         doc.rect(M, y - 3.2, 1.3, 5.4, "F"); // sol vurgu çubuğu
         doc.setFontSize(10.5);
