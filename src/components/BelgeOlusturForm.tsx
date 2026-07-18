@@ -680,7 +680,7 @@ type Satir =
   | { tur: "altbaslik"; metin: string }
   | { tur: "paragraf"; metin: string }
   | { tur: "madde"; metin: string; numara?: number }
-  | { tur: "tablo"; headers?: string[]; rows: string[][]; note?: string };
+  | { tur: "tablo"; headers?: string[]; rows: string[][]; note?: string; colWidths?: number[] };
 
 const M = 15;
 const W = 210;
@@ -760,7 +760,7 @@ function duzMetneCevir(doc: JsPDFType, sablon: BelgeSablonu, belgeAdi: string): 
         );
       });
     } else if (b.type === "table") {
-      satirlar.push({ tur: "tablo", headers: b.headers, rows: b.rows, note: b.note });
+      satirlar.push({ tur: "tablo", headers: b.headers, rows: b.rows, note: b.note, colWidths: b.colWidths });
     }
   });
 
@@ -769,8 +769,12 @@ function duzMetneCevir(doc: JsPDFType, sablon: BelgeSablonu, belgeAdi: string): 
 
 // ---- Tablo ölçümü + çizimi -------------------------------------------
 // Sütun genişlikleri: ilk sütun biraz daha geniş (etiket sütunu), kalanlar eşit paylaşır.
-function tabloKolonGenislikleri(genislik: number, kolonSayisi: number): number[] {
+function tabloKolonGenislikleri(genislik: number, kolonSayisi: number, ozelOranlar?: number[]): number[] {
   if (kolonSayisi <= 1) return [genislik];
+  if (ozelOranlar && ozelOranlar.length === kolonSayisi) {
+    const toplam = ozelOranlar.reduce((a, b) => a + b, 0);
+    return ozelOranlar.map((o) => (genislik * o) / toplam);
+  }
   const ilkOran = 1.3;
   const toplamOran = ilkOran + (kolonSayisi - 1);
   const birim = genislik / toplamOran;
@@ -794,11 +798,11 @@ const TABLO_PADDING = 1.6;
 
 function tabloYuksekligiHesapla(
   doc: JsPDFType,
-  tablo: { headers?: string[]; rows: string[][]; note?: string },
+  tablo: { headers?: string[]; rows: string[][]; note?: string; colWidths?: number[] },
   genislik: number
 ): number {
   const kolonSayisi = (tablo.headers || tablo.rows[0] || []).length;
-  const kolonGenislikleri = tabloKolonGenislikleri(genislik, kolonSayisi);
+  const kolonGenislikleri = tabloKolonGenislikleri(genislik, kolonSayisi, tablo.colWidths);
   let yukseklik = 0;
 
   if (tablo.headers) {
@@ -823,13 +827,13 @@ function tabloYuksekligiHesapla(
 
 function tabloCiz(
   doc: JsPDFType,
-  tablo: { headers?: string[]; rows: string[][]; note?: string },
+  tablo: { headers?: string[]; rows: string[][]; note?: string; colWidths?: number[] },
   x: number,
   yBaslangic: number,
   genislik: number
 ) {
   const kolonSayisi = (tablo.headers || tablo.rows[0] || []).length;
-  const kolonGenislikleri = tabloKolonGenislikleri(genislik, kolonSayisi);
+  const kolonGenislikleri = tabloKolonGenislikleri(genislik, kolonSayisi, tablo.colWidths);
   let y = yBaslangic;
 
   const satirCiz = (

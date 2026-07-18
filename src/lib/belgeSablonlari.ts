@@ -14,7 +14,7 @@ export type TemplateBlock =
   | { type: "subheading"; text: string }
   | { type: "bullet"; items: string[] }
   | { type: "numbered"; items: string[] }
-  | { type: "table"; headers?: string[]; rows: string[][]; note?: string };
+  | { type: "table"; headers?: string[]; rows: string[][]; note?: string; colWidths?: number[] };
 
 export type BelgeSablonu = {
   docType: "PROSEDÜR" | "TALİMAT" | "KONTROL FORMU" | "LİSTE";
@@ -1299,43 +1299,107 @@ export const BELGE_SABLONLARI: Record<string, BelgeSablonu> = {
   // ═══════════════════════════ SEFER / AKTARIM (SA1-SA3) ═══════════════════════════
 
   SA1: {
-    docType: "LİSTE",
-    yayinTarihi: "01.11.2026",
-    amac: "Bu form, tehlikeli madde sevkiyatı yapan her seferin (aracın çıkış-varış sürecinin) takip edilmesi amacıyla kullanılır.",
+    docType: "KONTROL FORMU",
+    yayinTarihi: "18.07.2026",
+    amac: "Bu form, tehlikeli madde sevkiyatı yapan her seferin başlamadan önce sistemsel ve evraksal olarak ADR'ye uygunluğunun doğrulanmasını, sefer sırasında izlenmesini ve sefer sonunda kapatılmasını sağlamak amacıyla kullanılır.",
     kapsam: "Taşımacı faaliyeti kapsamındaki tüm seferler için geçerlidir.",
     blocks: [
       { type: "subheading", text: "Sefer Bilgileri" },
       { type: "bullet", items: [
-        "Sefer Tarihi", "Araç Plaka No", "Sürücü Adı Soyadı", "Çıkış Noktası", "Varış Noktası",
-        "Taşınan Madde / UN No / Miktar", "Çıkış Saati", "Varış Saati (Gerçekleşen)", "Sefer Durumu (Tamamlandı / Devam Ediyor / İptal)",
+        "Sefer No (ID): ……………", "Çıkış Noktası: ……………", "Varış Noktası: ……………",
+        "Çekici Plaka: ……………", "Dorse Plaka: ……………", "Sürücü Ad/Soyad: ……………",
       ]},
-      { type: "paragraph", text: "Her sefer tamamlandığında ilgili satır doldurularak kayıt altına alınır; olağandışı bir durum (gecikme, kaza, ihlal) varsa açıklama bölümüne not düşülür." },
+      { type: "subheading", text: "1. Sefer Öncesi Sistemsel ve Evraksal Eşleştirme" },
+      { type: "table", headers: ["No", "Kontrol Edilen Evraksal Bağlantı Adımı", "UYGUN", "RED", "İlgili Modül"],
+        colWidths: [0.45, 3.3, 0.7, 0.7, 1.1],
+        rows: [
+          ["1.1", "Sefere ait tüm UN numaralarını içeren güncel taşıma evrakı (ADR 5.4.1) düzenlenmiş ve basılmış mı?", "[   ]", "[   ]", "SA3"],
+          ["1.2", "Sahalar arası transfer varsa, karışık yükleme (ADR 7.5.2) ve segregasyon onayı alınmış mı?", "[   ]", "[   ]", "SA2"],
+          ["1.3", "Sürücünün SRC5 belgesi ve mesleki yeterlilik eğitim sertifikası geçerlilik tarihi içinde mi?", "[   ]", "[   ]", "L3"],
+          ["1.4", "Çekici/dorse için ADR Taşıt Uygunluk Belgesi mevcut ve süresi geçmemiş mi?", "[   ]", "[   ]", "T18"],
+          ["1.5", "Araçta ADR 8.1.4/8.1.5 uyarınca zorunlu yangın söndürücü ve kişisel koruyucu teçhizat eksiksiz mi?", "[   ]", "[   ]", "T19 / K8"],
+          ["1.6", "Turuncu plaka ve tehlike etiketleri taşınan maddenin sınıfına uygun şekilde takılmış mı?", "[   ]", "[   ]", "T18 / K9"],
+        ], note: "UYGUN/RED sütunlarındaki her RED işareti için düzeltici eylem tamamlanmadan sefer başlatılmaz." },
+      { type: "subheading", text: "2. Sefer Sırası İzleme" },
+      { type: "bullet", items: [
+        "Sürücünün AETR/sürüş-dinlenme sürelerine uyumu takip edilir.",
+        "Rota üzerinde tünel kısıtlaması olan güzergâh bulunuyorsa (ADR 1.9.5) buna uygun geçiş planlanır.",
+        "Sefer sırasında yaşanan kaza, sızıntı, arıza veya kontrol noktası ihlali derhal TMGD'ye ve saha sorumlusuna bildirilir.",
+      ]},
+      { type: "subheading", text: "3. Sefer Sonu Kapanış" },
+      { type: "bullet", items: [
+        "Varışta teslim tutanağı/CMR imzalatılır, gerçekleşen varış saati kaydedilir.",
+        "Boşaltma sonrası araç ADR Bölüm 5.3 kapsamındaki işaret ve levhalar bakımından kontrol edilir (boşsa kaldırılır).",
+        "Sefer sırasında bir RED/ihlal kaydı varsa kapanış öncesi düzeltici eylemin tamamlandığı teyit edilir.",
+      ]},
     ],
   },
 
   SA2: {
-    docType: "LİSTE",
-    yayinTarihi: "01.11.2026",
-    amac: "Bu kayıt, bir taşıma biriminden diğerine yapılan tehlikeli madde aktarım işlemlerinin (örn. araçtan araca, tanktan tanka) belgelenmesi amacıyla tutulur.",
-    kapsam: "Boşaltan ve Yükleyen faaliyetleri kapsamında gerçekleştirilen tüm aktarım işlemleri için geçerlidir.",
+    docType: "KONTROL FORMU",
+    yayinTarihi: "18.07.2026",
+    amac: "Bu form, sahalar arası veya taşıma birimleri arası (araçtan araca, tanktan tanka) yapılan tehlikeli madde aktarım işlemlerinin ADR 7.5.2 karışık yükleme/ayrım kurallarına uygunluğunun ve aktarımın fiziksel emniyet şartlarının denetlenerek kayıt altına alınmasını sağlar.",
+    kapsam: "Boşaltan ve Yükleyen faaliyetleri kapsamında gerçekleştirilen tüm sahalar arası aktarım işlemleri için geçerlidir.",
     blocks: [
       { type: "subheading", text: "Aktarım Bilgileri" },
       { type: "bullet", items: [
-        "Aktarım Tarihi", "Madde Adı / UN No", "Kaynak Taşıma Birimi (Plaka/Tank No)",
-        "Hedef Taşıma Birimi (Plaka/Tank No)", "Aktarılan Miktar", "Aktarımı Yapan Personel",
-        "Sızıntı/Dökülme Yaşandı mı? (Evet/Hayır — açıklama)",
+        "Kaynak Saha/Depo: ……………", "Hedef Saha/Depo: ……………",
+        "Gelen Araç Plaka: ……………", "Giden Araç Plaka: ……………",
+        "Madde Adı / UN No: ……………", "Aktarılan Miktar: ……………",
       ]},
-      { type: "paragraph", text: "Aktarım öncesi her iki taşıma biriminin de maddeye uygunluğu ve sızdırmazlığı kontrol edilir; aktarım sonrası kayıt bu forma işlenir." },
+      { type: "subheading", text: "1. ADR 7.5.2 Karışık Yükleme ve Ayrım (Segregasyon) Denetimleri" },
+      { type: "table", headers: ["No", "Kontrol Edilen Operasyonel Adım", "UYGUN", "RED", "Açıklama"],
+        colWidths: [0.45, 3.3, 0.7, 0.7, 1.5],
+        rows: [
+          ["1.1", "Aynı araca aktarılan farklı sınıftaki paketler arasında karışık yükleme yasağı (ADR 7.5.2 matrisi) ihlali var mı?", "[   ]", "[   ]", ""],
+          ["1.2", "Toksik (Sınıf 6.1) veya bulaşıcı (Sınıf 6.2) maddeler gıda/hayvan yemi maddelerinden ayrı konumlandırıldı mı? (ADR 7.5.4)", "[   ]", "[   ]", ""],
+          ["1.3", "Aktarılan ürün miktarı kaynak sahanın L1 envanterinden düşüldü, hedef sahanın kabul limitleri doğrulandı mı?", "[   ]", "[   ]", ""],
+          ["1.4", "Aktarılan ambalaj/tankın taşınacak madde ile kimyasal uyumluluğu ve sızdırmazlığı önceden kontrol edildi mi?", "[   ]", "[   ]", ""],
+        ]},
+      { type: "subheading", text: "2. Fiziksel Aktarım ve Emniyet Kontrolleri" },
+      { type: "table", headers: ["No", "Kontrol Edilen Operasyonel Adım", "UYGUN", "RED", "Açıklama"],
+        colWidths: [0.45, 3.3, 0.7, 0.7, 1.5],
+        rows: [
+          ["2.1", "Aktarım öncesi/sırasında paketlerde delinme, ezilme, sızıntı veya gaz kaçırma emaresi var mı? (Varsa T16 derhal tetiklenmeli)", "[   ]", "[   ]", ""],
+          ["2.2", "Yeni araca aktarılan ambalajlar devrilmeye/kaymaya karşı takoz, kayış veya hava yastığıyla sabitlendi mi?", "[   ]", "[   ]", ""],
+          ["2.3", "Hedef araca yükleme bitiminde tehlike etiketleri ve turuncu plakalar yükün sınıfına göre güncellendi mi?", "[   ]", "[   ]", ""],
+        ], note: "2.1'de RED işaretlenmesi halinde T16 (Dolum Sonrası Sızdırmazlık ve Bulaşma Kontrol Talimatı) prosedürü derhal devreye alınır." },
+      { type: "paragraph", text: "Aktarım öncesi her iki taşıma biriminin de maddeye uygunluğu ve sızdırmazlığı kontrol edilir; sızıntı/dökülme yaşanması halinde açıklama sütununa not düşülür ve TMGD'ye bildirilir." },
     ],
   },
 
   SA3: {
-    docType: "LİSTE",
-    yayinTarihi: "01.11.2026",
-    amac: "Bu kayıt, firmanın ADR kapsamındaki tüm belgelerinin (TMFB, sözleşme, sertifikalar, muayene belgeleri vb.) tek bir yerden takip edilmesi amacıyla tutulur.",
-    kapsam: "İşletmenin ADR mevzuatı kapsamında sahip olması gereken tüm belgeler için geçerlidir.",
+    docType: "KONTROL FORMU",
+    yayinTarihi: "18.07.2026",
+    amac: "Bu form, düzenlenen taşıma evrakının ADR Bölüm 5.4.1 kapsamındaki zorunlu içerik unsurlarını taşıyıp taşımadığının sevkiyat öncesi kontrol edilmesini ve firmanın ADR kapsamındaki diğer belgelerinin (TMFB, sertifikalar, muayene belgeleri) tek noktadan takip edilmesini sağlar.",
+    kapsam: "Gönderen ve Taşımacı faaliyetleri kapsamında düzenlenen tüm taşıma evrakları ile işletmenin ADR mevzuatı kapsamında sahip olması gereken tüm belgeler için geçerlidir.",
     blocks: [
-      { type: "subheading", text: "Takip Edilecek Belgeler" },
+      { type: "subheading", text: "Evrak Bilgileri" },
+      { type: "bullet", items: [
+        "Sefer / Evrak ID: ……………", "Kontrol Tarihi: ……………", "Plaka / Sürücü: ……………",
+      ]},
+      { type: "subheading", text: "1. Zorunlu Metin ve İçerik Kontrolleri (ADR 5.4.1.1)" },
+      { type: "table", headers: ["No", "Kontrol Kriteri / Madde Gerekliliği", "UYGUN", "RED", "Açıklama"],
+        colWidths: [0.45, 3.3, 0.7, 0.7, 1.5],
+        rows: [
+          ["1.1", "UN Numarası: Başına \"UN\" ibaresi konularak doğru girilmiş mi? (Örn: UN 1203)", "[   ]", "[   ]", ""],
+          ["1.2", "Resmi Taşıma Adı (PSN): ADR 3.2 Tablo A'ya göre tam ve uygun mu?", "[   ]", "[   ]", ""],
+          ["1.3", "Sınıf ve tehlike etiketleri: Ana ve varsa ilave risk etiket numaraları parantez içinde belirtilmiş mi?", "[   ]", "[   ]", ""],
+          ["1.4", "Ambalaj Grubu (PG): Varsa PG I, PG II veya PG III olarak doğru yazılmış mı?", "[   ]", "[   ]", ""],
+          ["1.5", "Tünel Kısıtlama Kodu: Parantez içinde büyük harfle belirtilmiş mi? (Örn: (D/E))", "[   ]", "[   ]", ""],
+          ["1.6", "Paket sayısı, tipi ve toplam brüt kütle net şekilde belirtilmiş mi? (ADR 5.4.1.1.1)", "[   ]", "[   ]", ""],
+          ["1.7", "Gönderen ve alıcı bilgileri (unvan, adres) eksiksiz mi?", "[   ]", "[   ]", ""],
+        ]},
+      { type: "subheading", text: "2. Özel Durum ve Muafiyet Kontrolleri" },
+      { type: "table", headers: ["No", "Kontrol Kriteri / Madde Gerekliliği", "UYGUN", "RED", "Açıklama"],
+        colWidths: [0.45, 3.3, 0.7, 0.7, 1.5],
+        rows: [
+          ["2.1", "ADR 1.1.3.6 muafiyeti: Taşıma kategorisi puan hesabı yapılmış ve toplam puan 1000'in altında mı?", "[   ]", "[   ]", ""],
+          ["2.2", "Sınırlı miktar (LQ) sevkiyatlarında \"Sınırlı Miktarda Tehlikeli Madde\" işaretlemesi (ADR 3.4) yapılmış mı?", "[   ]", "[   ]", ""],
+          ["2.3", "Boş temizlenmemiş ambalajlar için \"BOŞ AMBALAJ, 3 (D/E)\" veya \"BOŞ TANK-KONTEYNER, 9, (E)\" ibaresi mevcut mu?", "[   ]", "[   ]", ""],
+          ["2.4", "Çevreye zararlı maddelerde \"ÇEVREYE ZARARLI\" veya \"DENİZ KİRLETİCİ\" ibaresi var mı?", "[   ]", "[   ]", ""],
+        ]},
+      { type: "subheading", text: "3. Takip Edilecek Diğer ADR Belgeleri" },
       { type: "bullet", items: [
         "Tehlikeli Madde Faaliyet Belgesi (TMFB) ve geçerlilik tarihi",
         "TMGD Hizmet Sözleşmesi ve TMGD Sertifikası",
@@ -1344,7 +1408,7 @@ export const BELGE_SABLONLARI: Record<string, BelgeSablonu> = {
         "Basınçlı ekipman/tank muayene belgeleri",
         "Yıllık Faaliyet Raporları ve Ziyaret Raporları",
       ]},
-      { type: "paragraph", text: "Bu kayıt, Belge Takip modülündeki verilerle tutarlı olacak şekilde düzenli olarak güncellenir; süresi yaklaşan/geçen belgeler öncelikli olarak takip edilir." },
+      { type: "paragraph", text: "1. ve 2. bölümlerdeki her RED işareti, evrak sevkiyat öncesi düzeltilmeden sefer başlatılmaz. 3. bölüm, Belge Takip modülündeki verilerle tutarlı olacak şekilde düzenli güncellenir." },
     ],
   },
 };
