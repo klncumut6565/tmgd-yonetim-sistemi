@@ -745,136 +745,135 @@ export const BELGE_SABLONLARI: Record<string, BelgeSablonu> = {
 
   P6: {
     docType: "PROSEDÜR",
-    yayinTarihi: "01.01.2026",
-    amac: "Bu prosedür, tehlikeli maddelerin ADR Bölüm 4.1'deki paketleme talimatlarına uygun şekilde ambalajlanmasını sağlamak amacıyla hazırlanmıştır.",
-    kapsam: "Tehlikeli maddelerin paketleme, ambalajlama ve etiketleme işlemlerinde görev alan tüm personel için geçerlidir.",
+    yayinTarihi: "17.06.2026",
+    amac: "Bu prosedür, tehlikeli maddelerin ADR (Tehlikeli Malların Karayoluyla Taşınması Hakkında Avrupa Anlaşması) 4.1'de belirtilen paketleme talimatlarına uygun şekilde paketlenmesi, iş sağlığı ve güvenliği, çevre koruma ve yasal uygunluk çerçevesinde alınması gereken önlemleri, süreçleri ve sorumlulukları tanımlamayı amaçlamaktadır.",
+    kapsam: "Bu prosedür, işletme bünyesinde gerçekleştirilen tüm tehlikeli madde paketleme işlemlerini ve bu işlemlerde görev alan çalışanları, kullanılan ekipmanları, ambalajlama süreçlerini ve ilgili diğer faaliyetleri kapsar.",
     tanimlar: [
-      { terim: "UN Sertifikalı Ambalaj", tanim: "ADR Bölüm 6'daki test ve onay kriterlerini karşılayarak UN kodu almış ambalajdır." },
-      { terim: "Karışık Paketleme", tanim: "Birden fazla iç ambalajın tek bir dış ambalaj içinde birlikte paketlenmesidir." },
+      { terim: "ADR", tanim: "Tehlikeli Malların Karayolu ile Uluslararası Taşımacılığına İlişkin Avrupa Anlaşmasıdır." },
+      { terim: "Paketleyen", tanim: "Tehlikeli maddeleri, büyük ambalajlara ve orta boy dökme yük konteynerler de dâhil olmak üzere değişik tipteki ambalajlara yerleştiren ve gerektiğinde paketleri taşınmak üzere hazır hale getiren işletmelerdir." },
+      { terim: "Taşıma Evrakı", tanim: "ADR Bölüm 5.4.1'deki bilgileri içerecek şekilde gönderen tarafından düzenlenmiş belgedir." },
+      { terim: "Tehlikeli Madde (Tehlikeli Yük)", tanim: "ADR Bölüm 3.2'deki tehlikeli maddelerin listelendiği Tablo A'da yer alan madde ve nesnelerdir." },
+      { terim: "UN Numarası", tanim: "Tehlikeli maddelerin taşımacılıkta tanımlanmasını sağlayan dört haneli koddur." },
+      { terim: "Güvenlik Bilgi Formu (SDS)", tanim: "Maddelerin özelliklerini ve güvenlik önlemlerini içeren belgedir." },
+      { terim: "Tehlikeli Madde Güvenlik Danışmanı (TMGD)", tanim: "İfa edeceği görev ve nitelikleri ADR Bölüm 1.8.3'te belirtilen ve Bakanlık tarafından Tehlikeli Madde Güvenlik Danışmanı Sertifikası düzenlenerek yetkilendirilen gerçek kişidir." },
+      { terim: "Tehlike İkaz İşareti", tanim: "Tehlikeli yük taşımacılığında kullanılan ambalajlardaki yüklerin sınıf, tehlike derecesi ve muhteviyatı gibi özelliklerini ifade eden, harf, rakam ve şekillerin yer aldığı etikettir." },
+      { terim: "KKD (Kişisel Koruyucu Donanım)", tanim: "Çalışanları iş risklerine karşı koruyan ekipmanlardır (eldiven, maske vb.)." },
     ],
     blocks: [
-      { type: "subheading", text: "1. Paketleme Öncesi Hazırlık" },
-      { type: "numbered", items: [
-        "Maddenin ADR sınıfı, ambalaj grubu ve ilgili paketleme talimatı (P-kodu, ADR 4.1.4) SDS üzerinden belirlenir.",
-        "Kullanılacak ambalajın UN sertifikalı ve maddeye uygun (kimyasal uyumluluk, basınç dayanımı) olduğu doğrulanır.",
-        "Ambalaj dış yüzeyi hasar, çatlak veya deformasyon açısından kontrol edilir; hasarlı ambalaj kullanılmaz.",
-      ]},
-      { type: "subheading", text: "2. Paketleme İşlemi" },
-      { type: "numbered", items: [
-        "Madde, ADR 4.1'deki genel ve özel paketleme talimatlarına uygun olarak ambalaja yerleştirilir.",
-        "Karışık paketleme yapılacaksa ADR 4.1.10'daki uyumluluk kısıtlamalarına uyulur; reaktif maddeler bir arada paketlenmez.",
-        "Ambalaj, taşıma sırasında sızıntı veya dökülmeyi önleyecek şekilde sıkıca kapatılır.",
-      ]},
-      { type: "subheading", text: "3. Etiketleme ve Belgeleme" },
-      { type: "numbered", items: [
-        "Her ambalaj üzerine ADR'ye uygun tehlike sınıf etiketi, UN numarası ve gerekiyorsa yönlendirme işareti (\"Yukarı Bu Taraf\") yapıştırılır.",
-        "Paketleme işlemi, kullanılan ambalaj bilgileri ve kontrol sonucu K6 kontrol formuna kaydedilir.",
-      ]},
-    ],
-  },
-
-  T9: {
-    docType: "TALİMAT",
-    yayinTarihi: "01.11.2026",
-    amac: "Bu talimat, tehlikeli madde paketlemesinde kullanılan basınçlı ekipmanların (basınçlı kaplar, taşınabilir tanklar vb.) periyodik test ve muayenelerinin takibini düzenler.",
-    kapsam: "Paketleme sürecinde kullanılan tüm basınçlı ekipmanlar için geçerlidir.",
-    blocks: [
-      { type: "subheading", text: "Muayene Takibi" },
+      { type: "subheading", text: "4. Prosedür Adımları" },
+      { type: "subheading", text: "4.1. Paketleme Öncesi Yapılacak İşlemler" },
+      { type: "subheading", text: "4.1.1. Risk Değerlendirmesi ve Planlama" },
       { type: "bullet", items: [
-        "Her basınçlı ekipmanın periyodik muayene ve test tarihleri (ADR standartlarına göre) bir takip listesinde tutulur.",
-        "Muayene süresi dolmuş veya dolmak üzere olan ekipmanlar kullanım dışı bırakılır; kullanılmaz.",
-        "Basınç testi, sızdırmazlık testi ve dış yüzey kontrolü sonuçları belgelenir ve arşivlenir.",
+        "Taşınacak tehlikeli maddenin türü ve özellikleri analiz edilir.",
+        "Maddenin ADR sınıfı ve UN numarası belirlenir.",
+        "Yapılan analizlere göre uygun ambalaj türü ve güvenlik önlemleri belirlenir.",
+        "SDS (Güvenlik Bilgi Formu) raporları tedarik edilir.",
       ]},
-      { type: "subheading", text: "Uygulama Adımları" },
-      { type: "numbered", items: [
-        "Ekipman envanteri çıkarılır; her ekipmana benzersiz bir tanımlama numarası verilir.",
-        "Muayene tarihi yaklaşan ekipmanlar için önceden yetkili muayene kuruluşuyla randevu planlanır.",
-        "Muayene sonucu \"uygun\" çıkmayan ekipman derhal hizmet dışı bırakılır ve T10 talimatına göre bertaraf/iade süreci başlatılır.",
-      ]},
-    ],
-  },
-
-  T10: {
-    docType: "TALİMAT",
-    yayinTarihi: "01.11.2026",
-    amac: "Bu talimat, periyodik muayene süresi geçmiş veya muayeneden \"uygunsuz\" çıkan basınçlı ekipmanların güvenli şekilde hizmet dışı bırakılması ve bertaraf edilmesini düzenler.",
-    kapsam: "Muayene süresi dolmuş, hasarlı veya uygunsuz bulunan tüm basınçlı ekipmanlar için geçerlidir.",
-    blocks: [
-      { type: "subheading", text: "Uygulama" },
-      { type: "numbered", items: [
-        "Muayenesi geçmiş/uygunsuz ekipman derhal kullanımdan çekilir ve \"KULLANILAMAZ\" etiketiyle işaretlenir.",
-        "İçinde tehlikeli madde kalıntısı varsa, ADR ve yerel mevzuata uygun şekilde boşaltılır ve arındırılır.",
-        "Ekipman, tamir/yeniden muayene için yetkili kuruluşa gönderilir ya da geri dönüşü olmayacak şekilde bertaraf edilir.",
-        "Bertaraf işlemi lisanslı atık yönetim firması aracılığıyla yapılır ve bertaraf belgesi arşivlenir.",
-        "Hizmet dışı bırakılan ekipman, envanterden düşülür ve takip kaydına işlenir.",
-      ]},
-    ],
-  },
-
-  T11: {
-    docType: "TALİMAT",
-    yayinTarihi: "01.11.2026",
-    amac: "Bu talimat, farklı tehlikeli maddelerin tek bir dış ambalaj içinde birlikte paketlenmesine (karışık paketleme) ilişkin ADR 4.1.10 kurallarını belirler.",
-    kapsam: "Birden fazla iç ambalajın aynı dış ambalajda paketleneceği tüm durumlar için geçerlidir.",
-    blocks: [
-      { type: "subheading", text: "Genel Kurallar" },
+      { type: "subheading", text: "4.1.2. Ambalaj Seçimi ve Hazırlığı" },
       { type: "bullet", items: [
-        "Farklı tehlikeli maddeler, ADR 4.1.10.4'teki uyumluluk tablosunda izin verilmedikçe aynı dış ambalajda birlikte paketlenemez.",
-        "Birbiriyle tehlikeli reaksiyona girebilecek maddeler (yanma, ısı/gaz üretimi, patlama vb.) kesinlikle bir arada paketlenmez.",
-        "İç ambalajlar, dış ambalaj içinde hareket etmeyecek ve birbirine temas etmeyecek şekilde sabitlenir/ayrılır.",
+        "ADR 4.1'e uygun, UN onaylı ambalajlar seçilir.",
+        "Ambalajların temiz, hasarsız ve uygunluk işaretlerinin belirgin olduğu doğrulanır.",
+        "Gerekirse ambalaja dolum öncesi emici materyaller temin edilir.",
       ]},
-      { type: "subheading", text: "Uygulama" },
-      { type: "numbered", items: [
-        "Karışık paketleme öncesi tüm maddelerin SDS'leri incelenerek kimyasal uyumluluk teyit edilir.",
-        "Uyumluluk tablosu kontrol edilir; izin verilmeyen kombinasyon tespit edilirse maddeler ayrı ambalajlanır.",
-        "Karışık paket dış yüzeyine, içerdiği tüm maddelerin etiket ve UN numaraları eksiksiz işlenir.",
-      ]},
-    ],
-  },
-
-  T12: {
-    docType: "TALİMAT",
-    yayinTarihi: "01.11.2026",
-    amac: "Bu talimat, paketlenen tehlikeli maddelerin ambalaj işaretleme ve etiketleme uygunluğunun kontrolünü düzenler.",
-    kapsam: "Paketleme sonrası tüm ambalajlı ürünler için geçerlidir.",
-    blocks: [
-      { type: "subheading", text: "Kontrol Edilecek Hususlar" },
+      { type: "subheading", text: "4.1.3. Eğitim ve Bilgilendirme" },
       { type: "bullet", items: [
-        "Her ambalaj üzerinde tehlike sınıf etiketi, UN numarası ve varsa yönlendirme/çevresel tehlike işaretleri bulunmalıdır.",
-        "Etiketler suya, darbeye ve aşınmaya dayanıklı malzemeden olmalı ve ambalaj üzerinde görünür şekilde konumlandırılmalıdır.",
-        "Ambalaj üzerindeki UN kodlaması (ör. \"UN 4G/X...\"), kullanılan ambalajın test/onay bilgisini doğru şekilde yansıtmalıdır.",
-        "Sınırlı miktar (LQ) veya istisna miktar (EQ) kapsamında paketleme yapılıyorsa ilgili özel işaretleme (LQ elması, EQ işareti) uygulanmalıdır.",
+        "Çalışanlara tehlikeli maddelerin paketlenmesi, işaretlenmesi, acil durum prosedürleri ve ADR gereklilikleri hakkında eğitim verilir.",
+        "Çalışanların KKD kullanımı konusunda bilgilendirilmesi sağlanır.",
       ]},
-      { type: "subheading", text: "Uygulama" },
-      { type: "numbered", items: [
-        "Paketleme tamamlandıktan sonra her ambalaj tek tek kontrol edilir ve K6 kontrol formuna işlenir.",
-        "Etiketleme eksik/hatalı bulunan ambalajlar sevke çıkarılmadan düzeltilir.",
-      ]},
-    ],
-  },
-
-  K6: {
-    docType: "KONTROL FORMU",
-    yayinTarihi: "01.11.2026",
-    blocks: [
-      { type: "subheading", text: "Paketleme Bilgileri" },
-      { type: "bullet", items: ["Tarih: ……………", "Madde Adı / UN No: ……………", "Ambalaj Türü ve UN Kodu: ……………", "Paketleyen İşletme: ……………"] },
-      { type: "subheading", text: "Kontrol Alanları (Evet / Hayır)" },
+      { type: "subheading", text: "4.2. Paketleme Sırasında Yapılacak İşlemler" },
+      { type: "subheading", text: "4.2.1. Çalışma Alanının Güvenliği" },
       { type: "bullet", items: [
-        "Ambalaj UN sertifikalı ve maddeye uygun mu?",
-        "Ambalaj dış yüzeyinde hasar/çatlak/deformasyon var mı?",
-        "Basınçlı ekipman kullanıldıysa muayene/test tarihi geçerli mi?",
-        "Karışık paketleme yapıldıysa uyumluluk tablosuna uygun mu?",
-        "Etiketleme ve UN numarası eksiksiz mi?",
-        "Sınırlı/istisna miktar işaretlemesi (varsa) doğru mu?",
-        "Ambalaj sıkıca kapatıldı, sızıntı riski yok mu?",
+        "Paketleme alanında yalnızca yetkili personelin bulunması sağlanır.",
+        "Alan temiz ve düzenli tutulur; dökülme ve sızıntılara karşı dökülme kitleri hazır bulundurulur.",
       ]},
-      { type: "subheading", text: "Kontrolü Yapan" },
-      { type: "bullet", items: ["Adı: ……………", "İmzası: ……………", "Tarih: ……………"] },
+      { type: "subheading", text: "4.2.2. Ambalajlama Süreci" },
+      { type: "bullet", items: [
+        "Tehlikeli madde, ambalajlama talimatlarında belirtilen şekilde ve miktarda ambalajlanır.",
+        "Ambalajın kapasitesi aşılmamalı, uygun dolum oranı sağlanmalıdır.",
+        "Kapaklar sıkıca kapatılır, sızdırmazlık kontrolü yapılır.",
+      ]},
+      { type: "subheading", text: "4.2.3. Etiketleme ve İşaretleme" },
+      { type: "paragraph", text: "Ambalajlara ADR'ye uygun olarak aşağıdaki işaretlemeler yapılır:" },
+      { type: "bullet", items: [
+        "Sınıf etiketi (ör. yanıcı sıvılar için 3 numaralı etiket).",
+        "UN sertifikalı olduğunu gösteren ambalaj kodu.",
+        "UN numarası ve gerekli ise madde adı yazılır.",
+        "Gerekirse \"kırılabilir\" veya \"üst taraf bu yön\" gibi ek işaretlemeler yapılır.",
+      ]},
+      { type: "paragraph", text: "Her bir ambalaj kodu farklılık gösterir. Örnek kodlama: 5M2/Y30/S/21, TR/TSE01*0017" },
+      { type: "table", headers: ["Kod Bileşeni", "Anlamı"],
+        colWidths: [1.1, 3.2],
+        rows: [
+          ["5M2", "Çok katmanlı su geçirmez kâğıt torba"],
+          ["Y", "Paketleme grubu II ve III olan ürünler için uygun ambalaj"],
+          ["30", "Katılar veya iç ambalajlar içerecek şekilde tasarlanmış ambalajlar için kilogram cinsinden azami brüt kütle"],
+          ["S", "Ambalajın katı malzemelerin veya iç ambalajların taşınmasına yönelik tasarlandığını gösteren harf"],
+          ["21, TR", "Üretim yılı ve üretildiği ülke"],
+          ["TSE01*0017", "Yetkili makam onayı ve üretici kuruluş yetki numarası"],
+        ]},
+      { type: "subheading", text: "4.3. Paketleme Sonrasında Yapılacak İşlemler" },
+      { type: "subheading", text: "4.3.1. Kontrol ve Onay" },
+      { type: "bullet", items: [
+        "Ambalajların kapakları ve contalarının sızdırmaz olduğu doğrulanır.",
+        "Etiketlerin eksiksiz ve doğru şekilde yapıştırıldığı kontrol edilir.",
+      ]},
+      { type: "subheading", text: "4.3.2. Depolama Hazırlığı" },
+      { type: "bullet", items: [
+        "Paketlenen maddeler, İSG'nin depolama gerekliliklerine uygun şekilde ayrılmış alanlara taşınır.",
+        "Depolama sırasında uygun sıcaklık ve nem kontrolü sağlanır.",
+      ]},
+      { type: "subheading", text: "4.3.3. Atık Yönetimi" },
+      { type: "bullet", items: [
+        "Kullanılan atık malzemeler (ör. dökülme kitleri, temizlik bezleri) tehlikeli atık yönetim prosedürlerine uygun şekilde bertaraf edilir.",
+      ]},
+      { type: "subheading", text: "4.3.4. Kayıt Tutma" },
+      { type: "bullet", items: [
+        "Paketleme sürecine ait belgeler (ambalaj türü, dolum miktarı, etiket bilgileri, kontrol formları) saklanır.",
+        "Eğitim kayıtları, risk değerlendirme raporları ve uygunsuzluk raporları düzenlenir.",
+      ]},
+      { type: "subheading", text: "4.4. Acil Durumda Yapılacak İşlemler" },
+      { type: "subheading", text: "4.4.1. Sızıntı veya Dökülme Durumu" },
+      { type: "bullet", items: [
+        "Alan derhal tahliye edilir.",
+        "Dökülen maddenin türüne uygun temizlik ekipmanları kullanılarak müdahale edilir.",
+        "Durum üst yönetime ve ilgili yetkililere raporlanır.",
+      ]},
+      { type: "subheading", text: "4.4.2. Yangın veya Patlama Riski" },
+      { type: "bullet", items: [
+        "Yangın söndürücüler (ör. köpük veya kuru kimyasal) kullanılarak müdahale edilir.",
+        "Yetkililer bilgilendirilir ve çevredeki alan güvenlik çemberine alınır.",
+      ]},
+      { type: "subheading", text: "4.4.3. Yaralanma veya Zehirlenme Durumu" },
+      { type: "bullet", items: [
+        "Yaralanan kişiye ilk yardım yapılır ve acil sağlık ekiplerine haber verilir.",
+        "Olay raporu hazırlanır ve risk yönetim prosedürleri yeniden değerlendirilir.",
+      ]},
+      { type: "subheading", text: "5. Sorumluluklar" },
+      { type: "subheading", text: "5.1. Çalışanların Sorumlulukları" },
+      { type: "bullet", items: [
+        "Paketleme sırasında talimatlara uygun şekilde çalışmak, KKD kullanmak ve prosedüre riayet etmek.",
+      ]},
+      { type: "subheading", text: "5.2. Yöneticilerin Sorumlulukları" },
+      { type: "bullet", items: [
+        "Çalışanların eğitilmesini ve prosedüre uygun şekilde çalışmasını sağlamak.",
+        "Paketleme işlemlerini denetlemek ve uygunsuzluk durumunda müdahale etmek.",
+      ]},
+      { type: "subheading", text: "5.3. İş Sağlığı ve Güvenliği Ekibinin Sorumlulukları" },
+      { type: "bullet", items: [
+        "Prosedürün güncelliğini sağlamak ve risk değerlendirmelerini düzenli olarak yapmak.",
+        "Acil durum prosedürlerinin uygulanabilirliğini denetlemek.",
+      ]},
+      { type: "subheading", text: "6. Kayıt ve Raporlama" },
+      { type: "bullet", items: [
+        "Paketleme işlemleri ile ilgili tüm belgeler en az 5 yıl saklanmalıdır.",
+        "Eğitim katılım belgeleri, risk değerlendirme raporları, denetim sonuçları ve uygunsuzluk bildirimleri düzenli olarak güncellenmelidir.",
+      ]},
+      { type: "subheading", text: "7. Revizyon ve İyileştirme" },
+      { type: "bullet", items: [
+        "Prosedür, ADR mevzuatındaki değişikliklere göre düzenli olarak gözden geçirilir ve güncellenir.",
+      ]},
     ],
   },
-
-  // ═══════════════════════════ DOLDURAN (P7, T13-T17, K7) ═══════════════════════════
 
   P7: {
     docType: "PROSEDÜR",

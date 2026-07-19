@@ -26,6 +26,11 @@ import {
   catalogForActivities,
 } from "@/lib/belgeKatalogu";
 import { belgeSablonu, BelgeSablonu } from "@/lib/belgeSablonlari";
+import {
+  SIAM_LOGO_B64,
+  SIAM_LOGO_EN_BOY,
+  SIAM_QR_B64,
+} from "@/lib/kapakVarliklari";
 import type { jsPDF as JsPDFType } from "jspdf";
 
 type Firm = {
@@ -261,6 +266,21 @@ export default function BelgeOlusturForm({ fixedFirmId, initialFirmId, compact =
         const sablon = belgeSablonu(item.code);
 
         if (sablon) {
+          // Kapakta yazacak "TEHLİKELİ MADDE FAALİYET BELGESİ KAPSAMI"
+          // bilgisi: belgenin kendi faaliyet konuları, firmanınkilerle
+          // kesiştirilerek bulunur. Belge tüm firmalar için ortaksa
+          // (activities boş) firmanın tüm faaliyetleri yazılır.
+          const firmaFaaliyetleri = firm.activities || [];
+          const belgeFaaliyetleri =
+            item.activities.length === 0
+              ? firmaFaaliyetleri
+              : item.activities.filter((a) => firmaFaaliyetleri.includes(a));
+          const faaliyetKapsami = (
+            belgeFaaliyetleri.length > 0 ? belgeFaaliyetleri : item.activities
+          )
+            .map((a) => ACTIVITY_LABELS[a] || a)
+            .join(" · ");
+
           await renderYapilandirilmisBelge(
             doc,
             firm.name,
@@ -270,7 +290,8 @@ export default function BelgeOlusturForm({ fixedFirmId, initialFirmId, compact =
             logo,
             notes,
             hazirlayanAdi,
-            onaylayanAdi.trim()
+            onaylayanAdi.trim(),
+            faaliyetKapsami
           );
         } else {
           await fontuKaydet(doc);
@@ -944,7 +965,8 @@ function baslikTablosuCiz(
   sayfaNo: number,
   toplamSayfa: number,
   yukseklik: number,
-  adLines: string[]
+  adLines: string[],
+  sayfaEtiketi?: string
 ) {
   const ustY = 8;
 
@@ -1000,11 +1022,20 @@ function baslikTablosuCiz(
   doc.text(`Doküman No: ${code}`, sagX, ustY + 5);
   doc.text(`Yayın Tarihi: ${sablon.yayinTarihi}`, sagX, ustY + 10);
   doc.text(`Revizyon Tarihi: ${bugun}`, sagX, ustY + 15);
-  doc.text(`Sayfa No: Sayfa ${sayfaNo} / ${toplamSayfa}`, sagX, ustY + 20);
+  doc.text(
+    sayfaEtiketi ?? `Sayfa No: Sayfa ${sayfaNo} / ${toplamSayfa}`,
+    sagX,
+    ustY + 20
+  );
 }
 
-function altTabloCiz(doc: JsPDFType, hazirlayanAdi: string, onaylayanAdi: string) {
-  const y = 275;
+function altTabloCiz(
+  doc: JsPDFType,
+  hazirlayanAdi: string,
+  onaylayanAdi: string,
+  ustY?: number
+) {
+  const y = ustY ?? 275;
   const yukseklik = 18;
   const kolonGenislik = (W - 2 * M) / 3;
 
@@ -1051,6 +1082,121 @@ function altTabloCiz(doc: JsPDFType, hazirlayanAdi: string, onaylayanAdi: string
   });
 }
 
+// ---------------------------------------------------------------------
+// KAPAK SAYFASI
+//
+// Her belgenin ilk sayfası. Referans TMGDK formatına uygun olarak:
+//   • üstte standart başlık kutusu (firma logosu + belge adı + doküman no,
+//     sayfa alanında "Kapak Sayfası" yazar),
+//   • ortada firma unvanı ve belgenin konusu,
+//   • altında faaliyet belgesi kapsamı,
+//   • en altta HAZIRLAYAN/KONTROL EDEN/ONAYLAYAN tablosu,
+//   • sağ alt köşede TMGDK kurumsal logosu ve karekodu bulunur.
+//
+// Karekod ve TMGDK logosu firmadan bağımsızdır; başka firmaların logoları
+// kapakta yer almaz (yalnızca belgenin düzenlendiği firmanın logosu).
+// ---------------------------------------------------------------------
+function kapakSayfasiCiz(
+  doc: JsPDFType,
+  firmAdi: string,
+  code: string,
+  belgeAdi: string,
+  sablon: BelgeSablonu,
+  logo: LogoData,
+  bugun: string,
+  faaliyetKapsami: string,
+  hazirlayanAdi: string,
+  onaylayanAdi: string,
+  baslikYukseklik: number,
+  adLines: string[]
+) {
+  baslikTablosuCiz(
+    doc,
+    firmAdi,
+    code,
+    belgeAdi,
+    sablon,
+    logo,
+    bugun,
+    1,
+    1,
+    baslikYukseklik,
+    adLines,
+    "Sayfa No: Kapak Sayfası"
+  );
+
+  const genislik = W - 2 * M;
+  const ortaX = W / 2;
+
+  // Firma unvanı — sayfanın üst-orta bölümünde, büyük ve kalın
+  doc.setFontSize(15);
+  doc.setFont(FONT, "bold");
+  const unvanSatirlari: string[] = doc.splitTextToSize(
+    firmAdi.toLocaleUpperCase("tr-TR"),
+    genislik - 20
+  );
+  let y = 105;
+  unvanSatirlari.forEach((satir) => {
+    doc.text(satir, ortaX, y, { align: "center" });
+    y += 8;
+  });
+
+  // Belgenin konusu — madde işaretli, referans belgedeki gibi
+  y += 8;
+  doc.setFontSize(10.5);
+  doc.setFont(FONT, "bold");
+  const konu = `${belgeAdi} (${code})`;
+  const konuSatirlari: string[] = doc.splitTextToSize(konu, genislik - 24);
+  doc.circle(M + 8, y - 1.4, 0.9, "F");
+  konuSatirlari.forEach((satir) => {
+    doc.text(satir, M + 13, y);
+    y += 5.4;
+  });
+
+  // Faaliyet belgesi kapsamı
+  if (faaliyetKapsami) {
+    doc.setFontSize(11);
+    doc.setFont(FONT, "bold");
+    const kapsamSatirlari: string[] = doc.splitTextToSize(
+      `TEHLİKELİ MADDE FAALİYET BELGESİ KAPSAMI: ${faaliyetKapsami.toLocaleUpperCase("tr-TR")}`,
+      genislik - 10
+    );
+    let ky = 205;
+    kapsamSatirlari.forEach((satir) => {
+      doc.text(satir, ortaX, ky, { align: "center" });
+      ky += 6;
+    });
+  }
+
+  // İmza tablosu (kapakta içerik sayfalarına göre daha yukarıda)
+  altTabloCiz(doc, hazirlayanAdi, onaylayanAdi, 228);
+
+  // Sağ alt köşe: TMGDK kurumsal logosu + karekod
+  const qrBoyut = 22;
+  const qrX = W - M - qrBoyut;
+  const qrY = 262;
+  try {
+    doc.addImage(SIAM_QR_B64, "PNG", qrX, qrY, qrBoyut, qrBoyut);
+  } catch {
+    /* karekod eklenemezse belge yine üretilsin */
+  }
+
+  const logoYukseklik = 11;
+  const logoGenislik = logoYukseklik * SIAM_LOGO_EN_BOY;
+  try {
+    doc.addImage(
+      SIAM_LOGO_B64,
+      "JPEG",
+      qrX - logoGenislik - 4,
+      qrY + (qrBoyut - logoYukseklik) / 2,
+      logoGenislik,
+      logoYukseklik
+    );
+  } catch {
+    /* logo eklenemezse belge yine üretilsin */
+  }
+}
+
 async function renderYapilandirilmisBelge(
   doc: JsPDFType,
   firmAdi: string,
@@ -1060,7 +1206,8 @@ async function renderYapilandirilmisBelge(
   logo: LogoData,
   notlar: string,
   hazirlayanAdi: string,
-  onaylayanAdi: string
+  onaylayanAdi: string,
+  faaliyetKapsami: string
 ) {
   await fontuKaydet(doc);
 
@@ -1087,8 +1234,24 @@ async function renderYapilandirilmisBelge(
   const toplamSayfa = sayfalar.length;
   const genislik = W - 2 * M;
 
+  // Kapak sayfası her belgenin ilk sayfasıdır; içerik ondan sonra başlar.
+  kapakSayfasiCiz(
+    doc,
+    firmAdi,
+    code,
+    belgeAdi,
+    sablon,
+    logo,
+    bugun,
+    faaliyetKapsami,
+    hazirlayanAdi,
+    onaylayanAdi,
+    baslikYukseklik,
+    adLines
+  );
+
   sayfalar.forEach((sayfaSatirlari, idx) => {
-    if (idx > 0) doc.addPage();
+    doc.addPage(); // kapak 1. sayfa olduğundan içerik her zaman yeni sayfada
 
     baslikTablosuCiz(doc, firmAdi, code, belgeAdi, sablon, logo, bugun, idx + 1, toplamSayfa, baslikYukseklik, adLines);
     altTabloCiz(doc, hazirlayanAdi, onaylayanAdi);
