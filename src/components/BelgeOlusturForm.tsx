@@ -669,6 +669,33 @@ function logoKutusuHesapla(enBoyOrani: number, kutuX: number, kutuY: number, kut
   return { x: kutuX + (kutuBoyut - w) / 2, y: kutuY + (kutuBoyut - h) / 2, w, h };
 }
 
+// Logoyu KARE değil, verilen DİKDÖRTGEN alana en/boy oranını bozmadan
+// sığdırır ve ortalar. Başlık kutusunun sol hücresi geniş ama alçak
+// olduğundan, kare kutuya sığdırmak logoyu gereksiz küçültüyordu.
+// Ölçüler her iki boyutun da sınırından küçük seçildiği için taşma olamaz.
+function logoAlanaSigdir(
+  enBoyOrani: number,
+  alanX: number,
+  alanY: number,
+  alanGenislik: number,
+  alanYukseklik: number
+) {
+  const oran = enBoyOrani > 0 ? enBoyOrani : 1;
+  // Önce yüksekliği doldur, genişlik taşarsa genişliğe göre yeniden ölçekle.
+  let h = alanYukseklik;
+  let w = h * oran;
+  if (w > alanGenislik) {
+    w = alanGenislik;
+    h = w / oran;
+  }
+  return {
+    x: alanX + (alanGenislik - w) / 2,
+    y: alanY + (alanYukseklik - h) / 2,
+    w,
+    h,
+  };
+}
+
 // ŞABLONU OLMAYAN kodlar için eski/basit tek sayfalık çerçeve (değişmedi).
 function renderBasitBelge(
   doc: JsPDFType,
@@ -1130,7 +1157,19 @@ function baslikTablosuCiz(
   // Sol: logo / firma adı
   if (logo) {
     try {
-      const box = logoKutusuHesapla(logo.enBoyOrani, M + 3, ustY + 3, 18);
+      // Sol hücre 38 mm genişliğinde; 2,5 mm kenar boşluğu bırakılır.
+      // Yükseklik hücreyle sınırlı, ayrıca 22 mm ile tavanlanır (belge adı
+      // uzayıp kutu büyüdüğünde logo orantısız büyümesin).
+      const kenar = 2.5;
+      const alanG = 38 - 2 * kenar;
+      const alanY = Math.min(yukseklik - 2 * kenar, 22);
+      const box = logoAlanaSigdir(
+        logo.enBoyOrani,
+        M + kenar,
+        ustY + kenar,
+        alanG,
+        alanY
+      );
       doc.addImage(logo.data, logo.fmt, box.x, box.y, box.w, box.h);
     } catch {
       /* yoksay */
@@ -1201,29 +1240,36 @@ function altTabloCiz(
   doc.line(M + kolonGenislik * 2, y, M + kolonGenislik * 2, y + yukseklik);
 
   const basliklar = ["HAZIRLAYAN", "KONTROL EDEN", "ONAYLAYAN"];
-  const altBasliklar = ["Tehlikeli Madde Güvenlik Danışmanı", "Tehlikeli Madde Güvenlik Danışmanı Koordinatörü", "Sorumlu Kişi"];
+  // ONAYLAYAN sütununda unvan, isim girilip girilmediğine göre değişir:
+  // isim varsa altına gerçek unvanı olan "Tesis Sorumlusu" yazılır, isim
+  // yoksa kutuda yalnızca "Sorumlu Kişi" yer tutucusu kalır.
+  const altBasliklar = [
+    "Tehlikeli Madde Güvenlik Danışmanı",
+    "Tehlikeli Madde Güvenlik Danışmanı Koordinatörü",
+    "Sorumlu Kişi",
+  ];
+  const isimliUnvanlar = [
+    altBasliklar[0],
+    altBasliklar[1],
+    "Tesis Sorumlusu",
+  ];
 
   basliklar.forEach((b, i) => {
     const x = M + kolonGenislik * i + kolonGenislik / 2;
     const isim = isimler[i];
-    const roluHerZamanGoster = i !== 2; // ONAYLAYAN'daki "Sorumlu Kişi" yalnızca isim YOKSA gösterilir
 
     doc.setFontSize(7.5);
     doc.setFont(FONT, "bold");
     doc.text(b, x, y + 5, { align: "center" });
 
     if (isim) {
-      // İsim varsa: kalın isim satırı ortada; HAZIRLAYAN/KONTROL EDEN için
-      // altında gerçek unvanı da gösterilir, ONAYLAYAN'da yalnızca isim kalır
-      // (aksi halde girilen isimle çelişen "Sorumlu Kişi" ibaresi kalırdı).
+      // İsim varsa: kalın isim satırı ortada, hemen altında kişinin unvanı.
       doc.setFontSize(7.5);
       doc.setFont(FONT, "bold");
       doc.text(isim.toLocaleUpperCase("tr-TR"), x, y + 10.5, { align: "center", maxWidth: kolonGenislik - 4 });
-      if (roluHerZamanGoster) {
-        doc.setFontSize(6);
-        doc.setFont(FONT, "normal");
-        doc.text(altBasliklar[i], x, y + 14.3, { align: "center", maxWidth: kolonGenislik - 4 });
-      }
+      doc.setFontSize(6);
+      doc.setFont(FONT, "normal");
+      doc.text(isimliUnvanlar[i], x, y + 14.3, { align: "center", maxWidth: kolonGenislik - 4 });
     } else {
       // İsim bilinmiyorsa (ör. firmaya TMGD ataması yapılmamış / onaylayan girilmemiş):
       // yalnızca rol adı gösterilir.
