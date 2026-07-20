@@ -40,6 +40,9 @@ type Firm = {
   activities: string[] | null;
   contract_start: string | null;
   logo_url: string | null;
+  /** Belge alt tablosundaki ONAYLAYAN kutusuna yazılacak tesis sorumlusu.
+   *  Firma bazlı hatırlanır (migration 024). */
+  approver_name: string | null;
 };
 
 const CATEGORY_ORDER: CatalogCategory[] = ["P", "T", "K", "L", "SA"];
@@ -75,7 +78,7 @@ export default function BelgeOlusturForm({ fixedFirmId, initialFirmId, compact =
       // yoksa aktif firmaların tamamını çekip seçiciye doldur.
       let query = supabase
         .from("firms")
-        .select("id, name, activities, contract_start, logo_url");
+        .select("id, name, activities, contract_start, logo_url, approver_name");
 
       query = fixedFirmId
         ? query.eq("id", fixedFirmId)
@@ -89,7 +92,12 @@ export default function BelgeOlusturForm({ fixedFirmId, initialFirmId, compact =
           ? retryQuery.eq("id", fixedFirmId)
           : retryQuery.eq("status", "active").order("name");
         const retry = await retryQuery;
-        data = (retry.data || []).map((f) => ({ ...f, activities: [], contract_start: null })) as typeof data;
+        data = (retry.data || []).map((f) => ({
+          ...f,
+          activities: [],
+          contract_start: null,
+          approver_name: null,
+        })) as typeof data;
         error = retry.error;
         if (!retry.error) {
           setError(
@@ -99,8 +107,17 @@ export default function BelgeOlusturForm({ fixedFirmId, initialFirmId, compact =
       } else if (error) {
         setError("Firmalar yüklenemedi: " + hataCevir(error));
       }
-      setFirms((data as Firm[]) || []);
+      const gelenFirmalar = (data as Firm[]) || [];
+      setFirms(gelenFirmalar);
       if (fixedFirmId) setFirmId(fixedFirmId);
+
+      // Açılışta seçili bir firma varsa (tek firma modu ya da bağlantıyla
+      // gelinen firma) onun kayıtlı onaylayan ismini alana yerleştir.
+      const acilistakiId = fixedFirmId || initialFirmId;
+      if (acilistakiId) {
+        const f = gelenFirmalar.find((x) => x.id === acilistakiId);
+        if (f?.approver_name) setOnaylayanAdi(f.approver_name);
+      }
     })();
   }, [fixedFirmId]);
 
@@ -157,6 +174,10 @@ export default function BelgeOlusturForm({ fixedFirmId, initialFirmId, compact =
     setMsg("");
     setError("");
     clearTempLogo();
+    // Onaylayan (tesis sorumlusu) firma bazlı hatırlanır: seçilen firmaya
+    // en son kaydedilmiş isim alana otomatik gelir.
+    const yeniFirma = firms.find((f) => f.id === id);
+    setOnaylayanAdi(yeniFirma?.approver_name || "");
   }
 
   // Seçili firmanın KAYITLI logosu için küçük önizleme (imzalı URL) —
@@ -258,6 +279,33 @@ export default function BelgeOlusturForm({ fixedFirmId, initialFirmId, compact =
           ? await logoDataUrl(firm.logo_url)
           : null;
       const bugun = new Date().toLocaleDateString("tr-TR");
+
+      // Onaylayan (tesis sorumlusu) firma bazlı hatırlanır: bu üretimde
+      // yazılan isim, önceki kayıttan farklıysa firmaya işlenir; böylece
+      // aynı firma bir daha seçildiğinde alan kendiliğinden dolu gelir.
+      const yeniOnaylayan = onaylayanAdi.trim();
+      if (yeniOnaylayan && yeniOnaylayan !== (firm.approver_name || "")) {
+        const { error: kayitHatasi } = await supabase
+          .from("firms")
+          .update({ approver_name: yeniOnaylayan })
+          .eq("id", firm.id);
+
+        if (kayitHatasi) {
+          // Kolon yoksa (migration 024 çalıştırılmamışsa) belge üretimi
+          // engellenmez; yalnızca isim hatırlanmaz ve kullanıcı bilgilendirilir.
+          if (/approver_name/i.test(kayitHatasi.message || "")) {
+            setError(
+              "Onaylayan ismi firmaya kaydedilemedi — veritabanı güncellemesi (024_firma_onaylayan_kisi.sql) henüz çalıştırılmamış."
+            );
+          }
+        } else {
+          setFirms((prev) =>
+            prev.map((f) =>
+              f.id === firm.id ? { ...f, approver_name: yeniOnaylayan } : f
+            )
+          );
+        }
+      }
 
       for (const code of selected) {
         const item = CATALOG.find((c) => c.code === code);
@@ -401,7 +449,9 @@ export default function BelgeOlusturForm({ fixedFirmId, initialFirmId, compact =
           )}
 
           <label className="block mb-4">
-            <span className="text-sm text-gray-600">Onaylayan (opsiyonel)</span>
+            <span className="text-sm text-gray-600">
+              Onaylayan — Tesis Sorumlusu (opsiyonel)
+            </span>
             <input
               type="text"
               className="border p-2 w-full rounded mt-1"
@@ -411,6 +461,14 @@ export default function BelgeOlusturForm({ fixedFirmId, initialFirmId, compact =
             />
             <span className="text-xs text-gray-400">
               Belge alt tablosundaki &quot;ONAYLAYAN&quot; kutusuna yazılacak isim.
+              Bir kez yazıldığında bu firmaya kaydedilir; firma tekrar
+              seçildiğinde kendiliğinden gelir.
+              {firm?.approver_name && onaylayanAdi === firm.approver_name && (
+                <span className="text-green-600">
+                  {" "}
+                  ✓ {firm.name} için kayıtlı.
+                </span>
+              )}
             </span>
           </label>
 
