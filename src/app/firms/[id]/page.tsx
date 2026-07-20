@@ -481,6 +481,49 @@ export default function FirmDetailPage({
     loadBelgeler();
   }
 
+  // ---- Belge Takip: sağ taraftaki dosya önizleme paneli -----------------
+  // Seçilen dosya için Storage'dan imzalı bir bağlantı alınır ve panelde
+  // gösterilir. PDF ve görseller doğrudan gömülür; Word gibi tarayıcıda
+  // açılamayan türlerde indirme bağlantısı sunulur.
+  const [onizleme, setOnizleme] = useState<{
+    id: string;
+    ad: string;
+    url: string;
+    tur: "pdf" | "gorsel" | "diger";
+  } | null>(null);
+  const [onizlemeYukleniyor, setOnizlemeYukleniyor] = useState(false);
+
+  function dosyaTuru(ad: string): "pdf" | "gorsel" | "diger" {
+    const u = ad.toLowerCase();
+    if (u.endsWith(".pdf")) return "pdf";
+    if (/\.(jpg|jpeg|png|gif|webp)$/.test(u)) return "gorsel";
+    return "diger";
+  }
+
+  const onizlemeAc = useCallback(
+    async (dosya: { id: string; file_path: string; file_name: string }) => {
+      setOnizlemeYukleniyor(true);
+      setOnizleme(null);
+      // 1 saat: paneli açık bırakıp başka maddelere bakan kullanıcıda
+      // bağlantının erken düşmemesi için.
+      const { data, error } = await supabase.storage
+        .from("firm-files")
+        .createSignedUrl(dosya.file_path, 3600);
+      setOnizlemeYukleniyor(false);
+      if (error || !data?.signedUrl) {
+        setFileMsg("Önizleme bağlantısı oluşturulamadı: " + hataCevir(error));
+        return;
+      }
+      setOnizleme({
+        id: dosya.id,
+        ad: dosya.file_name,
+        url: data.signedUrl,
+        tur: dosyaTuru(dosya.file_name),
+      });
+    },
+    []
+  );
+
   async function downloadItemFile(path: string) {
     const { data, error } = await supabase.storage
       .from("firm-files")
@@ -867,7 +910,9 @@ export default function FirmDetailPage({
 
       {/* BELGE TAKİP — faaliyete göre şekillenen akordeon liste */}
       {tab === "belge_takip" && (
-        <div className="max-w-4xl">
+        <div className="flex gap-6 items-start">
+          {/* SOL: belge takip listesi */}
+          <div className="flex-1 min-w-0 max-w-4xl">
           {/* Genel ilerleme */}
           <div className="flex items-center justify-between border rounded-xl p-4 mb-4">
             <div>
@@ -1053,8 +1098,24 @@ export default function FirmDetailPage({
                             {itemFiles.length > 0 && (
                               <div className="mt-1.5 ml-7 space-y-1">
                                 {itemFiles.map((f) => (
-                                  <div key={f.id} className="flex items-center gap-2 text-xs text-gray-500">
-                                    <span className="truncate flex-1 min-w-0">📄 {f.file_name}</span>
+                                  <div
+                                    key={f.id}
+                                    className={
+                                      "flex items-center gap-2 text-xs rounded px-1 -mx-1 " +
+                                      (onizleme?.id === f.id
+                                        ? "bg-blue-50 text-blue-700"
+                                        : "text-gray-500")
+                                    }
+                                  >
+                                    {/* Dosya adına tıklamak sağdaki önizleme
+                                        panelinde içeriği açar. */}
+                                    <button
+                                      onClick={() => onizlemeAc(f)}
+                                      title="Önizle"
+                                      className="truncate flex-1 min-w-0 text-left hover:underline"
+                                    >
+                                      📄 {f.file_name}
+                                    </button>
                                     <button
                                       onClick={() => downloadItemFile(f.file_path)}
                                       title="İndir"
@@ -1084,6 +1145,95 @@ export default function FirmDetailPage({
               );
             })}
           </div>
+          </div>
+
+          {/* SAĞ: dosya önizleme paneli — geniş ekranlarda boş kalan alanı
+              kullanır, dar ekranlarda gizlenir (mobilde dosyalar indirilerek
+              görüntülenir, panel yeri daraltmasın diye). */}
+          <aside className="hidden xl:block w-[440px] shrink-0 sticky top-4">
+            <div className="border rounded-xl overflow-hidden bg-white">
+              <div className="flex items-center justify-between gap-2 px-3 py-2 border-b bg-gray-50">
+                <span className="text-sm font-semibold truncate">
+                  {onizleme ? onizleme.ad : "Dosya Önizleme"}
+                </span>
+                {onizleme && (
+                  <div className="flex items-center gap-1 shrink-0">
+                    <a
+                      href={onizleme.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title="Yeni sekmede aç"
+                      className="text-xs px-2 py-1 rounded bg-blue-50 text-blue-700 hover:bg-blue-100"
+                    >
+                      ↗
+                    </a>
+                    <button
+                      onClick={() => setOnizleme(null)}
+                      title="Kapat"
+                      className="text-xs px-2 py-1 rounded text-gray-400 hover:text-red-500 hover:bg-red-50"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              <div className="h-[calc(100vh-9rem)] min-h-[420px] bg-gray-50">
+                {onizlemeYukleniyor && (
+                  <div className="h-full flex items-center justify-center text-sm text-gray-400">
+                    Önizleme hazırlanıyor...
+                  </div>
+                )}
+
+                {!onizlemeYukleniyor && !onizleme && (
+                  <div className="h-full flex flex-col items-center justify-center text-center px-6 text-gray-400">
+                    <span className="text-4xl mb-3">📄</span>
+                    <p className="text-sm">
+                      Soldaki listeden bir dosya adına tıklayınca içeriği
+                      burada görüntülenir.
+                    </p>
+                  </div>
+                )}
+
+                {!onizlemeYukleniyor && onizleme?.tur === "pdf" && (
+                  <iframe
+                    src={onizleme.url}
+                    title={onizleme.ad}
+                    className="w-full h-full border-0"
+                  />
+                )}
+
+                {!onizlemeYukleniyor && onizleme?.tur === "gorsel" && (
+                  <div className="h-full overflow-auto p-3">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={onizleme.url}
+                      alt={onizleme.ad}
+                      className="max-w-full mx-auto"
+                    />
+                  </div>
+                )}
+
+                {!onizlemeYukleniyor && onizleme?.tur === "diger" && (
+                  <div className="h-full flex flex-col items-center justify-center text-center px-6 text-gray-500">
+                    <span className="text-4xl mb-3">📎</span>
+                    <p className="text-sm mb-4">
+                      Bu dosya türü tarayıcıda önizlenemiyor (Word belgeleri
+                      gibi). İndirerek açabilirsin.
+                    </p>
+                    <a
+                      href={onizleme.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-sm px-3 py-1.5 rounded border bg-white hover:bg-gray-50"
+                    >
+                      ⬇ İndir
+                    </a>
+                  </div>
+                )}
+              </div>
+            </div>
+          </aside>
         </div>
       )}
 
