@@ -36,7 +36,12 @@ const KALIPLAR: [RegExp, string][] = [
   [/invalid input syntax for type date/i, "Tarih biçimi hatalı. Lütfen tarih alanını takvimden seç."],
   [/invalid input syntax for type (integer|numeric)/i, "Sayı alanına geçersiz bir değer girildi. Lütfen yalnızca rakam kullan."],
   [/invalid input syntax for type uuid/i, "Geçersiz kayıt kimliği. Sayfayı yenileyip tekrar dene."],
-  [/value too long/i, "Girilen değer çok uzun. Lütfen kısalt."],
+  // Postgres yalnızca sınırı bildirir, hangi alan olduğunu söylemez; bu yüzden
+  // uzunluk sınırı olan alanlar kullanıcıya tek tek hatırlatılır.
+  [
+    /value too long/i,
+    "Bir alana izin verilenden uzun bir değer girildi. Uzunluk sınırı olan alanlar: Vergi No (en fazla 20), MERSİS No (25), Plaka (20), T.C. Kimlik No (20). Lütfen bu alanları kontrol edip kısalt.",
+  ],
 
   // ---- Tablo / kolon ----
   [/(relation|table).*(does not exist)/i, "Veritabanı tablosu bulunamadı. Supabase'de schema.sql'in güncel sürümünün çalıştırıldığından emin ol."],

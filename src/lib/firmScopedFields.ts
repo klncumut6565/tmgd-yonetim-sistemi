@@ -29,7 +29,7 @@ export const VEHICLE_FIELDS: FieldDef[] = [
 export const DRIVER_FIELDS: FieldDef[] = [
   { key: "first_name", label: "Ad", type: "text", required: true },
   { key: "last_name", label: "Soyad", type: "text", required: true },
-  { key: "national_id", label: "T.C. Kimlik No", type: "text", inTable: false },
+  { key: "national_id", label: "T.C. Kimlik No", type: "text", inTable: false, maxLength: 20 },
   { key: "phone", label: "Telefon", type: "text" },
   { key: "email", label: "E-posta", type: "text", inTable: false },
   { key: "adr_certificate_no", label: "SRC-5 Belge No", type: "text", inTable: false },

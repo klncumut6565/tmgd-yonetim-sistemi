@@ -27,6 +27,8 @@ export type FieldDef = {
   inTable?: boolean;           // listede sütun olarak gösterilsin mi (varsayılan true)
   defaultValue?: string;       // yeni kayıt formu açıldığında alanın ön dolu geleceği metin (örn. rapor şablonu)
   textareaRows?: number;       // type=textarea için satır sayısı (varsayılan 4)
+  maxLength?: number;          // veritabanındaki varchar(n) sınırı; girişte de engellenir
+                               // (örn. plate_number varchar(20), national_id varchar(20))
 };
 
 type Firm = { id: string; name: string; activities?: string[] | null; orphan?: boolean };
@@ -939,6 +941,7 @@ export default function FirmScopedCrud({
                           ? "number"
                           : "text"
                       }
+                      maxLength={f.maxLength}
                       value={form[f.key] || ""}
                       onChange={(e) =>
                         setForm({ ...form, [f.key]: e.target.value })

@@ -783,7 +783,14 @@ export default function FirmDetailPage({
             </label>
             <label className="block">
               <span className="text-sm text-gray-600">Vergi No</span>
-              <input className="border p-2 w-full rounded mt-1" value={form.tax_number || ""} onChange={set("tax_number")} />
+              {/* Veritabanında varchar(20); tarayıcı tarafında da sınırlanır ki
+                  kaydetme anında "değer çok uzun" hatası alınmasın. */}
+              <input
+                className="border p-2 w-full rounded mt-1"
+                maxLength={20}
+                value={form.tax_number || ""}
+                onChange={set("tax_number")}
+              />
             </label>
             <label className="block">
               <span className="text-sm text-gray-600">Şehir</span>
