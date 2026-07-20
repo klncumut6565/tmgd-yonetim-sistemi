@@ -11,7 +11,7 @@
 //
 // Her sayfa kendi alan tanımlarını (FieldDef[]) ve tablo adını verir.
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase/client";
 import { useUser } from "@/hooks/useUser";
 import { hataCevir } from "@/lib/hataCevir";
@@ -47,6 +47,8 @@ type Props = {
                                 // ekranın sağında bağımsız bir not defteri paneli olarak gösterilir
   notepadLabel?: string;       // not defteri panelinin başlığı
   notepadTemplate?: string;    // yeni kayıt oluşturulduğunda not defterine ön dolu gelecek şablon
+  dosyaEki?: boolean;          // true ise her kayda dosya eklenebilir ve sağda önizleme paneli açılır
+                               // (araç ruhsat/muayene, sürücü SRC5, personel eğitim belgesi vb.)
 };
 
 const STATUS_LABELS: Record<string, string> = {
@@ -67,6 +69,7 @@ export default function FirmScopedCrud({
   notepadField,
   notepadLabel,
   notepadTemplate,
+  dosyaEki = false,
 }: Props) {
   const { canWrite } = useUser();
   const [firms, setFirms] = useState<Firm[]>([]);
@@ -91,6 +94,20 @@ export default function FirmScopedCrud({
 
   // Not defteri paneli durumu
   const [notepadRowId, setNotepadRowId] = useState<string | null>(null);
+
+  // ---- Dosya ekleri (dosyaEki=true olduğunda) --------------------------
+  type KayitDosya = { id: string; kayit_id: string; file_path: string; file_name: string };
+  const [dosyalar, setDosyalar] = useState<KayitDosya[]>([]);
+  const [dosyaRowId, setDosyaRowId] = useState<string | null>(null);
+  const [dosyaYukleniyor, setDosyaYukleniyor] = useState(false);
+  const [dosyaMsg, setDosyaMsg] = useState("");
+  const [onizleme, setOnizleme] = useState<{
+    id: string;
+    ad: string;
+    url: string;
+    tur: "pdf" | "gorsel" | "diger";
+  } | null>(null);
+  const [onizlemeYukleniyor, setOnizlemeYukleniyor] = useState(false);
   const [notepadText, setNotepadText] = useState("");
   const [notepadSaving, setNotepadSaving] = useState(false);
   const [notepadMsg, setNotepadMsg] = useState("");
@@ -168,13 +185,136 @@ export default function FirmScopedCrud({
     setLoading(false);
   }
 
+  // Bu firmanın bu tablodaki kayıtlarına ait tüm dosya ekleri
+  const loadDosyalar = useCallback(
+    async (targetFirmId: string) => {
+      if (!dosyaEki || !targetFirmId) return;
+      const { data, error } = await supabase
+        .from("kayit_dosyalari")
+        .select("id, kayit_id, file_path, file_name")
+        .eq("firm_id", targetFirmId)
+        .eq("tablo_adi", table)
+        .order("uploaded_at", { ascending: true });
+
+      if (error) {
+        setDosyalar([]);
+        if (/does not exist|not find the table/i.test(error.message || "")) {
+          setDosyaMsg(
+            "Dosya ekleme özelliği için veritabanı güncellemesi henüz çalıştırılmamış. " +
+              "Supabase → SQL Editor'de database/025_kayit_dosya_ekleri.sql dosyasını çalıştır."
+          );
+        }
+        return;
+      }
+      setDosyalar((data as KayitDosya[]) || []);
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [dosyaEki, table]
+  );
+
+  // Kayıt bazlı dosya listesi
+  const dosyalarByRow = useMemo(() => {
+    const m = new Map<string, KayitDosya[]>();
+    dosyalar.forEach((d) => {
+      const list = m.get(d.kayit_id) || [];
+      list.push(d);
+      m.set(d.kayit_id, list);
+    });
+    return m;
+  }, [dosyalar]);
+
+  function dosyaTuru(ad: string): "pdf" | "gorsel" | "diger" {
+    const u = ad.toLowerCase();
+    if (u.endsWith(".pdf")) return "pdf";
+    if (/\.(jpg|jpeg|png|gif|webp)$/.test(u)) return "gorsel";
+    return "diger";
+  }
+
+  async function onizlemeAc(d: KayitDosya) {
+    setOnizlemeYukleniyor(true);
+    setOnizleme(null);
+    const { data, error } = await supabase.storage
+      .from("firm-files")
+      .createSignedUrl(d.file_path, 3600);
+    setOnizlemeYukleniyor(false);
+    if (error || !data?.signedUrl) {
+      setDosyaMsg("Önizleme bağlantısı oluşturulamadı: " + hataCevir(error));
+      return;
+    }
+    setOnizleme({
+      id: d.id,
+      ad: d.file_name,
+      url: data.signedUrl,
+      tur: dosyaTuru(d.file_name),
+    });
+  }
+
+  async function dosyaYukle(rowId: string, file: File) {
+    if (!firmId) return;
+    setDosyaYukleniyor(true);
+    setDosyaMsg("");
+
+    // Dosya adındaki Türkçe karakter ve boşluklar Storage yolunda sorun
+    // çıkarabildiği için yol güvenli hale getirilir; orijinal ad ayrıca saklanır.
+    const uzanti = file.name.includes(".") ? file.name.split(".").pop() : "";
+    const guvenliAd = `${Date.now()}${uzanti ? "." + uzanti : ""}`;
+    const yol = `${firmId}/${table}/${rowId}/${guvenliAd}`;
+
+    const { error: upErr } = await supabase.storage
+      .from("firm-files")
+      .upload(yol, file, { upsert: false });
+
+    if (upErr) {
+      setDosyaYukleniyor(false);
+      setDosyaMsg("Dosya yüklenemedi: " + hataCevir(upErr));
+      return;
+    }
+
+    const { error: dbErr } = await supabase.from("kayit_dosyalari").insert({
+      firm_id: firmId,
+      tablo_adi: table,
+      kayit_id: rowId,
+      file_path: yol,
+      file_name: file.name,
+    });
+
+    setDosyaYukleniyor(false);
+    if (dbErr) {
+      // Kayıt açılamadıysa yüklenen dosyayı geride bırakma
+      await supabase.storage.from("firm-files").remove([yol]);
+      setDosyaMsg("Dosya kaydedilemedi: " + hataCevir(dbErr));
+      return;
+    }
+    await loadDosyalar(firmId);
+  }
+
+  async function dosyaSil(d: KayitDosya) {
+    if (!confirm(`"${d.file_name}" silinsin mi?`)) return;
+    const { error } = await supabase
+      .from("kayit_dosyalari")
+      .delete()
+      .eq("id", d.id);
+    if (error) {
+      setDosyaMsg("Dosya silinemedi: " + hataCevir(error));
+      return;
+    }
+    await supabase.storage.from("firm-files").remove([d.file_path]);
+    if (onizleme?.id === d.id) setOnizleme(null);
+    if (firmId) await loadDosyalar(firmId);
+  }
+
   useEffect(() => {
     if (!fixedFirmId) loadFirms();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
-    if (firmId) loadRows(firmId);
+    if (firmId) {
+      loadRows(firmId);
+      loadDosyalar(firmId);
+    }
+    setDosyaRowId(null);
+    setOnizleme(null);
     if (notepadField) {
       setNotepadRowId(null);
       setNotepadText("");
@@ -351,8 +491,8 @@ export default function FirmScopedCrud({
 
   return (
     <div className={compact ? "" : "p-6"}>
-      <div className={notepadField ? "lg:flex lg:gap-6 lg:items-start" : ""}>
-        <div className={notepadField ? "flex-1 min-w-0" : ""}>
+      <div className={notepadField || dosyaEki ? "lg:flex lg:gap-6 lg:items-start" : ""}>
+        <div className={notepadField || dosyaEki ? "flex-1 min-w-0" : ""}>
           <div className="flex items-center justify-between mb-4">
             {!compact && <h1 className="text-3xl font-bold">{title}</h1>}
             {canWrite && (
@@ -467,11 +607,20 @@ export default function FirmScopedCrud({
                   filteredRows.map((row) => (
                     <tr
                       key={row.id}
-                      onClick={() => notepadField && openNotepad(row)}
+                      onClick={() => {
+                        if (notepadField) openNotepad(row);
+                        if (dosyaEki) {
+                          setDosyaRowId(row.id);
+                          setOnizleme(null);
+                        }
+                      }}
                       className={
                         "border-b last:border-0" +
-                        (notepadField ? " cursor-pointer hover:bg-gray-50" : "") +
-                        (notepadField && notepadRowId === row.id ? " bg-blue-50" : "")
+                        (notepadField || dosyaEki ? " cursor-pointer hover:bg-gray-50" : "") +
+                        ((notepadField && notepadRowId === row.id) ||
+                        (dosyaEki && dosyaRowId === row.id)
+                          ? " bg-blue-50"
+                          : "")
                       }
                     >
                       {tableFields.map((f) => (
@@ -479,8 +628,32 @@ export default function FirmScopedCrud({
                           {renderCell(row, f)}
                         </td>
                       ))}
-                      {(canWrite || notepadField) && (
+                      {(canWrite || notepadField || dosyaEki) && (
                         <td className="p-3 text-right whitespace-nowrap">
+                          {dosyaEki && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setDosyaRowId(row.id);
+                                setOnizleme(null);
+                                setDosyaMsg("");
+                              }}
+                              title="Dosyalar"
+                              className={
+                                "mr-3 hover:underline " +
+                                (dosyaRowId === row.id
+                                  ? "text-blue-600 font-semibold"
+                                  : "text-gray-500")
+                              }
+                            >
+                              📎 Dosya
+                              {(dosyalarByRow.get(row.id)?.length || 0) > 0 && (
+                                <span className="ml-1 text-xs bg-blue-100 text-blue-700 rounded-full px-1.5">
+                                  {dosyalarByRow.get(row.id)?.length}
+                                </span>
+                              )}
+                            </button>
+                          )}
                           {notepadField && (
                             <button
                               onClick={(e) => {
@@ -523,6 +696,144 @@ export default function FirmScopedCrud({
             </table>
           </div>
         </div>
+
+        {/* DOSYA EKLERİ — ekranın sağında; seçili kaydın dosyaları listelenir
+            ve seçilen dosya panelde önizlenir. */}
+        {dosyaEki && (
+          <div className="lg:w-[420px] shrink-0 mt-6 lg:mt-0">
+            <div className="border rounded-xl overflow-hidden lg:sticky lg:top-4 bg-white">
+              <div className="px-4 py-3 border-b bg-gray-50">
+                <h3 className="font-bold">Dosyalar</h3>
+                {dosyaRowId ? (
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    Seçili kayda ait belgeler
+                  </p>
+                ) : (
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    Soldaki listeden bir kayıt seç
+                  </p>
+                )}
+              </div>
+
+              {dosyaMsg && (
+                <p className="text-xs text-red-600 px-4 py-2 border-b">{dosyaMsg}</p>
+              )}
+
+              {dosyaRowId && (
+                <div className="p-3 border-b">
+                  {canWrite && (
+                    <label className="block mb-2">
+                      <span className="text-xs text-gray-500">
+                        {dosyaYukleniyor ? "Yükleniyor..." : "Dosya ekle"}
+                      </span>
+                      <input
+                        type="file"
+                        disabled={dosyaYukleniyor}
+                        onChange={(e) => {
+                          const f = e.target.files?.[0];
+                          if (f && dosyaRowId) dosyaYukle(dosyaRowId, f);
+                          e.target.value = "";
+                        }}
+                        className="block w-full text-xs mt-1"
+                      />
+                    </label>
+                  )}
+
+                  {(dosyalarByRow.get(dosyaRowId)?.length || 0) === 0 ? (
+                    <p className="text-xs text-gray-400">
+                      Bu kayda henüz dosya eklenmemiş.
+                    </p>
+                  ) : (
+                    <ul className="space-y-1">
+                      {dosyalarByRow.get(dosyaRowId)?.map((d) => (
+                        <li
+                          key={d.id}
+                          className={
+                            "flex items-center gap-2 text-xs rounded px-1 " +
+                            (onizleme?.id === d.id
+                              ? "bg-blue-50 text-blue-700"
+                              : "text-gray-600")
+                          }
+                        >
+                          <button
+                            onClick={() => onizlemeAc(d)}
+                            title="Önizle"
+                            className="truncate flex-1 min-w-0 text-left hover:underline"
+                          >
+                            📄 {d.file_name}
+                          </button>
+                          {canWrite && (
+                            <button
+                              onClick={() => dosyaSil(d)}
+                              title="Sil"
+                              className="text-gray-400 hover:text-red-500 shrink-0"
+                            >
+                              ✕
+                            </button>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
+
+              <div className="h-[520px] bg-gray-50">
+                {onizlemeYukleniyor && (
+                  <div className="h-full flex items-center justify-center text-sm text-gray-400">
+                    Önizleme hazırlanıyor...
+                  </div>
+                )}
+
+                {!onizlemeYukleniyor && !onizleme && (
+                  <div className="h-full flex flex-col items-center justify-center text-center px-6 text-gray-400">
+                    <span className="text-4xl mb-3">📄</span>
+                    <p className="text-sm">
+                      Dosya adına tıklayınca içeriği burada görüntülenir.
+                    </p>
+                  </div>
+                )}
+
+                {!onizlemeYukleniyor && onizleme?.tur === "pdf" && (
+                  <iframe
+                    src={onizleme.url}
+                    title={onizleme.ad}
+                    className="w-full h-full border-0"
+                  />
+                )}
+
+                {!onizlemeYukleniyor && onizleme?.tur === "gorsel" && (
+                  <div className="h-full overflow-auto p-3">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={onizleme.url}
+                      alt={onizleme.ad}
+                      className="max-w-full mx-auto"
+                    />
+                  </div>
+                )}
+
+                {!onizlemeYukleniyor && onizleme?.tur === "diger" && (
+                  <div className="h-full flex flex-col items-center justify-center text-center px-6 text-gray-500">
+                    <span className="text-4xl mb-3">📎</span>
+                    <p className="text-sm mb-4">
+                      Bu dosya türü tarayıcıda önizlenemiyor. İndirerek
+                      açabilirsin.
+                    </p>
+                    <a
+                      href={onizleme.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-sm px-3 py-1.5 rounded border bg-white hover:bg-gray-50"
+                    >
+                      ⬇ İndir
+                    </a>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* NOT DEFTERİ — modaldan bağımsız, ekranın sağında sabit panel */}
         {notepadField && (

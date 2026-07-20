@@ -1369,6 +1369,7 @@ export default function FirmDetailPage({
           title="Araçlar"
           fields={VEHICLE_FIELDS}
           searchKeys={["plate_number", "brand", "model", "vehicle_type"]}
+          dosyaEki
           fixedFirmId={id}
           compact
         />
@@ -1380,6 +1381,7 @@ export default function FirmDetailPage({
           title="Sürücüler"
           fields={DRIVER_FIELDS}
           searchKeys={["first_name", "last_name", "phone", "national_id"]}
+          dosyaEki
           fixedFirmId={id}
           compact
         />
@@ -1391,6 +1393,7 @@ export default function FirmDetailPage({
           title="Personeller"
           fields={EMPLOYEE_FIELDS}
           searchKeys={["first_name", "last_name", "department", "position"]}
+          dosyaEki
           fixedFirmId={id}
           compact
         />
