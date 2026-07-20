@@ -173,7 +173,14 @@ export default function NotificationBell() {
   useEffect(() => {
     load();
     const t = setInterval(load, 30000);
-    const onFocus = () => load();
+    // Mobilde ekran açılışı da "focus" sayılır; art arda sorgu atılmaması
+    // için son tazelemeden sonra 20 saniyelik bir bekleme uygulanır.
+    let sonTazeleme = Date.now();
+    const onFocus = () => {
+      if (Date.now() - sonTazeleme < 20000) return;
+      sonTazeleme = Date.now();
+      load();
+    };
     window.addEventListener("focus", onFocus);
     return () => {
       clearInterval(t);

@@ -40,8 +40,14 @@ export default function PendingApprovalsBell() {
     // 30 saniyede bir yenile
     const zamanlayici = setInterval(yukle, 30000);
 
-    // Sekmeye geri dönülünce yenile
-    const odak = () => yukle();
+    // Sekmeye geri dönülünce yenile. Mobilde ekran her açıldığında bu olay
+    // tetiklendiği için 20 saniyelik bir bekleme sınırı uygulanır.
+    let sonTazeleme = Date.now();
+    const odak = () => {
+      if (Date.now() - sonTazeleme < 20000) return;
+      sonTazeleme = Date.now();
+      yukle();
+    };
     window.addEventListener("focus", odak);
 
     return () => {

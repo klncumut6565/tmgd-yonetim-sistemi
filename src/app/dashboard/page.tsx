@@ -196,9 +196,15 @@ export default function DashboardPage() {
 
     load();
     // Sayfa arka planda kalıp tekrar odaklanıldığında (örn. Görevler'de bir
-    // görevü tamamlayıp Dashboard'a dönüldüğünde) veriler tazelenir —
-    // NotificationBell'deki aynı çalışan desen.
-    const onFocus = () => load();
+    // görevi tamamlayıp Dashboard'a dönüldüğünde) veriler tazelenir.
+    // Mobilde ekran her açıldığında "focus" tetiklendiği için, son
+    // tazelemenin üzerinden 20 saniye geçmediyse tekrar sorgu atılmaz.
+    let sonTazeleme = Date.now();
+    const onFocus = () => {
+      if (Date.now() - sonTazeleme < 20000) return;
+      sonTazeleme = Date.now();
+      load();
+    };
     window.addEventListener("focus", onFocus);
     return () => window.removeEventListener("focus", onFocus);
   }, []);

@@ -1,9 +1,9 @@
 "use client";
 
-// Oturum açan kullanıcının prof: onay durumu, rolü, temel bilgileri.
+// Oturum açan kullanıcının profili: onay durumu, rolü, temel bilgileri.
 // Tüm korumalı sayfalar ve Sidebar bunu kullanır.
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase/client";
 
 export type Profile = {
@@ -17,11 +17,11 @@ export type Profile = {
 
 export type UseUserResult = {
   loading: boolean;
-  authed: boolean;          // oturum açık mı
+  authed: boolean; // oturum açık mı
   profile: Profile | null;
   isSuperAdmin: boolean;
   isApproved: boolean;
-  canWrite: boolean;        // ekle/düzenle/sil yetkisi (rol bazlı)
+  canWrite: boolean; // ekle/düzenle/sil yetkisi (rol bazlı)
 };
 
 // database/004_rol_yetkileri.sql'deki yazabilir() ile birebir aynı liste
@@ -32,14 +32,28 @@ export function useUser(): UseUserResult {
   const [authed, setAuthed] = useState(false);
   const [profile, setProfile] = useState<Profile | null>(null);
 
+  // Hâlihazırda yüklü kullanıcının kimliği. Auth olayı geldiğinde
+  // gerçekten başka bir kullanıcıya mı geçildiğini anlamak için tutulur.
+  const mevcutKullaniciId = useRef<string | null>(null);
+
   useEffect(() => {
     let mounted = true;
 
-    async function load() {
-      const { data: authData } = await supabase.auth.getUser();
-      const user = authData?.user;
+    /**
+     * @param sessiz true ise "Yükleniyor..." ekranı gösterilmez; veriler
+     * arka planda tazelenir. Sekmeye geri dönüldüğünde sayfanın sıfırlanmaması
+     * için token yenilemelerinde bu mod kullanılır.
+     */
+    async function load(sessiz = false) {
+      if (!sessiz && mounted) setLoading(true);
+
+      // getSession() oturumu yerel depodan okur (ağ turu yok); getUser()
+      // her çağrıda sunucuya gider ve mobilde gözle görülür gecikme yaratır.
+      const { data: sessionData } = await supabase.auth.getSession();
+      const user = sessionData?.session?.user ?? null;
 
       if (!user) {
+        mevcutKullaniciId.current = null;
         if (mounted) {
           setAuthed(false);
           setProfile(null);
@@ -48,6 +62,7 @@ export function useUser(): UseUserResult {
         return;
       }
 
+      mevcutKullaniciId.current = user.id;
       if (mounted) setAuthed(true);
 
       const { data: prof } = await supabase
@@ -57,17 +72,39 @@ export function useUser(): UseUserResult {
         .single();
 
       if (mounted) {
-        setProfile((prof as Profile) || null);
+        // Sessiz tazelemede sorgu boş dönerse (geçici ağ hatası) eldeki
+        // profil korunur; aksi halde sayfa boşuna kilit ekranına düşer.
+        if (prof || !sessiz) setProfile((prof as Profile) || null);
         setLoading(false);
       }
     }
 
     load();
 
-    // Oturum değişince (giriş/çıkış) yeniden yükle
-    const { data: sub } = supabase.auth.onAuthStateChange(() => {
-      setLoading(true);
-      load();
+    const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
+      // TOKEN_REFRESHED ve INITIAL_SESSION olayları, kullanıcı sekmeye geri
+      // döndüğünde (ekran kilidi açıldığında, başka siteden geri gelindiğinde)
+      // supabase-js tarafından kendiliğinden tetiklenir. Bunlarda loading'i
+      // true yapmak AuthGuard'ın tüm sayfa ağacını söküp yeniden kurmasına,
+      // yani kullanıcının kaldığı yeri kaybetmesine yol açar.
+      if (event === "INITIAL_SESSION" || event === "TOKEN_REFRESHED") return;
+
+      if (event === "SIGNED_OUT") {
+        mevcutKullaniciId.current = null;
+        if (mounted) {
+          setAuthed(false);
+          setProfile(null);
+          setLoading(false);
+        }
+        return;
+      }
+
+      // SIGNED_IN olayı da sekmeye dönüşte aynı kullanıcı için tekrar
+      // gelebilir; yalnızca kimlik gerçekten değiştiyse tam yükleme yapılır.
+      const yeniId = session?.user?.id ?? null;
+      const kullaniciDegisti = yeniId !== mevcutKullaniciId.current;
+
+      load(!kullaniciDegisti);
     });
 
     return () => {
