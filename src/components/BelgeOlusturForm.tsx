@@ -703,10 +703,30 @@ type Satir =
   | { tur: "madde"; metin: string; numara?: number }
   | { tur: "tablo"; headers?: string[]; rows: string[][]; note?: string; colWidths?: number[] };
 
-const M = 15;
+// Sayfa geometrisi — orijinal TMGDK belgelerinden ölçülerek alınmıştır:
+// dış çerçeve 8,5 mm, başlık kutusu 12,4 mm'den başlar, içerik alanı
+// başlık kutusunun altından imza tablosunun üstüne (244 mm) kadar sürer.
+const M = 12.4; // içerik kenar boşluğu (= başlık kutusu sol kenarı)
 const W = 210;
 const H = 297;
-const FOOTER_UST = 270; // içerik bitişi (alt tablo öncesi)
+const CERCEVE_KENAR = 8.5; // dış çerçevenin sayfa kenarına uzaklığı
+const CERCEVE_ALT = 287.5; // dış çerçevenin alt kenarı
+const ALT_TABLO_UST = 244; // imza tablosu üst kenarı (içerik sayfaları)
+const ALT_TABLO_YUKSEKLIK = 35.5;
+const FOOTER_UST = ALT_TABLO_UST - 2; // içerik bitişi (alt tablo öncesi)
+
+/** Her sayfaya orijinal belgedeki dış çerçeveyi çizer. */
+function cerceveCiz(doc: JsPDFType) {
+  doc.setDrawColor(0, 0, 0);
+  doc.setLineWidth(0.7);
+  doc.rect(
+    CERCEVE_KENAR,
+    CERCEVE_KENAR,
+    W - 2 * CERCEVE_KENAR,
+    CERCEVE_ALT - CERCEVE_KENAR
+  );
+  doc.setLineWidth(0.3);
+}
 const FONT = "LiberationSans"; // Türkçe karakter destekli gömülü font (bkz. pdfFonts.ts)
 const RENK_VURGU: [number, number, number] = [30, 64, 175]; // kurumsal mavi (subheading, çizgiler)
 const SATIR_YUKSEKLIGI: Record<"baslik" | "altbaslik" | "paragraf" | "madde", number> = {
@@ -968,7 +988,7 @@ function baslikTablosuCiz(
   adLines: string[],
   sayfaEtiketi?: string
 ) {
-  const ustY = 8;
+  const ustY = M; // başlık kutusu üst kenarı (çerçevenin hemen altı)
 
   doc.setDrawColor(0, 0, 0);
   doc.setLineWidth(0.3);
@@ -1033,10 +1053,11 @@ function altTabloCiz(
   doc: JsPDFType,
   hazirlayanAdi: string,
   onaylayanAdi: string,
-  ustY?: number
+  ustY?: number,
+  ozelYukseklik?: number
 ) {
-  const y = ustY ?? 275;
-  const yukseklik = 18;
+  const y = ustY ?? ALT_TABLO_UST;
+  const yukseklik = ozelYukseklik ?? ALT_TABLO_YUKSEKLIK;
   const kolonGenislik = (W - 2 * M) / 3;
 
   // KONTROL EDEN kutusu firma/atamadan bağımsız her zaman sabit TMGD Koordinatörü'dür.
@@ -1110,6 +1131,7 @@ function kapakSayfasiCiz(
   baslikYukseklik: number,
   adLines: string[]
 ) {
+  cerceveCiz(doc);
   baslikTablosuCiz(
     doc,
     firmAdi,
@@ -1169,12 +1191,12 @@ function kapakSayfasiCiz(
   }
 
   // İmza tablosu (kapakta içerik sayfalarına göre daha yukarıda)
-  altTabloCiz(doc, hazirlayanAdi, onaylayanAdi, 228);
+  altTabloCiz(doc, hazirlayanAdi, onaylayanAdi, 218, 42.7);
 
   // Sağ alt köşe: TMGDK kurumsal logosu + karekod
   const qrBoyut = 22;
   const qrX = W - M - qrBoyut;
-  const qrY = 262;
+  const qrY = 263;
   try {
     doc.addImage(SIAM_QR_B64, "PNG", qrX, qrY, qrBoyut, qrBoyut);
   } catch {
@@ -1252,6 +1274,7 @@ async function renderYapilandirilmisBelge(
 
   sayfalar.forEach((sayfaSatirlari, idx) => {
     doc.addPage(); // kapak 1. sayfa olduğundan içerik her zaman yeni sayfada
+    cerceveCiz(doc);
 
     baslikTablosuCiz(doc, firmAdi, code, belgeAdi, sablon, logo, bugun, idx + 1, toplamSayfa, baslikYukseklik, adLines);
     altTabloCiz(doc, hazirlayanAdi, onaylayanAdi);
