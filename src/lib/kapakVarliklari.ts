@@ -7,6 +7,8 @@
 // kutusunda gösterilir; başka firmaların logoları belgeye gömülmez.
 //
 // Karekod hedefi: https://qr1.be/YOYNRJ
+// Logo doğrulaması: turuncu SİAM TMGDK logosu (294x177). Referans belgede
+// ayrıca müşteri firmanın kendi logosu bulunur; o şablona gömülmez.
 // ---------------------------------------------------------------------
 
 /** SİAM TMGDK kurumsal logosu (JPEG, 294x177 px) */
