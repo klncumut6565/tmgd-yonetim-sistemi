@@ -26,6 +26,7 @@ import {
   catalogForActivities,
 } from "@/lib/belgeKatalogu";
 import { belgeSablonu, BelgeSablonu } from "@/lib/belgeSablonlari";
+import { BELGE_GORSELLERI } from "@/lib/belgeGorselleri";
 import {
   SIAM_LOGO_B64,
   SIAM_LOGO_EN_BOY,
@@ -701,7 +702,8 @@ type Satir =
   | { tur: "altbaslik"; metin: string }
   | { tur: "paragraf"; metin: string }
   | { tur: "madde"; metin: string; numara?: number }
-  | { tur: "tablo"; headers?: string[]; rows: string[][]; note?: string; colWidths?: number[] };
+  | { tur: "tablo"; headers?: string[]; rows: string[][]; note?: string; colWidths?: number[] }
+  | { tur: "gorseller"; ids: string[]; sutun: number; yukseklik: number; note?: string };
 
 // Sayfa geometrisi — orijinal TMGDK belgelerinden ölçülerek alınmıştır:
 // dış çerçeve 8,5 mm, başlık kutusu 12,4 mm'den başlar, içerik alanı
@@ -802,6 +804,14 @@ function duzMetneCevir(doc: JsPDFType, sablon: BelgeSablonu, belgeAdi: string): 
       });
     } else if (b.type === "table") {
       satirlar.push({ tur: "tablo", headers: b.headers, rows: b.rows, note: b.note, colWidths: b.colWidths });
+    } else if (b.type === "images") {
+      satirlar.push({
+        tur: "gorseller",
+        ids: b.ids.filter((id) => BELGE_GORSELLERI[id]),
+        sutun: b.sutun ?? 4,
+        yukseklik: b.yukseklik ?? 22,
+        note: b.note,
+      });
     }
   });
 
@@ -931,7 +941,65 @@ function tabloCiz(
 // başlıklarının bir önceki satırın hemen dibine yapışmasını önler.
 const ALTBASLIK_ON_BOSLUK = 4.6;
 
+function gorsellerYuksekligiHesapla(
+  doc: JsPDFType,
+  satir: { ids: string[]; sutun: number; yukseklik: number; note?: string },
+  genislik: number
+): number {
+  const satirSayisi = Math.ceil(satir.ids.length / satir.sutun);
+  let y = satirSayisi * (satir.yukseklik + 4) + 2;
+  if (satir.note) {
+    doc.setFontSize(7.5);
+    doc.setFont(FONT, "normal");
+    y += doc.splitTextToSize(satir.note, genislik).length * 3.8 + 2;
+  }
+  return y;
+}
+
+function gorsellerCiz(
+  doc: JsPDFType,
+  satir: { ids: string[]; sutun: number; yukseklik: number; note?: string },
+  x: number,
+  yBaslangic: number,
+  genislik: number
+) {
+  const hucreGenislik = genislik / satir.sutun;
+  let y = yBaslangic;
+  satir.ids.forEach((id, i) => {
+    const veri = BELGE_GORSELLERI[id];
+    if (!veri) return;
+    const sutunNo = i % satir.sutun;
+    if (sutunNo === 0 && i > 0) y += satir.yukseklik + 4;
+    const ozellik = doc.getImageProperties
+      ? doc.getImageProperties(veri)
+      : { width: 1, height: 1 };
+    const oran = ozellik.width / ozellik.height || 1;
+    let h = satir.yukseklik;
+    let w = h * oran;
+    if (w > hucreGenislik - 4) {
+      w = hucreGenislik - 4;
+      h = w / oran;
+    }
+    const gx = x + sutunNo * hucreGenislik + (hucreGenislik - w) / 2;
+    const gy = y + (satir.yukseklik - h) / 2;
+    try {
+      doc.addImage(veri, "JPEG", gx, gy, w, h);
+    } catch {
+      /* görsel eklenemezse belge yine üretilsin */
+    }
+  });
+  if (satir.note) {
+    y += satir.yukseklik + 5;
+    doc.setFontSize(7.5);
+    doc.setFont(FONT, "normal");
+    doc.setTextColor(110, 110, 110);
+    doc.text(doc.splitTextToSize(satir.note, genislik), x, y);
+    doc.setTextColor(0, 0, 0);
+  }
+}
+
 function satirYuksekligi(doc: JsPDFType, satir: Satir, genislik: number): number {
+  if (satir.tur === "gorseller") return gorsellerYuksekligiHesapla(doc, satir, genislik);
   if (satir.tur === "tablo") return tabloYuksekligiHesapla(doc, satir, genislik);
   return SATIR_YUKSEKLIGI[satir.tur] + (satir.tur === "altbaslik" ? 2 + ALTBASLIK_ON_BOSLUK : 0);
 }
@@ -1309,6 +1377,9 @@ async function renderYapilandirilmisBelge(
       } else if (satir.tur === "tablo") {
         tabloCiz(doc, satir, M, y, genislik);
         y += tabloYuksekligiHesapla(doc, satir, genislik);
+      } else if (satir.tur === "gorseller") {
+        gorsellerCiz(doc, satir, M, y, genislik);
+        y += gorsellerYuksekligiHesapla(doc, satir, genislik);
       } else {
         doc.setFontSize(9.5);
         doc.setFont(FONT, "normal");

@@ -14,7 +14,12 @@ export type TemplateBlock =
   | { type: "subheading"; text: string }
   | { type: "bullet"; items: string[] }
   | { type: "numbered"; items: string[] }
-  | { type: "table"; headers?: string[]; rows: string[][]; note?: string; colWidths?: number[] };
+  | { type: "table"; headers?: string[]; rows: string[][]; note?: string; colWidths?: number[] }
+  // Orijinal belgelerde yer alan görseller (ADR levhaları, teçhizat
+  // görselleri vb.). `ids` içindeki anahtarlar belgeGorselleri.ts'te
+  // tanımlıdır; `sutun` bir satırda kaç görsel yan yana dizileceğini,
+  // `yukseklik` ise mm cinsinden görsel yüksekliğini belirtir.
+  | { type: "images"; ids: string[]; sutun?: number; yukseklik?: number; note?: string };
 
 export type BelgeSablonu = {
   docType: "PROSEDÜR" | "TALİMAT" | "KONTROL FORMU" | "LİSTE";
@@ -108,6 +113,7 @@ export const BELGE_SABLONLARI: Record<string, BelgeSablonu> = {
       ]},
       { type: "subheading", text: "3.6. Turuncu Plakanın Özellikleri" },
       { type: "paragraph", text: "Plaka(Yazılı ya da Boş), 15 dakikalık yangına maruz kalma durumunda takıldığı yuvadan çıkmayacaktır. Aracın istikametinden bağımsız olarak sabit kalacaktır. Turuncu renkli plakalar, yukarıda belirtilen ebatlarda belirtilen şekilde olacak ve 15 mm kalınlıkta siyah yatay bir çizgi ile ortadan ikiye ayrılacaktır." },
+      { type: "images", ids: ["turuncu_plaka"], sutun: 1, yukseklik: 55 },
       { type: "subheading", text: "3.7. Tehlikeli Madde Taşıyan Araçlarda Bulunması Gerekenler (Dökümantasyon)" },
       { type: "bullet", items: [
         "Şoför SRC5 Belgesi (Tehlikeli Madde Taşımacılığı Sürücü Eğitim Sertifikası- Tank Taşımacılığına uygun olmalıdır.)",
@@ -128,11 +134,30 @@ export const BELGE_SABLONLARI: Record<string, BelgeSablonu> = {
         "‘’D’’ sınıfı yangınlar: Hafif metal yangınları (alüminyum, magnezyum, sodyum, potasyum, lityum vb.)",
       ]},
       { type: "paragraph", text: "ADR'ye göre araç ünitelerinde bulunması gereken söndürücülerin asgari miktarları aşağıdaki tabloda verilmiştir:" },
+      { type: "table",
+        headers: [
+          "Taşıma biriminin azami kütlesi (azami yüklü ağırlık)",
+          "Yangın söndürücünün asgari sayısı",
+          "Taşıma ünitesindeki asgari toplam kapasite",
+          "Motor veya sürücü kabini için asgari kapasite",
+          "Kabin dışındaki ek söndürücülerden en az birinin asgari kapasitesi",
+        ],
+        colWidths: [1.6, 1.0, 1.1, 1.1, 1.2],
+        rows: [
+          ["3,5 tondan küçük", "2", "4 kg", "2 kg", "2 kg"],
+          ["3,5 - 7,5 ton arası", "2", "8 kg", "2 kg", "6 kg"],
+          ["7,5 tondan büyük", "2", "12 kg", "2 kg", "6 kg"],
+        ],
+        note: "Kapasiteler kuru toz (ya da söndürmede kullanılan diğer uygun eşdeğer ajan madde) cihazları içindir." },
       { type: "bullet", items: [
         "NOT: Araçta bulunması zorunlu olan yangın söndürme tüplerinin özellik, sayı ve kapasitelerinin kontrol edilmesi. Bu tüplerin, test tarihlerinin geçip geçmediği, mührünün olmadığı kontrol edilecektir.",
         "YANGIN EKİPMANLARI TAŞIYICI FİRMA TARAFINDAN TEDARİK EDİLEREK ARACA VERİLMESİ GEREKLİDİR.",
       ]},
       { type: "subheading", text: "3.9. Tehlikeli Madde Taşıyan Araçlarda Bulunması Gereken Teçhizatlar ve Kişisel Koruyucu Donanımlar" },
+      { type: "images",
+        ids: ["tec1","tec2","tec3","tec4","tec5","tec6","tec7","tec8","tec9","tec10","tec11","tec12","tec13"],
+        sutun: 4, yukseklik: 26,
+        note: "Yukarıdaki teçhizat ve kişisel koruyucu donanımlar, ADR 8.1.5 uyarınca taşıma ünitesinde eksiksiz bulundurulur." },
       { type: "bullet", items: [
       ]},
     ],
