@@ -756,22 +756,27 @@ function duzMetneCevir(doc: JsPDFType, sablon: BelgeSablonu, belgeAdi: string): 
 
   satirlar.push({ tur: "baslik", metin: belgeAdi });
 
+  // Amaç / Kapsam / Tanımlar da orijinal belgelerdeki gibi numaralı
+  // bölümlerdir; gövde bölümlerinin numaraları bunların ardından devam eder.
+  let bolumNo = 0;
+  const bolumBasligi = (ad: string) => `${++bolumNo}. ${ad}`;
+
   if (sablon.amac) {
-    satirlar.push({ tur: "altbaslik", metin: "Amaç" });
+    satirlar.push({ tur: "altbaslik", metin: bolumBasligi("Amaç") });
     doc.setFontSize(9.5);
     doc.splitTextToSize(sablon.amac, genislik).forEach((t: string) =>
       satirlar.push({ tur: "paragraf", metin: t })
     );
   }
   if (sablon.kapsam) {
-    satirlar.push({ tur: "altbaslik", metin: "Kapsam" });
+    satirlar.push({ tur: "altbaslik", metin: bolumBasligi("Kapsam") });
     doc.setFontSize(9.5);
     doc.splitTextToSize(sablon.kapsam, genislik).forEach((t: string) =>
       satirlar.push({ tur: "paragraf", metin: t })
     );
   }
   if (sablon.tanimlar && sablon.tanimlar.length > 0) {
-    satirlar.push({ tur: "altbaslik", metin: "Tanımlar" });
+    satirlar.push({ tur: "altbaslik", metin: bolumBasligi("Tanımlar") });
     doc.setFontSize(9.5);
     sablon.tanimlar.forEach((t) => {
       doc.splitTextToSize(`${t.terim}: ${t.tanim}`, genislik - 4).forEach((line: string) =>
