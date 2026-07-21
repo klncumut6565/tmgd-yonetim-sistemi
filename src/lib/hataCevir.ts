@@ -40,7 +40,7 @@ const KALIPLAR: [RegExp, string][] = [
   // uzunluk sınırı olan alanlar kullanıcıya tek tek hatırlatılır.
   [
     /value too long/i,
-    "Bir alana izin verilenden uzun bir değer girildi. Uzunluk sınırı olan alanlar: Vergi No (en fazla 20), MERSİS No (25), Plaka (20), T.C. Kimlik No (20). Lütfen bu alanları kontrol edip kısalt.",
+    "Bir alana izin verilenden uzun bir değer girildi. Uzunluk sınırı olan alanlar: Plaka (en fazla 20), T.C. Kimlik No (20). Lütfen bu alanları kontrol edip kısalt.",
   ],
 
   // ---- Tablo / kolon ----

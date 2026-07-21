@@ -783,11 +783,11 @@ export default function FirmDetailPage({
             </label>
             <label className="block">
               <span className="text-sm text-gray-600">Vergi No</span>
-              {/* Veritabanında varchar(20); tarayıcı tarafında da sınırlanır ki
-                  kaydetme anında "değer çok uzun" hatası alınmasın. */}
+              {/* Uzunluk sınırı yok: bu alana vergi dairesiyle birlikte tam
+                  bilgi yazılabiliyor (bkz. migration 026). */}
               <input
                 className="border p-2 w-full rounded mt-1"
-                maxLength={20}
+                placeholder="Örn. Küçükköy Vergi Dairesi / 0790003218"
                 value={form.tax_number || ""}
                 onChange={set("tax_number")}
               />
