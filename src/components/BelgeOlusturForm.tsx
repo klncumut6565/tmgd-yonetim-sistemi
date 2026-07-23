@@ -726,7 +726,7 @@ function renderBasitBelge(
   doc.setFontSize(10);
   doc.setFont(FONT, "normal");
   doc.setTextColor(90, 90, 90);
-  doc.text(`Belge Kodu: ${item.code}`, logo ? 45 : 15, 27);
+  doc.text(`Doküman No: TMGDK-${item.code}`, logo ? 45 : 15, 27);
   doc.text(`Tarih: ${bugun}`, logo ? 45 : 15, 32);
   doc.setTextColor(0, 0, 0);
 
@@ -769,7 +769,7 @@ function renderBasitBelge(
   doc.setFontSize(8);
   doc.setTextColor(120, 120, 120);
   doc.text(
-    `${firm.name} · ${item.code} · TMGD Yönetim Sistemi tarafından ${bugun} tarihinde oluşturuldu`,
+    `${firm.name} · TMGDK-${item.code} · TMGD Yönetim Sistemi tarafından ${bugun} tarihinde oluşturuldu`,
     15,
     290
   );
