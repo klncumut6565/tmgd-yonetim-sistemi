@@ -21,6 +21,7 @@ import {
 } from "@/lib/belgeKatalogu";
 import FirmScopedCrud from "@/components/FirmScopedCrud";
 import KimyasalEnvanter from "@/components/KimyasalEnvanter";
+import TasimaEvraki from "@/components/TasimaEvraki";
 import BelgeOlusturForm from "@/components/BelgeOlusturForm";
 import {
   VEHICLE_FIELDS,
@@ -159,6 +160,7 @@ export default function FirmDetailPage({
   const [firm, setFirm] = useState<Firm | null>(null);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<TabKey>("belge_takip");
+  const [adrAltSekme, setAdrAltSekme] = useState<"evrak" | "envanter">("evrak");
 
   // Firma Bilgileri sekmesinden ayrılınca düzenleme modu sıfırlanır —
   // sekmeye her dönüşte güvenli (salt okunur) görünümle başlanır.
@@ -1427,14 +1429,36 @@ export default function FirmDetailPage({
           Taşıma Evrakı alt sekmesi Aşama 3'te eklenecek; envanter onun
           ürün kaynağı olacak (arama yalnızca bu listeden yapılır). */}
       {tab === "adr_transport" && (
-        <div className="max-w-5xl">
+        <div>
           <h2 className="text-lg font-bold mb-1">🚚 ADR Transport</h2>
-          <p className="text-sm text-gray-500 mb-4">
-            Kimyasal Envanter — bu firmanın taşıma evraklarında kullanılacak
-            madde listesi. ADR bilgileri ortak Tablo A&apos;dan (2.939 kayıt)
-            otomatik gelir.
+          <p className="text-sm text-gray-500 mb-3">
+            Taşıma evrakları bu firmanın kendi Kimyasal Envanterinden beslenir;
+            ADR bilgileri ortak Tablo A&apos;dan (2.939 kayıt) otomatik gelir.
           </p>
-          <KimyasalEnvanter firmId={id} />
+          <div className="flex gap-2 mb-4">
+            {(["evrak", "envanter"] as const).map((alt) => (
+              <button
+                key={alt}
+                onClick={() => setAdrAltSekme(alt)}
+                className={
+                  "px-3 py-1.5 rounded-lg text-sm border " +
+                  (adrAltSekme === alt
+                    ? "bg-blue-600 text-white border-blue-600"
+                    : "bg-white hover:bg-gray-50")
+                }
+              >
+                {alt === "evrak" ? "📄 Taşıma Evrakı" : "🧪 Kimyasal Envanter"}
+              </button>
+            ))}
+          </div>
+          {adrAltSekme === "envanter" && (
+            <div className="max-w-5xl">
+              <KimyasalEnvanter firmId={id} />
+            </div>
+          )}
+          {adrAltSekme === "evrak" && firm && (
+            <TasimaEvraki firmId={id} firmaAdi={firm.name} />
+          )}
         </div>
       )}
     </div>
