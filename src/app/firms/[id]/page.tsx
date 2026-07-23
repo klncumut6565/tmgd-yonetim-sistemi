@@ -20,6 +20,7 @@ import {
   codeSection,
 } from "@/lib/belgeKatalogu";
 import FirmScopedCrud from "@/components/FirmScopedCrud";
+import KimyasalEnvanter from "@/components/KimyasalEnvanter";
 import BelgeOlusturForm from "@/components/BelgeOlusturForm";
 import {
   VEHICLE_FIELDS,
@@ -73,6 +74,7 @@ const TABS = [
   { key: "drivers", label: "Sürücüler" },
   { key: "employees", label: "Personeller" },
   { key: "visits", label: "Ziyaretler" },
+  { key: "adr_transport", label: "ADR Transport" },
   { key: "genel", label: "Firma Bilgileri" },
 ] as const;
 
@@ -1419,6 +1421,21 @@ export default function FirmDetailPage({
           notepadLabel="Rapor İçeriği (Planlanan / Gerçekleşen Faaliyet)"
           notepadTemplate={VISIT_REPORT_TEMPLATE}
         />
+      )}
+
+      {/* ADR TRANSPORT — Aşama 2: firma bazlı kimyasal envanter.
+          Taşıma Evrakı alt sekmesi Aşama 3'te eklenecek; envanter onun
+          ürün kaynağı olacak (arama yalnızca bu listeden yapılır). */}
+      {tab === "adr_transport" && (
+        <div className="max-w-5xl">
+          <h2 className="text-lg font-bold mb-1">🚚 ADR Transport</h2>
+          <p className="text-sm text-gray-500 mb-4">
+            Kimyasal Envanter — bu firmanın taşıma evraklarında kullanılacak
+            madde listesi. ADR bilgileri ortak Tablo A&apos;dan (2.939 kayıt)
+            otomatik gelir.
+          </p>
+          <KimyasalEnvanter firmId={id} />
+        </div>
       )}
     </div>
   );
