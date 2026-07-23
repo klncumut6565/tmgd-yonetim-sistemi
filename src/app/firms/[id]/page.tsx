@@ -1453,7 +1453,7 @@ export default function FirmDetailPage({
           </div>
           {adrAltSekme === "envanter" && (
             <div className="max-w-5xl">
-              <KimyasalEnvanter firmId={id} />
+              <KimyasalEnvanter firmId={id} firmaAdi={firm?.name || ""} />
             </div>
           )}
           {adrAltSekme === "evrak" && firm && (

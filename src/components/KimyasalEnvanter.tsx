@@ -16,6 +16,7 @@
 // =========================================================================
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { jsPDF as JsPDFType } from "jspdf";
 import { supabase } from "@/lib/supabase/client";
 import { hataCevir } from "@/lib/hataCevir";
 import { useUser } from "@/hooks/useUser";
@@ -48,7 +49,13 @@ type FirmChemical = {
   notes: string | null;
 };
 
-export default function KimyasalEnvanter({ firmId }: { firmId: string }) {
+export default function KimyasalEnvanter({
+  firmId,
+  firmaAdi,
+}: {
+  firmId: string;
+  firmaAdi: string;
+}) {
   const { canWrite, profile } = useUser();
   // 'company' rolü ekleme yapabilir ama düzenleyemez/silemez.
   const ekleyebilir = canWrite || profile?.role === "company";
@@ -174,6 +181,211 @@ export default function KimyasalEnvanter({ firmId }: { firmId: string }) {
     setAmbalaj("");
     setMiktar("");
     yukle();
+  }
+
+  const [l1Uretiliyor, setL1Uretiliyor] = useState(false);
+
+  // ---------------------------------------------------------------
+  // L1 — Tehlikeli Madde Envanter Listesi üretimi.
+  //
+  // Envanterdeki güncel kayıtlardan, sistemin belge standardına uygun
+  // (dış çerçeve + başlık kutusu + zebra tablo) bir PDF üretir ve bunu
+  // Belge Takip'teki L1 maddesine dosya olarak yükler — böylece envanter
+  // ile L1 belgesi arasındaki bağ otomatik kurulur ve L1 maddesi
+  // "tamamlandı" işaretlenir (dosya varlığı kanıttır, Belge Takip'teki
+  // elle yükleme akışıyla aynı kural).
+  // ---------------------------------------------------------------
+  async function l1UretVeYukle() {
+    if (liste.length === 0) {
+      setMesaj("Envanter boş — önce kimyasal ekle.");
+      return;
+    }
+    setL1Uretiliyor(true);
+    setMesaj("");
+    try {
+      const { jsPDF } = await import("jspdf");
+      const { LIBERATION_SANS_REGULAR_B64, LIBERATION_SANS_BOLD_B64 } =
+        await import("@/lib/pdfFonts");
+      const doc: JsPDFType = new jsPDF({ unit: "mm", format: "a4" });
+      const FONT = "LiberationSans";
+      doc.addFileToVFS("LiberationSans-Regular.ttf", LIBERATION_SANS_REGULAR_B64);
+      doc.addFont("LiberationSans-Regular.ttf", FONT, "normal");
+      doc.addFileToVFS("LiberationSans-Bold.ttf", LIBERATION_SANS_BOLD_B64);
+      doc.addFont("LiberationSans-Bold.ttf", FONT, "bold");
+      doc.setFont(FONT, "normal");
+
+      const W = 210;
+      const M = 12.4;
+      const bugun = new Date().toLocaleDateString("tr-TR");
+
+      const cerceve = () => {
+        doc.setDrawColor(0, 0, 0);
+        doc.setLineWidth(0.7);
+        doc.rect(8.5, 8.5, W - 17, 279);
+        doc.setLineWidth(0.3);
+      };
+      const baslik = (sayfa: number, toplam: number) => {
+        cerceve();
+        doc.setDrawColor(0, 0, 0);
+        doc.rect(M, M, W - 2 * M, 20);
+        doc.line(M + 38, M, M + 38, M + 20);
+        doc.line(W - M - 43, M, W - M - 43, M + 20);
+        doc.setFont(FONT, "bold");
+        doc.setFontSize(8);
+        doc.text(firmaAdi, M + 19, M + 10, {
+          align: "center",
+          maxWidth: 34,
+        });
+        doc.setFontSize(12);
+        doc.setTextColor(30, 58, 138);
+        doc.text("LİSTE", (M + 38 + (W - M - 43)) / 2, M + 8, { align: "center" });
+        doc.setFontSize(9);
+        doc.setTextColor(0, 0, 0);
+        doc.text("Tehlikeli Madde Envanter Listesi", (M + 38 + (W - M - 43)) / 2, M + 14, {
+          align: "center",
+        });
+        doc.setFontSize(7);
+        doc.setFont(FONT, "normal");
+        const sagX = W - M - 41;
+        doc.text("Doküman No: L1", sagX, M + 5);
+        doc.text(`Tarih: ${bugun}`, sagX, M + 10);
+        doc.text(`Sayfa: ${sayfa} / ${toplam}`, sagX, M + 15);
+      };
+
+      // Tablo düzeni
+      const kolonlar = [
+        { b: "#", w: 8 },
+        { b: "UN No", w: 16 },
+        { b: "Resmi Taşıma Adı", w: 64 },
+        { b: "Ticari Ad", w: 38 },
+        { b: "Sınıf", w: 12 },
+        { b: "PG", w: 10 },
+        { b: "Tünel", w: 14 },
+        { b: "Kat.", w: 10 },
+        { b: "Yıllık Miktar", w: 13.2 },
+      ];
+      const tabloW = kolonlar.reduce((a, k) => a + k.w, 0);
+      const satirlar = liste.map((k, i) => {
+        const adSatir: string[] = doc.splitTextToSize(k.proper_shipping_name, 62);
+        const ticariSatir: string[] = doc.splitTextToSize(k.trade_name || "—", 36);
+        const yuk = Math.max(6, Math.max(adSatir.length, ticariSatir.length) * 3.4 + 2.6);
+        return { k, i, adSatir, ticariSatir, yuk };
+      });
+
+      // Sayfalama hesabı
+      const ustY = M + 24;
+      const altSinir = 280;
+      let sayfalar = 1;
+      {
+        let y = ustY + 7;
+        for (const s2 of satirlar) {
+          if (y + s2.yuk > altSinir) {
+            sayfalar++;
+            y = ustY + 7;
+          }
+          y += s2.yuk;
+        }
+      }
+
+      let sayfa = 1;
+      baslik(sayfa, sayfalar);
+      let y = ustY;
+      const tabloBasligi = () => {
+        doc.setFillColor(235, 238, 245);
+        doc.rect(M, y, tabloW, 7, "F");
+        doc.rect(M, y, tabloW, 7);
+        doc.setFont(FONT, "bold");
+        doc.setFontSize(7);
+        let x = M;
+        kolonlar.forEach((c) => {
+          doc.text(c.b, x + 1.5, y + 4.8);
+          x += c.w;
+        });
+        y += 7;
+        doc.setFont(FONT, "normal");
+      };
+      tabloBasligi();
+
+      satirlar.forEach((s2) => {
+        if (y + s2.yuk > altSinir) {
+          doc.addPage();
+          sayfa++;
+          baslik(sayfa, sayfalar);
+          y = ustY;
+          tabloBasligi();
+        }
+        if (s2.i % 2 === 1) {
+          doc.setFillColor(247, 248, 250);
+          doc.rect(M, y, tabloW, s2.yuk, "F");
+        }
+        doc.rect(M, y, tabloW, s2.yuk);
+        doc.setFontSize(7);
+        let x = M;
+        const hucre = (t: string, w: number, orta = false) => {
+          doc.text(t, orta ? x + w / 2 : x + 1.5, y + 4.4, orta ? { align: "center" } : undefined);
+          x += w;
+        };
+        hucre(String(s2.i + 1), 8, true);
+        hucre(`UN ${s2.k.un_number}`, 16);
+        doc.text(s2.adSatir, x + 1.5, y + 4.4);
+        x += 64;
+        doc.text(s2.ticariSatir, x + 1.5, y + 4.4);
+        x += 38;
+        hucre(s2.k.adr_class || "—", 12, true);
+        hucre(s2.k.packing_group || "—", 10, true);
+        hucre(s2.k.tunnel_code || "—", 14, true);
+        hucre(s2.k.transport_category || "—", 10, true);
+        hucre((s2.k.annual_amount || "—").slice(0, 10), 13.2);
+        y += s2.yuk;
+      });
+
+      doc.setFontSize(6.5);
+      doc.setTextColor(120, 120, 120);
+      doc.text(
+        `${liste.length} kimyasal · ADR alanları Tablo A'dan alınmıştır · TMGD Yönetim Sistemi`,
+        W / 2,
+        284,
+        { align: "center" }
+      );
+
+      // Belge Takip'e yükleme — elle yükleme akışıyla AYNI yol ve tablolar.
+      const pdfBlob = doc.output("blob");
+      const dosyaAdi = `L1_Envanter_Listesi_${bugun.replace(/\./g, "-")}.pdf`;
+      const yol = `${firmId}/belge-takip/L1_genel/${Date.now()}_${dosyaAdi}`;
+
+      const { error: upErr } = await supabase.storage
+        .from("firm-files")
+        .upload(yol, pdfBlob, { upsert: true, contentType: "application/pdf" });
+      if (upErr) {
+        setMesaj("L1 yüklenemedi: " + hataCevir(upErr));
+        return;
+      }
+      const { error: dbErr } = await supabase.from("firm_belge_dosyalari").insert({
+        firm_id: firmId,
+        code: "L1",
+        period: "",
+        file_path: yol,
+        file_name: dosyaAdi,
+      });
+      if (dbErr) {
+        setMesaj("L1 kaydedilemedi: " + hataCevir(dbErr));
+        return;
+      }
+      // Dosya varlığı maddenin karşılandığının kanıtı — Belge Takip kuralı.
+      await supabase
+        .from("firm_belgeleri")
+        .upsert(
+          { firm_id: firmId, code: "L1", period: "", done: true },
+          { onConflict: "firm_id,code,period" }
+        );
+
+      doc.save(dosyaAdi);
+      setMesaj(
+        `✓ L1 listesi ${liste.length} kimyasalla üretildi, Belge Takip'e yüklendi ve indirildi.`
+      );
+    } finally {
+      setL1Uretiliyor(false);
+    }
   }
 
   async function sil(k: FirmChemical) {
@@ -347,10 +559,22 @@ export default function KimyasalEnvanter({ firmId }: { firmId: string }) {
               ))}
             </tbody>
           </table>
-          <p className="text-xs text-gray-400 mt-2">
-            {liste.length} kimyasal · ADR alanları Tablo A&apos;dan otomatik
-            doldurulur.
-          </p>
+          <div className="flex items-center justify-between mt-2">
+            <p className="text-xs text-gray-400">
+              {liste.length} kimyasal · ADR alanları Tablo A&apos;dan otomatik
+              doldurulur.
+            </p>
+            {canWrite && (
+              <button
+                onClick={l1UretVeYukle}
+                disabled={l1Uretiliyor}
+                className="text-xs px-3 py-1.5 rounded border bg-white hover:bg-gray-50 disabled:opacity-50"
+                title="Envanterden L1 belgesi üret, Belge Takip'e yükle ve indir"
+              >
+                {l1Uretiliyor ? "Üretiliyor..." : "📄 L1 Listesi Üret → Belge Takip'e Yükle"}
+              </button>
+            )}
+          </div>
         </div>
       )}
     </div>
