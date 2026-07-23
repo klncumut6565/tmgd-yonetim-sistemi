@@ -427,7 +427,9 @@ export default function FirmDetailPage({
     return { label, className };
   }
 
-  const ALLOWED_EXT = [".pdf", ".doc", ".docx", ".jpg", ".jpeg", ".png"];
+  // Excel/CSV, L1 (ADR Envanter Listesi) gibi liste maddelerinin içe
+  // aktarılabilir formatta yüklenebilmesi için desteklenir.
+  const ALLOWED_EXT = [".pdf", ".doc", ".docx", ".xlsx", ".xls", ".csv", ".jpg", ".jpeg", ".png"];
 
   // Birden fazla dosya seçilebilir — her biri ayrı bir ek olarak yüklenir.
   async function uploadItemFiles(code: string, period: string, fileList: FileList) {
@@ -441,7 +443,7 @@ export default function FirmDetailPage({
     });
     if (invalid) {
       setFileMsg(
-        `Desteklenmeyen dosya türü: "${invalid.name}". İzin verilenler: PDF, Word, JPEG, PNG.`
+        `Desteklenmeyen dosya türü: "${invalid.name}". İzin verilenler: PDF, Word, Excel, CSV, JPEG, PNG.`
       );
       return;
     }
@@ -1092,7 +1094,7 @@ export default function FirmDetailPage({
                                     id={inputId}
                                     type="file"
                                     multiple
-                                    accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,image/png,image/jpeg,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                                    accept=".pdf,.doc,.docx,.xlsx,.xls,.csv,.jpg,.jpeg,.png,image/png,image/jpeg,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv"
                                     className="hidden"
                                     onChange={(e) => {
                                       if (e.target.files && e.target.files.length > 0) {
