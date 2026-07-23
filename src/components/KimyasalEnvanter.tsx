@@ -437,7 +437,7 @@ export default function KimyasalEnvanter({
         doc.setFontSize(7);
         doc.setFont(FONT, "normal");
         const sagX = W - M - 41;
-        doc.text("Doküman No: L1", sagX, M + 5);
+        doc.text("Doküman No: TMGDK-L1", sagX, M + 5);
         doc.text(`Tarih: ${bugun}`, sagX, M + 10);
         doc.text(`Sayfa: ${sayfa} / ${toplam}`, sagX, M + 15);
       };

@@ -1209,7 +1209,9 @@ function baslikTablosuCiz(
   doc.setFontSize(7);
   doc.setFont(FONT, "normal");
   const sagX = W - M - 43;
-  doc.text(`Doküman No: ${code}`, sagX, ustY + 5);
+  // Doküman numarası kurum önekiyle yazılır: TMGDK-P1, TMGDK-L1 gibi
+  // (referans TMGDK belgelerindeki numaralandırma standardı).
+  doc.text(`Doküman No: TMGDK-${code}`, sagX, ustY + 5);
   doc.text(`Yayın Tarihi: ${sablon.yayinTarihi}`, sagX, ustY + 10);
   doc.text(`Revizyon Tarihi: ${bugun}`, sagX, ustY + 15);
   doc.text(
