@@ -25,6 +25,7 @@ import { supabase } from "@/lib/supabase/client";
 import { hataCevir } from "@/lib/hataCevir";
 import { useUser } from "@/hooks/useUser";
 import type { jsPDF as JsPDFType } from "jspdf";
+import { checkPair, CheckResult, UnRow as MixUnRow } from "@/lib/adrMix";
 import {
   LIBERATION_SANS_REGULAR_B64,
   LIBERATION_SANS_BOLD_B64,
@@ -36,9 +37,11 @@ type Envanter = {
   un_number: string;
   proper_shipping_name: string;
   adr_class: string | null;
+  classification_code: string | null;
   packing_group: string | null;
   tunnel_code: string | null;
   transport_category: string | null;
+  labels: string | null; // karışık yükleme motoru etiketlerden çalışır
   trade_name: string | null;
 };
 
@@ -47,6 +50,8 @@ type Kalem = {
   un_number: string;
   proper_shipping_name: string;
   adr_class: string | null;
+  classification_code: string | null;
+  labels: string | null;
   packing_group: string | null;
   tunnel_code: string | null;
   transport_category: string | null;
@@ -316,7 +321,7 @@ export default function TasimaEvraki({
   const yukle = useCallback(async () => {
     const [env, sur, arc, evr] = await Promise.all([
       supabase.from("firm_chemicals")
-        .select("id, un_number, proper_shipping_name, adr_class, packing_group, tunnel_code, transport_category, trade_name")
+        .select("id, un_number, proper_shipping_name, adr_class, classification_code, packing_group, tunnel_code, transport_category, labels, trade_name")
         .eq("firm_id", firmId).order("un_number"),
       supabase.from("drivers")
         .select("id, first_name, last_name, adr_certificate_no, adr_valid_until")
@@ -344,6 +349,49 @@ export default function TasimaEvraki({
   const { puan, plakaGerekli, muafiyetsiz } = useMemo(() => hesapla1136(kalemler), [kalemler]);
   const tunel = useMemo(() => tunelKisiti(kalemler), [kalemler]);
 
+  // KARIŞIK YÜKLEME — ADR sayfasındaki doğrulanmış motorun (adrMix)
+  // aynısı. Evraktaki benzersiz maddelerin tüm İKİLİ kombinasyonları
+  // kontrol edilir; sonuçlar yasak > şartlı > uygun önceliğiyle panelde
+  // gösterilir. LQ/EQ kalemler de dahildir: 7.5.2 ayrım kuralları
+  // miktar muafiyetinden bağımsız uygulanır (güvenli taraf).
+  const karisikSonuclar = useMemo<CheckResult[]>(() => {
+    // Aynı UN+ad birden çok kalemde olabilir; kombinasyon benzersiz
+    // maddeler üzerinden kurulur.
+    const benzersiz = new Map<string, Kalem>();
+    for (const k of kalemler) {
+      benzersiz.set(`${k.un_number}|${k.proper_shipping_name}`, k);
+    }
+    const maddeler = Array.from(benzersiz.values()).map(
+      (k): MixUnRow => ({
+        id: k.firm_chemical_id || `${k.un_number}`,
+        un_number: k.un_number,
+        proper_shipping_name: k.proper_shipping_name,
+        class: k.adr_class || "",
+        classification_code: k.classification_code,
+        packing_group: k.packing_group,
+        tunnel_code: k.tunnel_code,
+        hazard_no: null,
+        labels: k.labels,
+        transport_category: k.transport_category,
+        limited_quantity: null,
+        excepted_quantity: null,
+      })
+    );
+    const sonuclar: CheckResult[] = [];
+    for (let i = 0; i < maddeler.length; i++) {
+      for (let j = i + 1; j < maddeler.length; j++) {
+        sonuclar.push(checkPair(maddeler[i], maddeler[j]));
+      }
+    }
+    // Önce yasaklar, sonra şartlılar/bilinmeyenler, en sonda uygunlar
+    const oncelik: Record<string, number> = {
+      NO: 0, EXPLOSIVE_SPECIAL: 1, UNKNOWN: 2, FOOD: 3, COND: 4, OK: 5,
+    };
+    sonuclar.sort((a, b2) => (oncelik[a.status] ?? 9) - (oncelik[b2.status] ?? 9));
+    return sonuclar;
+  }, [kalemler]);
+  const karisikYasak = karisikSonuclar.some((r) => r.status === "NO");
+
   const seciliSurucu = suruculer.find((s) => s.id === surucuId) || null;
   const seciliArac = araclar.find((a) => a.id === aracId) || null;
 
@@ -358,6 +406,8 @@ export default function TasimaEvraki({
       un_number: kim.un_number,
       proper_shipping_name: kim.proper_shipping_name,
       adr_class: kim.adr_class,
+      classification_code: kim.classification_code,
+      labels: kim.labels,
       packing_group: kim.packing_group,
       tunnel_code: kim.tunnel_code,
       transport_category: kim.transport_category,
@@ -387,11 +437,17 @@ export default function TasimaEvraki({
     setGonderen(ev.consignor || firmaAdi); setAlici(ev.consignee || "");
     setTasiyici(ev.carrier || ""); setSurucuId(ev.driver_id || "");
     setAracId(ev.vehicle_id || ""); setNotlar(ev.notes || "");
-    setKalemler(((it || []) as Record<string, unknown>[]).map((r) => ({
+    setKalemler(((it || []) as Record<string, unknown>[]).map((r) => {
+      // Karışık yükleme motoru etiketlerle çalışır; kayıtlı kalemlerde
+      // labels saklanmadığından envanterdeki eş kayıttan tamamlanır.
+      const env = envanter.find((e) => e.id === r.firm_chemical_id);
+      return {
       firm_chemical_id: (r.firm_chemical_id as string) || null,
       un_number: (r.un_number as string) || "",
       proper_shipping_name: (r.proper_shipping_name as string) || "",
       adr_class: (r.adr_class as string) || null,
+      classification_code: env?.classification_code ?? null,
+      labels: env?.labels ?? null,
       packing_group: (r.packing_group as string) || null,
       tunnel_code: (r.tunnel_code as string) || null,
       transport_category: (r.transport_category as string) || null,
@@ -400,13 +456,22 @@ export default function TasimaEvraki({
       quantity: Number(r.quantity) || 0,
       unit: (r.unit as string) || "kg",
       is_lq: !!r.is_lq, is_eq: !!r.is_eq,
-    })));
+      };
+    }));
     setMesaj("");
   }
 
   async function kaydet() {
     if (!evrakNo.trim()) { setMesaj("Evrak No zorunlu."); return; }
     if (kalemler.length === 0) { setMesaj("En az bir ürün ekle."); return; }
+    if (
+      karisikYasak &&
+      !confirm(
+        "DİKKAT: Bu evraktaki maddeler arasında ADR 7.5.2'ye göre KARIŞIK YÜKLEME YASAĞI var. Aynı taşıma ünitesinde taşınamazlar.\n\nYine de kaydedilsin mi?"
+      )
+    ) {
+      return;
+    }
     setMesaj("");
     const govde = {
       firm_id: firmId, document_no: evrakNo.trim(), transport_date: tarih,
@@ -673,6 +738,53 @@ export default function TasimaEvraki({
               <p className="text-sm">Tünel Kısıtlaması: <b>{tunel}</b></p>
               <p className="text-xs text-gray-400 mt-2">{kalemler.length} ürün · LQ/EQ kalemleri puana dahil edilmez</p>
             </>
+          )}
+
+          {/* KARIŞIK YÜKLEME — ADR 7.5.2 (adrMix ortak motoru) */}
+          {karisikSonuclar.length > 0 && (
+            <div className="mt-4 pt-3 border-t">
+              <p className="text-sm font-semibold mb-1">Karışık Yükleme (ADR 7.5.2)</p>
+              {karisikYasak ? (
+                <p className="text-sm text-red-600 font-semibold mb-2">
+                  ⛔ YASAK kombinasyon var — aynı taşıma ünitesinde taşınamaz!
+                </p>
+              ) : karisikSonuclar.every((r) => r.status === "OK") ? (
+                <p className="text-sm text-green-700 mb-2">
+                  ✅ Tüm kombinasyonlar birlikte taşınabilir.
+                </p>
+              ) : (
+                <p className="text-sm text-amber-600 mb-2">
+                  ⚠ Şartlı / kontrol gerektiren kombinasyon var.
+                </p>
+              )}
+              <ul className="space-y-1.5 max-h-64 overflow-auto pr-1">
+                {karisikSonuclar
+                  .filter((r) => r.status !== "OK")
+                  .map((r, i) => (
+                    <li
+                      key={i}
+                      className={
+                        "text-xs rounded p-1.5 border " +
+                        (r.status === "NO"
+                          ? "bg-red-50 border-red-200 text-red-700"
+                          : r.status === "UNKNOWN"
+                          ? "bg-gray-50 border-gray-200 text-gray-600"
+                          : "bg-amber-50 border-amber-200 text-amber-800")
+                      }
+                    >
+                      <b>UN {r.un1} ↔ UN {r.un2}</b>{" "}
+                      <span className="text-[10px] opacity-70">(ADR {r.adrRef})</span>
+                      <br />
+                      {r.reason}
+                    </li>
+                  ))}
+              </ul>
+              {karisikSonuclar.every((r) => r.status === "OK") && (
+                <p className="text-[11px] text-gray-400">
+                  {karisikSonuclar.length} kombinasyon kontrol edildi.
+                </p>
+              )}
+            </div>
           )}
         </div>
       </aside>
