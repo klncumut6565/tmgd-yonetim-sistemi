@@ -186,6 +186,196 @@ export default function KimyasalEnvanter({
   const [l1Uretiliyor, setL1Uretiliyor] = useState(false);
 
   // ---------------------------------------------------------------
+  // L1 DOSYASINDAN İÇE AKTARMA
+  //
+  // Umut'un akışı: L1 envanter listesi (Excel) Belge Takip'in
+  // "ADR Envanter Listesi" başlığındaki L1 maddesine yüklenir; firmanın
+  // kimyasal envanteri BU DOSYADAN beslenir. Buton, L1'e yüklenmiş en
+  // güncel dosyayı indirir, Excel'i ayrıştırır, UN kolonunu bulur,
+  // Tablo A ile doğrular ve önizleme onayından sonra envantere yazar.
+  // ---------------------------------------------------------------
+  type IceAktarSatir = {
+    un: string;
+    ad: string; // dosyadaki ürün/ticari ad (trade_name olarak saklanır)
+    miktar: string;
+    ambalaj: string;
+    tabloA: UnRow | null; // eşleşen Tablo A kaydı (null = bulunamadı)
+    zatenVar: boolean;
+  };
+  const [iceAktarSatirlar, setIceAktarSatirlar] = useState<IceAktarSatir[] | null>(null);
+  const [iceAktarDosyaAdi, setIceAktarDosyaAdi] = useState("");
+  const [iceAktariliyor, setIceAktariliyor] = useState(false);
+
+  async function l1DosyasindanOku() {
+    setIceAktariliyor(true);
+    setMesaj("");
+    setIceAktarSatirlar(null);
+    try {
+      // 1) L1'e yüklenmiş EN GÜNCEL dosyayı bul
+      const { data: dosyalar, error: dErr } = await supabase
+        .from("firm_belge_dosyalari")
+        .select("file_path, file_name, uploaded_at")
+        .eq("firm_id", firmId)
+        .eq("code", "L1")
+        .order("uploaded_at", { ascending: false })
+        .limit(1);
+      if (dErr || !dosyalar || dosyalar.length === 0) {
+        setMesaj(
+          "Belge Takip'te L1 (ADR Envanter Listesi) maddesine yüklenmiş dosya bulunamadı. Önce dosyayı oraya yükle."
+        );
+        return;
+      }
+      const dosya = dosyalar[0];
+      const u = dosya.file_name.toLowerCase();
+      if (!/\.(xlsx|xls|csv)$/.test(u)) {
+        setMesaj(
+          `L1'deki son dosya "${dosya.file_name}" — Excel değil. İçe aktarma için L1'e .xlsx/.xls/.csv formatında liste yükle (PDF ayrıştırılamaz).`
+        );
+        return;
+      }
+
+      // 2) İndir
+      const { data: url } = await supabase.storage
+        .from("firm-files")
+        .createSignedUrl(dosya.file_path, 300);
+      if (!url?.signedUrl) {
+        setMesaj("Dosya indirilemedi.");
+        return;
+      }
+      const buf = await (await fetch(url.signedUrl)).arrayBuffer();
+
+      // 3) Ayrıştır — başlık satırını ve kolonları sezgisel bul
+      const XLSX = await import("xlsx");
+      const wb = XLSX.read(buf, { type: "array" });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const grid: unknown[][] = XLSX.utils.sheet_to_json(ws, {
+        header: 1,
+        defval: "",
+      });
+
+      const norm = (v: unknown) =>
+        String(v ?? "").toLocaleLowerCase("tr-TR").replace(/\s+/g, " ").trim();
+
+      // Başlık satırı: "un" geçen hücresi olan ilk 15 satırdan biri
+      let basIdx = -1;
+      let unKol = -1;
+      for (let i = 0; i < Math.min(grid.length, 15); i++) {
+        for (let j = 0; j < (grid[i] || []).length; j++) {
+          const h = norm(grid[i][j]);
+          if (h === "un" || h === "un no" || h === "un numarası" || h === "un number" || h.startsWith("un ")) {
+            basIdx = i;
+            unKol = j;
+            break;
+          }
+        }
+        if (basIdx >= 0) break;
+      }
+      if (basIdx < 0) {
+        setMesaj(
+          `"${dosya.file_name}" içinde UN kolonu bulunamadı. Başlık satırında "UN No" benzeri bir kolon olmalı.`
+        );
+        return;
+      }
+      const basliklar = (grid[basIdx] || []).map(norm);
+      const kolBul = (...adaylar: string[]) =>
+        basliklar.findIndex((h) => adaylar.some((a) => h.includes(a)));
+      const adKol = kolBul("ürün", "urun", "madde adı", "kimyasal", "ticari", "product", "ad");
+      const miktarKol = kolBul("miktar", "yıllık", "yillik", "quantity", "amount");
+      const ambalajKol = kolBul("ambalaj", "packag");
+
+      // 4) Satırları topla
+      const ham: { un: string; ad: string; miktar: string; ambalaj: string }[] = [];
+      for (let i = basIdx + 1; i < grid.length; i++) {
+        const row = grid[i] || [];
+        const unHam = String(row[unKol] ?? "").replace(/\D/g, "");
+        if (!unHam || unHam.length < 4) continue;
+        const un = unHam.slice(0, 4);
+        ham.push({
+          un,
+          ad: adKol >= 0 ? String(row[adKol] ?? "").trim() : "",
+          miktar: miktarKol >= 0 ? String(row[miktarKol] ?? "").trim() : "",
+          ambalaj: ambalajKol >= 0 ? String(row[ambalajKol] ?? "").trim() : "",
+        });
+      }
+      if (ham.length === 0) {
+        setMesaj("Dosyada UN numaralı satır bulunamadı.");
+        return;
+      }
+
+      // 5) Tablo A doğrulaması (tek sorgu) + mükerrer kontrolü
+      const benzersizUn = Array.from(new Set(ham.map((h) => h.un)));
+      const { data: tabloA } = await supabase
+        .from("adr_un_numbers")
+        .select("*")
+        .in("un_number", benzersizUn);
+      const tabloAMap = new Map<string, UnRow[]>();
+      ((tabloA as UnRow[]) || []).forEach((r) => {
+        const list = tabloAMap.get(r.un_number) || [];
+        list.push(r);
+        tabloAMap.set(r.un_number, list);
+      });
+
+      setIceAktarSatirlar(
+        ham.map((h) => {
+          // Aynı UN'nin birden çok varyantı olabilir (örn. UN 1950 → 12 kayıt);
+          // içe aktarmada İLK varyant önerilir, TMGD listeden düzeltebilir.
+          const varyantlar = tabloAMap.get(h.un) || [];
+          return {
+            ...h,
+            tabloA: varyantlar[0] || null,
+            zatenVar: liste.some((l) => l.un_number === h.un),
+          };
+        })
+      );
+      setIceAktarDosyaAdi(dosya.file_name);
+    } finally {
+      setIceAktariliyor(false);
+    }
+  }
+
+  async function iceAktarOnayla() {
+    if (!iceAktarSatirlar) return;
+    const eklenecek = iceAktarSatirlar.filter((r) => r.tabloA && !r.zatenVar);
+    if (eklenecek.length === 0) {
+      setMesaj("İçe aktarılacak yeni kayıt yok (hepsi mevcut veya Tablo A'da bulunamadı).");
+      return;
+    }
+    setIceAktariliyor(true);
+    try {
+      const { error } = await supabase.from("firm_chemicals").insert(
+        eklenecek.map((r) => ({
+          firm_id: firmId,
+          adr_un_id: r.tabloA!.id,
+          un_number: r.tabloA!.un_number,
+          proper_shipping_name: r.tabloA!.proper_shipping_name,
+          adr_class: r.tabloA!.class,
+          classification_code: r.tabloA!.classification_code,
+          packing_group: r.tabloA!.packing_group,
+          tunnel_code: r.tabloA!.tunnel_code,
+          transport_category: r.tabloA!.transport_category,
+          labels: r.tabloA!.labels,
+          limited_quantity: r.tabloA!.limited_quantity,
+          excepted_quantity: r.tabloA!.excepted_quantity,
+          trade_name: r.ad || null,
+          packaging_info: r.ambalaj || null,
+          annual_amount: r.miktar || null,
+        }))
+      );
+      if (error) {
+        setMesaj("İçe aktarılamadı: " + hataCevir(error));
+        return;
+      }
+      setMesaj(
+        `✓ "${iceAktarDosyaAdi}" dosyasından ${eklenecek.length} kimyasal envantere aktarıldı.`
+      );
+      setIceAktarSatirlar(null);
+      yukle();
+    } finally {
+      setIceAktariliyor(false);
+    }
+  }
+
+  // ---------------------------------------------------------------
   // L1 — Tehlikeli Madde Envanter Listesi üretimi.
   //
   // Envanterdeki güncel kayıtlardan, sistemin belge standardına uygun
@@ -408,6 +598,103 @@ export default function KimyasalEnvanter({
         <p className="text-sm text-red-600 border border-red-200 bg-red-50 rounded p-3 mb-4">
           {hata}
         </p>
+      )}
+
+      {/* L1 DOSYASINDAN İÇE AKTARMA — envanterin ana kaynağı Belge
+          Takip'teki "ADR Envanter Listesi" (L1) dosyasıdır. */}
+      {canWrite && !hata && (
+        <div className="border rounded-xl p-4 mb-4 bg-blue-50/50">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div>
+              <h4 className="font-semibold text-sm">
+                Belge Takip&apos;teki L1 dosyasından içe aktar
+              </h4>
+              <p className="text-xs text-gray-500">
+                &quot;ADR Envanter Listesi&quot; başlığına yüklenen en güncel
+                Excel (.xlsx/.csv) okunur; UN numaraları Tablo A ile doğrulanıp
+                envantere yazılır.
+              </p>
+            </div>
+            <button
+              onClick={l1DosyasindanOku}
+              disabled={iceAktariliyor}
+              className="px-3 py-1.5 rounded bg-blue-600 text-white text-xs hover:bg-blue-700 disabled:opacity-50"
+            >
+              {iceAktariliyor ? "Okunuyor..." : "📥 L1 Dosyasını Oku"}
+            </button>
+          </div>
+
+          {iceAktarSatirlar && (
+            <div className="mt-3">
+              <p className="text-xs mb-2">
+                <b>{iceAktarDosyaAdi}</b> — {iceAktarSatirlar.length} satır bulundu:{" "}
+                <span className="text-green-700">
+                  {iceAktarSatirlar.filter((r) => r.tabloA && !r.zatenVar).length} eklenecek
+                </span>
+                {" · "}
+                <span className="text-gray-500">
+                  {iceAktarSatirlar.filter((r) => r.zatenVar).length} zaten envanterde
+                </span>
+                {" · "}
+                <span className="text-red-600">
+                  {iceAktarSatirlar.filter((r) => !r.tabloA).length} Tablo A&apos;da yok
+                </span>
+              </p>
+              <div className="max-h-56 overflow-auto border rounded bg-white">
+                <table className="w-full text-xs">
+                  <thead className="bg-gray-50 sticky top-0">
+                    <tr>
+                      <th className="p-1.5 text-left">UN</th>
+                      <th className="p-1.5 text-left">Dosyadaki Ad</th>
+                      <th className="p-1.5 text-left">Tablo A Eşleşmesi</th>
+                      <th className="p-1.5 text-center">Durum</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {iceAktarSatirlar.map((r, i) => (
+                      <tr key={i} className="border-t">
+                        <td className="p-1.5 font-semibold">UN {r.un}</td>
+                        <td className="p-1.5">{r.ad || "—"}</td>
+                        <td className="p-1.5 text-gray-600">
+                          {r.tabloA ? r.tabloA.proper_shipping_name.slice(0, 55) : "—"}
+                        </td>
+                        <td className="p-1.5 text-center">
+                          {!r.tabloA ? (
+                            <span className="text-red-600">Tablo A&apos;da yok</span>
+                          ) : r.zatenVar ? (
+                            <span className="text-gray-400">mevcut</span>
+                          ) : (
+                            <span className="text-green-700">eklenecek</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div className="flex gap-2 mt-2">
+                <button
+                  onClick={iceAktarOnayla}
+                  disabled={iceAktariliyor}
+                  className="px-3 py-1.5 rounded bg-green-600 text-white text-xs hover:bg-green-700 disabled:opacity-50"
+                >
+                  ✓ Onayla ve Envantere Aktar
+                </button>
+                <button
+                  onClick={() => setIceAktarSatirlar(null)}
+                  className="px-3 py-1.5 rounded border text-xs bg-white hover:bg-gray-50"
+                >
+                  Vazgeç
+                </button>
+              </div>
+              <p className="text-[11px] text-gray-400 mt-1">
+                Birden çok varyantı olan UN numaralarında (örn. UN 1950) ilk
+                varyant önerilir; aktarımdan sonra listeden silip doğru varyantı
+                elle ekleyebilirsin.
+              </p>
+            </div>
+          )}
+        </div>
       )}
 
       {/* EKLEME — şablona bağlı: yalnızca Tablo A'dan seçim */}
