@@ -311,7 +311,15 @@ export default function BelgeOlusturForm({ fixedFirmId, initialFirmId, compact =
         const item = CATALOG.find((c) => c.code === code);
         if (!item) continue;
 
-        const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+        // Belge yönü şablondan gelir; yatay şablonlarda (çok sütunlu
+        // matrisler) sayfa 297x210 olur.
+        const yatayMi = !!belgeSablonu(item.code)?.yatay;
+        const doc = new jsPDF({
+          orientation: yatayMi ? "landscape" : "portrait",
+          unit: "mm",
+          format: "a4",
+        });
+        sayfaYonunuAyarla(yatayMi);
         const sablon = belgeSablonu(item.code);
 
         if (sablon) {
@@ -794,13 +802,27 @@ type Satir =
 // dış çerçeve 8,5 mm, başlık kutusu 12,4 mm'den başlar, içerik alanı
 // başlık kutusunun altından imza tablosunun üstüne (244 mm) kadar sürer.
 const M = 12.4; // içerik kenar boşluğu (= başlık kutusu sol kenarı)
-const W = 210;
-const H = 297;
+
+// Sayfa ölçüleri belge yönüne göre değişir. Dikey (varsayılan) A4 210x297;
+// yatay belgelerde (örn. çok sütunlu matris tabloları) 297x210 olur.
+// Bir anda tek belge üretildiği için (döngü sıralı ve await'li) bu
+// değerlerin render başında ayarlanması güvenlidir.
+let W = 210;
+let H = 297;
 const CERCEVE_KENAR = 8.5; // dış çerçevenin sayfa kenarına uzaklığı
-const CERCEVE_ALT = 287.5; // dış çerçevenin alt kenarı
-const ALT_TABLO_UST = 244; // imza tablosu üst kenarı (içerik sayfaları)
+let CERCEVE_ALT = 287.5; // dış çerçevenin alt kenarı
+
+/** Render başında sayfa yönünü uygular; tüm çizim ölçüleri buna dayanır. */
+function sayfaYonunuAyarla(yatay: boolean) {
+  W = yatay ? 297 : 210;
+  H = yatay ? 210 : 297;
+  CERCEVE_ALT = H - 9.5;
+  ALT_TABLO_UST = yatay ? 157 : 244;
+  FOOTER_UST = ALT_TABLO_UST - 2;
+}
+let ALT_TABLO_UST = 244; // imza tablosu üst kenarı (içerik sayfaları)
 const ALT_TABLO_YUKSEKLIK = 35.5;
-const FOOTER_UST = ALT_TABLO_UST - 2; // içerik bitişi (alt tablo öncesi)
+let FOOTER_UST = ALT_TABLO_UST - 2; // içerik bitişi (alt tablo öncesi)
 
 /** Her sayfaya orijinal belgedeki dış çerçeveyi çizer. */
 function cerceveCiz(doc: JsPDFType) {

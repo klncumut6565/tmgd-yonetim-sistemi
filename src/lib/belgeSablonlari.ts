@@ -22,6 +22,9 @@ export type TemplateBlock =
   | { type: "images"; ids: string[]; sutun?: number; yukseklik?: number; note?: string };
 
 export type BelgeSablonu = {
+  /** true ise belge YATAY (landscape) A4 üretilir — çok sütunlu matris
+   *  tabloları dikey sayfaya sığmadığı için (örn. T20 karışık yükleme). */
+  yatay?: boolean;
   docType: "PROSEDÜR" | "TALİMAT" | "KONTROL FORMU" | "LİSTE";
   yayinTarihi: string; // sabit ilk yayın tarihi (revizyon tarihi = belge oluşturma tarihi olarak basılır)
   amac?: string;
@@ -1480,6 +1483,7 @@ export const BELGE_SABLONLARI: Record<string, BelgeSablonu> = {
 
   T20: {
     docType: "TALİMAT",
+    yatay: true, // 13 sütunlu karışık yükleme matrisi dikey sayfaya sığmaz
     yayinTarihi: "01.11.2025",
     amac: "Bu talimat; yükleme/karışık yükleme sınırlamalarını (ADR 7.5), taşıma sırasında tespit edilen güvenlik ihlallerinde izlenecek yolu (ADR 1.8.5 ve 8.3) ve boş/temizlenmemiş yük taşıma birimleri için gerekli taşıma evrakı kurallarını (ADR 5.4.1.1.6) belirler.",
     kapsam: "Tehlikeli madde taşıyan tüm araçlar ve boş/temizlenmemiş yük taşıma birimi (YTB) sevkiyatları için geçerlidir.",
@@ -1509,6 +1513,27 @@ export const BELGE_SABLONLARI: Record<string, BelgeSablonu> = {
         "EX-II / EX-III Tipi Araç: Patlayıcı madde ve nesnelerin (Sınıf 1) taşınması için tasarlanmış; EX-III daha yüksek miktar/tehlikeye uygun, daha ağır koruma özellikleri taşır.",
         "MEMU Tipi Araç: Mobil patlayıcı üretim birimi; patlayıcı hammaddeleri taşır ve belirli bir alanda işleyerek patlayıcı maddeye dönüştürebilir.",
       ]},
+      { type: "subheading", text: "6. Karışık Yükleme Matrisi (ADR 7.5.2.1)" },
+      { type: "paragraph", text: "Aşağıdaki matris, farklı tehlike etiketlerine sahip ambalajlı yüklerin aynı taşıma biriminde birlikte taşınıp taşınamayacağını gösterir. (+) birlikte taşınabilir, (X) birlikte taşınamaz, (K) koşulludur; ADR 7.5.2.1 dipnotlarındaki şartlar sağlanmalıdır. (*) Sınıf 1 için uyumluluk grubu tablosuna (ADR 7.5.2.2) bakılır." },
+      { type: "table",
+        headers: ["Sınıf", "1", "2", "3", "4.1", "4.2", "4.3", "5.1", "5.2", "6.1", "6.2", "7", "8", "9"],
+        colWidths: [1.4, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+        rows: [
+          ["1", "*", "*", "*", "*", "*", "*", "*", "*", "*", "*", "*", "*", "*"],
+          ["2", "*", "+", "+", "+", "+", "+", "+", "+", "+", "X", "X", "+", "+"],
+          ["3", "*", "+", "+", "+", "+", "+", "+", "K", "+", "X", "X", "+", "+"],
+          ["4.1", "*", "+", "+", "+", "+", "+", "+", "K", "+", "X", "X", "+", "+"],
+          ["4.2", "*", "+", "+", "+", "+", "+", "+", "K", "+", "X", "X", "+", "+"],
+          ["4.3", "*", "+", "+", "+", "+", "+", "+", "K", "+", "X", "X", "+", "+"],
+          ["5.1", "*", "+", "+", "+", "+", "+", "+", "+", "+", "X", "X", "+", "+"],
+          ["5.2", "*", "+", "K", "K", "K", "K", "+", "+", "+", "X", "X", "K", "+"],
+          ["6.1", "*", "+", "+", "+", "+", "+", "+", "+", "+", "X", "X", "+", "+"],
+          ["6.2", "*", "X", "X", "X", "X", "X", "X", "X", "X", "+", "X", "X", "X"],
+          ["7", "*", "X", "X", "X", "X", "X", "X", "X", "X", "X", "+", "X", "X"],
+          ["8", "*", "+", "+", "+", "+", "+", "+", "K", "+", "X", "X", "+", "+"],
+          ["9", "*", "+", "+", "+", "+", "+", "+", "+", "+", "X", "X", "+", "+"],
+        ],
+        note: "Bu matris sistemdeki ADR karışık yükleme motorunun verisiyle birebir aynıdır; Taşıma Evrakı ekranı girilen ürünler için aynı kontrolü otomatik yapar." },
     ],
   },
 
