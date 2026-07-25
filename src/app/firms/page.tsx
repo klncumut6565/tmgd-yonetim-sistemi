@@ -23,6 +23,7 @@ type Firm = {
   status: string;
   activities: string[] | null;
   contract_start: string | null;
+  logo_url: string | null;
 };
 
 type Progress = { total: number; done: number; pct: number };
@@ -43,6 +44,7 @@ export default function FirmsPage() {
   const [error, setError] = useState("");
   const [progressByFirm, setProgressByFirm] = useState<Record<string, Progress>>({});
   const [lastVisitByFirm, setLastVisitByFirm] = useState<Record<string, string>>({});
+  const [logoUrlByFirm, setLogoUrlByFirm] = useState<Record<string, string>>({});
 
   // Yeni firma formu
   const [name, setName] = useState("");
@@ -59,7 +61,7 @@ export default function FirmsPage() {
     setError("");
     let { data, error } = await supabase
       .from("firms")
-      .select("id, name, city, district, phone, status, activities, contract_start")
+      .select("id, name, city, district, phone, status, activities, contract_start, logo_url")
       .order("name");
 
     // "activities" kolonu henüz eklenmemişse (migration 010 çalıştırılmadıysa)
@@ -67,7 +69,7 @@ export default function FirmsPage() {
     if (error && /column.*(activities).*does not exist|activities.*does not exist/i.test(error.message || "")) {
       const retry = await supabase
         .from("firms")
-        .select("id, name, city, district, phone, status")
+        .select("id, name, city, district, phone, status, logo_url")
         .order("name");
       data = (retry.data || []).map((f) => ({ ...f, activities: [], contract_start: null })) as typeof data;
       error = retry.error;
@@ -86,6 +88,31 @@ export default function FirmsPage() {
     setLoading(false);
     loadProgress(firmList);
     loadLastVisits();
+    loadLogos(firmList);
+  }
+
+  // Logosu olan firmalar için imzalı URL'leri paralel üretir (firma detay
+  // sayfasıyla aynı yaklaşım). Logosu olmayan firmalar map'e girmez, listede
+  // eskisi gibi logosuz görünür.
+  async function loadLogos(firmList: Firm[]) {
+    const withLogo = firmList.filter((f) => f.logo_url);
+    if (withLogo.length === 0) {
+      setLogoUrlByFirm({});
+      return;
+    }
+    const results = await Promise.all(
+      withLogo.map(async (f) => {
+        const { data } = await supabase.storage
+          .from("firm-files")
+          .createSignedUrl(f.logo_url as string, 3600);
+        return [f.id, data?.signedUrl || ""] as const;
+      })
+    );
+    const map: Record<string, string> = {};
+    results.forEach(([id, url]) => {
+      if (url) map[id] = url;
+    });
+    setLogoUrlByFirm(map);
   }
 
   // Tüm firmaların en son ziyaret tarihini tek sorguyla çeker
@@ -322,7 +349,20 @@ export default function FirmsPage() {
                     onClick={() => router.push(`/firms/${firm.id}`)}
                     className="border-t hover:bg-gray-50 cursor-pointer"
                   >
-                    <td className="p-3 font-medium">{firm.name}</td>
+                    <td className="p-3 font-medium">
+                      <div className="flex items-center gap-2">
+                        {logoUrlByFirm[firm.id] ? (
+                          <img
+                            src={logoUrlByFirm[firm.id]}
+                            alt=""
+                            className="h-6 w-6 object-contain rounded border bg-white flex-shrink-0"
+                          />
+                        ) : (
+                          <span className="h-6 w-6 flex-shrink-0" aria-hidden="true" />
+                        )}
+                        <span>{firm.name}</span>
+                      </div>
+                    </td>
                     <td className="p-3">
                       <div className="flex flex-wrap gap-1">
                         {(firm.activities || []).length === 0 && (
