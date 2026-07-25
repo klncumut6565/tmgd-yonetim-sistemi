@@ -321,6 +321,7 @@ export default function FirmsPage() {
             <table className="w-full text-sm">
               <thead className="bg-gray-50">
                 <tr>
+                  <th className="text-left p-3 font-medium text-gray-600 w-12">#</th>
                   <th className="text-left p-3 font-medium text-gray-600">Firma</th>
                   <th className="text-left p-3 font-medium text-gray-600">Faaliyet</th>
                   <th className="text-left p-3 font-medium text-gray-600">Şehir / İlçe</th>
@@ -333,32 +334,33 @@ export default function FirmsPage() {
               <tbody>
                 {loading && (
                   <tr>
-                    <td colSpan={7} className="p-4 text-gray-500">Yükleniyor...</td>
+                    <td colSpan={8} className="p-4 text-gray-500">Yükleniyor...</td>
                   </tr>
                 )}
                 {!loading && filtered.length === 0 && (
                   <tr>
-                    <td colSpan={7} className="p-4 text-gray-500">
+                    <td colSpan={8} className="p-4 text-gray-500">
                       {search ? "Aramaya uyan firma yok." : "Henüz firma eklenmemiş."}
                     </td>
                   </tr>
                 )}
-                {filtered.map((firm) => (
+                {filtered.map((firm, index) => (
                   <tr
                     key={firm.id}
                     onClick={() => router.push(`/firms/${firm.id}`)}
                     className="border-t hover:bg-gray-50 cursor-pointer"
                   >
+                    <td className="p-3 text-gray-400 tabular-nums">{index + 1}.</td>
                     <td className="p-3 font-medium">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-3">
                         {logoUrlByFirm[firm.id] ? (
                           <img
                             src={logoUrlByFirm[firm.id]}
                             alt=""
-                            className="h-6 w-6 object-contain rounded border bg-white flex-shrink-0"
+                            className="h-10 w-10 object-contain rounded border bg-white flex-shrink-0"
                           />
                         ) : (
-                          <span className="h-6 w-6 flex-shrink-0" aria-hidden="true" />
+                          <span className="h-10 w-10 flex-shrink-0" aria-hidden="true" />
                         )}
                         <span>{firm.name}</span>
                       </div>
