@@ -866,7 +866,7 @@ export default function FirmDetailPage({
               <span className="text-sm text-gray-600">Firma logosu</span>
               <input
                 type="file"
-                accept="image/png,image/jpeg"
+                accept=".png,.jpg,.jpeg,image/png,image/jpeg"
                 disabled={!canWrite || logoUploading}
                 className="border p-2 w-full rounded mt-1 text-sm"
                 onChange={(e) => {

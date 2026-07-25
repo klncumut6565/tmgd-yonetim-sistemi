@@ -529,7 +529,7 @@ export default function FirmsPage() {
               <input
                 ref={logoRef}
                 type="file"
-                accept="image/png,image/jpeg"
+                accept=".png,.jpg,.jpeg,image/png,image/jpeg"
                 className="border p-2 w-full rounded mt-1 text-sm"
                 onChange={(e) => setLogoFile(e.target.files?.[0] || null)}
               />
