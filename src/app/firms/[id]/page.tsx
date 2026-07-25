@@ -864,6 +864,18 @@ export default function FirmDetailPage({
             {/* Logo */}
             <label className="block">
               <span className="text-sm text-gray-600">Firma logosu</span>
+              {logoUrl && (
+                <div className="mt-1 mb-2 flex items-center gap-3">
+                  <img
+                    src={logoUrl}
+                    alt="Mevcut logo"
+                    className="h-16 w-16 object-contain rounded border bg-white"
+                  />
+                  <span className="text-xs text-gray-500">
+                    Mevcut logo — değiştirmek için yeni dosya seçin.
+                  </span>
+                </div>
+              )}
               <input
                 type="file"
                 accept=".png,.jpg,.jpeg,image/png,image/jpeg"
