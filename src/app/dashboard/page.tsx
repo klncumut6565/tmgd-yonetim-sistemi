@@ -5,12 +5,14 @@
 //  - Yaklaşan ADR Süreleri: schema.sql'deki hazır view'lar
 //    (adr_expiring_drivers / adr_expiring_vehicles) kullanılır
 //  - Son Görevler listesi
+//  - Son Sistem Değişiklikleri (audit log, sadece admin/super_admin)
 // Not: view'ların RLS'e saygı duyması için database/003_view_guvenligi.sql
 // çalıştırılmış olmalı (security_invoker).
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase/client";
+import AuditLogWidget from "@/components/audit/AuditLogWidget";
 
 type Counts = {
   firms: number;
@@ -318,6 +320,9 @@ export default function DashboardPage() {
           </tbody>
         </table>
       </div>
+
+      {/* Audit log widget — sadece admin/super_admin görür, migration yoksa gizlenir */}
+      <AuditLogWidget />
     </div>
   );
 }
