@@ -8,7 +8,6 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase/client";
-import { authFetch } from "@/lib/supabase/authFetch";
 import { useUser } from "@/hooks/useUser";
 import { useSpeechToText } from "@/hooks/useSpeechToText";
 
@@ -82,7 +81,6 @@ export default function FirmNotesTab({ firmId }: { firmId: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [firmId]);
 
-  const [asking, setAsking] = useState(false);
   const { desteklenir: sesDesteklenir, dinliyor, hata: sesHatasi, baslat: sesBaslat, durdur: sesDurdur } =
     useSpeechToText();
 
@@ -101,8 +99,6 @@ export default function FirmNotesTab({ firmId }: { firmId: string }) {
     setSaving(true);
     setError("");
 
-    const isAdrQuestion = newContent.trim().toLowerCase().startsWith("@adr");
-
     const { error: err } = await supabase.from("firm_notes").insert({
       firm_id: firmId,
       author_id: profile?.id ?? null,
@@ -117,33 +113,8 @@ export default function FirmNotesTab({ firmId }: { firmId: string }) {
       return;
     }
 
-    const question = newContent.trim();
     setNewContent("");
-    await loadNotes();
-
-    // @ADR ile başlıyorsa ADR Asistanı'na sor
-    if (isAdrQuestion) {
-      const cleanQuestion = question.replace(/^@adr/i, "").trim();
-      if (cleanQuestion) {
-        setAsking(true);
-        try {
-          const res = await authFetch("/api/adr-assistant", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ firmId, question: cleanQuestion }),
-          });
-          const json = await res.json();
-          if (!res.ok) {
-            setError(json.error ?? "ADR Asistanı yanıt veremedi.");
-          }
-        } catch (e) {
-          setError("ADR Asistanı çağrılamadı: " + (e instanceof Error ? e.message : String(e)));
-        } finally {
-          setAsking(false);
-          loadNotes();
-        }
-      }
-    }
+    loadNotes();
   }
 
   async function saveEdit() {
@@ -200,7 +171,7 @@ export default function FirmNotesTab({ firmId }: { firmId: string }) {
           <textarea
             className="border p-3 w-full rounded text-sm pr-12"
             rows={3}
-            placeholder="Yeni not yaz... (örn. '15 Temmuz'da firma ile görüşüldü, SDS güncellemesi bekleniyor')&#10;ADR Asistanına sormak için: @ADR UN 1203'ü UN 1170 ile taşıyabilir miyim?"
+            placeholder="Yeni not yaz... (örn. '15 Temmuz'da firma ile görüşüldü, SDS güncellemesi bekleniyor')"
             value={newContent}
             onChange={(e) => setNewContent(e.target.value)}
           />
@@ -228,15 +199,14 @@ export default function FirmNotesTab({ firmId }: { firmId: string }) {
         )}
         <div className="flex justify-between items-center mt-2">
           <span className="text-xs text-gray-400">
-            🤖 <code>@ADR</code> ile başlayan notlar ADR Asistanı'na yönlendirilir
-            {sesDesteklenir && " · 🎤 mikrofonla sesli not girebilirsin"}
+            {sesDesteklenir ? "🎤 mikrofonla sesli not girebilirsin" : ""}
           </span>
           <button
             onClick={addNote}
-            disabled={saving || asking || !newContent.trim()}
+            disabled={saving || !newContent.trim()}
             className="px-4 py-2 bg-black text-white rounded text-sm disabled:opacity-50"
           >
-            {saving ? "Kaydediliyor..." : asking ? "ADR Asistanı yanıtlıyor..." : "Not Ekle"}
+            {saving ? "Kaydediliyor..." : "Not Ekle"}
           </button>
         </div>
       </div>

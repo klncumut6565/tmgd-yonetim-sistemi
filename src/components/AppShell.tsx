@@ -8,6 +8,7 @@ import { usePathname, useRouter } from "next/navigation";
 import AuthGuard from "@/components/AuthGuard";
 import Sidebar from "@/components/layout/Sidebar";
 import NotificationBell from "@/components/NotificationBell";
+import ADRAssistantWidget from "@/components/adr-assistant/ADRAssistantWidget";
 import { useUser } from "@/hooks/useUser";
 import { supabase } from "@/lib/supabase/client";
 
@@ -65,6 +66,11 @@ export default function AppShell({
           <main>{children}</main>
         </div>
       </div>
+
+      {/* Kalıcı ADR Asistanı — sadece super_admin, sayfa/route değişse
+          bile burada (AppShell seviyesinde) mount edildiği için hayatta
+          kalır. Buzz entegrasyonu kapsamında sadece super_admin. */}
+      {isApproved && isSuperAdmin && <ADRAssistantWidget />}
     </AuthGuard>
   );
 }

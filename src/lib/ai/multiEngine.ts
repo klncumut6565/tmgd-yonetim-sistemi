@@ -3,6 +3,10 @@
 // otomatik fallback. Bir saglayici basarisiz olursa (kota, hata, ag
 // sorunu — HERHANGI bir sebep) sirali olarak digerine gecilir.
 //
+// Cok-turlu sohbet destekler: messages dizisi sistem promptu HARIC
+// onceki user/assistant mesajlarini icerir, en sonda yeni user mesaji
+// bulunur.
+//
 // SADECE server tarafinda kullanilir (API anahtarlari burada islenir).
 
 export type ProviderKey = 'grok' | 'gemini' | 'openrouter';
@@ -14,6 +18,11 @@ export type ProviderConfig = {
   priority: number;
 };
 
+export type ChatMessage = {
+  role: 'user' | 'assistant';
+  content: string;
+};
+
 export type EngineCallResult = {
   ok: boolean;
   text?: string;
@@ -21,7 +30,7 @@ export type EngineCallResult = {
   errors: { provider: ProviderKey; message: string }[];
 };
 
-async function callGrok(apiKey: string, model: string, systemPrompt: string, userMessage: string): Promise<string> {
+async function callGrok(apiKey: string, model: string, systemPrompt: string, messages: ChatMessage[]): Promise<string> {
   const res = await fetch('https://api.x.ai/v1/chat/completions', {
     method: 'POST',
     headers: {
@@ -30,10 +39,7 @@ async function callGrok(apiKey: string, model: string, systemPrompt: string, use
     },
     body: JSON.stringify({
       model,
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userMessage },
-      ],
+      messages: [{ role: 'system', content: systemPrompt }, ...messages],
       max_tokens: 1200,
     }),
   });
@@ -49,14 +55,20 @@ async function callGrok(apiKey: string, model: string, systemPrompt: string, use
   return text;
 }
 
-async function callGemini(apiKey: string, model: string, systemPrompt: string, userMessage: string): Promise<string> {
+async function callGemini(apiKey: string, model: string, systemPrompt: string, messages: ChatMessage[]): Promise<string> {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+
+  const contents = messages.map((m) => ({
+    role: m.role === 'assistant' ? 'model' : 'user',
+    parts: [{ text: m.content }],
+  }));
+
   const res = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       systemInstruction: { parts: [{ text: systemPrompt }] },
-      contents: [{ role: 'user', parts: [{ text: userMessage }] }],
+      contents,
       generationConfig: { maxOutputTokens: 1200 },
     }),
   });
@@ -72,7 +84,7 @@ async function callGemini(apiKey: string, model: string, systemPrompt: string, u
   return text;
 }
 
-async function callOpenRouter(apiKey: string, model: string, systemPrompt: string, userMessage: string): Promise<string> {
+async function callOpenRouter(apiKey: string, model: string, systemPrompt: string, messages: ChatMessage[]): Promise<string> {
   const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST',
     headers: {
@@ -81,10 +93,7 @@ async function callOpenRouter(apiKey: string, model: string, systemPrompt: strin
     },
     body: JSON.stringify({
       model,
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userMessage },
-      ],
+      messages: [{ role: 'system', content: systemPrompt }, ...messages],
       max_tokens: 1200,
     }),
   });
@@ -100,20 +109,16 @@ async function callOpenRouter(apiKey: string, model: string, systemPrompt: strin
   return text;
 }
 
-const CALLERS: Record<ProviderKey, (apiKey: string, model: string, systemPrompt: string, userMessage: string) => Promise<string>> = {
+const CALLERS: Record<ProviderKey, (apiKey: string, model: string, systemPrompt: string, messages: ChatMessage[]) => Promise<string>> = {
   grok: callGrok,
   gemini: callGemini,
   openrouter: callOpenRouter,
 };
 
-/**
- * Yapilandirilmis saglayicilari priority sirasina gore dener.
- * api_key bos olanlar atlanir. Ilk basarili yaniti doner.
- */
 export async function callWithFallback(
   configs: ProviderConfig[],
   systemPrompt: string,
-  userMessage: string
+  messages: ChatMessage[]
 ): Promise<EngineCallResult> {
   const errors: EngineCallResult['errors'] = [];
 
@@ -123,14 +128,13 @@ export async function callWithFallback(
 
   for (const cfg of sorted) {
     try {
-      const text = await CALLERS[cfg.provider](cfg.api_key as string, cfg.model, systemPrompt, userMessage);
+      const text = await CALLERS[cfg.provider](cfg.api_key as string, cfg.model, systemPrompt, messages);
       return { ok: true, text, provider: cfg.provider, errors };
     } catch (err) {
       errors.push({
         provider: cfg.provider,
         message: err instanceof Error ? err.message : String(err),
       });
-      // sıradaki sağlayıcıya geç
       continue;
     }
   }

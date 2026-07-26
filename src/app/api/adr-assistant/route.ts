@@ -1,21 +1,19 @@
 // src/app/api/adr-assistant/route.ts
-// Faz 4 — ADR Asistani. Firma Notlari sekmesinde "@ADR <soru>" yazildiginda
-// cagrilir. Sorudaki UN numaralarini gercek adr_un_numbers tablosundan
-// dogrulayip, coklu-motor (Grok/Gemini/OpenRouter) fallback ile Turkce
-// cevap uretir.
+// ADR Asistani — global floating sohbet penceresinden cagrilir (bkz.
+// src/components/adr-assistant/ADRAssistantWidget.tsx). Sorudaki UN
+// numaralarini gercek adr_un_numbers tablosundan dogrulayip, coklu-motor
+// (Grok/Gemini/OpenRouter) fallback ile Turkce cevap uretir. Cok-turlu
+// sohbet destekler (onceki mesajlar "history" ile gonderilir).
 //
 // Yalnizca super_admin cagirabilir (Bearer token, bkz. verifySuperAdmin.ts).
 //
 // ONEMLI: Karisik yukleme UYUMLULUK sorulari icin bu asistan KESIN HUKUM
-// VERMEZ — mevcut /adr?tab=karisik aracina yonlendirir. Sebep: uyumluluk
-// matrisi bu asistanin disinda, ayri bir motorda (adr_mix_pro) calisiyor;
-// LLM'in kendi bilgisiyle boyle bir regulasyon sorusuna kesin cevap
-// vermesi guvenlik riski tasir.
+// VERMEZ — mevcut /adr?tab=karisik aracina yonlendirir.
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getSuperAdminFromRequest } from '@/lib/supabase/verifySuperAdmin'
-import { callWithFallback, type ProviderConfig } from '@/lib/ai/multiEngine'
+import { callWithFallback, type ProviderConfig, type ChatMessage } from '@/lib/ai/multiEngine'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 30
@@ -34,6 +32,7 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => null)
   const firmId = body?.firmId as string | undefined
   const question = (body?.question as string | undefined)?.trim()
+  const history = Array.isArray(body?.history) ? (body.history as ChatMessage[]) : []
 
   if (!question) {
     return NextResponse.json({ error: '"question" alanı boş olamaz.' }, { status: 400 })
@@ -41,7 +40,7 @@ export async function POST(req: NextRequest) {
 
   const supabase = createAdminClient()
 
-  // 1) Firma bağlamı (varsa)
+  // 1) Firma bağlamı (widget şu an bir firma sayfasındaysa gönderilir)
   let firmContext = ''
   if (firmId) {
     const { data: firm } = await supabase
@@ -50,7 +49,7 @@ export async function POST(req: NextRequest) {
       .eq('id', firmId)
       .single()
     if (firm) {
-      firmContext = `Firma: ${firm.name}. Faaliyet konuları: ${(firm.activities ?? []).join(', ') || 'belirtilmemiş'}.`
+      firmContext = `Şu an görüntülenen firma: ${firm.name}. Faaliyet konuları: ${(firm.activities ?? []).join(', ') || 'belirtilmemiş'}.`
     }
   }
 
@@ -77,20 +76,18 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // 3) Sistem prompt'u
-  const systemPrompt = `Sen bir TMGD (Tehlikeli Madde Güvenlik Danışmanı) yardımcı asistanısın. Türkçe, kısa ve net cevap ver.
+  const systemPrompt = `Sen bir TMGD (Tehlikeli Madde Güvenlik Danışmanı) yardımcı asistanısın. Türkçe, kısa ve net cevap ver. Bu bir sohbet penceresi — önceki mesajları dikkate alarak bağlamı koru.
 
 KURALLAR:
 - Sadece sana verilen "Tablo A verisi" bölümündeki UN numarası bilgilerini KESİN OLARAK doğru kabul et. Orada olmayan UN numaraları hakkında kesin bilgi verme, "Tablo A'da doğrulayamadım" de.
-- KARIŞIK YÜKLEME UYUMLULUĞU (bir aracta iki farklı maddenin birlikte taşınıp taşınamayacağı) sorularına KESİN HÜKÜM VERME. Bunun için mevcut "Karışık Yükleme" aracını (uygulamada ADR Bilgi Motoru → Karışık Yükleme sekmesi) kullanmasını öner — o araç gerçek ADR 7.5.2 uyumluluk matrisini kullanıyor, sen kullanmıyorsun.
-- Regülasyon maddesi numarası (örn. "ADR 1.1.3.6") verirken kesin değilsen belirt.
+- KARIŞIK YÜKLEME UYUMLULUĞU (bir aracta iki farklı maddenin birlikte taşınıp taşınamayacağı) sorularına KESİN HÜKÜM VERME. Bunun için mevcut "Karışık Yükleme" aracını (ADR Bilgi Motoru → Karışık Yükleme sekmesi) kullanmasını öner.
+- Regülasyon maddesi numarası verirken kesin değilsen belirt.
 - Kısa, pratik, TMGD'nin günlük işine yarayacak şekilde cevap ver.
 
 ${firmContext}
 
 ${unContext}`.trim()
 
-  // 4) Yapılandırılmış sağlayıcıları çek
   const { data: providerRows, error: provErr } = await supabase
     .from('ai_provider_keys')
     .select('provider, api_key, model, priority')
@@ -108,7 +105,9 @@ ${unContext}`.trim()
     )
   }
 
-  const result = await callWithFallback(configs, systemPrompt, question)
+  const messages: ChatMessage[] = [...history, { role: 'user', content: question }]
+
+  const result = await callWithFallback(configs, systemPrompt, messages)
 
   if (!result.ok) {
     return NextResponse.json(
@@ -118,16 +117,6 @@ ${unContext}`.trim()
       },
       { status: 502 }
     )
-  }
-
-  // 5) Cevabı firm_notes'a asistan notu olarak kaydet (varsa firmId)
-  if (firmId) {
-    await supabase.from('firm_notes').insert({
-      firm_id: firmId,
-      author_id: null,
-      is_assistant: true,
-      content: result.text,
-    })
   }
 
   return NextResponse.json({
