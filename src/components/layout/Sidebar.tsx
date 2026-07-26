@@ -95,6 +95,17 @@ export default function Sidebar() {
             >
               🔒 Denetim İzi
             </Link>
+            <Link
+              href="/workflow-rules"
+              className={
+                "block px-3 py-2 rounded " +
+                (pathname === "/workflow-rules"
+                  ? "bg-black text-white"
+                  : "hover:bg-gray-100")
+              }
+            >
+              ⚙️ Workflow Kuralları
+            </Link>
           </>
         )}
       </nav>
