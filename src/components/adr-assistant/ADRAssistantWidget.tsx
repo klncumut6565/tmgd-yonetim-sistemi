@@ -115,9 +115,17 @@ export default function ADRAssistantWidget() {
       const json = await res.json();
 
       if (!res.ok) {
+        const detayMetni = Array.isArray(json.details)
+          ? json.details.map((d: { provider: string; message: string }) => `• ${d.provider}: ${d.message}`).join("\n")
+          : "";
         setMessages((prev) => [
           ...prev,
-          { id: crypto.randomUUID(), role: "assistant", content: json.error ?? "Bir hata oluştu.", error: true },
+          {
+            id: crypto.randomUUID(),
+            role: "assistant",
+            content: (json.error ?? "Bir hata oluştu.") + (detayMetni ? "\n\n" + detayMetni : ""),
+            error: true,
+          },
         ]);
       } else {
         setMessages((prev) => [
