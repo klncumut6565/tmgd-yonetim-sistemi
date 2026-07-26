@@ -2,7 +2,7 @@
 // Denetim icin audit log ihraci. JSON veya CSV.
 // GET /api/audit/export?firm_id=xxx&from=2026-01-01&to=2026-07-25&format=csv
 //
-// Yalnizca super_admin/admin erisebilir.
+// Yalnizca super_admin/admin erisebilir (public.profiles.role uzerinden).
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
@@ -24,8 +24,19 @@ export async function GET(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
 
-  const role = (user.user_metadata as { role?: string } | null)?.role
-  if (!role || !['super_admin', 'admin'].includes(role)) {
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('role, approval_status, is_active')
+    .eq('id', user.id)
+    .single()
+
+  if (
+    profileError ||
+    !profile ||
+    profile.approval_status !== 'approved' ||
+    !profile.is_active ||
+    !['super_admin', 'admin'].includes(profile.role)
+  ) {
     return NextResponse.json({ error: 'forbidden' }, { status: 403 })
   }
 

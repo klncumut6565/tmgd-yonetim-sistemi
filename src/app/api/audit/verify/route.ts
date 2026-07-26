@@ -2,7 +2,7 @@
 // Audit log hash zincirinin butunlugunu kontrol eder.
 // GET /api/audit/verify?start_id=1&end_id=1000
 //
-// Yalnizca super_admin/admin erisebilir.
+// Yalnizca super_admin/admin erisebilir (public.profiles.role uzerinden).
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
@@ -17,8 +17,19 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
   }
 
-  const role = (user.user_metadata as { role?: string } | null)?.role
-  if (!role || !['super_admin', 'admin'].includes(role)) {
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('role, approval_status, is_active')
+    .eq('id', user.id)
+    .single()
+
+  if (
+    profileError ||
+    !profile ||
+    profile.approval_status !== 'approved' ||
+    !profile.is_active ||
+    !['super_admin', 'admin'].includes(profile.role)
+  ) {
     return NextResponse.json({ error: 'forbidden' }, { status: 403 })
   }
 
