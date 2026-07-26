@@ -24,6 +24,7 @@ import KimyasalEnvanter from "@/components/KimyasalEnvanter";
 import TasimaEvraki from "@/components/TasimaEvraki";
 import BelgeOlusturForm from "@/components/BelgeOlusturForm";
 import FirmAuditTab from "@/components/audit/FirmAuditTab";
+import FirmNotesTab from "@/components/notes/FirmNotesTab";
 import {
   VEHICLE_FIELDS,
   DRIVER_FIELDS,
@@ -79,6 +80,7 @@ const TABS = [
   { key: "adr_transport", label: "ADR Transport" },
   { key: "genel", label: "Firma Bilgileri" },
   { key: "denetim", label: "🔒 Denetim İzi" },
+  { key: "notlar", label: "📝 Notlar" },
 ] as const;
 
 type TabKey = (typeof TABS)[number]["key"];
@@ -297,7 +299,7 @@ export default function FirmDetailPage({
   const isTasimaci = (firm?.activities || []).includes("tasimaci");
   const TASIMACI_SEKMELERI: TabKey[] = ["vehicles", "drivers"];
   const visibleTabs = TABS.filter((t) => {
-    if (t.key === "denetim") return isSuperAdminOnly;
+    if (t.key === "denetim" || t.key === "notlar") return isSuperAdminOnly;
     return isTasimaci || !TASIMACI_SEKMELERI.includes(t.key);
   });
 
@@ -1484,6 +1486,10 @@ export default function FirmDetailPage({
           engelliyor; visibleTabs bu sekmeyi onlara hiç göstermez. */}
       {tab === "denetim" && isSuperAdminOnly && (
         <FirmAuditTab firmId={id} />
+      )}
+
+      {tab === "notlar" && isSuperAdminOnly && (
+        <FirmNotesTab firmId={id} />
       )}
     </div>
   );
