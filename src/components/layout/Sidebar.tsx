@@ -110,6 +110,17 @@ export default function Sidebar() {
             >
               ⚙️ Workflow Kuralları
             </Link>
+            <Link
+              href="/ai-engine-keys"
+              className={
+                "block px-3 py-2 rounded " +
+                (pathname === "/ai-engine-keys"
+                  ? "bg-black text-white"
+                  : "hover:bg-gray-100")
+              }
+            >
+              🤖 AI Motor Anahtarları
+            </Link>
           </>
         )}
       </nav>

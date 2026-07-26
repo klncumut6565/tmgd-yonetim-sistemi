@@ -1,0 +1,189 @@
+"use client";
+
+// Yönetim → AI Motor Anahtarları
+// Grok / Gemini / OpenRouter API anahtarlarını yapılandırma sayfası.
+// ADR Asistanı bu anahtarları priority sırasına göre dener (fallback).
+
+import { useEffect, useState } from "react";
+import { supabase } from "@/lib/supabase/client";
+import { useUser } from "@/hooks/useUser";
+
+type ProviderRow = {
+  provider: "grok" | "gemini" | "openrouter";
+  api_key: string | null;
+  model: string;
+  priority: number;
+  updated_at: string;
+};
+
+const PROVIDER_LABELS: Record<string, string> = {
+  grok: "Grok (xAI)",
+  gemini: "Gemini (Google)",
+  openrouter: "OpenRouter",
+};
+
+export default function AiEngineKeysPage() {
+  const { isSuperAdmin, loading: userLoading } = useUser();
+  const [rows, setRows] = useState<ProviderRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [edits, setEdits] = useState<Record<string, { apiKey: string; model: string; priority: number }>>({});
+  const [saving, setSaving] = useState<string | null>(null);
+  const [message, setMessage] = useState("");
+
+  async function load() {
+    setLoading(true);
+    const { data } = await supabase
+      .from("ai_provider_keys")
+      .select("*")
+      .order("priority", { ascending: true });
+
+    const list = (data as ProviderRow[]) ?? [];
+    setRows(list);
+
+    const initial: Record<string, { apiKey: string; model: string; priority: number }> = {};
+    list.forEach((r) => {
+      initial[r.provider] = { apiKey: "", model: r.model, priority: r.priority };
+    });
+    setEdits(initial);
+    setLoading(false);
+  }
+
+  useEffect(() => {
+    load();
+  }, []);
+
+  async function saveProvider(provider: string) {
+    const edit = edits[provider];
+    if (!edit) return;
+    setSaving(provider);
+    setMessage("");
+
+    const payload: Record<string, unknown> = {
+      model: edit.model,
+      priority: edit.priority,
+    };
+    // Yalnızca yeni bir anahtar yazıldıysa güncelle — boş bırakılırsa
+    // mevcut anahtar korunur (yanlışlıkla silinmesin diye).
+    if (edit.apiKey.trim()) {
+      payload.api_key = edit.apiKey.trim();
+    }
+
+    const { error } = await supabase
+      .from("ai_provider_keys")
+      .update(payload)
+      .eq("provider", provider);
+
+    setSaving(null);
+
+    if (error) {
+      setMessage(`${PROVIDER_LABELS[provider]} kaydedilemedi: ${error.message}`);
+      return;
+    }
+
+    setMessage(`✓ ${PROVIDER_LABELS[provider]} güncellendi.`);
+    load();
+  }
+
+  if (userLoading) {
+    return <div className="p-6 text-gray-500">Yükleniyor...</div>;
+  }
+
+  if (!isSuperAdmin) {
+    return (
+      <div className="p-6">
+        <p className="text-gray-600">Bu sayfaya erişim yetkin yok.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-6 max-w-3xl mx-auto">
+      <h1 className="text-2xl font-bold mb-2">AI Motor Anahtarları</h1>
+      <p className="text-sm text-gray-500 mb-6">
+        ADR Asistanı bu sağlayıcıları öncelik sırasına göre dener. Bir sağlayıcının kotası
+        dolarsa veya hata verirse otomatik olarak sıradakine geçer. Bir anahtar girildikten
+        sonra sen yenisini girene kadar sistemde kalır.
+      </p>
+
+      {message && (
+        <p className="text-sm bg-blue-50 border border-blue-200 rounded p-3 mb-4">{message}</p>
+      )}
+
+      {loading && <p className="text-gray-500">Yükleniyor...</p>}
+
+      <div className="space-y-4">
+        {rows.map((row) => {
+          const edit = edits[row.provider] ?? { apiKey: "", model: row.model, priority: row.priority };
+          const hasKey = !!row.api_key;
+          return (
+            <div key={row.provider} className="border rounded-xl p-4">
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="font-semibold">{PROVIDER_LABELS[row.provider]}</h2>
+                <span
+                  className={
+                    "text-xs px-2 py-0.5 rounded " +
+                    (hasKey ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500")
+                  }
+                >
+                  {hasKey ? "Anahtar girilmiş ✓" : "Anahtar yok"}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <label className="block md:col-span-2">
+                  <span className="text-xs text-gray-500">
+                    API Anahtarı {hasKey && "(değiştirmek için yenisini yaz, boş bırak = değişmez)"}
+                  </span>
+                  <input
+                    type="password"
+                    className="border p-2 w-full rounded mt-1 text-sm"
+                    placeholder={hasKey ? "••••••••••••" : "API anahtarını yapıştır"}
+                    value={edit.apiKey}
+                    onChange={(e) =>
+                      setEdits((s) => ({ ...s, [row.provider]: { ...edit, apiKey: e.target.value } }))
+                    }
+                  />
+                </label>
+
+                <label className="block">
+                  <span className="text-xs text-gray-500">Öncelik (1 = önce denenir)</span>
+                  <input
+                    type="number"
+                    min={1}
+                    max={10}
+                    className="border p-2 w-full rounded mt-1 text-sm"
+                    value={edit.priority}
+                    onChange={(e) =>
+                      setEdits((s) => ({ ...s, [row.provider]: { ...edit, priority: Number(e.target.value) } }))
+                    }
+                  />
+                </label>
+
+                <label className="block md:col-span-2">
+                  <span className="text-xs text-gray-500">Model</span>
+                  <input
+                    className="border p-2 w-full rounded mt-1 text-sm font-mono"
+                    value={edit.model}
+                    onChange={(e) =>
+                      setEdits((s) => ({ ...s, [row.provider]: { ...edit, model: e.target.value } }))
+                    }
+                  />
+                </label>
+
+                <div className="flex items-end">
+                  <button
+                    onClick={() => saveProvider(row.provider)}
+                    disabled={saving === row.provider}
+                    className="px-4 py-2 bg-black text-white rounded text-sm disabled:opacity-50 w-full"
+                  >
+                    {saving === row.provider ? "Kaydediliyor..." : "Kaydet"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}

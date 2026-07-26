@@ -1,0 +1,139 @@
+// src/app/api/adr-assistant/route.ts
+// Faz 4 — ADR Asistani. Firma Notlari sekmesinde "@ADR <soru>" yazildiginda
+// cagrilir. Sorudaki UN numaralarini gercek adr_un_numbers tablosundan
+// dogrulayip, coklu-motor (Grok/Gemini/OpenRouter) fallback ile Turkce
+// cevap uretir.
+//
+// Yalnizca super_admin cagirabilir (Bearer token, bkz. verifySuperAdmin.ts).
+//
+// ONEMLI: Karisik yukleme UYUMLULUK sorulari icin bu asistan KESIN HUKUM
+// VERMEZ — mevcut /adr?tab=karisik aracina yonlendirir. Sebep: uyumluluk
+// matrisi bu asistanin disinda, ayri bir motorda (adr_mix_pro) calisiyor;
+// LLM'in kendi bilgisiyle boyle bir regulasyon sorusuna kesin cevap
+// vermesi guvenlik riski tasir.
+
+import { NextRequest, NextResponse } from 'next/server'
+import { createAdminClient } from '@/lib/supabase/admin'
+import { getSuperAdminFromRequest } from '@/lib/supabase/verifySuperAdmin'
+import { callWithFallback, type ProviderConfig } from '@/lib/ai/multiEngine'
+
+export const dynamic = 'force-dynamic'
+export const maxDuration = 30
+
+function extractUnNumbers(text: string): string[] {
+  const matches = text.match(/\b\d{4}\b/g) ?? []
+  return Array.from(new Set(matches)).slice(0, 5)
+}
+
+export async function POST(req: NextRequest) {
+  const admin = await getSuperAdminFromRequest(req)
+  if (!admin) {
+    return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
+  }
+
+  const body = await req.json().catch(() => null)
+  const firmId = body?.firmId as string | undefined
+  const question = (body?.question as string | undefined)?.trim()
+
+  if (!question) {
+    return NextResponse.json({ error: '"question" alanı boş olamaz.' }, { status: 400 })
+  }
+
+  const supabase = createAdminClient()
+
+  // 1) Firma bağlamı (varsa)
+  let firmContext = ''
+  if (firmId) {
+    const { data: firm } = await supabase
+      .from('firms')
+      .select('name, activities')
+      .eq('id', firmId)
+      .single()
+    if (firm) {
+      firmContext = `Firma: ${firm.name}. Faaliyet konuları: ${(firm.activities ?? []).join(', ') || 'belirtilmemiş'}.`
+    }
+  }
+
+  // 2) Sorudaki UN numaralarını gerçek Tablo A'dan doğrula (halüsinasyon önleme)
+  const unNumbers = extractUnNumbers(question)
+  let unContext = ''
+  if (unNumbers.length > 0) {
+    const { data: unRows } = await supabase
+      .from('adr_un_numbers')
+      .select('un_number, proper_shipping_name, class, packing_group, tunnel_code, hazard_no, labels, transport_category, limited_quantity, excepted_quantity')
+      .in('un_number', unNumbers)
+
+    if (unRows && unRows.length > 0) {
+      unContext =
+        'Sorudan tespit edilen UN numaralarına ait gerçek Tablo A verisi:\n' +
+        unRows
+          .map(
+            (r) =>
+              `UN ${r.un_number}: ${r.proper_shipping_name} — Sınıf ${r.class ?? '?'}, Ambalaj Grubu ${r.packing_group ?? '-'}, Tünel Kodu ${r.tunnel_code ?? '-'}, Tehlike No ${r.hazard_no ?? '-'}, Etiketler: ${r.labels ?? '-'}`
+          )
+          .join('\n')
+    } else {
+      unContext = `Not: Soruda ${unNumbers.join(', ')} numaraları geçiyor ama Tablo A'da bu numaralarla eşleşen kayıt bulunamadı — bu numaraları teyit etmeden kullanma.`
+    }
+  }
+
+  // 3) Sistem prompt'u
+  const systemPrompt = `Sen bir TMGD (Tehlikeli Madde Güvenlik Danışmanı) yardımcı asistanısın. Türkçe, kısa ve net cevap ver.
+
+KURALLAR:
+- Sadece sana verilen "Tablo A verisi" bölümündeki UN numarası bilgilerini KESİN OLARAK doğru kabul et. Orada olmayan UN numaraları hakkında kesin bilgi verme, "Tablo A'da doğrulayamadım" de.
+- KARIŞIK YÜKLEME UYUMLULUĞU (bir aracta iki farklı maddenin birlikte taşınıp taşınamayacağı) sorularına KESİN HÜKÜM VERME. Bunun için mevcut "Karışık Yükleme" aracını (uygulamada ADR Bilgi Motoru → Karışık Yükleme sekmesi) kullanmasını öner — o araç gerçek ADR 7.5.2 uyumluluk matrisini kullanıyor, sen kullanmıyorsun.
+- Regülasyon maddesi numarası (örn. "ADR 1.1.3.6") verirken kesin değilsen belirt.
+- Kısa, pratik, TMGD'nin günlük işine yarayacak şekilde cevap ver.
+
+${firmContext}
+
+${unContext}`.trim()
+
+  // 4) Yapılandırılmış sağlayıcıları çek
+  const { data: providerRows, error: provErr } = await supabase
+    .from('ai_provider_keys')
+    .select('provider, api_key, model, priority')
+
+  if (provErr || !providerRows) {
+    return NextResponse.json({ error: 'AI sağlayıcı yapılandırması okunamadı.' }, { status: 500 })
+  }
+
+  const configs = providerRows as ProviderConfig[]
+  const anyKeyConfigured = configs.some((c) => !!c.api_key)
+  if (!anyKeyConfigured) {
+    return NextResponse.json(
+      { error: 'Hiçbir AI sağlayıcı anahtarı girilmemiş. Yönetim → AI Motor Anahtarları sayfasından en az bir anahtar ekle.' },
+      { status: 400 }
+    )
+  }
+
+  const result = await callWithFallback(configs, systemPrompt, question)
+
+  if (!result.ok) {
+    return NextResponse.json(
+      {
+        error: 'Hiçbir AI motoru yanıt veremedi.',
+        details: result.errors,
+      },
+      { status: 502 }
+    )
+  }
+
+  // 5) Cevabı firm_notes'a asistan notu olarak kaydet (varsa firmId)
+  if (firmId) {
+    await supabase.from('firm_notes').insert({
+      firm_id: firmId,
+      author_id: null,
+      is_assistant: true,
+      content: result.text,
+    })
+  }
+
+  return NextResponse.json({
+    ok: true,
+    answer: result.text,
+    provider_used: result.provider,
+    fallback_errors: result.errors,
+  })
+}
