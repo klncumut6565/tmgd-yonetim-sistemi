@@ -23,6 +23,7 @@ import FirmScopedCrud from "@/components/FirmScopedCrud";
 import KimyasalEnvanter from "@/components/KimyasalEnvanter";
 import TasimaEvraki from "@/components/TasimaEvraki";
 import BelgeOlusturForm from "@/components/BelgeOlusturForm";
+import FirmAuditTab from "@/components/audit/FirmAuditTab";
 import {
   VEHICLE_FIELDS,
   DRIVER_FIELDS,
@@ -77,6 +78,7 @@ const TABS = [
   { key: "visits", label: "Ziyaretler" },
   { key: "adr_transport", label: "ADR Transport" },
   { key: "genel", label: "Firma Bilgileri" },
+  { key: "denetim", label: "🔒 Denetim İzi" },
 ] as const;
 
 type TabKey = (typeof TABS)[number]["key"];
@@ -155,7 +157,8 @@ export default function FirmDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = use(params);
-  const { canWrite } = useUser();
+  const { canWrite, profile } = useUser();
+  const isAdminOrSuper = profile?.role === "super_admin" || profile?.role === "admin";
 
   const [firm, setFirm] = useState<Firm | null>(null);
   const [loading, setLoading] = useState(true);
@@ -293,9 +296,10 @@ export default function FirmDetailPage({
   // taşımacılık faaliyeti olmayan firmalarda bu sekmeler gizlenir.
   const isTasimaci = (firm?.activities || []).includes("tasimaci");
   const TASIMACI_SEKMELERI: TabKey[] = ["vehicles", "drivers"];
-  const visibleTabs = TABS.filter(
-    (t) => isTasimaci || !TASIMACI_SEKMELERI.includes(t.key)
-  );
+  const visibleTabs = TABS.filter((t) => {
+    if (t.key === "denetim") return isAdminOrSuper;
+    return isTasimaci || !TASIMACI_SEKMELERI.includes(t.key);
+  });
 
   // Firma yüklendiğinde/faaliyeti değiştiğinde, o an gizli bir sekmedeysek
   // (örn. Taşımacı işaretini kaldırdıysak) otomatik olarak Belge Takip'e dön.
@@ -1474,6 +1478,12 @@ export default function FirmDetailPage({
             <TasimaEvraki firmId={id} firmaAdi={firm.name} />
           )}
         </div>
+      )}
+
+      {/* DENETİM İZİ — sadece admin/super_admin. RLS zaten diğer rolleri
+          engelliyor; visibleTabs bu sekmeyi onlara hiç göstermez. */}
+      {tab === "denetim" && isAdminOrSuper && (
+        <FirmAuditTab firmId={id} />
       )}
     </div>
   );
