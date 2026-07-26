@@ -1,11 +1,12 @@
 // src/app/audit-log/page.tsx
 // Yonetim -> Denetim Izi
-// Hash-chain audit log goruntuleyicisi. Sadece super_admin/admin.
+// Hash-chain audit log goruntuleyicisi. Sadece super_admin.
 
 'use client'
 
 import { Fragment, useEffect, useMemo, useState } from 'react'
 import { supabase } from '@/lib/supabase/client'
+import { useUser } from '@/hooks/useUser'
 
 type AuditRow = {
   id: number
@@ -32,6 +33,8 @@ type VerifyResult = {
 const PAGE_SIZE = 100
 
 export default function AuditLogPage() {
+  const { isSuperAdmin, loading: userLoading } = useUser()
+
   const [rows, setRows] = useState<AuditRow[]>([])
   const [loading, setLoading] = useState(true)
   const [page, setPage] = useState(0)
@@ -108,6 +111,18 @@ export default function AuditLogPage() {
     () => (totalCount ? Math.ceil(totalCount / PAGE_SIZE) : 1),
     [totalCount]
   )
+
+  if (userLoading) {
+    return <div className="p-6 text-gray-500">Yükleniyor...</div>
+  }
+
+  if (!isSuperAdmin) {
+    return (
+      <div className="p-6">
+        <p className="text-gray-600">Bu sayfaya erişim yetkin yok.</p>
+      </div>
+    )
+  }
 
   return (
     <div className="p-6 max-w-[1400px] mx-auto">

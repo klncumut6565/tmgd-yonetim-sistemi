@@ -35,7 +35,7 @@ export async function GET(req: NextRequest) {
     !profile ||
     profile.approval_status !== 'approved' ||
     !profile.is_active ||
-    !['super_admin', 'admin'].includes(profile.role)
+    profile.role !== 'super_admin'
   ) {
     return NextResponse.json({ error: 'forbidden' }, { status: 403 })
   }

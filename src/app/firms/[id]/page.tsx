@@ -158,7 +158,7 @@ export default function FirmDetailPage({
 }) {
   const { id } = use(params);
   const { canWrite, profile } = useUser();
-  const isAdminOrSuper = profile?.role === "super_admin" || profile?.role === "admin";
+  const isSuperAdminOnly = profile?.role === "super_admin";
 
   const [firm, setFirm] = useState<Firm | null>(null);
   const [loading, setLoading] = useState(true);
@@ -297,7 +297,7 @@ export default function FirmDetailPage({
   const isTasimaci = (firm?.activities || []).includes("tasimaci");
   const TASIMACI_SEKMELERI: TabKey[] = ["vehicles", "drivers"];
   const visibleTabs = TABS.filter((t) => {
-    if (t.key === "denetim") return isAdminOrSuper;
+    if (t.key === "denetim") return isSuperAdminOnly;
     return isTasimaci || !TASIMACI_SEKMELERI.includes(t.key);
   });
 
@@ -1482,7 +1482,7 @@ export default function FirmDetailPage({
 
       {/* DENETİM İZİ — sadece admin/super_admin. RLS zaten diğer rolleri
           engelliyor; visibleTabs bu sekmeyi onlara hiç göstermez. */}
-      {tab === "denetim" && isAdminOrSuper && (
+      {tab === "denetim" && isSuperAdminOnly && (
         <FirmAuditTab firmId={id} />
       )}
     </div>

@@ -8,6 +8,7 @@
 import { useEffect, useState } from "react";
 import * as yaml from "js-yaml";
 import { supabase } from "@/lib/supabase/client";
+import { useUser } from "@/hooks/useUser";
 import { WORKFLOW_SOURCES } from "@/lib/workflow/sources";
 
 type Rule = {
@@ -44,6 +45,8 @@ message_template: "{first_name} {last_name} ({firm_name}) sürücüsünün SRC-5
 `;
 
 export default function WorkflowRulesPage() {
+  const { isSuperAdmin, loading: userLoading } = useUser();
+
   const [rules, setRules] = useState<Rule[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState<string | "new" | null>(null);
@@ -169,6 +172,18 @@ export default function WorkflowRulesPage() {
     } finally {
       setRunning(false);
     }
+  }
+
+  if (userLoading) {
+    return <div className="p-6 text-gray-500">Yükleniyor...</div>;
+  }
+
+  if (!isSuperAdmin) {
+    return (
+      <div className="p-6">
+        <p className="text-gray-600">Bu sayfaya erişim yetkin yok.</p>
+      </div>
+    );
   }
 
   return (

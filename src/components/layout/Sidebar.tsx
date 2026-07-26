@@ -72,18 +72,22 @@ export default function Sidebar() {
 
         {/* Süper admin veya yönetici görür */}
         {(isSuperAdmin || isAdmin) && (
+          <Link
+            href="/admin"
+            className={
+              "block px-3 py-2 rounded mt-4 border-t pt-4 " +
+              (pathname === "/admin"
+                ? "bg-black text-white"
+                : "hover:bg-gray-100")
+            }
+          >
+            ⚙️ Yönetim
+          </Link>
+        )}
+
+        {/* Yalnızca süper admin görür (audit log / workflow motoru) */}
+        {isSuperAdmin && (
           <>
-            <Link
-              href="/admin"
-              className={
-                "block px-3 py-2 rounded mt-4 border-t pt-4 " +
-                (pathname === "/admin"
-                  ? "bg-black text-white"
-                  : "hover:bg-gray-100")
-              }
-            >
-              ⚙️ Yönetim
-            </Link>
             <Link
               href="/audit-log"
               className={

@@ -52,9 +52,8 @@ function timeAgo(ts: string): string {
 }
 
 export default function AuditLogWidget() {
-  const { profile, isSuperAdmin } = useUser();
-  const isAdmin = profile?.role === "admin";
-  const canSee = isSuperAdmin || isAdmin;
+  const { isSuperAdmin } = useUser();
+  const canSee = isSuperAdmin;
 
   const [rows, setRows] = useState<AuditRow[] | null>(null);
   const [chainOk, setChainOk] = useState<boolean | null>(null);

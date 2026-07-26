@@ -51,7 +51,7 @@ async function isAuthorized(req: NextRequest): Promise<boolean> {
     profile &&
     profile.approval_status === 'approved' &&
     profile.is_active &&
-    ['super_admin', 'admin'].includes(profile.role)
+    profile.role === 'super_admin'
   )
 }
 
