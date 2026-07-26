@@ -10,6 +10,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase/client";
 import { authFetch } from "@/lib/supabase/authFetch";
 import { useUser } from "@/hooks/useUser";
+import { useSpeechToText } from "@/hooks/useSpeechToText";
 
 type Note = {
   id: string;
@@ -82,6 +83,18 @@ export default function FirmNotesTab({ firmId }: { firmId: string }) {
   }, [firmId]);
 
   const [asking, setAsking] = useState(false);
+  const { desteklenir: sesDesteklenir, dinliyor, hata: sesHatasi, baslat: sesBaslat, durdur: sesDurdur } =
+    useSpeechToText();
+
+  function mikrofonToggle() {
+    if (dinliyor) {
+      sesDurdur();
+      return;
+    }
+    sesBaslat((metin) => {
+      setNewContent((prev) => (prev ? prev + " " + metin : metin));
+    });
+  }
 
   async function addNote() {
     if (!newContent.trim()) return;
@@ -183,16 +196,40 @@ export default function FirmNotesTab({ firmId }: { firmId: string }) {
 
       {/* Yeni not ekleme */}
       <div className="border rounded-xl p-4 mb-6 bg-gray-50">
-        <textarea
-          className="border p-3 w-full rounded text-sm"
-          rows={3}
-          placeholder="Yeni not yaz... (örn. '15 Temmuz'da firma ile görüşüldü, SDS güncellemesi bekleniyor')&#10;ADR Asistanına sormak için: @ADR UN 1203'ü UN 1170 ile taşıyabilir miyim?"
-          value={newContent}
-          onChange={(e) => setNewContent(e.target.value)}
-        />
+        <div className="relative">
+          <textarea
+            className="border p-3 w-full rounded text-sm pr-12"
+            rows={3}
+            placeholder="Yeni not yaz... (örn. '15 Temmuz'da firma ile görüşüldü, SDS güncellemesi bekleniyor')&#10;ADR Asistanına sormak için: @ADR UN 1203'ü UN 1170 ile taşıyabilir miyim?"
+            value={newContent}
+            onChange={(e) => setNewContent(e.target.value)}
+          />
+          {sesDesteklenir && (
+            <button
+              type="button"
+              onClick={mikrofonToggle}
+              title={dinliyor ? "Dinlemeyi durdur" : "Sesle not gir"}
+              className={
+                "absolute right-2 top-2 w-8 h-8 rounded-full flex items-center justify-center text-sm transition " +
+                (dinliyor
+                  ? "bg-red-500 text-white animate-pulse"
+                  : "bg-gray-100 text-gray-600 hover:bg-gray-200")
+              }
+            >
+              🎤
+            </button>
+          )}
+        </div>
+        {dinliyor && (
+          <p className="text-xs text-red-500 mt-1">🔴 Dinleniyor... konuşmayı bitirince mikrofon simgesine tekrar bas.</p>
+        )}
+        {sesHatasi && (
+          <p className="text-xs text-amber-600 mt-1">{sesHatasi}</p>
+        )}
         <div className="flex justify-between items-center mt-2">
           <span className="text-xs text-gray-400">
             🤖 <code>@ADR</code> ile başlayan notlar ADR Asistanı'na yönlendirilir
+            {sesDesteklenir && " · 🎤 mikrofonla sesli not girebilirsin"}
           </span>
           <button
             onClick={addNote}
