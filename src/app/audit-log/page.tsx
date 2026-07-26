@@ -6,6 +6,7 @@
 
 import { Fragment, useEffect, useMemo, useState } from 'react'
 import { supabase } from '@/lib/supabase/client'
+import { authFetch } from '@/lib/supabase/authFetch'
 import { useUser } from '@/hooks/useUser'
 
 type AuditRow = {
@@ -80,7 +81,7 @@ export default function AuditLogPage() {
   async function runVerify() {
     setVerifying(true)
     try {
-      const res = await fetch('/api/audit/verify')
+      const res = await authFetch('/api/audit/verify')
       const json = (await res.json()) as VerifyResult | { error: string }
       if ('error' in json) {
         console.error('Verify hatasi:', json.error)
@@ -93,13 +94,31 @@ export default function AuditLogPage() {
     }
   }
 
-  function exportCsv() {
+  async function exportCsv() {
     const params = new URLSearchParams({ format: 'csv' })
     if (filterTable) params.set('table', filterTable)
     if (filterFirm) params.set('firm_id', filterFirm)
     if (filterFrom) params.set('from', filterFrom)
     if (filterTo) params.set('to', filterTo)
-    window.location.href = `/api/audit/export?${params.toString()}`
+
+    // window.location.href ile basit navigasyon Authorization header'i
+    // ekleyemez (bkz. authFetch.ts notu) — bu yuzden fetch + blob indirme
+    // kullaniliyor.
+    const res = await authFetch(`/api/audit/export?${params.toString()}`)
+    if (!res.ok) {
+      // eslint-disable-next-line no-console
+      console.error('CSV indirilemedi:', res.status)
+      return
+    }
+    const blob = await res.blob()
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `audit_log_${Date.now()}.csv`
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    URL.revokeObjectURL(url)
   }
 
   const actionColor = (a: string) =>

@@ -8,6 +8,7 @@
 import { useEffect, useState } from "react";
 import * as yaml from "js-yaml";
 import { supabase } from "@/lib/supabase/client";
+import { authFetch } from "@/lib/supabase/authFetch";
 import { useUser } from "@/hooks/useUser";
 import { WORKFLOW_SOURCES } from "@/lib/workflow/sources";
 
@@ -159,7 +160,7 @@ export default function WorkflowRulesPage() {
     setRunResult(null);
     setRunError("");
     try {
-      const res = await fetch("/api/workflow/run");
+      const res = await authFetch("/api/workflow/run");
       const json = await res.json();
       if (!res.ok) {
         setRunError(json.error ?? "Bilinmeyen hata");

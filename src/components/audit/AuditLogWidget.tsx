@@ -7,6 +7,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase/client";
+import { authFetch } from "@/lib/supabase/authFetch";
 import { useUser } from "@/hooks/useUser";
 
 type AuditRow = {
@@ -83,7 +84,7 @@ export default function AuditLogWidget() {
 
       // Zincir bütünlüğü — /api/audit/verify çağrısı
       try {
-        const res = await fetch("/api/audit/verify");
+        const res = await authFetch("/api/audit/verify");
         if (res.ok) {
           const json = await res.json();
           setChainOk(Boolean(json.chain_intact));

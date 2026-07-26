@@ -2,36 +2,24 @@
 // Audit log hash zincirinin butunlugunu kontrol eder.
 // GET /api/audit/verify?start_id=1&end_id=1000
 //
-// Yalnizca super_admin/admin erisebilir (public.profiles.role uzerinden).
+// Yalnizca super_admin erisebilir. Bu uygulamada oturum cookie'de degil
+// localStorage'da tutuldugu icin (client.ts duz supabase-js kullaniyor,
+// @supabase/ssr degil), kimlik dogrulama "Authorization: Bearer
+// <access_token>" header'i uzerinden yapilir (bkz. authFetch.ts).
 
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
+import { getSuperAdminFromRequest } from '@/lib/supabase/verifySuperAdmin'
 
 export const dynamic = 'force-dynamic'
 
 export async function GET(req: NextRequest) {
-  const supabase = await createClient()
-
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
-  if (authError || !user) {
+  const admin = await getSuperAdminFromRequest(req)
+  if (!admin) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
   }
 
-  const { data: profile, error: profileError } = await supabase
-    .from('profiles')
-    .select('role, approval_status, is_active')
-    .eq('id', user.id)
-    .single()
-
-  if (
-    profileError ||
-    !profile ||
-    profile.approval_status !== 'approved' ||
-    !profile.is_active ||
-    profile.role !== 'super_admin'
-  ) {
-    return NextResponse.json({ error: 'forbidden' }, { status: 403 })
-  }
+  const supabase = createAdminClient()
 
   const { searchParams } = new URL(req.url)
   const startId = searchParams.get('start_id')

@@ -2,10 +2,13 @@
 // Denetim icin audit log ihraci. JSON veya CSV.
 // GET /api/audit/export?firm_id=xxx&from=2026-01-01&to=2026-07-25&format=csv
 //
-// Yalnizca super_admin/admin erisebilir (public.profiles.role uzerinden).
+// Yalnizca super_admin erisebilir. Bearer token ile dogrulanir (bkz.
+// verifySuperAdmin.ts) — bu uygulamada oturum cookie'de degil
+// localStorage'da tutuldugu icin cookie-tabanli kontrol calismaz.
 
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
+import { getSuperAdminFromRequest } from '@/lib/supabase/verifySuperAdmin'
 
 export const dynamic = 'force-dynamic'
 
@@ -19,26 +22,12 @@ function csvEscape(value: unknown): string {
 }
 
 export async function GET(req: NextRequest) {
-  const supabase = await createClient()
-
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
-
-  const { data: profile, error: profileError } = await supabase
-    .from('profiles')
-    .select('role, approval_status, is_active')
-    .eq('id', user.id)
-    .single()
-
-  if (
-    profileError ||
-    !profile ||
-    profile.approval_status !== 'approved' ||
-    !profile.is_active ||
-    profile.role !== 'super_admin'
-  ) {
-    return NextResponse.json({ error: 'forbidden' }, { status: 403 })
+  const admin = await getSuperAdminFromRequest(req)
+  if (!admin) {
+    return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
   }
+
+  const supabase = createAdminClient()
 
   const { searchParams } = new URL(req.url)
   const firmId = searchParams.get('firm_id')

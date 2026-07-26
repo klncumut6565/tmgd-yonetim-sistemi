@@ -5,16 +5,20 @@
 //      Vercel, CRON_SECRET env var'i tanimliysa istegi otomatik olarak
 //      `Authorization: Bearer <CRON_SECRET>` header'iyla gonderir.
 //
-//   2) Admin panelinden "Şimdi Çalıştır" butonu — normal oturum (cookie)
-//      ile, super_admin/admin kontrolu yapilir.
+//   2) Admin panelinden "Şimdi Çalıştır" butonu — kullanicinin access
+//      token'i "Authorization: Bearer <access_token>" olarak gonderilir
+//      (bkz. src/lib/supabase/authFetch.ts) ve super_admin kontrolu yapilir.
+//      NOT: Bu uygulamada oturum cookie'de degil localStorage'da tutuldugu
+//      icin cookie-tabanli kontrol calismiyordu — bu yuzden Bearer token
+//      yaklasimi kullanilir.
 //
 // Her calistirmada: enabled kurallari sirayla isler, ilgili view'i sorgular,
 // esigi gecen her kayit icin (rule_id, record_ref) bazinda son ne zaman
 // bildirim gonderildigine bakar — repeat_interval_days gecmediyse atlar.
 
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { getSuperAdminFromRequest } from '@/lib/supabase/verifySuperAdmin'
 import { WORKFLOW_SOURCES, renderTemplate, type WorkflowRuleJson } from '@/lib/workflow/sources'
 
 export const dynamic = 'force-dynamic'
@@ -36,23 +40,9 @@ async function isAuthorized(req: NextRequest): Promise<boolean> {
     if (authHeader === `Bearer ${cronSecret}`) return true
   }
 
-  // Yol 2: oturum acmis admin/super_admin
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return false
-
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('role, approval_status, is_active')
-    .eq('id', user.id)
-    .single()
-
-  return Boolean(
-    profile &&
-    profile.approval_status === 'approved' &&
-    profile.is_active &&
-    profile.role === 'super_admin'
-  )
+  // Yol 2: Bearer token ile super_admin dogrulama
+  const admin = await getSuperAdminFromRequest(req)
+  return admin !== null
 }
 
 export async function GET(req: NextRequest) {
