@@ -44,8 +44,23 @@ export function useSpeechToText() {
       }
     };
 
-    recognition.onerror = () => {
-      setHata("Ses tanıma sırasında bir hata oluştu.");
+    recognition.onerror = (event) => {
+      const kod = event.error;
+      let mesaj = "Ses tanıma sırasında bir hata oluştu.";
+      if (kod === "not-allowed" || kod === "service-not-allowed") {
+        mesaj =
+          "Mikrofon izni reddedilmiş görünüyor. Tarayıcının adres çubuğundaki kilit/site bilgisi simgesine tıklayıp " +
+          "\"Mikrofon\" iznini \"İzin Ver\" yap, sonra sayfayı yenile.";
+      } else if (kod === "no-speech") {
+        mesaj = "Ses algılanamadı — mikrofon açık ama konuşma duyulmadı. Tekrar dene.";
+      } else if (kod === "audio-capture") {
+        mesaj = "Mikrofon bulunamadı. Cihazında bir mikrofon bağlı/etkin olduğundan emin ol.";
+      } else if (kod === "network") {
+        mesaj = "Ağ hatası — ses tanıma servisine ulaşılamadı.";
+      } else if (kod === "aborted") {
+        mesaj = ""; // kullanıcı kendi durdurduysa hata gösterme
+      }
+      if (mesaj) setHata(mesaj);
       setDinliyor(false);
     };
 
@@ -60,9 +75,26 @@ export function useSpeechToText() {
     };
   }, []);
 
-  const baslat = useCallback((onSonuc: (metin: string) => void) => {
+  const baslat = useCallback(async (onSonuc: (metin: string) => void) => {
     if (!recognitionRef.current) return;
     setHata("");
+
+    // Bazı tarayıcılarda SpeechRecognition.start() tek başına izin
+    // penceresini güvenilir şekilde açmıyor (özellikle site daha önce
+    // "engelle" ile kapatıldıysa sessizce başarısız oluyor). getUserMedia
+    // ile açıkça izin istemek, tarayıcının izin penceresini garanti
+    // tetiklemesini sağlar.
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      stream.getTracks().forEach((t) => t.stop()); // sadece izin için açtık, hemen kapat
+    } catch {
+      setHata(
+        "Mikrofona erişilemedi — izin penceresi çıkmadıysa tarayıcının adres çubuğundaki " +
+          "kilit/site bilgisi simgesine tıklayıp \"Mikrofon\" iznini \"İzin Ver\" yap, sonra sayfayı yenile."
+      );
+      return;
+    }
+
     onResultRef.current = onSonuc;
     setDinliyor(true);
     try {
