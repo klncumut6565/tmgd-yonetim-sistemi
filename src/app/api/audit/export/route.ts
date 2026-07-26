@@ -1,8 +1,8 @@
 // src/app/api/audit/export/route.ts
-// Denetim için audit log ihracı. JSON veya CSV.
+// Denetim icin audit log ihraci. JSON veya CSV.
 // GET /api/audit/export?firm_id=xxx&from=2026-01-01&to=2026-07-25&format=csv
 //
-// Yalnızca super_admin/admin erişebilir.
+// Yalnizca super_admin/admin erisebilir.
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
@@ -19,7 +19,7 @@ function csvEscape(value: unknown): string {
 }
 
 export async function GET(req: NextRequest) {
-  const supabase = createClient()
+  const supabase = await createClient()
 
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
@@ -40,7 +40,7 @@ export async function GET(req: NextRequest) {
     .from('audit_log')
     .select('*')
     .order('id', { ascending: true })
-    .limit(50000) // Denetim ihracında pratik üst sınır
+    .limit(50000)
 
   if (firmId) query = query.eq('firm_id', firmId)
   if (from) query = query.gte('ts', from)
@@ -63,7 +63,6 @@ export async function GET(req: NextRequest) {
     const bodyLines = rows.map((r) =>
       headers.map((h) => csvEscape((r as Record<string, unknown>)[h])).join(',')
     )
-    // BOM eklenir → Excel'de Türkçe karakterler bozulmasın
     const csv = '\uFEFF' + [headerLine, ...bodyLines].join('\n')
 
     const filename = `audit_log_${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.csv`

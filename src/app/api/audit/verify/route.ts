@@ -1,8 +1,8 @@
 // src/app/api/audit/verify/route.ts
-// Audit log hash zincirinin bütünlüğünü kontrol eder.
+// Audit log hash zincirinin butunlugunu kontrol eder.
 // GET /api/audit/verify?start_id=1&end_id=1000
 //
-// Yalnızca super_admin/admin erişebilir.
+// Yalnizca super_admin/admin erisebilir.
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
@@ -10,7 +10,7 @@ import { createClient } from '@/lib/supabase/server'
 export const dynamic = 'force-dynamic'
 
 export async function GET(req: NextRequest) {
-  const supabase = createClient()
+  const supabase = await createClient()
 
   const { data: { user }, error: authError } = await supabase.auth.getUser()
   if (authError || !user) {

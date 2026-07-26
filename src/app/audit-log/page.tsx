@@ -1,10 +1,10 @@
 // src/app/audit-log/page.tsx
-// Yönetim → Denetim İzi
-// Hash-chain audit log görüntüleyicisi. Sadece super_admin/admin.
+// Yonetim -> Denetim Izi
+// Hash-chain audit log goruntuleyicisi. Sadece super_admin/admin.
 
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { Fragment, useEffect, useMemo, useState } from 'react'
 import { supabase } from '@/lib/supabase/client'
 
 type AuditRow = {
@@ -48,34 +48,31 @@ export default function AuditLogPage() {
   const [expandedId, setExpandedId] = useState<number | null>(null)
 
   useEffect(() => {
-    loadRows()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, filterTable, filterFirm, filterFrom, filterTo])
+    async function loadRows() {
+      setLoading(true)
+      let query = supabase
+        .from('audit_log')
+        .select('*', { count: 'exact' })
+        .order('id', { ascending: false })
+        .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1)
 
-  async function loadRows() {
-    setLoading(true)
-    let query = supabase
-      .from('audit_log')
-      .select('*', { count: 'exact' })
-      .order('id', { ascending: false })
-      .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1)
+      if (filterTable) query = query.eq('table_name', filterTable)
+      if (filterFirm) query = query.eq('firm_id', filterFirm)
+      if (filterFrom) query = query.gte('ts', filterFrom)
+      if (filterTo) query = query.lte('ts', filterTo)
 
-    if (filterTable) query = query.eq('table_name', filterTable)
-    if (filterFirm) query = query.eq('firm_id', filterFirm)
-    if (filterFrom) query = query.gte('ts', filterFrom)
-    if (filterTo) query = query.lte('ts', filterTo)
-
-    const { data, count, error } = await query
-    if (error) {
-      // eslint-disable-next-line no-console
-      console.error('Audit log yükleme hatası:', error)
-      setRows([])
-    } else {
-      setRows((data ?? []) as AuditRow[])
-      setTotalCount(count ?? null)
+      const { data, count, error } = await query
+      if (error) {
+        console.error('Audit log yukleme hatasi:', error)
+        setRows([])
+      } else {
+        setRows((data ?? []) as AuditRow[])
+        setTotalCount(count ?? null)
+      }
+      setLoading(false)
     }
-    setLoading(false)
-  }
+    loadRows()
+  }, [page, filterTable, filterFirm, filterFrom, filterTo])
 
   async function runVerify() {
     setVerifying(true)
@@ -83,8 +80,7 @@ export default function AuditLogPage() {
       const res = await fetch('/api/audit/verify')
       const json = (await res.json()) as VerifyResult | { error: string }
       if ('error' in json) {
-        // eslint-disable-next-line no-console
-        console.error('Verify hatası:', json.error)
+        console.error('Verify hatasi:', json.error)
         setVerifyResult(null)
       } else {
         setVerifyResult(json)
@@ -141,11 +137,12 @@ export default function AuditLogPage() {
 
       {verifyResult && (
         <div
-          className={`mb-4 p-4 rounded border ${
-            verifyResult.chain_intact
+          className={
+            'mb-4 p-4 rounded border ' +
+            (verifyResult.chain_intact
               ? 'bg-green-50 border-green-200 text-green-900'
-              : 'bg-red-50 border-red-200 text-red-900'
-          }`}
+              : 'bg-red-50 border-red-200 text-red-900')
+          }
         >
           {verifyResult.chain_intact ? (
             <div>
@@ -209,14 +206,14 @@ export default function AuditLogPage() {
               <tr><td colSpan={6} className="px-3 py-8 text-center text-gray-500">Kayıt yok.</td></tr>
             ) : (
               rows.map((r) => (
-                <>
-                  <tr key={r.id} className="border-t hover:bg-gray-50">
+                <Fragment key={r.id}>
+                  <tr className="border-t hover:bg-gray-50">
                     <td className="px-3 py-2 font-mono text-xs">{r.id}</td>
                     <td className="px-3 py-2 text-xs">
                       {new Date(r.ts).toLocaleString('tr-TR')}
                     </td>
                     <td className="px-3 py-2">
-                      <span className={`px-2 py-0.5 rounded text-xs font-medium ${actionColor(r.action)}`}>
+                      <span className={'px-2 py-0.5 rounded text-xs font-medium ' + actionColor(r.action)}>
                         {r.action}
                       </span>
                     </td>
@@ -224,7 +221,8 @@ export default function AuditLogPage() {
                       {r.table_name} / {r.record_id}
                     </td>
                     <td className="px-3 py-2 text-xs">
-                      {r.actor_email ?? '—'} <span className="text-gray-400">({r.actor_role ?? '—'})</span>
+                      {r.actor_email ?? '—'}{' '}
+                      <span className="text-gray-400">({r.actor_role ?? '—'})</span>
                     </td>
                     <td className="px-3 py-2">
                       <button
@@ -236,7 +234,7 @@ export default function AuditLogPage() {
                     </td>
                   </tr>
                   {expandedId === r.id && (
-                    <tr key={`${r.id}-detail`} className="bg-gray-50">
+                    <tr className="bg-gray-50">
                       <td colSpan={6} className="px-3 py-3">
                         <div className="grid grid-cols-2 gap-3 text-xs">
                           <div>
@@ -252,14 +250,14 @@ export default function AuditLogPage() {
                             </pre>
                           </div>
                         </div>
-                        <div className="mt-2 text-xs text-gray-500 font-mono">
+                        <div className="mt-2 text-xs text-gray-500 font-mono break-all">
                           <div>prev_hash: {r.prev_hash}</div>
                           <div>row_hash: {r.row_hash}</div>
                         </div>
                       </td>
                     </tr>
                   )}
-                </>
+                </Fragment>
               ))
             )}
           </tbody>

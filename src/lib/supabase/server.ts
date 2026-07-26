@@ -1,35 +1,28 @@
 // src/lib/supabase/server.ts
-// Server-side Supabase istemcisi — cookie-aware.
-// Route handler'lar, server component'ler ve server action'lar için.
-//
-// Gereksinim: @supabase/ssr paketi (npm install @supabase/ssr)
+// Server-side Supabase istemcisi (Next.js 15 uyumlu).
+// Route handler'lar, server component'ler ve server action'lar icin.
 
-import { createServerClient, type CookieOptions } from '@supabase/ssr'
+import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 
-export function createClient() {
-  const cookieStore = cookies()
+export async function createClient() {
+  const cookieStore = await cookies()
 
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        get(name: string) {
-          return cookieStore.get(name)?.value
+        getAll() {
+          return cookieStore.getAll()
         },
-        set(name: string, value: string, options: CookieOptions) {
+        setAll(cookiesToSet) {
           try {
-            cookieStore.set({ name, value, ...options })
+            cookiesToSet.forEach(({ name, value, options }) => {
+              cookieStore.set(name, value, options)
+            })
           } catch {
-            // Server component'te set çağrılabilir; middleware yoksa yut.
-          }
-        },
-        remove(name: string, options: CookieOptions) {
-          try {
-            cookieStore.set({ name, value: '', ...options })
-          } catch {
-            // Aynı sebep.
+            // Server Component icinden cagrildiginda set izin verilmez — yut.
           }
         },
       },
