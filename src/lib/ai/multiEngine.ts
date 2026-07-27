@@ -40,7 +40,7 @@ async function callGrok(apiKey: string, model: string, systemPrompt: string, mes
     body: JSON.stringify({
       model,
       messages: [{ role: 'system', content: systemPrompt }, ...messages],
-      max_tokens: 1200,
+      max_tokens: 700,
     }),
   });
 
@@ -69,7 +69,7 @@ async function callGemini(apiKey: string, model: string, systemPrompt: string, m
     body: JSON.stringify({
       systemInstruction: { parts: [{ text: systemPrompt }] },
       contents,
-      generationConfig: { maxOutputTokens: 1200 },
+      generationConfig: { maxOutputTokens: 700 },
     }),
   });
 
@@ -94,7 +94,7 @@ async function callOpenRouter(apiKey: string, model: string, systemPrompt: strin
     body: JSON.stringify({
       model,
       messages: [{ role: 'system', content: systemPrompt }, ...messages],
-      max_tokens: 1200,
+      max_tokens: 700,
     }),
   });
 
