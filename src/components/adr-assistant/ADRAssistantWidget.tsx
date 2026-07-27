@@ -205,7 +205,14 @@ export default function ADRAssistantWidget() {
 
   // ---- AÇIK: sağ tarafta mesajlaşma paneli ----
   return (
-    <div className="fixed right-0 top-0 h-full w-full sm:w-[420px] bg-white shadow-2xl z-50 flex flex-col border-l">
+    <>
+      {/* Karartma (backdrop) — mobilde panel dışına dokununca kapansın,
+          ayrıca panelin "sayfayı kaplamadığını" görsel olarak belirginleştirir. */}
+      <div
+        className="fixed inset-0 bg-black/30 z-40"
+        onClick={() => setOpen(false)}
+      />
+      <div className="fixed right-0 top-0 h-full w-[88%] max-w-[420px] bg-white shadow-2xl z-50 flex flex-col border-l">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b bg-gray-50">
         <div>
@@ -348,5 +355,6 @@ export default function ADRAssistantWidget() {
         </div>
       </div>
     </div>
+    </>
   );
 }
