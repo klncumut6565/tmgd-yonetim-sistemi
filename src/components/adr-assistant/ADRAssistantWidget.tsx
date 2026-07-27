@@ -137,7 +137,19 @@ export default function ADRAssistantWidget() {
 
         if (json.action) {
           const url = actionToUrl(json.action, firmId);
-          router.push(url);
+          if (url) {
+            router.push(url);
+          } else {
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: crypto.randomUUID(),
+                role: "assistant",
+                content: "Bu işlem için önce bir firma sayfasına gitmen gerekiyor.",
+                error: true,
+              },
+            ]);
+          }
         }
       }
     } catch (e) {

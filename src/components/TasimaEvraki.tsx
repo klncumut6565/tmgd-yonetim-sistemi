@@ -20,7 +20,7 @@
 // kullanıcısı evrakları görüntüleyip PDF indirebilir.
 // =========================================================================
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase/client";
 import { hataCevir } from "@/lib/hataCevir";
 import { useUser } from "@/hooks/useUser";
@@ -284,9 +284,14 @@ async function evrakPdfUret(args: {
 export default function TasimaEvraki({
   firmId,
   firmaAdi,
+  prefillUnNumbers,
 }: {
   firmId: string;
   firmaAdi: string;
+  /** ADR Asistanı'ndan gelen "şu UN numaralarını ekle" isteği — envanterde
+   * bulunan ilk eşleşme otomatik seçilir, miktar girişi kullanıcıda kalır
+   * (gerçek bir taşıma belgesi olduğu için miktarı asistan uydurmaz). */
+  prefillUnNumbers?: string[];
 }) {
   const { canWrite } = useUser();
 
@@ -344,6 +349,53 @@ export default function TasimaEvraki({
   }, [firmId]);
 
   useEffect(() => { yukle(); }, [yukle]);
+
+  // ADR Asistanı'ndan "UN X'i ekle" geldiyse: envanterde bulunan İLK
+  // eşleşmeyi otomatik seç, miktarı BOŞ bırak (kullanıcı girmeli — gerçek
+  // bir taşıma belgesi, miktarı asistan uydurmamalı). Aynı prefill isteği
+  // için sadece BİR KEZ çalışır (envanter yeniden yüklenince tekrar
+  // tetiklenmesin diye ref ile işaretleniyor).
+  const prefillIslendiRef = useRef<string>("");
+  useEffect(() => {
+    const istek = (prefillUnNumbers ?? []).join(",");
+    if (!istek || envanter.length === 0) return;
+    if (prefillIslendiRef.current === istek) return;
+    prefillIslendiRef.current = istek;
+
+    const bulunanlar: string[] = [];
+    const bulunmayanlar: string[] = [];
+    let ilkEslesme: Envanter | null = null;
+
+    for (const un of prefillUnNumbers ?? []) {
+      const eslesme = envanter.find((e) => e.un_number === un);
+      if (eslesme) {
+        bulunanlar.push(un);
+        if (!ilkEslesme) ilkEslesme = eslesme;
+      } else {
+        bulunmayanlar.push(un);
+      }
+    }
+
+    if (ilkEslesme) {
+      setSeciliKimyasal(ilkEslesme.id);
+    }
+
+    const parcalar: string[] = [];
+    if (bulunanlar.length > 0) {
+      parcalar.push(
+        `🤖 ADR Asistanı: UN ${bulunanlar.join(", ")} envanterde bulundu` +
+          (ilkEslesme ? ` — UN ${ilkEslesme.un_number} formda seçildi, miktarı girip "Kalem Ekle"ye bas.` : ".")
+      );
+      if (bulunanlar.length > 1) {
+        parcalar.push(`Diğerlerini eklemek için önce bunu ekleyip sonra tekrar seçmen gerekiyor.`);
+      }
+    }
+    if (bulunmayanlar.length > 0) {
+      parcalar.push(`⚠️ UN ${bulunmayanlar.join(", ")} firmanın Kimyasal Envanterinde bulunamadı, önce envantere eklenmesi gerekiyor.`);
+    }
+    if (parcalar.length > 0) setMesaj(parcalar.join(" "));
+  }, [envanter, prefillUnNumbers]);
+
 
   // Canlı ADR hesabı — her kalem değişikliğinde otomatik
   const { puan, plakaGerekli, muafiyetsiz } = useMemo(() => hesapla1136(kalemler), [kalemler]);

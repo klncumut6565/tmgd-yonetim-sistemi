@@ -78,7 +78,7 @@ const TABS = [
   { key: "drivers", label: "Sürücüler" },
   { key: "employees", label: "Personeller" },
   { key: "visits", label: "Ziyaretler" },
-  { key: "adr_transport", label: "ADR Transport" },
+  { key: "adr_transport", label: "Taşıma Evrakı" },
   { key: "genel", label: "Firma Bilgileri" },
   { key: "denetim", label: "🔒 Denetim İzi" },
   { key: "notlar", label: "📝 Notlar" },
@@ -180,9 +180,11 @@ function FirmDetailInner({
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<TabKey>("belge_takip");
   const [adrAltSekme, setAdrAltSekme] = useState<"evrak" | "envanter">("evrak");
+  const [evrakPrefillUns, setEvrakPrefillUns] = useState<string[]>([]);
 
   // ADR Asistani veya harici baglantilar icin: /firms/<id>?tab=belge_olustur
-  // gibi bir URL, dogrudan o sekmeyi acar.
+  // gibi bir URL, dogrudan o sekmeyi acar. ?evrak_un=1203,1170 ise Tasima
+  // Evraki formunda envanterden eslesen ilk kaydi otomatik secer.
   useEffect(() => {
     const tabParam = searchParams.get("tab");
     const validTabs: TabKey[] = [
@@ -192,6 +194,11 @@ function FirmDetailInner({
     ];
     if (tabParam && (validTabs as string[]).includes(tabParam)) {
       setTab(tabParam as TabKey);
+    }
+
+    const evrakUnParam = searchParams.get("evrak_un");
+    if (evrakUnParam) {
+      setEvrakPrefillUns(evrakUnParam.split(",").map((s) => s.trim()).filter(Boolean));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
@@ -1479,7 +1486,7 @@ function FirmDetailInner({
           ürün kaynağı olacak (arama yalnızca bu listeden yapılır). */}
       {tab === "adr_transport" && (
         <div>
-          <h2 className="text-lg font-bold mb-1">🚚 ADR Transport</h2>
+          <h2 className="text-lg font-bold mb-1">🚚 Taşıma Evrakı</h2>
           <p className="text-sm text-gray-500 mb-3">
             Taşıma evrakları bu firmanın kendi Kimyasal Envanterinden beslenir;
             ADR bilgileri ortak Tablo A&apos;dan (2.939 kayıt) otomatik gelir.
@@ -1506,7 +1513,7 @@ function FirmDetailInner({
             </div>
           )}
           {adrAltSekme === "evrak" && firm && (
-            <TasimaEvraki firmId={id} firmaAdi={firm.name} />
+            <TasimaEvraki firmId={id} firmaAdi={firm.name} prefillUnNumbers={evrakPrefillUns} />
           )}
         </div>
       )}
