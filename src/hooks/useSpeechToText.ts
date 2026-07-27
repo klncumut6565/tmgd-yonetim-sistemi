@@ -75,7 +75,7 @@ export function useSpeechToText() {
     };
   }, []);
 
-  const baslat = useCallback(async (onSonuc: (metin: string) => void) => {
+  const baslat = useCallback(async (onSonuc: (metin: string) => void, surekliDinleme: boolean = true) => {
     if (!recognitionRef.current) return;
     setHata("");
 
@@ -94,6 +94,11 @@ export function useSpeechToText() {
       );
       return;
     }
+
+    // Sesli Mod: surekliDinleme=false verilirse, tek cümle bitince
+    // (konuşma sessizliği algılanınca) tarayıcı kendisi durur — kullanıcı
+    // mikrofona tekrar basmadan otomatik "gönder" akışı kurulabilir.
+    recognitionRef.current.continuous = surekliDinleme;
 
     onResultRef.current = onSonuc;
     setDinliyor(true);

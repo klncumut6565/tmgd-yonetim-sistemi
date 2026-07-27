@@ -24,6 +24,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
 import { authFetch } from "@/lib/supabase/authFetch";
 import { useSpeechToText } from "@/hooks/useSpeechToText";
+import { useTextToSpeech } from "@/hooks/useTextToSpeech";
 import type { ChatMessage } from "@/lib/ai/multiEngine";
 import { actionToUrl } from "@/lib/ai/actions";
 
@@ -70,9 +71,11 @@ export default function ADRAssistantWidget() {
   const [sending, setSending] = useState(false);
   const { firmId, firmName } = useCurrentFirm();
   const scrollRef = useRef<HTMLDivElement>(null);
+  const [sesliMod, setSesliMod] = useState(false);
 
   const { desteklenir: sesDesteklenir, dinliyor, hata: sesHatasi, baslat: sesBaslat, durdur: sesDurdur } =
     useSpeechToText();
+  const { desteklenir: ttsDesteklenir, konusuyor, konus, durdur: ttsDurdur } = useTextToSpeech();
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
@@ -83,13 +86,24 @@ export default function ADRAssistantWidget() {
       sesDurdur();
       return;
     }
-    sesBaslat((metin) => {
-      setInput((prev) => (prev ? prev + " " + metin : metin));
-    });
+    if (konusuyor) ttsDurdur(); // asistan konuşurken mikrofon açılırsa önce onu kes (geri besleme önleme)
+
+    if (sesliMod) {
+      // Sesli Mod: tek cümle bitince (sessizlik algılanınca) tarayıcı
+      // kendiliğinden durur, transkript AUTOMATİK gönderilir — kullanıcı
+      // ayrıca "Gönder"e basmaz. ChatGPT'nin sesli modu gibi akış.
+      sesBaslat((metin) => {
+        gonder(metin);
+      }, false);
+    } else {
+      sesBaslat((metin) => {
+        setInput((prev) => (prev ? prev + " " + metin : metin));
+      });
+    }
   }
 
-  async function gonder() {
-    const question = input.trim();
+  async function gonder(overrideText?: string) {
+    const question = (overrideText ?? input).trim();
     if (!question || sending) return;
 
     setInput("");
@@ -120,20 +134,19 @@ export default function ADRAssistantWidget() {
         const detayMetni = Array.isArray(json.details)
           ? json.details.map((d: { provider: string; message: string }) => `• ${d.provider}: ${d.message}`).join("\n")
           : "";
+        const hataMetni = (json.error ?? "Bir hata oluştu.") + (detayMetni ? "\n\n" + detayMetni : "");
         setMessages((prev) => [
           ...prev,
-          {
-            id: crypto.randomUUID(),
-            role: "assistant",
-            content: (json.error ?? "Bir hata oluştu.") + (detayMetni ? "\n\n" + detayMetni : ""),
-            error: true,
-          },
+          { id: crypto.randomUUID(), role: "assistant", content: hataMetni, error: true },
         ]);
+        if (sesliMod && ttsDesteklenir) konus("Bir hata oluştu, lütfen tekrar dener misin.");
       } else {
         setMessages((prev) => [
           ...prev,
           { id: crypto.randomUUID(), role: "assistant", content: json.answer },
         ]);
+
+        if (sesliMod && ttsDesteklenir) konus(json.answer as string);
 
         if (json.action) {
           const url = actionToUrl(json.action, firmId);
@@ -203,13 +216,30 @@ export default function ADRAssistantWidget() {
             {firmName ? `Bağlam: ${firmName}` : "Genel sohbet (firma seçili değil)"}
           </p>
         </div>
-        <button
-          onClick={() => setOpen(false)}
-          title="Kapat (sohbet altta 1 satırlık bara döner)"
-          className="w-8 h-8 rounded-full hover:bg-gray-200 flex items-center justify-center text-gray-500"
-        >
-          ✕
-        </button>
+        <div className="flex items-center gap-1">
+          {ttsDesteklenir && sesDesteklenir && (
+            <button
+              onClick={() => {
+                if (sesliMod) ttsDurdur();
+                setSesliMod((v) => !v);
+              }}
+              title={sesliMod ? "Sesli Modu Kapat" : "Sesli Modu Aç (ChatGPT gibi konuşarak sohbet)"}
+              className={
+                "px-2.5 py-1 rounded-full text-xs font-medium flex items-center gap-1 transition " +
+                (sesliMod ? "bg-indigo-600 text-white" : "bg-gray-200 text-gray-600 hover:bg-gray-300")
+              }
+            >
+              {sesliMod ? "🔊 Sesli Mod" : "🔈 Sesli Mod"}
+            </button>
+          )}
+          <button
+            onClick={() => setOpen(false)}
+            title="Kapat (sohbet altta 1 satırlık bara döner)"
+            className="w-8 h-8 rounded-full hover:bg-gray-200 flex items-center justify-center text-gray-500"
+          >
+            ✕
+          </button>
+        </div>
       </div>
 
       {/* Mesaj listesi */}
@@ -255,12 +285,33 @@ export default function ADRAssistantWidget() {
             </div>
           </div>
         )}
+
+        {konusuyor && (
+          <div className="flex justify-start">
+            <div className="bg-indigo-100 border border-indigo-200 rounded-2xl px-3.5 py-2 text-sm text-indigo-700 flex items-center gap-2">
+              <span className="flex gap-0.5">
+                <span className="w-1 h-3 bg-indigo-500 rounded-full animate-pulse" />
+                <span className="w-1 h-3 bg-indigo-500 rounded-full animate-pulse [animation-delay:150ms]" />
+                <span className="w-1 h-3 bg-indigo-500 rounded-full animate-pulse [animation-delay:300ms]" />
+              </span>
+              🔊 Konuşuyor...
+              <button onClick={ttsDurdur} className="ml-1 text-xs underline text-indigo-500">
+                Durdur
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Giriş alanı */}
       <div className="border-t p-3">
         {dinliyor && (
-          <p className="text-xs text-red-500 mb-1">🔴 Dinleniyor...</p>
+          <p className="text-xs text-red-500 mb-1">
+            🔴 Dinleniyor{sesliMod ? " — bitince otomatik gönderilecek..." : "..."}
+          </p>
+        )}
+        {sesliMod && !dinliyor && !konusuyor && (
+          <p className="text-xs text-indigo-500 mb-1">🔊 Sesli Mod açık — mikrofona bas, konuş, otomatik gönderilir ve cevap sesli okunur.</p>
         )}
         {sesHatasi && <p className="text-xs text-amber-600 mb-1">{sesHatasi}</p>}
         <div className="flex items-end gap-2">
@@ -276,9 +327,10 @@ export default function ADRAssistantWidget() {
             <button
               type="button"
               onClick={mikrofonToggle}
-              title={dinliyor ? "Dinlemeyi durdur" : "Sesle sor"}
+              disabled={konusuyor}
+              title={dinliyor ? "Dinlemeyi durdur" : konusuyor ? "Asistan konuşurken mikrofon kapalı" : "Sesle sor"}
               className={
-                "w-9 h-9 shrink-0 rounded-full flex items-center justify-center transition " +
+                "w-9 h-9 shrink-0 rounded-full flex items-center justify-center transition disabled:opacity-30 " +
                 (dinliyor ? "bg-red-500 text-white animate-pulse" : "bg-gray-100 hover:bg-gray-200")
               }
             >
@@ -286,7 +338,7 @@ export default function ADRAssistantWidget() {
             </button>
           )}
           <button
-            onClick={gonder}
+            onClick={() => gonder()}
             disabled={sending || !input.trim()}
             className="w-9 h-9 shrink-0 rounded-full bg-black text-white flex items-center justify-center disabled:opacity-40"
             title="Gönder"
