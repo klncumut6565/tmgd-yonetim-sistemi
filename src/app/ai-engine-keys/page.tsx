@@ -22,6 +22,31 @@ const PROVIDER_LABELS: Record<string, string> = {
   openrouter: "OpenRouter",
 };
 
+const PROVIDER_LINKS: Record<string, { anahtar: string; anahtarLabel: string; modeller: string; modellerLabel: string; bakiye?: string; bakiyeLabel?: string }> = {
+  grok: {
+    anahtar: "https://console.x.ai",
+    anahtarLabel: "🔑 API Anahtarı Al (console.x.ai)",
+    modeller: "https://docs.x.ai/docs/models",
+    modellerLabel: "📋 Güncel Model Listesi",
+  },
+  gemini: {
+    anahtar: "https://aistudio.google.com/apikey",
+    anahtarLabel: "🔑 API Anahtarı Al (Google AI Studio)",
+    modeller: "https://ai.google.dev/gemini-api/docs/models",
+    modellerLabel: "📋 Güncel Model Listesi",
+    bakiye: "https://aistudio.google.com/usage",
+    bakiyeLabel: "💳 Kota / Kullanım Durumu",
+  },
+  openrouter: {
+    anahtar: "https://openrouter.ai/settings/keys",
+    anahtarLabel: "🔑 API Anahtarı Al (OpenRouter)",
+    modeller: "https://openrouter.ai/models",
+    modellerLabel: "📋 Güncel Model Listesi",
+    bakiye: "https://openrouter.ai/settings/credits",
+    bakiyeLabel: "💳 Bakiye Yükle",
+  },
+};
+
 export default function AiEngineKeysPage() {
   const { isSuperAdmin, loading: userLoading } = useUser();
   const [rows, setRows] = useState<ProviderRow[]>([]);
@@ -128,6 +153,52 @@ export default function AiEngineKeysPage() {
                   {hasKey ? "Anahtar girilmiş ✓" : "Anahtar yok"}
                 </span>
               </div>
+
+              <div className="flex flex-wrap gap-x-4 gap-y-1 mb-3 text-xs">
+                <a
+                  href={PROVIDER_LINKS[row.provider].anahtar}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-indigo-600 hover:underline"
+                >
+                  {PROVIDER_LINKS[row.provider].anahtarLabel}
+                </a>
+                <a
+                  href={PROVIDER_LINKS[row.provider].modeller}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-indigo-600 hover:underline"
+                >
+                  {PROVIDER_LINKS[row.provider].modellerLabel}
+                </a>
+                {PROVIDER_LINKS[row.provider].bakiye && (
+                  <a
+                    href={PROVIDER_LINKS[row.provider].bakiye}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-amber-600 hover:underline font-medium"
+                  >
+                    {PROVIDER_LINKS[row.provider].bakiyeLabel}
+                  </a>
+                )}
+              </div>
+
+              {row.provider === "openrouter" && (
+                <div className="mb-3 p-2.5 bg-green-50 border border-green-200 rounded-lg text-xs flex items-center justify-between gap-2">
+                  <span className="text-green-800">
+                    🎁 OpenRouter&apos;da <strong>tamamen ücretsiz</strong> modeller var (kredi kartı gerekmez,
+                    günde 50 istek). Bakiye tükenme sorununu tamamen ortadan kaldırır.
+                  </span>
+                  <button
+                    onClick={() =>
+                      setEdits((s) => ({ ...s, openrouter: { ...edit, model: "openrouter/free" } }))
+                    }
+                    className="shrink-0 px-2 py-1 bg-green-600 text-white rounded text-xs hover:bg-green-700 whitespace-nowrap"
+                  >
+                    Ücretsiz Model Kullan
+                  </button>
+                </div>
+              )}
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                 <label className="block md:col-span-2">
