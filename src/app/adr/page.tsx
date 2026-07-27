@@ -14,7 +14,8 @@
 //      • Tünel kodu bilgilendirmesi: ADR 8.6
 //      • Risk puanı: FORBIDDEN=100, EXPLOSIVE_SPECIAL=85, UNKNOWN=60, FOOD=40, OK=0
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
 import {
   UnRow,
@@ -103,6 +104,15 @@ function SearchBox({ q, setQ, res, load, showDd, setShowDd, dropRef, onSel, extr
 }
 
 export default function AdrPage() {
+  return (
+    <Suspense fallback={<div className="p-8 text-gray-500">Yükleniyor...</div>}>
+      <AdrPageInner />
+    </Suspense>
+  );
+}
+
+function AdrPageInner() {
+  const searchParams = useSearchParams();
   const [tab, setTab] = useState<Tab>("search");
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<UnRow[]>([]);
@@ -132,6 +142,35 @@ export default function AdrPage() {
 
   useEffect(() => { const t = setTimeout(()=>doSearch(query,setResults,setSearching),280); return ()=>clearTimeout(t); }, [query,doSearch]);
   useEffect(() => { const t = setTimeout(()=>doSearch(mixQuery,setMixResults,setMixSearching),280); return ()=>clearTimeout(t); }, [mixQuery,doSearch]);
+
+  // ADR Asistanı veya harici bağlantılar icin: ?tab=karisik&uns=1203,1170
+  // gibi bir URL, dogrudan Karisik Yukleme sekmesini o UN numaralariyla
+  // doldurulmus olarak acar.
+  useEffect(() => {
+    const tabParam = searchParams.get("tab");
+    if (tabParam === "search" || tabParam === "muafiyet" || tabParam === "karisik") {
+      setTab(tabParam);
+    }
+
+    const unsParam = searchParams.get("uns");
+    if (unsParam) {
+      const unNumbers = unsParam.split(",").map((s) => s.trim()).filter(Boolean).slice(0, 10);
+      if (unNumbers.length > 0) {
+        supabase
+          .from("adr_un_numbers")
+          .select("*")
+          .in("un_number", unNumbers)
+          .then(({ data }) => {
+            (data as UnRow[] | null)?.forEach((row) => {
+              setMixItems((prev) =>
+                prev.find((i) => i.row.un_number === row.un_number) ? prev : [...prev, { row }]
+              );
+            });
+          });
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   useEffect(() => {
     const h=(e:MouseEvent)=>{

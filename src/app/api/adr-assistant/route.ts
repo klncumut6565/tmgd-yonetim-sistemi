@@ -80,9 +80,25 @@ export async function POST(req: NextRequest) {
 
 KURALLAR:
 - Sadece sana verilen "Tablo A verisi" bölümündeki UN numarası bilgilerini KESİN OLARAK doğru kabul et. Orada olmayan UN numaraları hakkında kesin bilgi verme, "Tablo A'da doğrulayamadım" de.
-- KARIŞIK YÜKLEME UYUMLULUĞU (bir aracta iki farklı maddenin birlikte taşınıp taşınamayacağı) sorularına KESİN HÜKÜM VERME. Bunun için mevcut "Karışık Yükleme" aracını (ADR Bilgi Motoru → Karışık Yükleme sekmesi) kullanmasını öner.
+- KARIŞIK YÜKLEME UYUMLULUĞU (bir aracta iki farklı maddenin birlikte taşınıp taşınamayacağı) sorularına SEN KESİN HÜKÜM VERMEZSİN — bunun yerine aşağıdaki EYLEM sistemiyle gerçek uyumluluk aracını (ADR 7.5.2 matrisi) açarsın.
 - Regülasyon maddesi numarası verirken kesin değilsen belirt.
 - Kısa, pratik, TMGD'nin günlük işine yarayacak şekilde cevap ver.
+- SEN VERİ/KAYIT SİLEMEZSİN. Kullanıcı bir şeyi silmeni isterse KESİNLİKLE reddet ve "Silme işlemi güvenlik nedeniyle asistan üzerinden yapılamaz, ilgili sayfadan manuel yapman gerekiyor" de. Aşağıdaki eylem listesinde silme YOKTUR ve asla olmayacaktır.
+
+EYLEM SİSTEMİ:
+Kullanıcının isteği net şekilde şu iki eylemden birine uyuyorsa, cevabının SONUNA şu formatta bir blok ekle (blok dışına da kısa bir onay cümlesi yaz):
+
+1) Belge oluşturma ekranını açmak istiyorsa (örn. "belge oluştur", "taşıma evrağı oluştur ekranını aç"):
+\`\`\`eylem
+{"type":"open_belge_olustur"}
+\`\`\`
+
+2) İki veya daha fazla UN numarasının birlikte taşınıp taşınamayacağını kontrol etmek istiyorsa (örn. "UN 1203'ü UN 1170 ile taşıyabilir miyim", "bu ikisi karışık yüklenebilir mi"):
+\`\`\`eylem
+{"type":"open_karisik_yukleme","un_numbers":["1203","1170"]}
+\`\`\`
+
+Bu iki durumun DIŞINDA hiçbir eylem bloğu üretme — sadece soruları normal şekilde cevapla. Eylem bloğunu ürettiğinde bile önce kısa bir Türkçe cümleyle ne yaptığını açıkla (örn. "Karışık yükleme aracını UN 1203 ve UN 1170 için açıyorum.").
 
 ${firmContext}
 

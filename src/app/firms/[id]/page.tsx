@@ -6,7 +6,8 @@
 //    görünümlü belge/görev takip listesi + genel ilerleme yüzdesi
 //  - Genel sekmesi: faaliyet konuları (çoklu seçim), sözleşme tarihi, logo
 
-import { use, useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, use, useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase/client";
 import { useUser } from "@/hooks/useUser";
@@ -158,7 +159,20 @@ export default function FirmDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  return (
+    <Suspense fallback={<div className="p-8 text-gray-500">Yükleniyor...</div>}>
+      <FirmDetailInner params={params} />
+    </Suspense>
+  );
+}
+
+function FirmDetailInner({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
   const { id } = use(params);
+  const searchParams = useSearchParams();
   const { canWrite, profile } = useUser();
   const isSuperAdminOnly = profile?.role === "super_admin";
 
@@ -166,6 +180,21 @@ export default function FirmDetailPage({
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<TabKey>("belge_takip");
   const [adrAltSekme, setAdrAltSekme] = useState<"evrak" | "envanter">("evrak");
+
+  // ADR Asistani veya harici baglantilar icin: /firms/<id>?tab=belge_olustur
+  // gibi bir URL, dogrudan o sekmeyi acar.
+  useEffect(() => {
+    const tabParam = searchParams.get("tab");
+    const validTabs: TabKey[] = [
+      "belge_takip", "tasks", "documents", "belge_olustur",
+      "vehicles", "drivers", "employees", "visits",
+      "adr_transport", "genel", "denetim", "notlar",
+    ];
+    if (tabParam && (validTabs as string[]).includes(tabParam)) {
+      setTab(tabParam as TabKey);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   // Firma Bilgileri sekmesinden ayrılınca düzenleme modu sıfırlanır —
   // sekmeye her dönüşte güvenli (salt okunur) görünümle başlanır.

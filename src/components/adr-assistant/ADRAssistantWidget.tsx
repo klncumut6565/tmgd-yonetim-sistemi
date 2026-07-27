@@ -20,11 +20,12 @@
 // bir migration ile eklenebilir (bkz. session notları).
 
 import { useEffect, useRef, useState } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
 import { authFetch } from "@/lib/supabase/authFetch";
 import { useSpeechToText } from "@/hooks/useSpeechToText";
 import type { ChatMessage } from "@/lib/ai/multiEngine";
+import { extractAction, actionToUrl, actionLabel } from "@/lib/ai/actions";
 
 type DisplayMessage = ChatMessage & { id: string; pending?: boolean; error?: boolean };
 
@@ -62,6 +63,7 @@ function useCurrentFirm() {
 }
 
 export default function ADRAssistantWidget() {
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<DisplayMessage[]>([]);
   const [input, setInput] = useState("");
@@ -128,10 +130,20 @@ export default function ADRAssistantWidget() {
           },
         ]);
       } else {
+        const { cleanText, action } = extractAction(json.answer as string);
         setMessages((prev) => [
           ...prev,
-          { id: crypto.randomUUID(), role: "assistant", content: json.answer },
+          { id: crypto.randomUUID(), role: "assistant", content: cleanText || json.answer },
         ]);
+
+        if (action) {
+          setMessages((prev) => [
+            ...prev,
+            { id: crypto.randomUUID(), role: "assistant", content: actionLabel(action) },
+          ]);
+          const url = actionToUrl(action, firmId);
+          router.push(url);
+        }
       }
     } catch (e) {
       setMessages((prev) => [
