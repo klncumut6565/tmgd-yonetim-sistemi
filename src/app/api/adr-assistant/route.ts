@@ -88,7 +88,7 @@ KURALLAR:
 - SEN VERİ/KAYIT SİLEMEZSİN. Kullanıcı bir şeyi silmeni isterse KESİNLİKLE reddet ve "Silme işlemi güvenlik nedeniyle asistan üzerinden yapılamaz, ilgili sayfadan manuel yapman gerekiyor" de. Aşağıdaki eylem listesinde silme YOKTUR ve asla olmayacaktır.
 
 EYLEM SİSTEMİ:
-Kullanıcının isteği net şekilde şu üç eylemden birine uyuyorsa, cevabının SONUNA şu formatta bir blok ekle (blok dışına da kısa bir onay cümlesi yaz):
+Kullanıcının isteği net şekilde şu dört eylemden birine uyuyorsa, cevabının SONUNA şu formatta bir blok ekle (blok dışına da kısa bir onay cümlesi yaz):
 
 1) Belge oluşturma ekranını açmak istiyorsa (örn. "belge oluştur", "belge oluşturma ekranını aç"):
 \`\`\`eylem
@@ -101,18 +101,25 @@ Kullanıcının isteği net şekilde şu üç eylemden birine uyuyorsa, cevabın
 \`\`\`
 Bu eylemi ürettiğinde UYUMLULUK SONUCUNU SEN YAZMA (tahmin etme) — sistem bu eylemi gördüğünde gerçek hesaplama motorunu otomatik çalıştırıp sonucu cevabına ekleyecek. Sen sadece "Kontrol ediyorum..." gibi kısa bir cümle yaz, kesin sonuç iddiasında bulunma.
 
-3) Şu an üzerinde bulunulan FİRMANIN kendi ekranları arasında geçiş istiyorsa (örn. "Taşıma Evrakı ekranını aç", "görevler sekmesine geç", "sürücüler ekranını göster") — SADECE firma bağlamı varsa (aşağıdaki "Firma:" satırı doluysa) bu eylemi üret:
+3) Şu an üzerinde bulunulan FİRMANIN kendi ekranları arasında geçiş istiyorsa (örn. "Taşıma Evrakı ekranını aç", "görevler sekmesine geç") — SADECE firma bağlamı varsa (aşağıdaki "Firma:" satırı doluysa) bu eylemi üret:
 \`\`\`eylem
 {"type":"open_firm_tab","tab":"adr_transport"}
 \`\`\`
 Geçerli "tab" değerleri: belge_takip, tasks, documents, belge_olustur, vehicles, drivers, employees, visits, adr_transport (Taşıma Evrakı), genel, denetim, notlar. Başka bir değer ASLA üretme.
-Eğer kullanıcı Taşıma Evrakı ekranını açarken belirli UN numaralı ürün(ler) de eklemek istiyorsa (örn. "Taşıma Evrakı ekranını aç, UN 1203 ile UN 1170 ürününü ekle"), "un_numbers" alanını da ekle:
-\`\`\`eylem
-{"type":"open_firm_tab","tab":"adr_transport","un_numbers":["1203","1170"]}
-\`\`\`
-ÖNEMLİ: Bu durumda ürünler OTOMATİK EKLENMEZ — sistem sadece firmanın envanterinde bu UN numaralarını arar, bulduğu ilkini formda seçili getirir. Miktarı kullanıcı kendi girip "Kalem Ekle"ye basmalı (gerçek bir taşıma belgesi olduğu için miktarı SEN uydurmazsın). Bunu kullanıcıya kısaca belirt.
 
-Bu üç durumun DIŞINDA hiçbir eylem bloğu üretme — sadece soruları normal şekilde cevapla. Eylem bloğunu ürettiğinde bile önce kısa bir Türkçe cümleyle ne yaptığını açıkla.
+4) Kullanıcı BAŞKA BİR FİRMAYI İSMİYLE açmak istiyorsa (örn. "ABC firmasını aç", "XYZ Ltd'nin taşıma evrakını göster") — bu, hangi ekranda olunursa olunsun kullanılabilir (genel ekranda dahil):
+\`\`\`eylem
+{"type":"open_firm","firm_name":"ABC"}
+\`\`\`
+Belirli bir sekme de isteniyorsa "tab" ekle, UN numarası da varsa "un_numbers" ekle:
+\`\`\`eylem
+{"type":"open_firm","firm_name":"ABC","tab":"adr_transport","un_numbers":["1203","1170"]}
+\`\`\`
+"firm_name" alanına kullanıcının söylediği ismi olabildiğince AYNEN yaz (kısaltma/düzeltme yapma) — sistem gerçek veritabanında arayıp en yakın eşleşmeyi bulacak. Firma bulunamazsa veya birden fazla eşleşme varsa sistem sana/kullanıcıya bunu bildirecek, sen firma ID'si UYDURMA.
+
+(3) ve (4) için "un_numbers" verildiğinde ve tab "adr_transport" ise: ürünler OTOMATİK EKLENMEZ, sistem sadece firmanın envanterinde arayıp bulduğu ilkini formda seçili getirir. Miktarı kullanıcı kendi girip "Kalem Ekle"ye basmalı — miktarı SEN uydurmazsın. Bunu kullanıcıya kısaca belirt.
+
+Bu dört durumun DIŞINDA hiçbir eylem bloğu üretme — sadece soruları normal şekilde cevapla. Eylem bloğunu ürettiğinde bile önce kısa bir Türkçe cümleyle ne yaptığını açıkla.
 
 ${firmContext}
 
@@ -150,8 +157,34 @@ ${unContext}`.trim()
   }
 
   // Eylem bloğunu ayrıştır (varsa metinden çıkar, temiz metni ayır)
-  const { cleanText, action } = extractAction(result.text as string)
+  const { cleanText, action: rawAction } = extractAction(result.text as string)
   let finalAnswer = cleanText
+  let action = rawAction
+
+  // open_firm eylemiyse: LLM sadece bir isim söyledi, firm_id BİLMİYOR
+  // ve UYDURAMAZ. Sunucu gerçek "firms" tablosunda arar:
+  //   0 eşleşme  -> eyleme devam etmez, kullanıcıya bilgi verilir
+  //   1 eşleşme  -> firm_id doldurulur, navigasyon güvenle yapılabilir
+  //   2+ eşleşme -> belirsiz, kullanıcıya seçenekler listelenir, navigasyon yapılmaz
+  if (action?.type === 'open_firm' && !action.firm_id) {
+    const { data: matches } = await supabase
+      .from('firms')
+      .select('id, name')
+      .ilike('name', `%${action.firm_name}%`)
+      .limit(6)
+
+    if (!matches || matches.length === 0) {
+      finalAnswer += `\n\n⚠️ "${action.firm_name}" isminde bir firma bulunamadı.`
+      action = null
+    } else if (matches.length === 1) {
+      action = { ...action, firm_id: matches[0].id, firm_name: matches[0].name }
+    } else {
+      finalAnswer +=
+        '\n\nBirden fazla eşleşme buldum, hangisini kastettiğini belirtir misin?\n' +
+        matches.map((m) => `• ${m.name}`).join('\n')
+      action = null
+    }
+  }
 
   // open_karisik_yukleme eylemiyse: LLM'in tahminine GÜVENME, gerçek
   // checkPair() motorunu (aynı /adr sayfasının kullandığı) çalıştırıp

@@ -26,7 +26,8 @@ export type FirmTabKey = (typeof VALID_FIRM_TABS)[number];
 export type AssistantAction =
   | { type: "open_belge_olustur" }
   | { type: "open_karisik_yukleme"; un_numbers: string[] }
-  | { type: "open_firm_tab"; tab: FirmTabKey; un_numbers?: string[] };
+  | { type: "open_firm_tab"; tab: FirmTabKey; un_numbers?: string[] }
+  | { type: "open_firm"; firm_id?: string; firm_name: string; tab?: FirmTabKey; un_numbers?: string[] };
 
 const ACTION_BLOCK_RE = /```eylem\s*([\s\S]*?)```/i;
 
@@ -68,6 +69,23 @@ export function extractAction(text: string): { cleanText: string; action: Assist
         action: { type: "open_firm_tab", tab: parsed.tab as FirmTabKey, un_numbers: unNumbers },
       };
     }
+
+    if (parsed?.type === "open_firm" && typeof parsed.firm_name === "string" && parsed.firm_name.trim()) {
+      const tab =
+        typeof parsed.tab === "string" && (VALID_FIRM_TABS as readonly string[]).includes(parsed.tab)
+          ? (parsed.tab as FirmTabKey)
+          : undefined;
+      const unNumbers =
+        Array.isArray(parsed.un_numbers) && parsed.un_numbers.every((u: unknown) => typeof u === "string")
+          ? (parsed.un_numbers as string[]).slice(0, 10)
+          : undefined;
+      // Not: firm_id burada YOK — model firma ID'sini bilmiyor/bilemez.
+      // Sunucu tarafı (route.ts) gerçek veritabanı aramasıyla dolduracak.
+      return {
+        cleanText,
+        action: { type: "open_firm", firm_name: parsed.firm_name.trim(), tab, un_numbers: unNumbers },
+      };
+    }
   } catch {
     // Geçersiz JSON — eylem yok say, sadece metni temizle
   }
@@ -96,6 +114,19 @@ export function actionToUrl(action: AssistantAction, firmId: string | null): str
         params.set("evrak_un", action.un_numbers.join(","));
       }
       return `/firms/${firmId}?${params.toString()}`;
+    }
+    case "open_firm": {
+      // Sunucu tarafı firm_id'yi zaten gerçek DB aramasıyla doldurmuş
+      // olmalı (bkz. route.ts). Doldurulmamışsa (beklenmedik durum)
+      // güvenli tarafta kal, navigasyon yapma.
+      if (!action.firm_id) return null;
+      const params = new URLSearchParams();
+      if (action.tab) params.set("tab", action.tab);
+      if (action.un_numbers && action.un_numbers.length > 0) {
+        params.set("evrak_un", action.un_numbers.join(","));
+      }
+      const qs = params.toString();
+      return `/firms/${action.firm_id}${qs ? `?${qs}` : ""}`;
     }
     default:
       return "/dashboard";
