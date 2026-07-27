@@ -71,35 +71,63 @@ export default function ADRAssistantWidget() {
   const [sending, setSending] = useState(false);
   const { firmId, firmName } = useCurrentFirm();
   const scrollRef = useRef<HTMLDivElement>(null);
-  const [sesliMod, setSesliMod] = useState(false);
 
-  const { desteklenir: sesDesteklenir, dinliyor, hata: sesHatasi, baslat: sesBaslat, durdur: sesDurdur } =
-    useSpeechToText();
+  // Sesli görüşme: mikrofona bir kez basınca başlar, tekrar basana ya da
+  // "Görüşmeyi Bitir"e basana kadar devam eder — konuş, otomatik gönderilir,
+  // cevap sesli gelir, cevap bitince OTOMATİK tekrar dinlemeye döner.
+  // Stale closure sorunlarını önlemek için hem state hem ref tutuluyor.
+  const [sesliGorusmeAktif, setSesliGorusmeAktif] = useState(false);
+  const sesliGorusmeRef = useRef(false);
+  function sesliGorusmeyiAyarla(deger: boolean) {
+    sesliGorusmeRef.current = deger;
+    setSesliGorusmeAktif(deger);
+  }
+
+  const {
+    desteklenir: sesDesteklenir,
+    dinliyor,
+    hata: sesHatasi,
+    hataKodu: sesHataKodu,
+    baslat: sesBaslat,
+    durdur: sesDurdur,
+  } = useSpeechToText();
   const { desteklenir: ttsDesteklenir, konusuyor, konus, durdur: ttsDurdur } = useTextToSpeech();
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages, open]);
 
-  function mikrofonToggle() {
-    if (dinliyor) {
+  function dinlemeyeBasla() {
+    sesBaslat((metin) => {
+      gonder(metin);
+    }, false); // false = tek cümle bitince (sessizlik) otomatik durur
+  }
+
+  // Ses algılanamadı (sessizlik/gürültü) ama görüşme hâlâ aktifse —
+  // kullanıcıyı tekrar mikrofona bastırmadan otomatik dinlemeye devam et.
+  useEffect(() => {
+    if (sesHataKodu === "no-speech" && sesliGorusmeRef.current) {
+      const t = setTimeout(() => dinlemeyeBasla(), 500);
+      return () => clearTimeout(t);
+    }
+    // Gerçek bir sorun (izin yok, mikrofon yok, ağ) ise görüşmeyi sonlandır
+    if (sesHataKodu && sesHataKodu !== "no-speech" && sesHataKodu !== "aborted") {
+      sesliGorusmeyiAyarla(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sesHataKodu]);
+
+  function mikrofonTikla() {
+    if (sesliGorusmeAktif) {
+      // Görüşme sürüyorken tıklamak = görüşmeyi bitir
+      sesliGorusmeyiAyarla(false);
       sesDurdur();
+      ttsDurdur();
       return;
     }
-    if (konusuyor) ttsDurdur(); // asistan konuşurken mikrofon açılırsa önce onu kes (geri besleme önleme)
-
-    if (sesliMod) {
-      // Sesli Mod: tek cümle bitince (sessizlik algılanınca) tarayıcı
-      // kendiliğinden durur, transkript AUTOMATİK gönderilir — kullanıcı
-      // ayrıca "Gönder"e basmaz. ChatGPT'nin sesli modu gibi akış.
-      sesBaslat((metin) => {
-        gonder(metin);
-      }, false);
-    } else {
-      sesBaslat((metin) => {
-        setInput((prev) => (prev ? prev + " " + metin : metin));
-      });
-    }
+    // Yeni görüşme başlat
+    sesliGorusmeyiAyarla(true);
+    dinlemeyeBasla();
   }
 
   async function gonder(overrideText?: string) {
@@ -139,14 +167,25 @@ export default function ADRAssistantWidget() {
           ...prev,
           { id: crypto.randomUUID(), role: "assistant", content: hataMetni, error: true },
         ]);
-        if (sesliMod && ttsDesteklenir) konus("Bir hata oluştu, lütfen tekrar dener misin.");
+        if (sesliGorusmeRef.current && ttsDesteklenir) {
+          konus("Bir hata oluştu, lütfen tekrar dener misin.", () => {
+            if (sesliGorusmeRef.current) dinlemeyeBasla();
+          });
+        }
       } else {
         setMessages((prev) => [
           ...prev,
           { id: crypto.randomUUID(), role: "assistant", content: json.answer },
         ]);
 
-        if (sesliMod && ttsDesteklenir) konus(json.answer as string);
+        if (sesliGorusmeRef.current && ttsDesteklenir) {
+          // Cevap seslendirilir; bitince GÖRÜŞME hâlâ aktifse otomatik
+          // olarak tekrar dinlemeye geçilir — gerçek karşılıklı konuşma,
+          // kullanıcının tekrar mikrofona basmasına gerek kalmaz.
+          konus(json.answer as string, () => {
+            if (sesliGorusmeRef.current) dinlemeyeBasla();
+          });
+        }
 
         if (json.action) {
           const url = actionToUrl(json.action, firmId);
@@ -175,6 +214,11 @@ export default function ADRAssistantWidget() {
           error: true,
         },
       ]);
+      if (sesliGorusmeRef.current && ttsDesteklenir) {
+        konus("Bağlantı hatası oluştu.", () => {
+          if (sesliGorusmeRef.current) dinlemeyeBasla();
+        });
+      }
     } finally {
       setSending(false);
     }
@@ -218,25 +262,28 @@ export default function ADRAssistantWidget() {
         <div>
           <h2 className="font-semibold text-sm flex items-center gap-2">
             🤖 ADR Asistanı
+            {sesliGorusmeAktif && (
+              <span className="text-xs bg-red-500 text-white px-2 py-0.5 rounded-full animate-pulse">
+                📞 Görüşme Aktif
+              </span>
+            )}
           </h2>
           <p className="text-xs text-gray-500">
             {firmName ? `Bağlam: ${firmName}` : "Genel sohbet (firma seçili değil)"}
           </p>
         </div>
         <div className="flex items-center gap-1">
-          {ttsDesteklenir && sesDesteklenir && (
+          {sesliGorusmeAktif && (
             <button
               onClick={() => {
-                if (sesliMod) ttsDurdur();
-                setSesliMod((v) => !v);
+                sesliGorusmeyiAyarla(false);
+                sesDurdur();
+                ttsDurdur();
               }}
-              title={sesliMod ? "Sesli Modu Kapat" : "Sesli Modu Aç (ChatGPT gibi konuşarak sohbet)"}
-              className={
-                "px-2.5 py-1 rounded-full text-xs font-medium flex items-center gap-1 transition " +
-                (sesliMod ? "bg-indigo-600 text-white" : "bg-gray-200 text-gray-600 hover:bg-gray-300")
-              }
+              title="Sesli görüşmeyi bitir"
+              className="px-2.5 py-1 rounded-full text-xs font-medium bg-red-600 text-white hover:bg-red-700"
             >
-              {sesliMod ? "🔊 Sesli Mod" : "🔈 Sesli Mod"}
+              🛑 Bitir
             </button>
           )}
           <button
@@ -313,19 +360,20 @@ export default function ADRAssistantWidget() {
       {/* Giriş alanı */}
       <div className="border-t p-3">
         {dinliyor && (
-          <p className="text-xs text-red-500 mb-1">
-            🔴 Dinleniyor{sesliMod ? " — bitince otomatik gönderilecek..." : "..."}
-          </p>
+          <p className="text-xs text-red-500 mb-1">🔴 Dinliyorum...</p>
         )}
-        {sesliMod && !dinliyor && !konusuyor && (
-          <p className="text-xs text-indigo-500 mb-1">🔊 Sesli Mod açık — mikrofona bas, konuş, otomatik gönderilir ve cevap sesli okunur.</p>
+        {sesliGorusmeAktif && !dinliyor && !konusuyor && (
+          <p className="text-xs text-indigo-500 mb-1">⏳ Bir sonraki cümlen için hazırlanıyor...</p>
+        )}
+        {!sesliGorusmeAktif && sesDesteklenir && !sending && (
+          <p className="text-xs text-gray-400 mb-1">🎤 Mikrofona bas — konuş, otomatik gönderilir, cevap sesli gelir.</p>
         )}
         {sesHatasi && <p className="text-xs text-amber-600 mb-1">{sesHatasi}</p>}
         <div className="flex items-end gap-2">
           <textarea
             className="flex-1 border rounded-lg p-2 text-sm resize-none"
             rows={2}
-            placeholder="Soru yaz veya mikrofonla konuş... (Enter ile gönder)"
+            placeholder="Soru yaz... (Enter ile gönder)"
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
@@ -333,15 +381,18 @@ export default function ADRAssistantWidget() {
           {sesDesteklenir && (
             <button
               type="button"
-              onClick={mikrofonToggle}
-              disabled={konusuyor}
-              title={dinliyor ? "Dinlemeyi durdur" : konusuyor ? "Asistan konuşurken mikrofon kapalı" : "Sesle sor"}
+              onClick={mikrofonTikla}
+              title={sesliGorusmeAktif ? "Görüşmeyi bitir" : "Sesli görüşme başlat"}
               className={
-                "w-9 h-9 shrink-0 rounded-full flex items-center justify-center transition disabled:opacity-30 " +
-                (dinliyor ? "bg-red-500 text-white animate-pulse" : "bg-gray-100 hover:bg-gray-200")
+                "w-9 h-9 shrink-0 rounded-full flex items-center justify-center transition " +
+                (dinliyor
+                  ? "bg-red-500 text-white animate-pulse"
+                  : sesliGorusmeAktif
+                    ? "bg-indigo-600 text-white"
+                    : "bg-gray-100 hover:bg-gray-200")
               }
             >
-              🎤
+              {sesliGorusmeAktif ? "📞" : "🎤"}
             </button>
           )}
           <button

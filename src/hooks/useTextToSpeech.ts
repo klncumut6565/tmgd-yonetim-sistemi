@@ -48,13 +48,16 @@ export function useTextToSpeech() {
     return () => window.speechSynthesis.removeEventListener("voiceschanged", sesleriYukle);
   }, []);
 
-  const konus = useCallback((metin: string) => {
+  const konus = useCallback((metin: string, onBitince?: () => void) => {
     if (typeof window === "undefined" || !window.speechSynthesis) return;
 
     window.speechSynthesis.cancel(); // önceki konuşmayı kes
 
     const temiz = seslendirmeIcinTemizle(metin);
-    if (!temiz) return;
+    if (!temiz) {
+      onBitince?.();
+      return;
+    }
 
     const utterance = new SpeechSynthesisUtterance(temiz);
     utterance.lang = "tr-TR";
@@ -63,8 +66,14 @@ export function useTextToSpeech() {
     utterance.pitch = 1;
 
     utterance.onstart = () => setKonusuyor(true);
-    utterance.onend = () => setKonusuyor(false);
-    utterance.onerror = () => setKonusuyor(false);
+    utterance.onend = () => {
+      setKonusuyor(false);
+      onBitince?.();
+    };
+    utterance.onerror = () => {
+      setKonusuyor(false);
+      onBitince?.();
+    };
 
     window.speechSynthesis.speak(utterance);
   }, []);

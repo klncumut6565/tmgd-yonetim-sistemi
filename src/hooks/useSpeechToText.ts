@@ -11,6 +11,7 @@ export function useSpeechToText() {
   const [dinliyor, setDinliyor] = useState(false);
   const [desteklenir, setDesteklenir] = useState(false);
   const [hata, setHata] = useState("");
+  const [hataKodu, setHataKodu] = useState("");
   const recognitionRef = useRef<InstanceType<NonNullable<Window["SpeechRecognition"]>> | null>(null);
   const onResultRef = useRef<((metin: string) => void) | null>(null);
 
@@ -46,6 +47,7 @@ export function useSpeechToText() {
 
     recognition.onerror = (event) => {
       const kod = event.error;
+      setHataKodu(kod);
       let mesaj = "Ses tanıma sırasında bir hata oluştu.";
       if (kod === "not-allowed" || kod === "service-not-allowed") {
         mesaj =
@@ -78,6 +80,7 @@ export function useSpeechToText() {
   const baslat = useCallback(async (onSonuc: (metin: string) => void, surekliDinleme: boolean = true) => {
     if (!recognitionRef.current) return;
     setHata("");
+    setHataKodu("");
 
     // Bazı tarayıcılarda SpeechRecognition.start() tek başına izin
     // penceresini güvenilir şekilde açmıyor (özellikle site daha önce
@@ -114,5 +117,5 @@ export function useSpeechToText() {
     setDinliyor(false);
   }, []);
 
-  return { desteklenir, dinliyor, hata, baslat, durdur };
+  return { desteklenir, dinliyor, hata, hataKodu, baslat, durdur };
 }
