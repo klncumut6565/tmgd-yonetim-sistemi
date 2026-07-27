@@ -14,6 +14,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getSuperAdminFromRequest } from '@/lib/supabase/verifySuperAdmin'
 import { callWithFallback, type ProviderConfig, type ChatMessage } from '@/lib/ai/multiEngine'
+import { extractAction } from '@/lib/ai/actions'
+import { checkPair, type UnRow, type CheckResult } from '@/lib/adrMix'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 30
@@ -97,8 +99,9 @@ Kullanıcının isteği net şekilde şu iki eylemden birine uyuyorsa, cevabın�
 \`\`\`eylem
 {"type":"open_karisik_yukleme","un_numbers":["1203","1170"]}
 \`\`\`
+Bu eylemi ürettiğinde UYUMLULUK SONUCUNU SEN YAZMA (tahmin etme) — sistem bu eylemi gördüğünde gerçek hesaplama motorunu otomatik çalıştırıp sonucu cevabına ekleyecek. Sen sadece "Kontrol ediyorum..." gibi kısa bir cümle yaz, kesin sonuç iddiasında bulunma.
 
-Bu iki durumun DIŞINDA hiçbir eylem bloğu üretme — sadece soruları normal şekilde cevapla. Eylem bloğunu ürettiğinde bile önce kısa bir Türkçe cümleyle ne yaptığını açıkla (örn. "Karışık yükleme aracını UN 1203 ve UN 1170 için açıyorum.").
+Bu iki durumun DIŞINDA hiçbir eylem bloğu üretme — sadece soruları normal şekilde cevapla. Eylem bloğunu ürettiğinde bile önce kısa bir Türkçe cümleyle ne yaptığını açıkla (örn. "Karışık yükleme aracını UN 1203 ve UN 1170 için açıyorum, sonucu kontrol ediyorum.").
 
 ${firmContext}
 
@@ -135,9 +138,64 @@ ${unContext}`.trim()
     )
   }
 
+  // Eylem bloğunu ayrıştır (varsa metinden çıkar, temiz metni ayır)
+  const { cleanText, action } = extractAction(result.text as string)
+  let finalAnswer = cleanText
+
+  // open_karisik_yukleme eylemiyse: LLM'in tahminine GÜVENME, gerçek
+  // checkPair() motorunu (aynı /adr sayfasının kullandığı) çalıştırıp
+  // deterministik sonucu cevaba EKLE. Böylece "uyumlu mu" sorusunun
+  // cevabı her zaman sistemin kendi hesaplamasından gelir.
+  if (action?.type === 'open_karisik_yukleme' && action.un_numbers.length >= 2) {
+    const { data: pairRows } = await supabase
+      .from('adr_un_numbers')
+      .select('*')
+      .in('un_number', action.un_numbers)
+
+    const rows = (pairRows ?? []) as UnRow[]
+    const foundNumbers = new Set(rows.map((r) => r.un_number))
+    const missing = action.un_numbers.filter((n) => !foundNumbers.has(n))
+
+    if (rows.length >= 2) {
+      const STATUS_TR: Record<string, string> = {
+        OK: '✓ Uyumlu',
+        NO: '✗ YASAK — birlikte taşınamaz',
+        COND: '⚠ Şartlı uyumlu',
+        UNKNOWN: '? Belirsiz — manuel kontrol gerekir',
+        EXPLOSIVE_SPECIAL: '⚠ Patlayıcı — manuel kontrol gerekir',
+        FOOD: '🍎 Gıda tedbiri gerekir',
+      }
+
+      const pairResults: CheckResult[] = []
+      for (let i = 0; i < rows.length; i++) {
+        for (let j = i + 1; j < rows.length; j++) {
+          pairResults.push(checkPair(rows[i], rows[j]))
+        }
+      }
+
+      const sonucSatirlari = pairResults
+        .map(
+          (p) =>
+            `• UN ${p.un1} ↔ UN ${p.un2}: ${STATUS_TR[p.status] ?? p.status} (ADR ${p.adrRef}) — ${p.reason}`
+        )
+        .join('\n')
+
+      finalAnswer +=
+        '\n\n📊 GERÇEK SİSTEM SONUCU (Karışık Yükleme motoru — ADR 7.5.2):\n' + sonucSatirlari
+
+      if (missing.length > 0) {
+        finalAnswer += `\n\n⚠️ Not: ${missing.join(', ')} numaraları Tablo A'da bulunamadı, hesaba dahil edilemedi.`
+      }
+    } else {
+      finalAnswer +=
+        '\n\n⚠️ Karışık yükleme hesaplaması yapılamadı — belirtilen UN numaralarından yeterlisi Tablo A\'da bulunamadı.'
+    }
+  }
+
   return NextResponse.json({
     ok: true,
-    answer: result.text,
+    answer: finalAnswer,
+    action,
     provider_used: result.provider,
     fallback_errors: result.errors,
   })

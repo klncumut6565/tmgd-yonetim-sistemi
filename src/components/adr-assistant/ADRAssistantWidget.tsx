@@ -25,7 +25,7 @@ import { supabase } from "@/lib/supabase/client";
 import { authFetch } from "@/lib/supabase/authFetch";
 import { useSpeechToText } from "@/hooks/useSpeechToText";
 import type { ChatMessage } from "@/lib/ai/multiEngine";
-import { extractAction, actionToUrl, actionLabel } from "@/lib/ai/actions";
+import { actionToUrl } from "@/lib/ai/actions";
 
 type DisplayMessage = ChatMessage & { id: string; pending?: boolean; error?: boolean };
 
@@ -130,18 +130,13 @@ export default function ADRAssistantWidget() {
           },
         ]);
       } else {
-        const { cleanText, action } = extractAction(json.answer as string);
         setMessages((prev) => [
           ...prev,
-          { id: crypto.randomUUID(), role: "assistant", content: cleanText || json.answer },
+          { id: crypto.randomUUID(), role: "assistant", content: json.answer },
         ]);
 
-        if (action) {
-          setMessages((prev) => [
-            ...prev,
-            { id: crypto.randomUUID(), role: "assistant", content: actionLabel(action) },
-          ]);
-          const url = actionToUrl(action, firmId);
+        if (json.action) {
+          const url = actionToUrl(json.action, firmId);
           router.push(url);
         }
       }
