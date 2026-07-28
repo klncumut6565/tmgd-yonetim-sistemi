@@ -28,6 +28,7 @@ import { useAudioRecorder } from "@/hooks/useAudioRecorder";
 import { useTextToSpeech } from "@/hooks/useTextToSpeech";
 import type { ChatMessage } from "@/lib/ai/multiEngine";
 import { actionToUrl } from "@/lib/ai/actions";
+import { yerelNiyetCoz } from "@/lib/ai/localIntent";
 
 type DisplayMessage = ChatMessage & { id: string; pending?: boolean; error?: boolean };
 
@@ -267,10 +268,72 @@ export default function ADRAssistantWidget() {
     if (!question || sending) return;
 
     setInput("");
-    setSending(true);
 
     const userMsg: DisplayMessage = { id: crypto.randomUUID(), role: "user", content: question };
     setMessages((prev) => [...prev, userMsg]);
+
+    // ---- YEREL NİYET ÇÖZÜMLEMESİ (LLM'den ÖNCE) ----
+    // Rasa'nın prensibi: net komutları dil modeline hiç gönderme.
+    // "görevler ekranını aç" gibi bir istek için API çağrısına gerek yok —
+    // anında, ücretsiz ve API kotası tükenmiş olsa bile çalışır.
+    const yerel = yerelNiyetCoz(question, !!firmId);
+    if (yerel) {
+      // "ABC firmasını aç" — firma ID'si gerekiyor. Bunu da yerel çözebiliriz:
+      // Supabase'den doğrudan arayarak (LLM'e gitmeye gerek yok).
+      if (yerel.action.type === "open_firm" && !yerel.action.firm_id) {
+        const { data: eslesenler } = await supabase
+          .from("firms")
+          .select("id, name")
+          .ilike("name", `%${yerel.action.firm_name}%`)
+          .limit(6);
+
+        if (eslesenler && eslesenler.length === 1) {
+          yerel.action = { ...yerel.action, firm_id: eslesenler[0].id, firm_name: eslesenler[0].name };
+        } else if (eslesenler && eslesenler.length > 1) {
+          const liste = eslesenler.map((f) => `• ${f.name}`).join("\n");
+          const mesaj = `Birden fazla firma eşleşti, hangisini kastettin?\n${liste}`;
+          setMessages((prev) => [
+            ...prev,
+            { id: crypto.randomUUID(), role: "assistant", content: mesaj },
+          ]);
+          if (sesliGorusmeRef.current && ttsDesteklenir) {
+            konus("Birden fazla firma eşleşti, hangisini kastettiğini belirtir misin?", () => {
+              if (sesliGorusmeRef.current) dinlemeyeBasla();
+            });
+          }
+          return;
+        } else {
+          const mesaj = `"${yerel.action.firm_name}" isminde bir firma bulunamadı.`;
+          setMessages((prev) => [
+            ...prev,
+            { id: crypto.randomUUID(), role: "assistant", content: mesaj, error: true },
+          ]);
+          if (sesliGorusmeRef.current && ttsDesteklenir) {
+            konus(mesaj, () => {
+              if (sesliGorusmeRef.current) dinlemeyeBasla();
+            });
+          }
+          return;
+        }
+      }
+
+      const url = actionToUrl(yerel.action, firmId);
+      if (url) {
+        setMessages((prev) => [
+          ...prev,
+          { id: crypto.randomUUID(), role: "assistant", content: yerel.cevap },
+        ]);
+        router.push(url);
+        if (sesliGorusmeRef.current && ttsDesteklenir) {
+          konus(yerel.cevap, () => {
+            if (sesliGorusmeRef.current) dinlemeyeBasla();
+          });
+        }
+        return;
+      }
+    }
+
+    setSending(true);
 
     // Geçmiş — sadece rol/içerik (API'ye giden format)
     const history: ChatMessage[] = [...messages, userMsg].map((m) => ({
