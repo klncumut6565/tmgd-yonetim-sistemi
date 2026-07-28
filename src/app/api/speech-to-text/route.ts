@@ -44,6 +44,50 @@ async function fetchZamanSinirli(url: string, init: RequestInit, msSinir: number
   }
 }
 
+
+/**
+ * Groq Whisper ile transkripsiyon — SES İÇİN ÖZELLEŞMİŞ model.
+ *
+ * Gemini gibi genel amaçlı çok modlu modeller yerine Whisper kullanmak
+ * hem çok daha hızlı (özel donanımda ~228x gerçek zaman) hem de ücretsiz
+ * katmanda cömert (günde 2.000 istek). Bu yüzden ilk sırada denenir.
+ *
+ * NOT: 'groq' (bu, Whisper sağlayıcısı) ile 'grok' (xAI sohbet modeli)
+ * karıştırılmamalı — farklı şirketler, farklı anahtarlar.
+ */
+async function groqDene(
+  apiKey: string,
+  model: string,
+  ses: Blob,
+  mimeType: string
+): Promise<{ ok: true; text: string } | { ok: false; hata: string }> {
+  const uzanti = mimeType.includes('mp4') ? 'mp4' : mimeType.includes('ogg') ? 'ogg' : 'webm'
+  const form = new FormData()
+  form.append('file', ses, `kayit.${uzanti}`)
+  form.append('model', model)
+  form.append('language', 'tr')
+  form.append('response_format', 'text')
+
+  try {
+    const res = await fetchZamanSinirli(
+      'https://api.groq.com/openai/v1/audio/transcriptions',
+      { method: 'POST', headers: { Authorization: `Bearer ${apiKey}` }, body: form },
+      9000
+    )
+
+    if (!res.ok) {
+      const cevap = await res.text().catch(() => '')
+      return { ok: false, hata: `Groq HTTP ${res.status}: ${cevap.slice(0, 150)}` }
+    }
+
+    // response_format=text olduğu için düz metin döner
+    const metin = (await res.text()).trim()
+    return { ok: true, text: metin }
+  } catch (e) {
+    return { ok: false, hata: 'Groq: ' + (e instanceof Error ? e.message : String(e)) }
+  }
+}
+
 /** Gemini ile transkripsiyon. Geçici hatalarda (429/503) tekrar dener. */
 async function geminiDene(
   apiKey: string,
@@ -161,17 +205,18 @@ export async function POST(req: NextRequest) {
   const { data: satirlar } = await supabase
     .from('ai_provider_keys')
     .select('provider, api_key, model')
-    .in('provider', ['gemini', 'openrouter'])
+    .in('provider', ['groq', 'gemini', 'openrouter'])
 
+  const groq = satirlar?.find((s) => s.provider === 'groq')
   const gemini = satirlar?.find((s) => s.provider === 'gemini')
   const openrouter = satirlar?.find((s) => s.provider === 'openrouter')
 
-  if (!gemini?.api_key && !openrouter?.api_key) {
+  if (!groq?.api_key && !gemini?.api_key && !openrouter?.api_key) {
     return NextResponse.json(
       {
         error:
-          'Sesli komut için Gemini veya OpenRouter anahtarı gerekli. ' +
-          'Yönetim → AI Motor Anahtarları sayfasından en az birini gir.',
+          'Sesli komut için bir ses motoru anahtarı gerekli. En iyi seçenek: Groq (Whisper) — ' +
+          'ücretsiz ve hızlı. Yönetim → AI Motor Anahtarları sayfasından gir.',
       },
       { status: 400 }
     )
@@ -182,7 +227,16 @@ export async function POST(req: NextRequest) {
   const mimeType = dosya.type || 'audio/webm'
   const hatalar: string[] = []
 
-  // 1) Gemini (tekrar denemeli)
+  // 1) Groq Whisper — ses için özelleşmiş, en hızlı ve ücretsiz katmanı cömert
+  if (groq?.api_key) {
+    const sonuc = await groqDene(groq.api_key, groq.model, dosya, mimeType)
+    if (sonuc.ok) {
+      return NextResponse.json({ ok: true, text: sonuc.text, provider_used: 'groq' })
+    }
+    hatalar.push(sonuc.hata)
+  }
+
+  // 2) Gemini (tekrar denemeli)
   if (gemini?.api_key) {
     const sonuc = await geminiDene(gemini.api_key, gemini.model, base64, mimeType)
     if (sonuc.ok) {
@@ -191,7 +245,7 @@ export async function POST(req: NextRequest) {
     hatalar.push(sonuc.hata)
   }
 
-  // 2) OpenRouter (yedek)
+  // 3) OpenRouter (son yedek)
   if (openrouter?.api_key) {
     const sonuc = await openRouterDene(openrouter.api_key, openrouter.model, base64, mimeType)
     if (sonuc.ok) {

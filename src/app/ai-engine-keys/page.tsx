@@ -9,7 +9,7 @@ import { supabase } from "@/lib/supabase/client";
 import { useUser } from "@/hooks/useUser";
 
 type ProviderRow = {
-  provider: "grok" | "gemini" | "openrouter";
+  provider: "grok" | "groq" | "gemini" | "openrouter";
   api_key: string | null;
   model: string;
   priority: number;
@@ -17,12 +17,19 @@ type ProviderRow = {
 };
 
 const PROVIDER_LABELS: Record<string, string> = {
-  grok: "Grok (xAI)",
-  gemini: "Gemini (Google)",
-  openrouter: "OpenRouter",
+  groq: "Groq — Whisper (SESLİ KOMUT)",
+  grok: "Grok (xAI) — Sohbet",
+  gemini: "Gemini (Google) — Sohbet",
+  openrouter: "OpenRouter — Sohbet",
 };
 
 const PROVIDER_LINKS: Record<string, { anahtar: string; anahtarLabel: string; modeller: string; modellerLabel: string; bakiye?: string; bakiyeLabel?: string }> = {
+  groq: {
+    anahtar: "https://console.groq.com/keys",
+    anahtarLabel: "🔑 ÜCRETSİZ Anahtar Al (console.groq.com)",
+    modeller: "https://console.groq.com/docs/speech-to-text",
+    modellerLabel: "📋 Ses Modelleri Dokümanı",
+  },
   grok: {
     anahtar: "https://console.x.ai",
     anahtarLabel: "🔑 API Anahtarı Al (console.x.ai)",
@@ -182,6 +189,18 @@ export default function AiEngineKeysPage() {
                   </a>
                 )}
               </div>
+
+              {row.provider === "groq" && (
+                <div className="mb-3 p-2.5 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-900">
+                  🎤 <strong>Bu anahtar SESLİ KOMUT içindir</strong> — mikrofona konuştuğunda sesi
+                  yazıya çevirir. Ücretsiz katman kredi kartı istemez, günde 2.000 kayıt hakkı verir
+                  ve çok hızlıdır.
+                  <div className="mt-1.5 pt-1.5 border-t border-blue-200">
+                    ⚠️ <strong>Karıştırma:</strong> <code>Groq</code> (bu, ses için) ile{" "}
+                    <code>Grok</code> (xAI, sohbet için) farklı şirketler — ayrı anahtarlar gerekir.
+                  </div>
+                </div>
+              )}
 
               {row.provider === "openrouter" && (
                 <div className="mb-3 p-2.5 bg-green-50 border border-green-200 rounded-lg text-xs flex items-center justify-between gap-2">
