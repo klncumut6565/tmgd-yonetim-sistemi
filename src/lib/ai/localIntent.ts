@@ -20,10 +20,32 @@
 import type { AssistantAction, FirmTabKey } from "./actions";
 
 export type LocalIntentSonuc = {
-  action: AssistantAction;
+  /** Beyaz listedeki bir eylem (firma bağlamı gerektirenler) */
+  action?: AssistantAction;
+  /** Doğrudan gidilecek global sayfa (firma bağlamı gerektirmez) */
+  url?: string;
   /** Kullanıcıya gösterilecek kısa onay cümlesi */
   cevap: string;
 };
+
+/**
+ * Sol menüdeki global sayfalar — firma seçili olmasa da açılabilir.
+ * Sidebar.tsx'teki menü ile aynı tutulmalı.
+ */
+const GLOBAL_SAYFALAR: { anahtarlar: string[]; url: string; ad: string }[] = [
+  { anahtarlar: ["gosterge paneli", "dashboard", "ana sayfa", "anasayfa"], url: "/dashboard", ad: "Gösterge Paneli" },
+  { anahtarlar: ["firmalar", "firma listesi", "musteriler"], url: "/firms", ad: "Firmalar" },
+  { anahtarlar: ["gorev", "gorevler", "is listesi"], url: "/tasks", ad: "Görevler" },
+  { anahtarlar: ["belge olustur", "belge olusturma", "yeni belge"], url: "/belge-olustur", ad: "Belge Oluştur" },
+  { anahtarlar: ["belgeler", "dokuman", "dokumanlar"], url: "/documents", ad: "Belgeler" },
+  { anahtarlar: ["arac", "araclar", "tasit", "tasitlar"], url: "/vehicles", ad: "Araçlar" },
+  { anahtarlar: ["surucu", "surucular", "sofor", "soforler"], url: "/drivers", ad: "Sürücüler" },
+  { anahtarlar: ["personel", "personeller", "calisan", "calisanlar"], url: "/employees", ad: "Personeller" },
+  { anahtarlar: ["ziyaret", "ziyaretler"], url: "/visits", ad: "Ziyaretler" },
+  { anahtarlar: ["rapor", "raporlar"], url: "/reports", ad: "Raporlar" },
+  { anahtarlar: ["adr bilgi motoru", "un sorgula", "tablo a"], url: "/adr", ad: "ADR Bilgi Motoru" },
+  { anahtarlar: ["ayarlar", "ayar"], url: "/settings", ad: "Ayarlar" },
+];
 
 /** Türkçe karakterleri sadeleştirip küçük harfe çevirir (eşleştirme için). */
 function normalize(metin: string): string {
@@ -37,6 +59,15 @@ function normalize(metin: string): string {
     .replace(/ç/g, "c")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+/** "bana", "lütfen" gibi dolgu kelimeleri ve ekran/pencere/sayfa gürültüsünü atar. */
+function gurultuTemizle(metin: string): string {
+  let s = metin;
+  ["bana", "lutfen", "rica etsem", "hemen", "sen"].forEach((k) => {
+    s = s.replace(new RegExp(`\\b${k}\\b`, "g"), " ");
+  });
+  return s.replace(/\s+/g, " ").trim();
 }
 
 /** Sekme adı eş anlamlıları — kullanıcı farklı kelimeler kullanabilir. */
@@ -56,7 +87,11 @@ const SEKME_ESLESMELERI: { anahtarlar: string[]; tab: FirmTabKey; ad: string }[]
 ];
 
 /** "aç/git/göster" gibi navigasyon niyeti bildiren fiiller. */
-const ACMA_FIILLERI = ["ac", "acar", "gec", "goster", "git", "getir", "acabilir"];
+const ACMA_FIILLERI = ["ac", "acar", "gec", "goster", "git", "getir", "acabilir", "acsana", "gidelim"];
+
+// "ekran", "pencere", "sayfa", "sekme", "bolum" — hepsi aynı şeyi kasteder,
+// eşleştirmede gürültü yaratmasın diye temizlenir.
+const EKRAN_KELIMELERI = ["ekranini", "ekrani", "ekran", "penceresini", "pencereyi", "pencere", "sayfasini", "sayfayi", "sayfa", "sekmesini", "sekmeyi", "sekme", "bolumunu", "bolum", "listesini"];
 
 function acmaNiyetiVarMi(metin: string): boolean {
   return ACMA_FIILLERI.some((f) => new RegExp(`\\b${f}`, "i").test(metin));
@@ -76,7 +111,7 @@ function unNumaralariniCikar(metin: string): string[] {
  * @param firmaBagalamiVar Şu an bir firma sayfasında mıyız?
  */
 export function yerelNiyetCoz(mesaj: string, firmaBagalamiVar: boolean): LocalIntentSonuc | null {
-  const m = normalize(mesaj);
+  const m = gurultuTemizle(normalize(mesaj));
 
   // Çok uzun mesajlar genelde soru/sohbettir, komut değil — LLM'e bırak
   if (m.length > 90) return null;
@@ -105,7 +140,10 @@ export function yerelNiyetCoz(mesaj: string, firmaBagalamiVar: boolean): LocalIn
     ACMA_FIILLERI.forEach((f) => {
       firmaAdi = firmaAdi.replace(new RegExp(`\\b${f}\\w*\\b`, "gi"), "");
     });
-    firmaAdi = firmaAdi.trim();
+    EKRAN_KELIMELERI.forEach((k) => {
+      firmaAdi = firmaAdi.replace(new RegExp(`\\b${k}\\b`, "gi"), "");
+    });
+    firmaAdi = firmaAdi.replace(/\s+/g, " ").trim();
 
     if (firmaAdi.length >= 2) {
       // Sekme de belirtilmiş olabilir: "ABC firmasının görevlerini aç"
@@ -141,6 +179,20 @@ export function yerelNiyetCoz(mesaj: string, firmaBagalamiVar: boolean): LocalIn
           unNumaralari.length > 0 && sekme.tab === "adr_transport"
             ? `${sekme.ad} ekranını açıyorum, UN ${unNumaralari.join(", ")} envanterde aranacak. Miktarı sen girip "Kalem Ekle"ye basmalısın.`
             : `${sekme.ad} ekranını açıyorum.`,
+      };
+    }
+  }
+
+  // ---- 4) Global sayfa açma (firma bağlamı GEREKTİRMEZ) -----------------
+  // "görevler penceresini aç", "raporlara git" — sol menüdeki sayfalar.
+  // Firma içi sekme eşleşmesi bulunamadıysa (ya da firma bağlamı yoksa)
+  // buraya düşer.
+  if (acmaNiyetiVarMi(m)) {
+    const sayfa = GLOBAL_SAYFALAR.find((s) => s.anahtarlar.some((a) => m.includes(a)));
+    if (sayfa) {
+      return {
+        url: sayfa.url,
+        cevap: `${sayfa.ad} sayfasını açıyorum.`,
       };
     }
   }

@@ -119,6 +119,7 @@ export default function ADRAssistantWidget() {
   const [sesizDenemeSayisi, setSesizDenemeSayisi] = useState(0);
   const [teshisAcik, setTeshisAcik] = useState(false);
   const [cevriliyor, setCevriliyor] = useState(false);
+  const bosSonucSayisiRef = useRef(0);
 
   async function sesiMetneCevir(ses: Blob) {
     setCevriliyor(true);
@@ -167,10 +168,30 @@ export default function ADRAssistantWidget() {
 
       const metin = (json.text ?? "").trim();
       if (!metin) {
-        // Anlaşılmadı — görüşme aktifse tekrar dinle
+        // Ses anlaşılmadı ya da halüsinasyon olarak filtrelendi.
+        // Üst üste 3 kez olursa görüşmeyi durdur — aksi halde sessiz bir
+        // ortamda sonsuz "dinle → boş sonuç → tekrar dinle" döngüsü olur.
+        bosSonucSayisiRef.current += 1;
+        if (bosSonucSayisiRef.current >= 3) {
+          bosSonucSayisiRef.current = 0;
+          sesliGorusmeyiAyarla(false);
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: crypto.randomUUID(),
+              role: "assistant",
+              content:
+                "Birkaç kez ses algılayamadım, görüşmeyi durdurdum. Mikrofona biraz daha yakın " +
+                "konuşmayı dene ya da soruyu yazabilirsin.",
+              error: true,
+            },
+          ]);
+          return;
+        }
         if (sesliGorusmeRef.current) dinlemeyeBasla();
         return;
       }
+      bosSonucSayisiRef.current = 0;
       gonder(metin);
     } catch (e) {
       setMessages((prev) => [
@@ -278,9 +299,24 @@ export default function ADRAssistantWidget() {
     // anında, ücretsiz ve API kotası tükenmiş olsa bile çalışır.
     const yerel = yerelNiyetCoz(question, !!firmId);
     if (yerel) {
+      // Global sayfa (firma bağlamı gerektirmez) — doğrudan git
+      if (yerel.url) {
+        setMessages((prev) => [
+          ...prev,
+          { id: crypto.randomUUID(), role: "assistant", content: yerel.cevap },
+        ]);
+        router.push(yerel.url);
+        if (sesliGorusmeRef.current && ttsDesteklenir) {
+          konus(yerel.cevap, () => {
+            if (sesliGorusmeRef.current) dinlemeyeBasla();
+          });
+        }
+        return;
+      }
+
       // "ABC firmasını aç" — firma ID'si gerekiyor. Bunu da yerel çözebiliriz:
       // Supabase'den doğrudan arayarak (LLM'e gitmeye gerek yok).
-      if (yerel.action.type === "open_firm" && !yerel.action.firm_id) {
+      if (yerel.action?.type === "open_firm" && !yerel.action.firm_id) {
         const { data: eslesenler } = await supabase
           .from("firms")
           .select("id, name")
@@ -317,7 +353,7 @@ export default function ADRAssistantWidget() {
         }
       }
 
-      const url = actionToUrl(yerel.action, firmId);
+      const url = yerel.action ? actionToUrl(yerel.action, firmId) : null;
       if (url) {
         setMessages((prev) => [
           ...prev,

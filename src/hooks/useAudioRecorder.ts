@@ -19,7 +19,11 @@
 
 import { useCallback, useRef, useState } from "react";
 
-const SESSIZLIK_ESIGI = 0.012; // RMS eşiği (0-1) — altı "sessizlik" sayılır
+const SESSIZLIK_ESIGI = 0.02; // RMS eşiği (0-1) — altı "sessizlik" sayılır.
+// NOT: Eşik bilinçli olarak yüksek tutuluyor. Düşük eşik = ortam gürültüsü
+// "konuşma" sayılır = boş kayıt gönderilir = Whisper halüsinasyon üretir
+// ("İzlediğiniz için teşekkür ederim" gibi uydurma metinler).
+const MIN_KONUSMA_MS = 400; // bu süreden kısa "konuşma" gürültü sayılır
 const SESSIZLIK_SURESI_MS = 1500; // bu kadar sessizlik = konuşma bitti
 const MAKS_KAYIT_MS = 15000; // güvenlik: en fazla 15 sn kayıt.
 // Not: Uzun kayıt = büyük dosya = yavaş yükleme + yavaş transkripsiyon.
@@ -39,6 +43,8 @@ export function useAudioRecorder() {
   const animasyonRef = useRef<number | null>(null);
   const maksSureRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const konusmaAlgilandiRef = useRef(false);
+  const konusmaSuresiRef = useRef(0);
+  const sonOlcumRef = useRef(0);
 
   const desteklenir =
     typeof window !== "undefined" &&
@@ -85,6 +91,8 @@ export function useAudioRecorder() {
       }
       setHata("");
       konusmaAlgilandiRef.current = false;
+      konusmaSuresiRef.current = 0;
+      sonOlcumRef.current = 0;
       parcalarRef.current = [];
 
       let stream: MediaStream;
@@ -127,6 +135,11 @@ export function useAudioRecorder() {
 
           const simdi = Date.now();
           if (rms > SESSIZLIK_ESIGI) {
+            // Gerçek konuşma süresini biriktir — tek bir "tık" sesi değil,
+            // anlamlı bir konuşma olduğundan emin olmak için.
+            if (sonOlcumRef.current > 0) {
+              konusmaSuresiRef.current += simdi - sonOlcumRef.current;
+            }
             konusmaAlgilandiRef.current = true;
             sessizlikBaslangicRef.current = null;
           } else if (konusmaAlgilandiRef.current) {
@@ -138,6 +151,7 @@ export function useAudioRecorder() {
               return;
             }
           }
+          sonOlcumRef.current = simdi;
           animasyonRef.current = requestAnimationFrame(olc);
         };
         animasyonRef.current = requestAnimationFrame(olc);
@@ -158,12 +172,15 @@ export function useAudioRecorder() {
       };
 
       recorder.onstop = () => {
-        const konusmaVardi = konusmaAlgilandiRef.current;
+        const yeterliKonusma =
+          konusmaAlgilandiRef.current && konusmaSuresiRef.current >= MIN_KONUSMA_MS;
         temizle();
         setKaydediyor(false);
         const blob = new Blob(parcalarRef.current, { type: mimeType || "audio/webm" });
-        // Çok kısa kayıtlar (tık sesi vb.) veya hiç konuşma yoksa null dön
-        onTamamlandi(konusmaVardi && blob.size > 1000 ? blob : null);
+        // Yeterli konuşma yoksa hiç gönderme — boş/gürültülü kayıt
+        // Whisper'da uydurma metne ("İzlediğiniz için teşekkür ederim")
+        // yol açıyor ve sesli modda saçma bir döngü başlatıyor.
+        onTamamlandi(yeterliKonusma && blob.size > 2000 ? blob : null);
       };
 
       recorder.start();

@@ -29,6 +29,46 @@ const TALIMAT =
   'Bu ses kaydını Türkçe olarak birebir yazıya dök. SADECE konuşulan metni yaz — ' +
   'açıklama, yorum, tırnak işareti veya başka hiçbir şey ekleme. Ses anlaşılmıyorsa boş döndür.'
 
+
+/**
+ * WHISPER HALÜSİNASYON FİLTRESİ
+ *
+ * Whisper modelleri sessizlik veya anlamsız gürültü aldığında, eğitim
+ * verisindeki YouTube altyazılarından öğrendikleri kalıpları UYDURUR.
+ * Türkçe'de en sık görülenler: "İzlediğiniz için teşekkür ederim",
+ * "Altyazı M.K.", "Abone olmayı unutmayın".
+ *
+ * Bu metinler kullanıcının söylediği bir şey DEĞİLDİR. Filtrelenmezse
+ * asistana gider, asistan cevap verir ve sesli modda sonsuz bir
+ * uydurma sohbet döngüsü başlar.
+ */
+const HALUSINASYON_KALIPLARI: RegExp[] = [
+  /izlediğiniz için teşekkür/i,
+  /izlediginiz icin tesekkur/i,
+  /altyazı\s*[:.]?\s*m\.?k\.?/i,
+  /altyazi\s*[:.]?\s*m\.?k\.?/i,
+  /^altyazı/i,
+  /^altyazi/i,
+  /abone olmayı unutmayın/i,
+  /abone olmayi unutmayin/i,
+  /bir sonraki (video|bölüm)/i,
+  /kanalıma abone/i,
+  /thanks? for watching/i,
+  /please subscribe/i,
+  /subtitles? by/i,
+  /^\s*(teşekkürler|tesekkurler|thank you|thanks)\s*[.!]?\s*$/i,
+  /^\s*(altyazı|altyazi|subtitle)s?\s*[:.]/i,
+];
+
+/** Metin bir Whisper halüsinasyonu mu? */
+function halusinasyonMu(metin: string): boolean {
+  const t = metin.trim();
+  if (!t) return true;
+  // Çok kısa çıktılar da genelde gürültüden gelir
+  if (t.length < 3) return true;
+  return HALUSINASYON_KALIPLARI.some((k) => k.test(t));
+}
+
 function bekle(ms: number) {
   return new Promise((r) => setTimeout(r, ms))
 }
@@ -231,6 +271,9 @@ export async function POST(req: NextRequest) {
   if (groq?.api_key) {
     const sonuc = await groqDene(groq.api_key, groq.model, dosya, mimeType)
     if (sonuc.ok) {
+      if (halusinasyonMu(sonuc.text)) {
+        return NextResponse.json({ ok: true, text: '', provider_used: 'groq', filtered: true })
+      }
       return NextResponse.json({ ok: true, text: sonuc.text, provider_used: 'groq' })
     }
     hatalar.push(sonuc.hata)
@@ -240,6 +283,9 @@ export async function POST(req: NextRequest) {
   if (gemini?.api_key) {
     const sonuc = await geminiDene(gemini.api_key, gemini.model, base64, mimeType)
     if (sonuc.ok) {
+      if (halusinasyonMu(sonuc.text)) {
+        return NextResponse.json({ ok: true, text: '', provider_used: 'gemini', filtered: true })
+      }
       return NextResponse.json({ ok: true, text: sonuc.text, provider_used: 'gemini' })
     }
     hatalar.push(sonuc.hata)
@@ -249,6 +295,9 @@ export async function POST(req: NextRequest) {
   if (openrouter?.api_key) {
     const sonuc = await openRouterDene(openrouter.api_key, openrouter.model, base64, mimeType)
     if (sonuc.ok) {
+      if (halusinasyonMu(sonuc.text)) {
+        return NextResponse.json({ ok: true, text: '', provider_used: 'openrouter', filtered: true })
+      }
       return NextResponse.json({ ok: true, text: sonuc.text, provider_used: 'openrouter' })
     }
     hatalar.push(sonuc.hata)

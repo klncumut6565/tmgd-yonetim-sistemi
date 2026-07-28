@@ -115,6 +115,54 @@ const CALLERS: Record<ProviderKey, (apiKey: string, model: string, systemPrompt:
   openrouter: callOpenRouter,
 };
 
+/**
+ * Model çıktısını kullanıcıya göstermeden önce temizler.
+ *
+ * NEDEN: Bazı modeller cevabın başına kendi düşünme sürecini ekliyor —
+ * çoğu zaman İNGİLİZCE ("We need to follow rules. The user wants...")
+ * veya güvenlik meta etiketleri ("User Safety: safe"). Bunlar kullanıcıya
+ * ASLA gösterilmemeli.
+ */
+export function modelCiktisiniTemizle(metin: string): string {
+  let t = metin;
+
+  // 1) Açık düşünme etiketleri
+  t = t.replace(/<think>[\s\S]*?<\/think>/gi, "");
+  t = t.replace(/<thinking>[\s\S]*?<\/thinking>/gi, "");
+  t = t.replace(/<reasoning>[\s\S]*?<\/reasoning>/gi, "");
+  t = t.replace(/<think(ing)?>[\s\S]*$/i, ""); // kapanmamış etiket
+
+  // 2) Güvenlik/meta etiket sızıntıları
+  t = t.replace(/^\s*(User|Response)\s+Safety\s*:\s*\w+\s*$/gim, "");
+
+  // 3) İngilizce düşünme kalıplarıyla başlayan satırları at
+  const dusunmeKaliplari = [
+    /^we (need|should|must|have) to\b/i,
+    /^the user (wants|is asking|asks|said)\b/i,
+    /^let'?s\b/i,
+    /^okay,? (so|the user)\b/i,
+    /^first,? (i|we) (need|should)\b/i,
+    /^i should\b/i,
+    /^according to the rules\b/i,
+    /^based on the (rules|policy|context)\b/i,
+    /^in the context of\b/i,
+    /^there'?s (no|a) rule\b/i,
+  ];
+
+  const dizi = t.split("\n");
+  let bas = 0;
+  while (bas < dizi.length) {
+    const s = dizi[bas].trim();
+    if (s === "") { bas++; continue; }
+    if (dusunmeKaliplari.some((k) => k.test(s))) { bas++; continue; }
+    break;
+  }
+  if (bas > 0) t = dizi.slice(bas).join("\n");
+
+  return t.trim();
+}
+
+
 export async function callWithFallback(
   configs: ProviderConfig[],
   systemPrompt: string,
@@ -128,7 +176,8 @@ export async function callWithFallback(
 
   for (const cfg of sorted) {
     try {
-      const text = await CALLERS[cfg.provider](cfg.api_key as string, cfg.model, systemPrompt, messages);
+      const ham = await CALLERS[cfg.provider](cfg.api_key as string, cfg.model, systemPrompt, messages);
+      const text = modelCiktisiniTemizle(ham);
       return { ok: true, text, provider: cfg.provider, errors };
     } catch (err) {
       errors.push({
