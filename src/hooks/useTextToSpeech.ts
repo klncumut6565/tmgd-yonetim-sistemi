@@ -52,6 +52,7 @@ export function useTextToSpeech() {
     if (typeof window === "undefined" || !window.speechSynthesis) return;
 
     window.speechSynthesis.cancel(); // önceki konuşmayı kes
+    window.speechSynthesis.resume(); // bazı mobil tarayıcılar sekme değişince motoru "duraklatır" — güvenlik önlemi
 
     const temiz = seslendirmeIcinTemizle(metin);
     if (!temiz) {
@@ -78,6 +79,23 @@ export function useTextToSpeech() {
     window.speechSynthesis.speak(utterance);
   }, []);
 
+  // MOBİL KİLİT AÇMA: iOS Safari / bazı Android tarayıcılar, speechSynthesis.
+  // speak() çağrısı kullanıcının dokunma anının DIŞINDA (örn. bir ağ isteği
+  // bittikten sonra, asenkron) yapılırsa sessizce YOK SAYAR. Bu fonksiyon
+  // dokunma olayının İÇİNDE (senkron) neredeyse sessiz kısa bir cümle
+  // "konuşarak" motoru bu sayfa oturumu için kilitten çıkarır — sonraki
+  // asenkron konus() çağrıları artık gerçekten sesli çalışır.
+  const kilidiAc = useCallback(() => {
+    if (typeof window === "undefined" || !window.speechSynthesis) return;
+    try {
+      const u = new SpeechSynthesisUtterance(" ");
+      u.volume = 0.01;
+      window.speechSynthesis.speak(u);
+    } catch {
+      // yut — kilit açma başarısız olsa bile ana akışı bozmasın
+    }
+  }, []);
+
   const durdur = useCallback(() => {
     if (typeof window !== "undefined" && window.speechSynthesis) {
       window.speechSynthesis.cancel();
@@ -85,5 +103,5 @@ export function useTextToSpeech() {
     setKonusuyor(false);
   }, []);
 
-  return { desteklenir, konusuyor, konus, durdur };
+  return { desteklenir, konusuyor, konus, durdur, kilidiAc };
 }

@@ -91,23 +91,51 @@ export default function ADRAssistantWidget() {
     baslat: sesBaslat,
     durdur: sesDurdur,
   } = useSpeechToText();
-  const { desteklenir: ttsDesteklenir, konusuyor, konus, durdur: ttsDurdur } = useTextToSpeech();
+  const { desteklenir: ttsDesteklenir, konusuyor, konus, durdur: ttsDurdur, kilidiAc: ttsKilidiAc } = useTextToSpeech();
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages, open]);
 
+  const [sesizDenemeSayisi, setSesizDenemeSayisi] = useState(0);
+
   function dinlemeyeBasla() {
     sesBaslat((metin) => {
+      setSesizDenemeSayisi(0); // başarılı algılama — sayaç sıfırlanır
       gonder(metin);
     }, false); // false = tek cümle bitince (sessizlik) otomatik durur
   }
 
   // Ses algılanamadı (sessizlik/gürültü) ama görüşme hâlâ aktifse —
   // kullanıcıyı tekrar mikrofona bastırmadan otomatik dinlemeye devam et.
+  // ÜST ÜSTE 3 kez algılanamazsa artık otomatik denemeyi DURDUR ve net bir
+  // mesaj göster — aksi halde masaüstünde gerçek bir mikrofon erişim
+  // sorunu (işletim sistemi seviyesinde izin kapalı vb.) sessizce sonsuz
+  // döngüye girip kullanıcıya hiçbir şey göstermeden takılı kalabilir.
   useEffect(() => {
     if (sesHataKodu === "no-speech" && sesliGorusmeRef.current) {
-      const t = setTimeout(() => dinlemeyeBasla(), 500);
+      if (sesizDenemeSayisi >= 2) {
+        sesliGorusmeyiAyarla(false);
+        setSesizDenemeSayisi(0);
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: crypto.randomUUID(),
+            role: "assistant",
+            content:
+              "🎤 Mikrofon birkaç kez ses algılayamadı, görüşmeyi durdurdum. Tarayıcı izni açık görünüyorsa " +
+              "sorun muhtemelen İŞLETİM SİSTEMİ seviyesinde: Windows'ta Ayarlar → Gizlilik → Mikrofon → " +
+              "\"Uygulamaların mikrofona erişmesine izin ver\" açık mı ve tarayıcı (Chrome/Edge) listede izinli mi kontrol et. " +
+              "Mac'te Sistem Ayarları → Gizlilik ve Güvenlik → Mikrofon → tarayıcı işaretli mi bak.",
+            error: true,
+          },
+        ]);
+        return;
+      }
+      const t = setTimeout(() => {
+        setSesizDenemeSayisi((n) => n + 1);
+        dinlemeyeBasla();
+      }, 500);
       return () => clearTimeout(t);
     }
     // Gerçek bir sorun (izin yok, mikrofon yok, ağ) ise görüşmeyi sonlandır
@@ -125,6 +153,12 @@ export default function ADRAssistantWidget() {
       ttsDurdur();
       return;
     }
+    // MOBİL FIX: TTS kilidini burada, dokunma olayının İÇİNDE (senkron) aç.
+    // dinlemeyeBasla() içindeki getUserMedia await'i yüzünden bundan sonrası
+    // artık "kullanıcı dokunması" sayılmıyor — mobil tarayıcılar bu noktadan
+    // sonra çağrılan speechSynthesis.speak()'i sessizce yok sayabilir.
+    if (ttsDesteklenir) ttsKilidiAc();
+
     // Yeni görüşme başlat
     sesliGorusmeyiAyarla(true);
     dinlemeyeBasla();
