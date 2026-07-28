@@ -21,7 +21,10 @@ import { useCallback, useRef, useState } from "react";
 
 const SESSIZLIK_ESIGI = 0.012; // RMS eşiği (0-1) — altı "sessizlik" sayılır
 const SESSIZLIK_SURESI_MS = 1500; // bu kadar sessizlik = konuşma bitti
-const MAKS_KAYIT_MS = 30000; // güvenlik: en fazla 30 sn kayıt
+const MAKS_KAYIT_MS = 15000; // güvenlik: en fazla 15 sn kayıt.
+// Not: Uzun kayıt = büyük dosya = yavaş yükleme + yavaş transkripsiyon.
+// Sunucu fonksiyonunun zaman sınırı olduğu için kısa tutmak önemli;
+// tek bir soru için 15 saniye fazlasıyla yeterli.
 
 export function useAudioRecorder() {
   const [kaydediyor, setKaydediyor] = useState(false);

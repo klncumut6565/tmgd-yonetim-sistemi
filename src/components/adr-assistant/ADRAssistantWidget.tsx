@@ -125,7 +125,29 @@ export default function ADRAssistantWidget() {
       const form = new FormData();
       form.append("audio", ses, "kayit.webm");
       const res = await authFetch("/api/speech-to-text", { method: "POST", body: form });
-      const json = await res.json();
+
+      // Sunucu zaman aşımına uğrarsa Vercel JSON değil HTML hata sayfası
+      // döndürür — doğrudan res.json() çağırmak "Unexpected token 'A'"
+      // gibi anlamsız bir hataya yol açar. Önce metni alıp güvenle ayrıştır.
+      const hamMetin = await res.text();
+      let json: { text?: string; error?: string; details?: string[] };
+      try {
+        json = JSON.parse(hamMetin);
+      } catch {
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: crypto.randomUUID(),
+            role: "assistant",
+            content:
+              "Ses işlenirken sunucu yanıt veremedi (muhtemelen zaman aşımı). " +
+              "Daha kısa konuşmayı dene ya da soruyu yazarak sor.",
+            error: true,
+          },
+        ]);
+        sesliGorusmeyiAyarla(false);
+        return;
+      }
 
       if (!res.ok) {
         const detay = Array.isArray(json.details) ? "\n\n" + json.details.join("\n") : "";

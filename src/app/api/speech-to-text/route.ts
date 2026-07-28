@@ -8,9 +8,13 @@
 // Sesi kendimiz metne çevirince davranış her tarayıcıda aynı olur.
 //
 // DAYANIKLILIK: Metin tarafındaki gibi burada da tek noktaya bağlı
-// kalmıyoruz. Önce Gemini denenir; geçici hatalarda (503 yoğunluk,
-// 429 kota) kısa beklemelerle tekrar denenir, o da olmazsa OpenRouter
-// üzerinden multimodal bir modele düşülür.
+// kalmıyoruz. Önce Gemini denenir; geçici bir hatada (503/429) BİR kez
+// tekrar denenir, o da olmazsa OpenRouter'a düşülür.
+//
+// ZAMAN BÜTÇESİ (önemli): Sunucu fonksiyonunun toplam süre sınırı var.
+// Aşılırsa Vercel HTML hata sayfası döndürür ve istemcideki JSON.parse
+// patlar ('Unexpected token A...'). Bu yüzden HER dış çağrının kendi
+// zaman sınırı var ve toplam bütçe maxDuration'ın altında tutuluyor.
 //
 // Yalnızca super_admin çağırabilir (Bearer token).
 
@@ -19,7 +23,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { getSuperAdminFromRequest } from '@/lib/supabase/verifySuperAdmin'
 
 export const dynamic = 'force-dynamic'
-export const maxDuration = 45
+export const maxDuration = 25
 
 const TALIMAT =
   'Bu ses kaydını Türkçe olarak birebir yazıya dök. SADECE konuşulan metni yaz — ' +
@@ -27,6 +31,17 @@ const TALIMAT =
 
 function bekle(ms: number) {
   return new Promise((r) => setTimeout(r, ms))
+}
+
+/** Belirtilen süre içinde yanıt gelmezse isteği iptal eden fetch. */
+async function fetchZamanSinirli(url: string, init: RequestInit, msSinir: number) {
+  const kontrolcu = new AbortController()
+  const zamanlayici = setTimeout(() => kontrolcu.abort(), msSinir)
+  try {
+    return await fetch(url, { ...init, signal: kontrolcu.signal })
+  } finally {
+    clearTimeout(zamanlayici)
+  }
 }
 
 /** Gemini ile transkripsiyon. Geçici hatalarda (429/503) tekrar dener. */
@@ -47,19 +62,19 @@ async function geminiDene(
     generationConfig: { maxOutputTokens: 300, temperature: 0 },
   })
 
-  // 503 (yoğunluk) ve 429 (kota) geçici olabilir — artan beklemelerle 3 deneme
-  const beklemeler = [0, 1500, 3500]
+  // 503/429 geçici olabilir — ama zaman bütçesi dar, sadece 1 tekrar
+  const beklemeler = [0, 800]
   let sonHata = ''
   let sonGeciciMi = false
 
   for (const bekleme of beklemeler) {
     if (bekleme > 0) await bekle(bekleme)
     try {
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: govde,
-      })
+      const res = await fetchZamanSinirli(
+        url,
+        { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: govde },
+        9000
+      )
 
       if (res.ok) {
         const json = await res.json()
@@ -91,7 +106,9 @@ async function openRouterDene(
   const format = mimeType.includes('mp4') ? 'mp4' : mimeType.includes('ogg') ? 'ogg' : 'webm'
 
   try {
-    const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    const res = await fetchZamanSinirli(
+      'https://openrouter.ai/api/v1/chat/completions',
+      {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
       body: JSON.stringify({
@@ -107,7 +124,9 @@ async function openRouterDene(
         ],
         max_tokens: 300,
       }),
-    })
+      },
+      9000
+    )
 
     if (!res.ok) {
       const cevap = await res.text().catch(() => '')
