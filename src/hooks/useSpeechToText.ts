@@ -12,6 +12,7 @@ export function useSpeechToText() {
   const [desteklenir, setDesteklenir] = useState(false);
   const [hata, setHata] = useState("");
   const [hataKodu, setHataKodu] = useState("");
+  const [tarayiciUyarisi, setTarayiciUyarisi] = useState("");
   const recognitionRef = useRef<InstanceType<NonNullable<Window["SpeechRecognition"]>> | null>(null);
   const onResultRef = useRef<((metin: string) => void) | null>(null);
 
@@ -26,6 +27,16 @@ export function useSpeechToText() {
       return;
     }
     setDesteklenir(true);
+
+    // Opera, Chromium tabanlı olmasına rağmen Web Speech API'yi tam
+    // desteklemiyor — nesne var gibi görünüyor ama ses tanıma çoğu zaman
+    // hiç sonuç üretmiyor. Kullanıcıyı boşuna uğraştırmamak için uyar.
+    const ua = navigator.userAgent;
+    if (/OPR\//i.test(ua) || /Opera/i.test(ua)) {
+      setTarayiciUyarisi(
+        "Opera tarayıcısı ses tanımayı tam desteklemiyor. Sesli komut için Chrome veya Edge kullanmanı öneririm."
+      );
+    }
 
     const recognition = new Ctor();
     recognition.lang = "tr-TR";
@@ -82,20 +93,55 @@ export function useSpeechToText() {
     setHata("");
     setHataKodu("");
 
-    // Bazı tarayıcılarda SpeechRecognition.start() tek başına izin
-    // penceresini güvenilir şekilde açmıyor (özellikle site daha önce
-    // "engelle" ile kapatıldıysa sessizce başarısız oluyor). getUserMedia
-    // ile açıkça izin istemek, tarayıcının izin penceresini garanti
-    // tetiklemesini sağlar.
+    // ÖNEMLİ (masaüstü hata düzeltmesi):
+    // Önceki sürüm HER SEFERİNDE getUserMedia ile mikrofonu açıp HEMEN
+    // kapatıyor, sonra SpeechRecognition.start() çağırıyordu. Bu bir yarış
+    // durumu yaratıyor: cihaz daha yeni serbest bırakılmışken tanıyıcı
+    // başlatılınca bazı masaüstü tarayıcılar (özellikle Opera) mikrofonu
+    // yeniden yakalayamıyor ve hiç ses algılamıyordu (mobil tolere ediyordu).
+    //
+    // Yeni yaklaşım: izin DURUMUNU sor.
+    //   - "granted" ise getUserMedia'ya hiç dokunma, doğrudan start() —
+    //     mikrofonu tanıyıcının kendisi açsın, araya girme.
+    //   - "prompt" ise (izin henüz sorulmamış) getUserMedia ile izin
+    //     penceresini tetikle; stream'i kapat ama ardından tanıyıcıyı
+    //     hemen değil, cihazın serbest kalması için kısa bir bekleme
+    //     sonrası başlat.
+    //   - "denied" ise kullanıcıya net talimat ver.
+    let izinDurumu: PermissionState | "unknown" = "unknown";
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      stream.getTracks().forEach((t) => t.stop()); // sadece izin için açtık, hemen kapat
+      const sonuc = await navigator.permissions.query({ name: "microphone" as PermissionName });
+      izinDurumu = sonuc.state;
     } catch {
+      // Permissions API mikrofonu desteklemiyor olabilir (Firefox/Safari) — bilinmiyor kabul et
+      izinDurumu = "unknown";
+    }
+
+    if (izinDurumu === "denied") {
       setHata(
-        "Mikrofona erişilemedi — izin penceresi çıkmadıysa tarayıcının adres çubuğundaki " +
-          "kilit/site bilgisi simgesine tıklayıp \"Mikrofon\" iznini \"İzin Ver\" yap, sonra sayfayı yenile."
+        "Mikrofon izni tarayıcıda engellenmiş. Adres çubuğundaki kilit/site bilgisi simgesine tıklayıp " +
+          "\"Mikrofon\" iznini \"İzin Ver\" yap, sonra sayfayı yenile."
       );
+      setHataKodu("not-allowed");
       return;
+    }
+
+    if (izinDurumu !== "granted") {
+      // İzin henüz verilmemiş (veya durum bilinmiyor): izin penceresini tetikle
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        stream.getTracks().forEach((t) => t.stop());
+        // Cihazın tamamen serbest kalması için kısa bir nefes — bu olmadan
+        // start() bazı tarayıcılarda sessizce başarısız oluyor.
+        await new Promise((r) => setTimeout(r, 250));
+      } catch {
+        setHata(
+          "Mikrofona erişilemedi — izin penceresi çıkmadıysa tarayıcının adres çubuğundaki " +
+            "kilit/site bilgisi simgesine tıklayıp \"Mikrofon\" iznini \"İzin Ver\" yap, sonra sayfayı yenile."
+        );
+        setHataKodu("not-allowed");
+        return;
+      }
     }
 
     // Sesli Mod: surekliDinleme=false verilirse, tek cümle bitince
@@ -117,5 +163,5 @@ export function useSpeechToText() {
     setDinliyor(false);
   }, []);
 
-  return { desteklenir, dinliyor, hata, hataKodu, baslat, durdur };
+  return { desteklenir, dinliyor, hata, hataKodu, tarayiciUyarisi, baslat, durdur };
 }

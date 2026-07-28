@@ -88,6 +88,7 @@ export default function ADRAssistantWidget() {
     dinliyor,
     hata: sesHatasi,
     hataKodu: sesHataKodu,
+    tarayiciUyarisi,
     baslat: sesBaslat,
     durdur: sesDurdur,
   } = useSpeechToText();
@@ -401,6 +402,11 @@ export default function ADRAssistantWidget() {
         )}
         {!sesliGorusmeAktif && sesDesteklenir && !sending && (
           <p className="text-xs text-gray-400 mb-1">🎤 Mikrofona bas — konuş, otomatik gönderilir, cevap sesli gelir.</p>
+        )}
+        {tarayiciUyarisi && (
+          <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2 mb-1">
+            ⚠️ {tarayiciUyarisi}
+          </p>
         )}
         {sesHatasi && <p className="text-xs text-amber-600 mb-1">{sesHatasi}</p>}
         <div className="flex items-end gap-2">
