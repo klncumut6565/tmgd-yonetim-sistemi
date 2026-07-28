@@ -24,6 +24,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
 import { authFetch } from "@/lib/supabase/authFetch";
 import { useSpeechToText } from "@/hooks/useSpeechToText";
+import { useAudioRecorder } from "@/hooks/useAudioRecorder";
 import { useTextToSpeech } from "@/hooks/useTextToSpeech";
 import type { ChatMessage } from "@/lib/ai/multiEngine";
 import { actionToUrl } from "@/lib/ai/actions";
@@ -94,7 +95,21 @@ export default function ADRAssistantWidget() {
     baslat: sesBaslat,
     durdur: sesDurdur,
   } = useSpeechToText();
+  const {
+    desteklenir: kayitDesteklenir,
+    kaydediyor,
+    seviye: sesSeviyesi,
+    hata: kayitHatasi,
+    baslat: kayitBaslat,
+    durdur: kayitDurdur,
+  } = useAudioRecorder();
   const { desteklenir: ttsDesteklenir, konusuyor, konus, durdur: ttsDurdur, kilidiAc: ttsKilidiAc } = useTextToSpeech();
+
+  // Sunucu tarafı transkripsiyon (MediaRecorder + /api/speech-to-text)
+  // varsayılan yöntemdir: her tarayıcıda AYNI şekilde çalışır. Web Speech
+  // API yalnızca kayıt desteklenmiyorsa yedek olarak kullanılır.
+  const sunucuTranskripsiyon = kayitDesteklenir;
+  const herhangiSesDestegi = kayitDesteklenir || sesDesteklenir;
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
@@ -102,21 +117,79 @@ export default function ADRAssistantWidget() {
 
   const [sesizDenemeSayisi, setSesizDenemeSayisi] = useState(0);
   const [teshisAcik, setTeshisAcik] = useState(false);
+  const [cevriliyor, setCevriliyor] = useState(false);
 
-  function dinlemeyeBasla() {
-    sesBaslat((metin) => {
-      setSesizDenemeSayisi(0); // başarılı algılama — sayaç sıfırlanır
+  async function sesiMetneCevir(ses: Blob) {
+    setCevriliyor(true);
+    try {
+      const form = new FormData();
+      form.append("audio", ses, "kayit.webm");
+      const res = await authFetch("/api/speech-to-text", { method: "POST", body: form });
+      const json = await res.json();
+
+      if (!res.ok) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: crypto.randomUUID(),
+            role: "assistant",
+            content: json.error ?? "Ses metne çevrilemedi.",
+            error: true,
+          },
+        ]);
+        sesliGorusmeyiAyarla(false);
+        return;
+      }
+
+      const metin = (json.text ?? "").trim();
+      if (!metin) {
+        // Anlaşılmadı — görüşme aktifse tekrar dinle
+        if (sesliGorusmeRef.current) dinlemeyeBasla();
+        return;
+      }
       gonder(metin);
-    }, false); // false = tek cümle bitince (sessizlik) otomatik durur
+    } catch (e) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: crypto.randomUUID(),
+          role: "assistant",
+          content: "Ses gönderilemedi: " + (e instanceof Error ? e.message : String(e)),
+          error: true,
+        },
+      ]);
+      sesliGorusmeyiAyarla(false);
+    } finally {
+      setCevriliyor(false);
+    }
   }
 
-  // Ses algılanamadı (sessizlik/gürültü) ama görüşme hâlâ aktifse —
-  // kullanıcıyı tekrar mikrofona bastırmadan otomatik dinlemeye devam et.
-  // ÜST ÜSTE 3 kez algılanamazsa artık otomatik denemeyi DURDUR ve net bir
-  // mesaj göster — aksi halde masaüstünde gerçek bir mikrofon erişim
-  // sorunu (işletim sistemi seviyesinde izin kapalı vb.) sessizce sonsuz
-  // döngüye girip kullanıcıya hiçbir şey göstermeden takılı kalabilir.
+  function dinlemeyeBasla() {
+    if (sunucuTranskripsiyon) {
+      kayitBaslat((ses) => {
+        if (!ses) {
+          // Hiç konuşma algılanmadı — görüşme aktifse tekrar dinlemeye geç
+          if (sesliGorusmeRef.current) {
+            setTimeout(() => {
+              if (sesliGorusmeRef.current) dinlemeyeBasla();
+            }, 300);
+          }
+          return;
+        }
+        sesiMetneCevir(ses);
+      });
+      return;
+    }
+    // Yedek yol: Web Speech API (yalnızca MediaRecorder yoksa)
+    sesBaslat((metin) => {
+      setSesizDenemeSayisi(0);
+      gonder(metin);
+    }, false);
+  }
+
+  // Web Speech API yedek yolundaki hata yönetimi (yalnızca o yol aktifse).
   useEffect(() => {
+    if (sunucuTranskripsiyon) return; // MediaRecorder kullanılıyorsa geçersiz
     if (sesHataKodu === "no-speech" && sesliGorusmeRef.current) {
       if (sesizDenemeSayisi >= 2) {
         sesliGorusmeyiAyarla(false);
@@ -129,8 +202,7 @@ export default function ADRAssistantWidget() {
             content:
               "🎤 Mikrofon birkaç kez ses algılayamadı, görüşmeyi durdurdum. Tarayıcı izni açık görünüyorsa " +
               "sorun muhtemelen İŞLETİM SİSTEMİ seviyesinde: Windows'ta Ayarlar → Gizlilik → Mikrofon → " +
-              "\"Uygulamaların mikrofona erişmesine izin ver\" açık mı ve tarayıcı (Chrome/Edge) listede izinli mi kontrol et. " +
-              "Mac'te Sistem Ayarları → Gizlilik ve Güvenlik → Mikrofon → tarayıcı işaretli mi bak.",
+              "\"Uygulamaların mikrofona erişmesine izin ver\" açık mı ve tarayıcı listede izinli mi kontrol et.",
             error: true,
           },
         ]);
@@ -142,7 +214,6 @@ export default function ADRAssistantWidget() {
       }, 500);
       return () => clearTimeout(t);
     }
-    // Gerçek bir sorun (izin yok, mikrofon yok, ağ) ise görüşmeyi sonlandır
     if (sesHataKodu && sesHataKodu !== "no-speech" && sesHataKodu !== "aborted") {
       sesliGorusmeyiAyarla(false);
     }
@@ -153,17 +224,17 @@ export default function ADRAssistantWidget() {
     if (sesliGorusmeAktif) {
       // Görüşme sürüyorken tıklamak = görüşmeyi bitir
       sesliGorusmeyiAyarla(false);
-      sesDurdur();
+      if (sunucuTranskripsiyon) kayitDurdur();
+      else sesDurdur();
       ttsDurdur();
       return;
     }
     // MOBİL FIX: TTS kilidini burada, dokunma olayının İÇİNDE (senkron) aç.
-    // dinlemeyeBasla() içindeki getUserMedia await'i yüzünden bundan sonrası
-    // artık "kullanıcı dokunması" sayılmıyor — mobil tarayıcılar bu noktadan
-    // sonra çağrılan speechSynthesis.speak()'i sessizce yok sayabilir.
+    // Sonraki adımlarda getUserMedia await'i var; ondan sonrası artık
+    // "kullanıcı dokunması" sayılmadığı için mobil tarayıcılar o noktadan
+    // sonra çağrılan speechSynthesis.speak()'i sessizce yok sayabiliyor.
     if (ttsDesteklenir) ttsKilidiAc();
 
-    // Yeni görüşme başlat
     sesliGorusmeyiAyarla(true);
     dinlemeyeBasla();
   }
@@ -397,24 +468,43 @@ export default function ADRAssistantWidget() {
 
       {/* Giriş alanı */}
       <div className="border-t p-3">
-        {dinliyor && (
-          <p className="text-xs text-red-500 mb-1">🔴 Dinliyorum...</p>
+        {(dinliyor || kaydediyor) && (
+          <div className="flex items-center gap-2 mb-1">
+            <p className="text-xs text-red-500">🔴 Dinliyorum...</p>
+            {kaydediyor && (
+              // Canlı ses seviyesi göstergesi — mikrofonun gerçekten ses
+              // aldığını görsel olarak doğrular
+              <div className="flex-1 h-1.5 bg-gray-200 rounded overflow-hidden">
+                <div
+                  className="h-full bg-red-500 transition-all duration-75"
+                  style={{ width: `${Math.round(sesSeviyesi * 100)}%` }}
+                />
+              </div>
+            )}
+          </div>
         )}
-        {sesliGorusmeAktif && !dinliyor && !konusuyor && (
+        {cevriliyor && <p className="text-xs text-indigo-500 mb-1">✍️ Konuşman yazıya çevriliyor...</p>}
+        {sesliGorusmeAktif && !dinliyor && !kaydediyor && !konusuyor && !cevriliyor && (
           <p className="text-xs text-indigo-500 mb-1">⏳ Bir sonraki cümlen için hazırlanıyor...</p>
         )}
-        {!sesliGorusmeAktif && sesDesteklenir && !sending && (
-          <p className="text-xs text-gray-400 mb-1">🎤 Mikrofona bas — konuş, otomatik gönderilir, cevap sesli gelir.</p>
+        {!sesliGorusmeAktif && herhangiSesDestegi && !sending && (
+          <p className="text-xs text-gray-400 mb-1">
+            🎤 Mikrofona bas — konuş, sustuğunda otomatik gönderilir, cevap sesli gelir.
+          </p>
         )}
-        {tarayiciUyarisi && (
+        {tarayiciUyarisi && !sunucuTranskripsiyon && (
           <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2 mb-1">
             ⚠️ {tarayiciUyarisi}
           </p>
         )}
-        {sesHatasi && <p className="text-xs text-amber-600 mb-1">{sesHatasi}</p>}
+        {kayitHatasi && <p className="text-xs text-amber-600 mb-1">{kayitHatasi}</p>}
+        {!sunucuTranskripsiyon && sesHatasi && (
+          <p className="text-xs text-amber-600 mb-1">{sesHatasi}</p>
+        )}
 
-        {/* Ses teşhis paneli — sorun giderirken hangi adımda takıldığını gösterir */}
-        {sesDesteklenir && (
+        {/* Ses teşhis paneli — yalnızca Web Speech API yedek yolu kullanılıyorsa
+            anlamlı (MediaRecorder yolunda olay günlüğü üretilmiyor) */}
+        {!sunucuTranskripsiyon && sesDesteklenir && (
           <div className="mb-1">
             <button
               onClick={() => setTeshisAcik((v) => !v)}
@@ -448,14 +538,14 @@ export default function ADRAssistantWidget() {
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
           />
-          {sesDesteklenir && (
+          {herhangiSesDestegi && (
             <button
               type="button"
               onClick={mikrofonTikla}
               title={sesliGorusmeAktif ? "Görüşmeyi bitir" : "Sesli görüşme başlat"}
               className={
                 "w-9 h-9 shrink-0 rounded-full flex items-center justify-center transition " +
-                (dinliyor
+                (dinliyor || kaydediyor
                   ? "bg-red-500 text-white animate-pulse"
                   : sesliGorusmeAktif
                     ? "bg-indigo-600 text-white"
