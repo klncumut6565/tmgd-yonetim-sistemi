@@ -16,6 +16,8 @@ export function useSpeechToText() {
   const [gunluk, setGunluk] = useState<string[]>([]);
   const recognitionRef = useRef<InstanceType<NonNullable<Window["SpeechRecognition"]>> | null>(null);
   const onResultRef = useRef<((metin: string) => void) | null>(null);
+  const sonucGeldiRef = useRef(false);
+  const konusmaAlgilandiRef = useRef(false);
 
   const kaydet = useCallback((satir: string) => {
     const zaman = new Date().toLocaleTimeString("tr-TR", { hour12: false });
@@ -60,7 +62,11 @@ export function useSpeechToText() {
     recognition.onstart = () => kaydet("▶ start (tanıyıcı başladı)");
     recognition.onaudiostart = () => kaydet("🎙 audiostart (mikrofon açıldı)");
     recognition.onsoundstart = () => kaydet("🔉 soundstart (ses algılandı)");
-    recognition.onspeechstart = () => kaydet("🗣 speechstart (konuşma algılandı)");
+    recognition.onspeechstart = () => {
+      kaydet("🗣 speechstart (konuşma algılandı)");
+      sonucGeldiRef.current = false;
+      konusmaAlgilandiRef.current = true;
+    };
     recognition.onspeechend = () => kaydet("🤐 speechend");
     recognition.onsoundend = () => kaydet("🔇 soundend");
     recognition.onaudioend = () => kaydet("📴 audioend (mikrofon kapandı)");
@@ -74,6 +80,7 @@ export function useSpeechToText() {
         }
       }
       kaydet(`✅ result: "${finalMetin.trim().slice(0, 40)}"`);
+      sonucGeldiRef.current = true;
       if (finalMetin.trim() && onResultRef.current) {
         onResultRef.current(finalMetin.trim());
       }
@@ -103,6 +110,21 @@ export function useSpeechToText() {
 
     recognition.onend = () => {
       kaydet("⏹ end (tanıyıcı durdu)");
+      // SESSİZ BAŞARISIZLIK TESPİTİ:
+      // Konuşma algılandı (speechstart) ama ne sonuç ne hata geldi —
+      // bu, sesin tanıma servisine gidip cevap dönmediği anlamına gelir.
+      // En sık sebebi: tarayıcının kullandığı konuşma servisine ağ
+      // erişiminin engellenmesi (uzantı, antivirüs, DNS/ISP filtresi).
+      if (sonucGeldiRef.current === false && konusmaAlgilandiRef.current) {
+        kaydet("⚠ sonuç gelmedi (servis yanıt vermedi)");
+        setHata(
+          "Konuşman algılandı ama metne çevrilemedi — tarayıcının konuşma tanıma servisine ulaşılamıyor. " +
+            "Genellikle bir tarayıcı uzantısı (reklam/gizlilik engelleyici) veya güvenlik yazılımı engeller. " +
+            "Gizli sekmede (Ctrl+Shift+N) deneyerek doğrulayabilirsin. Bu tarayıcıda sorun sürerse Edge çalışıyor."
+        );
+        setHataKodu("no-result");
+      }
+      konusmaAlgilandiRef.current = false;
       setDinliyor(false);
     };
 
