@@ -128,12 +128,13 @@ export default function ADRAssistantWidget() {
       const json = await res.json();
 
       if (!res.ok) {
+        const detay = Array.isArray(json.details) ? "\n\n" + json.details.join("\n") : "";
         setMessages((prev) => [
           ...prev,
           {
             id: crypto.randomUUID(),
             role: "assistant",
-            content: json.error ?? "Ses metne çevrilemedi.",
+            content: (json.error ?? "Ses metne çevrilemedi.") + detay,
             error: true,
           },
         ]);
@@ -490,6 +491,12 @@ export default function ADRAssistantWidget() {
         {!sesliGorusmeAktif && herhangiSesDestegi && !sending && (
           <p className="text-xs text-gray-400 mb-1">
             🎤 Mikrofona bas — konuş, sustuğunda otomatik gönderilir, cevap sesli gelir.
+          </p>
+        )}
+        {!herhangiSesDestegi && (
+          <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2 mb-1">
+            ⚠️ Bu tarayıcı ses kaydını desteklemiyor (MediaRecorder yok). Chrome, Edge veya Firefox
+            deneyebilirsin — ya da soruyu yazarak sorabilirsin.
           </p>
         )}
         {tarayiciUyarisi && !sunucuTranskripsiyon && (
