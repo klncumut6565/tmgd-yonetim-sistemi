@@ -28,11 +28,22 @@ interface SpeechRecognitionLike extends EventTarget {
   lang: string;
   continuous: boolean;
   interimResults: boolean;
+  maxAlternatives?: number;
   start(): void;
   stop(): void;
+  abort?(): void;
   onresult: ((event: SpeechRecognitionEventLike) => void) | null;
   onerror: ((event: SpeechRecognitionErrorEventLike) => void) | null;
   onend: (() => void) | null;
+  onstart: (() => void) | null;
+  // Teşhis için: bu olaylar mikrofon->ses->konuşma zincirinin
+  // hangi adımında takıldığını gösterir.
+  onaudiostart: (() => void) | null;
+  onsoundstart: (() => void) | null;
+  onspeechstart: (() => void) | null;
+  onspeechend: (() => void) | null;
+  onsoundend: (() => void) | null;
+  onaudioend: (() => void) | null;
 }
 
 declare global {

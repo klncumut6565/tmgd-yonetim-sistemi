@@ -13,8 +13,14 @@ export function useSpeechToText() {
   const [hata, setHata] = useState("");
   const [hataKodu, setHataKodu] = useState("");
   const [tarayiciUyarisi, setTarayiciUyarisi] = useState("");
+  const [gunluk, setGunluk] = useState<string[]>([]);
   const recognitionRef = useRef<InstanceType<NonNullable<Window["SpeechRecognition"]>> | null>(null);
   const onResultRef = useRef<((metin: string) => void) | null>(null);
+
+  const kaydet = useCallback((satir: string) => {
+    const zaman = new Date().toLocaleTimeString("tr-TR", { hour12: false });
+    setGunluk((g) => [...g.slice(-14), `${zaman} ${satir}`]);
+  }, []);
 
   useEffect(() => {
     const Ctor =
@@ -43,6 +49,22 @@ export function useSpeechToText() {
     recognition.continuous = true;
     recognition.interimResults = false;
 
+    // ---- TEŞHİS OLAYLARI ----
+    // Bu zincir, sorunun tam olarak hangi adımda olduğunu gösterir:
+    //   start yok            -> tanıyıcı hiç başlamıyor
+    //   start var, audio yok -> mikrofon açılmıyor (izin/cihaz)
+    //   audio var, sound yok -> mikrofon açık ama hiç ses gelmiyor (yanlış
+    //                            giriş cihazı seçili / cihaz sessize alınmış)
+    //   sound var, speech yok-> ses var ama konuşma olarak tanınmıyor
+    //   speech var, result yok-> tanıma servisine ulaşılamıyor (ağ/dil)
+    recognition.onstart = () => kaydet("▶ start (tanıyıcı başladı)");
+    recognition.onaudiostart = () => kaydet("🎙 audiostart (mikrofon açıldı)");
+    recognition.onsoundstart = () => kaydet("🔉 soundstart (ses algılandı)");
+    recognition.onspeechstart = () => kaydet("🗣 speechstart (konuşma algılandı)");
+    recognition.onspeechend = () => kaydet("🤐 speechend");
+    recognition.onsoundend = () => kaydet("🔇 soundend");
+    recognition.onaudioend = () => kaydet("📴 audioend (mikrofon kapandı)");
+
     recognition.onresult = (event) => {
       let finalMetin = "";
       for (let i = event.resultIndex; i < event.results.length; i++) {
@@ -51,6 +73,7 @@ export function useSpeechToText() {
           finalMetin += result[0].transcript;
         }
       }
+      kaydet(`✅ result: "${finalMetin.trim().slice(0, 40)}"`);
       if (finalMetin.trim() && onResultRef.current) {
         onResultRef.current(finalMetin.trim());
       }
@@ -58,6 +81,7 @@ export function useSpeechToText() {
 
     recognition.onerror = (event) => {
       const kod = event.error;
+      kaydet(`❌ error: ${kod}`);
       setHataKodu(kod);
       let mesaj = "Ses tanıma sırasında bir hata oluştu.";
       if (kod === "not-allowed" || kod === "service-not-allowed") {
@@ -78,6 +102,7 @@ export function useSpeechToText() {
     };
 
     recognition.onend = () => {
+      kaydet("⏹ end (tanıyıcı durdu)");
       setDinliyor(false);
     };
 
@@ -86,7 +111,7 @@ export function useSpeechToText() {
     return () => {
       recognition.stop();
     };
-  }, []);
+  }, [kaydet]);
 
   const baslat = useCallback(async (onSonuc: (metin: string) => void, surekliDinleme: boolean = true) => {
     if (!recognitionRef.current) return;
@@ -115,6 +140,17 @@ export function useSpeechToText() {
     } catch {
       // Permissions API mikrofonu desteklemiyor olabilir (Firefox/Safari) — bilinmiyor kabul et
       izinDurumu = "unknown";
+    }
+    kaydet(`🔑 izin durumu: ${izinDurumu}`);
+
+    // Teşhis: sistemde kaç mikrofon var, isimleri görünüyor mu?
+    try {
+      const cihazlar = await navigator.mediaDevices.enumerateDevices();
+      const mikrofonlar = cihazlar.filter((c) => c.kind === "audioinput");
+      const isimliOlan = mikrofonlar.filter((m) => m.label).length;
+      kaydet(`🎚 mikrofon sayısı: ${mikrofonlar.length} (isimli: ${isimliOlan})`);
+    } catch {
+      kaydet("🎚 cihaz listesi alınamadı");
     }
 
     if (izinDurumu === "denied") {
@@ -153,15 +189,18 @@ export function useSpeechToText() {
     setDinliyor(true);
     try {
       recognitionRef.current.start();
-    } catch {
-      // Zaten calisiyor olabilir — yut
+      kaydet("📞 start() çağrıldı");
+    } catch (e) {
+      kaydet(`⚠ start() istisna: ${e instanceof Error ? e.message : String(e)}`);
     }
-  }, []);
+  }, [kaydet]);
 
   const durdur = useCallback(() => {
     recognitionRef.current?.stop();
     setDinliyor(false);
   }, []);
 
-  return { desteklenir, dinliyor, hata, hataKodu, tarayiciUyarisi, baslat, durdur };
+  const gunluguTemizle = useCallback(() => setGunluk([]), []);
+
+  return { desteklenir, dinliyor, hata, hataKodu, tarayiciUyarisi, gunluk, gunluguTemizle, baslat, durdur };
 }

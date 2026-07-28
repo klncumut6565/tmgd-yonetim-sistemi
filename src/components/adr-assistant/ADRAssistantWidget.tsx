@@ -89,6 +89,8 @@ export default function ADRAssistantWidget() {
     hata: sesHatasi,
     hataKodu: sesHataKodu,
     tarayiciUyarisi,
+    gunluk,
+    gunluguTemizle,
     baslat: sesBaslat,
     durdur: sesDurdur,
   } = useSpeechToText();
@@ -99,6 +101,7 @@ export default function ADRAssistantWidget() {
   }, [messages, open]);
 
   const [sesizDenemeSayisi, setSesizDenemeSayisi] = useState(0);
+  const [teshisAcik, setTeshisAcik] = useState(false);
 
   function dinlemeyeBasla() {
     sesBaslat((metin) => {
@@ -409,6 +412,33 @@ export default function ADRAssistantWidget() {
           </p>
         )}
         {sesHatasi && <p className="text-xs text-amber-600 mb-1">{sesHatasi}</p>}
+
+        {/* Ses teşhis paneli — sorun giderirken hangi adımda takıldığını gösterir */}
+        {sesDesteklenir && (
+          <div className="mb-1">
+            <button
+              onClick={() => setTeshisAcik((v) => !v)}
+              className="text-[10px] text-gray-400 hover:text-gray-600 underline"
+            >
+              {teshisAcik ? "Ses teşhisini gizle" : "🔧 Ses teşhisi"}
+            </button>
+            {teshisAcik && (
+              <div className="mt-1 p-2 bg-gray-900 text-green-300 rounded text-[10px] font-mono max-h-40 overflow-y-auto">
+                <div className="flex justify-between items-center mb-1 text-gray-400">
+                  <span>Olay günlüğü ({gunluk.length})</span>
+                  <button onClick={gunluguTemizle} className="underline hover:text-white">
+                    temizle
+                  </button>
+                </div>
+                {gunluk.length === 0 ? (
+                  <div className="text-gray-500">Henüz olay yok — mikrofona bas.</div>
+                ) : (
+                  gunluk.map((satir, i) => <div key={i}>{satir}</div>)
+                )}
+              </div>
+            )}
+          </div>
+        )}
         <div className="flex items-end gap-2">
           <textarea
             className="flex-1 border rounded-lg p-2 text-sm resize-none"
