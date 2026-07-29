@@ -110,6 +110,71 @@ type Kalem = {
 
 type Surucu = { id: string; first_name: string; last_name: string; adr_certificate_no: string | null; adr_valid_until: string | null };
 type Arac = { id: string; plate_number: string; brand: string | null; adr_certificate_no: string | null };
+
+/**
+ * ADR 1.10.3 — YÜKSEK SONUÇLU TEHLİKELİ MAL (emniyet planı gerekliliği)
+ *
+ * Tablo 1.10.3.1.2'deki miktar eşiklerine göre, bir sevkiyatın "yüksek
+ * sonuçlu" sayılıp sayılmadığını hesaplar. Yüksek sonuçlu ise ADR
+ * 1.10.3.2 uyarınca EMNİYET PLANI hazırlanması gerekir.
+ *
+ * NOT: Eşikler ambalajlı taşıma içindir. Tank/dökme taşımada eşikler
+ * daha düşüktür (3000 lt yerine her miktar). Bu hesap bir ÖN
+ * DEĞERLENDİRMEDİR — nihai karar TMGD'ye aittir.
+ */
+function emniyetPlaniGerekli(kalemler: Kalem[]): {
+  gerekli: boolean;
+  sebepler: string[];
+} {
+  const sebepler: string[] = [];
+
+  // Sınıf bazında toplam miktar (kg/lt ayrımı yapılmadan — ADR tablosu
+  // her ikisini de aynı eşikle değerlendirir)
+  const sinifToplam = new Map<string, number>();
+  for (const k of kalemler) {
+    const sinif = (k.adr_class || "").trim();
+    if (!sinif) continue;
+    const mevcut = sinifToplam.get(sinif) ?? 0;
+    sinifToplam.set(sinif, mevcut + (k.quantity || 0));
+  }
+
+  for (const k of kalemler) {
+    const sinif = (k.adr_class || "").trim();
+    const ag = (k.packing_group || "").trim().toUpperCase();
+    const toplam = sinifToplam.get(sinif) ?? 0;
+
+    // Sınıf 6.1 Ambalaj Grubu I — HER MİKTAR yüksek sonuçlu
+    if (sinif.startsWith("6.1") && ag === "I") {
+      sebepler.push(`UN ${k.un_number}: Sınıf 6.1 AG I — her miktarda emniyet planı gerekir`);
+      continue;
+    }
+    // Sınıf 6.2 (bulaşıcı) — kategori A her miktar
+    if (sinif.startsWith("6.2")) {
+      sebepler.push(`UN ${k.un_number}: Sınıf 6.2 — bulaşıcı madde, emniyet planı değerlendirilmeli`);
+      continue;
+    }
+    // Sınıf 7 (radyoaktif) — aktivite eşiğine tabi, TMGD değerlendirmeli
+    if (sinif.startsWith("7")) {
+      sebepler.push(`UN ${k.un_number}: Sınıf 7 — radyoaktif, aktivite eşiği TMGD tarafından kontrol edilmeli`);
+      continue;
+    }
+    // Sınıf 1 (patlayıcı) — 3000 kg
+    if (sinif.startsWith("1") && !sinif.startsWith("1.4S") && toplam > 3000) {
+      sebepler.push(`Sınıf ${sinif}: toplam ${toplam} > 3000 — emniyet planı gerekir`);
+      continue;
+    }
+    // Sınıf 2, 3, 4.2, 4.3, 5.1, 8 — AG I/II için 3000 eşiği
+    const esikliSiniflar = ["2", "3", "4.1", "4.2", "4.3", "5.1", "8"];
+    if (esikliSiniflar.some((c) => sinif.startsWith(c)) && (ag === "I" || ag === "II") && toplam > 3000) {
+      sebepler.push(`Sınıf ${sinif} AG ${ag}: toplam ${toplam} > 3000 — emniyet planı gerekir`);
+    }
+  }
+
+  // Aynı sebep birden çok kez eklenmiş olabilir
+  const benzersiz = Array.from(new Set(sebepler));
+  return { gerekli: benzersiz.length > 0, sebepler: benzersiz };
+}
+
 type EvrakOzet = { id: string; document_no: string; transport_date: string | null; status: string | null; total_points: number | null; tunnel_restriction_code: string | null };
 
 // ── ADR 1.1.3.6 motoru (src/app/adr/page.tsx ile aynı, doğrulanmış) ──────
@@ -183,7 +248,7 @@ async function evrakPdfUret(args: {
   doc.addFont("LiberationSans-Bold.ttf", FONT, "bold");
   doc.setFont(FONT, "normal");
 
-  const M = 12, W = 210;
+  const M = 12, W = 210, H = 297; // A4 mm — H imza konumu hesabında kullanılır
   const NAVY: [number, number, number] = [30, 58, 138];
   let y = 14;
 
@@ -304,8 +369,17 @@ async function evrakPdfUret(args: {
     y += notSatirlari.length * 3.4 + 4;
   }
 
-  // İmza kutuları
-  const imzaY = Math.max(y + 4, 250);
+  // İmza kutuları — içeriğin HEMEN ALTINA yerleştirilir.
+  // Önceden Math.max(y + 4, 250) ile sayfanın en altına sabitleniyordu;
+  // az kalemli evraklarda ürün listesi ile imza arasında büyük bir boşluk
+  // kalıyordu. Artık içeriği takip ediyor, yalnızca sayfaya sığmayacaksa
+  // yeni sayfaya geçiyor.
+  let imzaY = y + 6;
+  const IMZA_YUKSEKLIK = 24;
+  if (imzaY + IMZA_YUKSEKLIK > H - 18) {
+    doc.addPage();
+    imzaY = M + 6;
+  }
   const imzaW = (W - 2 * M - 8) / 2;
   doc.setDrawColor(150, 150, 150);
   doc.rect(M, imzaY, imzaW, 24);
@@ -561,8 +635,50 @@ export default function TasimaEvraki({
   }, [kalemler]);
   const karisikYasak = karisikSonuclar.some((r) => r.status === "NO");
 
+  // ADR 1.10.3 — Emniyet planı gerekliliği (canlı)
+  const emniyet = useMemo(() => emniyetPlaniGerekli(kalemler), [kalemler]);
+
   const seciliSurucu = suruculer.find((s) => s.id === surucuId) || null;
   const seciliArac = araclar.find((a) => a.id === aracId) || null;
+
+  /**
+   * SRC-5 / ADR sürücü sertifikası kontrolü (canlı).
+   * ADR 8.2.1 uyarınca tehlikeli madde taşıyan sürücünün geçerli
+   * eğitim sertifikası olmalıdır. Muafiyet kapsamındaki (1.1.3.6)
+   * taşımalarda da 8.2.3 farkındalık eğitimi aranır; burada belge
+   * geçerliliği kontrol ediliyor.
+   */
+  const surucuUyari = useMemo(() => {
+    if (kalemler.length === 0) return null;
+    if (!seciliSurucu) return { seviye: "bilgi" as const, mesaj: "Sürücü seçilmedi — SRC-5 kontrolü yapılamıyor." };
+    if (!seciliSurucu.adr_certificate_no) {
+      return { seviye: "hata" as const, mesaj: `${seciliSurucu.first_name} ${seciliSurucu.last_name}: SRC-5/ADR sertifika numarası kayıtlı değil.` };
+    }
+    if (seciliSurucu.adr_valid_until) {
+      const kalanGun = Math.round(
+        (new Date(seciliSurucu.adr_valid_until + "T00:00:00").getTime() - Date.now()) / 86400000
+      );
+      if (kalanGun < 0) {
+        return { seviye: "hata" as const, mesaj: `SRC-5 belgesi ${Math.abs(kalanGun)} gün önce doldu (${seciliSurucu.adr_valid_until}) — bu sürücü ADR taşıması yapamaz.` };
+      }
+      if (kalanGun <= 30) {
+        return { seviye: "uyari" as const, mesaj: `SRC-5 belgesi ${kalanGun} gün sonra doluyor (${seciliSurucu.adr_valid_until}).` };
+      }
+      return { seviye: "ok" as const, mesaj: `SRC-5 geçerli (${seciliSurucu.adr_valid_until}).` };
+    }
+    return { seviye: "uyari" as const, mesaj: "SRC-5 geçerlilik tarihi kayıtlı değil." };
+  }, [seciliSurucu, kalemler.length]);
+
+  /** Araç ADR uygunluk belgesi kontrolü — muafiyet dışı taşımalarda gerekli. */
+  const aracUyari = useMemo(() => {
+    if (kalemler.length === 0) return null;
+    if (!seciliArac) return null;
+    if (!plakaGerekli) return null; // muafiyet kapsamında araç belgesi aranmaz
+    if (!seciliArac.adr_certificate_no) {
+      return { seviye: "uyari" as const, mesaj: `${seciliArac.plate_number}: ADR uygunluk belgesi (ADR sertifikası) kayıtlı değil.` };
+    }
+    return { seviye: "ok" as const, mesaj: `Araç ADR belgesi kayıtlı (${seciliArac.adr_certificate_no}).` };
+  }, [seciliArac, plakaGerekli, kalemler.length]);
 
   /** Girilen alıcıyı bu firmanın rehberine kaydeder (bir dahaki sefere listeden seçilir). */
   async function aliciyiRehbereKaydet() {
@@ -1066,6 +1182,78 @@ export default function TasimaEvraki({
               <p className="text-sm">Tünel Kısıtlaması: <b>{tunel}</b></p>
               <p className="text-xs text-gray-400 mt-2">{kalemler.length} ürün · LQ/EQ kalemleri puana dahil edilmez</p>
             </>
+          )}
+
+
+          {/* SÜRÜCÜ / ARAÇ BELGE KONTROLÜ — ADR 8.2.1 (SRC-5) */}
+          {(surucuUyari || aracUyari) && (
+            <div className="mt-3 pt-3 border-t">
+              <p className="text-xs font-semibold text-gray-700 mb-1.5">Belge Kontrolü</p>
+              {surucuUyari && (
+                <p
+                  className={
+                    "text-xs mb-1 rounded p-1.5 border " +
+                    (surucuUyari.seviye === "hata"
+                      ? "bg-red-50 border-red-200 text-red-800"
+                      : surucuUyari.seviye === "uyari"
+                        ? "bg-amber-50 border-amber-200 text-amber-800"
+                        : surucuUyari.seviye === "ok"
+                          ? "bg-green-50 border-green-200 text-green-800"
+                          : "bg-gray-50 border-gray-200 text-gray-600")
+                  }
+                >
+                  {surucuUyari.seviye === "hata" ? "✗" : surucuUyari.seviye === "ok" ? "✓" : "⚠"} {surucuUyari.mesaj}
+                </p>
+              )}
+              {aracUyari && (
+                <p
+                  className={
+                    "text-xs rounded p-1.5 border " +
+                    (aracUyari.seviye === "ok"
+                      ? "bg-green-50 border-green-200 text-green-800"
+                      : "bg-amber-50 border-amber-200 text-amber-800")
+                  }
+                >
+                  {aracUyari.seviye === "ok" ? "✓" : "⚠"} {aracUyari.mesaj}
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* EMNİYET PLANI — ADR 1.10.3 */}
+          {kalemler.length > 0 && (
+            <div className="mt-3 pt-3 border-t">
+              <p className="text-xs font-semibold text-gray-700 mb-1.5">Emniyet Planı (ADR 1.10.3)</p>
+              {emniyet.gerekli ? (
+                <div className="text-xs bg-amber-50 border border-amber-200 rounded p-2 text-amber-900">
+                  <p className="font-medium mb-1">⚠ Emniyet planı gerekebilir:</p>
+                  <ul className="space-y-0.5">
+                    {emniyet.sebepler.map((s2, i) => (
+                      <li key={i}>• {s2}</li>
+                    ))}
+                  </ul>
+                  <p className="mt-1.5 text-[11px] text-amber-700">
+                    Bu bir ön değerlendirmedir. Tank/dökme taşımada eşikler daha düşüktür — nihai karar TMGD&apos;ye aittir.
+                  </p>
+                </div>
+              ) : (
+                <p className="text-xs bg-green-50 border border-green-200 rounded p-2 text-green-800">
+                  ✓ Tablo 1.10.3.1.2 eşikleri aşılmıyor — emniyet planı gerekmiyor görünüyor.
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* YAZILI TALİMAT — ADR 5.4.3 */}
+          {kalemler.length > 0 && (
+            <div className="mt-3 pt-3 border-t">
+              <p className="text-xs font-semibold text-gray-700 mb-1.5">Yazılı Talimat (ADR 5.4.3)</p>
+              <p className="text-xs bg-blue-50 border border-blue-200 rounded p-2 text-blue-900">
+                📋 Taşıma sırasında araçta, sürücünün anlayacağı dilde <strong>yazılı talimat</strong> bulunmalıdır.
+                Yazılı talimat taşınan maddeye değil, <strong>ADR&apos;nin standart formatına</strong> göre hazırlanır
+                (4 sayfalık standart metin) ve taşımacı tarafından sağlanır.
+              </p>
+            </div>
           )}
 
           {/* KARIŞIK YÜKLEME — ADR 7.5.2 (adrMix ortak motoru) */}
