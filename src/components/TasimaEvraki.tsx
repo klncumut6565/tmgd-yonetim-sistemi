@@ -45,6 +45,31 @@ type TabloARow = {
   labels: string | null;
 };
 
+/**
+ * ADR ambalaj türleri — ADR Bölüm 6.1 ambalaj kodlarıyla uyumlu, TMGD'nin
+ * günlük kullandığı pratik liste. Serbest metin yerine liste kullanmak
+ * evraklarda tutarlılık sağlar (aynı ambalaj her evrakta aynı yazılır).
+ * "Diğer" seçilirse serbest metin alanı açılır.
+ */
+const AMBALAJ_TURLERI = [
+  "Çelik varil (1A1/1A2)",
+  "Plastik varil (1H1/1H2)",
+  "Fiber varil (1G)",
+  "Çelik bidon (3A1/3A2)",
+  "Plastik bidon (3H1/3H2)",
+  "Çelik kutu (4A)",
+  "Karton kutu (4G)",
+  "Plastik kutu (4H1/4H2)",
+  "Ahşap kutu (4C1/4C2)",
+  "Plastik torba (5H2/5H3)",
+  "Kompozit ambalaj (6HA1)",
+  "IBC - plastik (31H1/31HA1)",
+  "IBC - çelik (31A)",
+  "Tank / Tanker",
+  "Gaz tüpü",
+  "Diğer",
+] as const;
+
 type Envanter = {
   id: string;
   un_number: string;
@@ -56,6 +81,13 @@ type Envanter = {
   transport_category: string | null;
   labels: string | null; // karışık yükleme motoru etiketlerden çalışır
   trade_name: string | null;
+};
+
+/** Firma bazlı alıcı rehberi kaydı (firm_consignees) */
+type Consignee = {
+  id: string;
+  title: string;
+  address: string | null;
 };
 
 type Kalem = {
@@ -324,6 +356,12 @@ export default function TasimaEvraki({
   const [tarih, setTarih] = useState(() => new Date().toISOString().slice(0, 10));
   const [gonderen, setGonderen] = useState(firmaAdi);
   const [alici, setAlici] = useState("");
+  const [aliciAdres, setAliciAdres] = useState("");
+
+  // Firma bazlı alıcı rehberi — bir kez kaydedilir, sonraki evraklarda
+  // listeden seçilir (migration 035: firm_consignees)
+  const [aliciListesi, setAliciListesi] = useState<Consignee[]>([]);
+  const [aliciKaydediliyor, setAliciKaydediliyor] = useState(false);
   const [tasiyici, setTasiyici] = useState("");
   const [surucuId, setSurucuId] = useState("");
   const [aracId, setAracId] = useState("");
@@ -341,6 +379,7 @@ export default function TasimaEvraki({
   const [tabloAAraniyor, setTabloAAraniyor] = useState(false);
   const [seciliTabloA, setSeciliTabloA] = useState<TabloARow | null>(null);
   const [ambalajTuru, setAmbalajTuru] = useState("");
+  const [ambalajDiger, setAmbalajDiger] = useState("");
   const [ambalajAdet, setAmbalajAdet] = useState("1");
   const [miktar, setMiktar] = useState("");
   const [birim, setBirim] = useState("kg");
@@ -348,7 +387,7 @@ export default function TasimaEvraki({
   const [eq, setEq] = useState(false);
 
   const yukle = useCallback(async () => {
-    const [env, sur, arc, evr] = await Promise.all([
+    const [env, sur, arc, evr, alc] = await Promise.all([
       supabase.from("firm_chemicals")
         .select("id, un_number, proper_shipping_name, adr_class, classification_code, packing_group, tunnel_code, transport_category, labels, trade_name")
         .eq("firm_id", firmId).order("un_number"),
@@ -361,6 +400,9 @@ export default function TasimaEvraki({
       supabase.from("transport_documents")
         .select("id, document_no, transport_date, status, total_points, tunnel_restriction_code")
         .eq("firm_id", firmId).order("created_at", { ascending: false }).limit(50),
+      supabase.from("firm_consignees")
+        .select("id, title, address")
+        .eq("firm_id", firmId).order("title"),
     ]);
     if (env.error && /does not exist|not find the table/i.test(env.error.message || "")) {
       setHata("Veritabanı güncellemesi (027_adr_transport_envanter.sql) henüz çalıştırılmamış.");
@@ -370,6 +412,9 @@ export default function TasimaEvraki({
     setSuruculer((sur.data as Surucu[]) || []);
     setAraclar((arc.data as Arac[]) || []);
     setEvraklar((evr.data as EvrakOzet[]) || []);
+    // Alıcı rehberi henüz oluşturulmamışsa (migration 035 çalışmadıysa)
+    // sessizce boş geç — evrak düzenleme yine de çalışsın.
+    setAliciListesi((alc.data as Consignee[]) || []);
   }, [firmId]);
 
   useEffect(() => { yukle(); }, [yukle]);
@@ -519,6 +564,28 @@ export default function TasimaEvraki({
   const seciliSurucu = suruculer.find((s) => s.id === surucuId) || null;
   const seciliArac = araclar.find((a) => a.id === aracId) || null;
 
+  /** Girilen alıcıyı bu firmanın rehberine kaydeder (bir dahaki sefere listeden seçilir). */
+  async function aliciyiRehbereKaydet() {
+    const unvan = alici.trim();
+    if (!unvan) { setMesaj("Önce alıcı unvanını yaz."); return; }
+    setAliciKaydediliyor(true);
+    const { error } = await supabase.from("firm_consignees").upsert(
+      { firm_id: firmId, title: unvan, address: aliciAdres.trim() || null },
+      { onConflict: "firm_id,title" }
+    );
+    setAliciKaydediliyor(false);
+    if (error) {
+      setMesaj(
+        /does not exist|not find the table/i.test(error.message)
+          ? "Alıcı rehberi için veritabanı güncellemesi (035_firm_consignees.sql) gerekli."
+          : "Alıcı kaydedilemedi: " + error.message
+      );
+      return;
+    }
+    setMesaj(`✓ "${unvan}" alıcı rehberine kaydedildi.`);
+    yukle();
+  }
+
   function kalemEkle() {
     // İki kaynak: firmanın envanteri VEYA doğrudan ADR Tablo A.
     // Tablo A'dan gelenlerde firm_chemical_id null olur (envanter kaydı
@@ -556,17 +623,17 @@ export default function TasimaEvraki({
     setMesaj("");
     setKalemler((prev) => [...prev, {
       ...secim,
-      packaging_type: ambalajTuru.trim(),
+      packaging_type: (ambalajTuru === "Diğer" ? ambalajDiger.trim() : ambalajTuru.trim()),
       packaging_count: Math.max(1, parseInt(ambalajAdet) || 1),
       quantity: q, unit: birim, is_lq: lq, is_eq: eq,
     }]);
     setSeciliKimyasal(""); setSeciliTabloA(null); setTabloAArama("");
-    setAmbalajTuru(""); setAmbalajAdet("1");
+    setAmbalajTuru(""); setAmbalajDiger(""); setAmbalajAdet("1");
     setMiktar(""); setLq(false); setEq(false);
   }
 
   function temizle() {
-    setEvrakId(null); setEvrakNo(""); setAlici(""); setTasiyici("");
+    setEvrakId(null); setEvrakNo(""); setAlici(""); setAliciAdres(""); setTasiyici("");
     setSurucuId(""); setAracId(""); setNotlar(""); setKalemler([]);
     setGonderen(firmaAdi); setMesaj("");
     setTarih(new Date().toISOString().slice(0, 10));
@@ -580,7 +647,17 @@ export default function TasimaEvraki({
     if (!ev) return;
     setEvrakId(ev.id); setEvrakNo(ev.document_no || "");
     setTarih(ev.transport_date || new Date().toISOString().slice(0, 10));
-    setGonderen(ev.consignor || firmaAdi); setAlici(ev.consignee || "");
+    setGonderen(ev.consignor || firmaAdi);
+    // Kayıtta unvan ve adres tek alanda satır sonuyla ayrılmış tutuluyor
+    const aliciTam = ev.consignee || "";
+    const ilkSatirSonu = aliciTam.indexOf("\n");
+    if (ilkSatirSonu > -1) {
+      setAlici(aliciTam.slice(0, ilkSatirSonu));
+      setAliciAdres(aliciTam.slice(ilkSatirSonu + 1));
+    } else {
+      setAlici(aliciTam);
+      setAliciAdres("");
+    }
     setTasiyici(ev.carrier || ""); setSurucuId(ev.driver_id || "");
     setAracId(ev.vehicle_id || ""); setNotlar(ev.notes || "");
     setKalemler(((it || []) as Record<string, unknown>[]).map((r) => {
@@ -621,7 +698,9 @@ export default function TasimaEvraki({
     setMesaj("");
     const govde = {
       firm_id: firmId, document_no: evrakNo.trim(), transport_date: tarih,
-      consignor: gonderen.trim(), consignee: alici.trim(), carrier: tasiyici.trim(),
+      consignor: gonderen.trim(),
+      consignee: aliciAdres.trim() ? `${alici.trim()}\n${aliciAdres.trim()}` : alici.trim(),
+      carrier: tasiyici.trim(),
       driver_id: surucuId || null, vehicle_id: aracId || null,
       status: "Kaydedildi", total_points: muafiyetsiz ? null : puan,
       orange_plate_required: plakaGerekli,
@@ -659,7 +738,9 @@ export default function TasimaEvraki({
     const doc = await evrakPdfUret({
       firmaAdi, evrakNo: evrakNo || "(taslak)",
       tarih: tarih.split("-").reverse().join("."),
-      gonderen, alici, tasiyici,
+      gonderen,
+      alici: aliciAdres.trim() ? `${alici}\n${aliciAdres.trim()}` : alici,
+      tasiyici,
       surucu: seciliSurucu, arac: seciliArac,
       kalemler, puan, plakaGerekli, muafiyetsiz, tunel, notlar,
     });
@@ -705,8 +786,41 @@ export default function TasimaEvraki({
               value={tarih} onChange={(e) => setTarih(e.target.value)} disabled={!canWrite} />
             <input className="border p-2 rounded text-sm" placeholder="Gönderen"
               value={gonderen} onChange={(e) => setGonderen(e.target.value)} disabled={!canWrite} />
-            <input className="border p-2 rounded text-sm" placeholder="Alıcı"
-              value={alici} onChange={(e) => setAlici(e.target.value)} disabled={!canWrite} />
+            <div className="md:col-span-1">
+              {aliciListesi.length > 0 && (
+                <select
+                  className="border p-2 rounded text-sm w-full mb-1"
+                  value=""
+                  onChange={(e) => {
+                    const sec = aliciListesi.find((a) => a.id === e.target.value);
+                    if (sec) {
+                      setAlici(sec.title);
+                      setAliciAdres(sec.address || "");
+                    }
+                  }}
+                  disabled={!canWrite}
+                >
+                  <option value="">📋 Kayıtlı alıcılardan seç...</option>
+                  {aliciListesi.map((a) => (
+                    <option key={a.id} value={a.id}>{a.title}</option>
+                  ))}
+                </select>
+              )}
+              <input className="border p-2 rounded text-sm w-full" placeholder="Alıcı firma unvanı"
+                value={alici} onChange={(e) => setAlici(e.target.value)} disabled={!canWrite} />
+              <textarea className="border p-2 rounded text-sm w-full mt-1" rows={2}
+                placeholder="Alıcı adresi"
+                value={aliciAdres} onChange={(e) => setAliciAdres(e.target.value)} disabled={!canWrite} />
+              {canWrite && alici.trim() && (
+                <button
+                  onClick={aliciyiRehbereKaydet}
+                  disabled={aliciKaydediliyor}
+                  className="text-xs text-blue-600 hover:underline mt-1 disabled:opacity-50"
+                >
+                  {aliciKaydediliyor ? "Kaydediliyor..." : "💾 Bu alıcıyı rehbere kaydet"}
+                </button>
+              )}
+            </div>
             <input className="border p-2 rounded text-sm" placeholder="Taşıyıcı firma"
               value={tasiyici} onChange={(e) => setTasiyici(e.target.value)} disabled={!canWrite} />
             <select className="border p-2 rounded text-sm" value={surucuId}
@@ -802,8 +916,13 @@ export default function TasimaEvraki({
                     </option>
                   ))}
                 </select>
-                <input className="border p-2 rounded text-sm" placeholder="Ambalaj (örn. Varil)"
-                  value={ambalajTuru} onChange={(e) => setAmbalajTuru(e.target.value)} />
+                <select className="border p-2 rounded text-sm"
+                  value={ambalajTuru} onChange={(e) => setAmbalajTuru(e.target.value)}>
+                  <option value="">Ambalaj türü...</option>
+                  {AMBALAJ_TURLERI.map((a) => (
+                    <option key={a} value={a}>{a}</option>
+                  ))}
+                </select>
                 <input className="border p-2 rounded text-sm" type="number" min="1" placeholder="Adet"
                   value={ambalajAdet} onChange={(e) => setAmbalajAdet(e.target.value)} />
                 <input className="border p-2 rounded text-sm" type="number" min="0" step="any"
@@ -813,6 +932,11 @@ export default function TasimaEvraki({
                   <option value="kg">kg</option><option value="lt">lt</option><option value="adet">adet</option>
                 </select>
               </div>
+              {ambalajTuru === "Diğer" && (
+                <input className="border p-2 rounded text-sm w-full mt-2"
+                  placeholder="Ambalaj türünü yaz..."
+                  value={ambalajDiger} onChange={(e) => setAmbalajDiger(e.target.value)} />
+              )}
               <div className="flex items-center gap-4 mt-2">
                 <label className="text-xs flex items-center gap-1">
                   <input type="checkbox" checked={lq} onChange={(e) => setLq(e.target.checked)} />
