@@ -417,6 +417,30 @@ function FirmDetailInner({
     return m;
   }, [belgeler]);
 
+  /**
+   * TMGD Hizmet Sözleşmesi (S1) satırındaki başlangıç tarihi.
+   *
+   * Bu tarih firms.contract_start alanına yazılır — belge takip listesinde
+   * ayrı tutulmaz. Sebebi: sistem bu tarihi ziyaret raporu aylarını ve
+   * yıllık faaliyet raporlarını üretmek için kullanıyor (belgeKatalogu.ts).
+   * İki ayrı yerde tarih tutmak, listenin yanlış üretilmesine yol açardı.
+   */
+  async function updateContractStart(date: string) {
+    if (!canWrite) return;
+    const { error } = await supabase
+      .from("firms")
+      .update({ contract_start: date || null })
+      .eq("id", id);
+    if (error) {
+      setFileMsg("Sözleşme başlangıç tarihi kaydedilemedi: " + hataCevir(error));
+      return;
+    }
+    // Firma bilgisini tazele — checklist (ziyaret ayları / yıllık raporlar)
+    // bu tarihe göre yeniden üretilir.
+    const { data } = await supabase.from("firms").select("*").eq("id", id).single();
+    if (data) setFirm(data as Firm);
+  }
+
   async function updateExpiry(code: string, period: string, date: string) {
     if (!canWrite) return;
     const { error } = await supabase.from("firm_belgeleri").upsert(
@@ -1140,6 +1164,25 @@ function FirmDetailInner({
                                     value={visitDate}
                                     disabled={!canWrite}
                                     onChange={(e) => updateVisitDate(it.period, e.target.value)}
+                                    className="border rounded px-1 py-0.5 text-xs disabled:bg-gray-50 disabled:text-gray-400"
+                                  />
+                                </div>
+                              ) : it.code === "S1" ? (
+                                /* TMGD Hizmet Sözleşmesi — bu belgede anlamlı olan
+                                   BAŞLANGIÇ tarihidir (sözleşmenin bitişi değil).
+                                   Doğrudan firms.contract_start alanını düzenler:
+                                   sistem bu tarihi ziyaret raporu ayları ve yıllık
+                                   faaliyet raporu hesaplarında kullandığı için ayrı
+                                   bir tarih tutmak tutarsızlık yaratırdı. */
+                                <div className="flex items-center gap-1 shrink-0 text-xs text-gray-400">
+                                  <span title="Sözleşme Başlangıç Tarihi — ziyaret ve yıllık rapor takvimini belirler">
+                                    📅 Başlangıç:
+                                  </span>
+                                  <input
+                                    type="date"
+                                    value={firm?.contract_start ? String(firm.contract_start).slice(0, 10) : ""}
+                                    disabled={!canWrite}
+                                    onChange={(e) => updateContractStart(e.target.value)}
                                     className="border rounded px-1 py-0.5 text-xs disabled:bg-gray-50 disabled:text-gray-400"
                                   />
                                 </div>
