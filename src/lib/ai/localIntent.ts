@@ -99,8 +99,29 @@ function acmaNiyetiVarMi(metin: string): boolean {
 
 /** Metinden UN numaralarını çıkarır (4 haneli sayılar). */
 function unNumaralariniCikar(metin: string): string[] {
-  const eslesmeler = metin.match(/\b\d{4}\b/g) ?? [];
-  return Array.from(new Set(eslesmeler)).slice(0, 10);
+  // ÖNCELİK: açıkça "UN 1203" / "un1203" biçiminde yazılmışsa yalnızca
+  // onları al. Aksi halde miktar gibi başka 4 haneli sayılar (örn.
+  // "3000 litre") yanlışlıkla UN numarası sanılıyordu.
+  const acikUn = Array.from(metin.matchAll(/\bun\s*(\d{4})\b/gi)).map((m) => m[1]);
+  if (acikUn.length > 0) return Array.from(new Set(acikUn)).slice(0, 10);
+
+  // "UN" öneki yoksa: 4 haneli sayıları al ama BİRİM takip edenleri
+  // (miktar) dışla — "3000 litre", "1500 kg" gibi.
+  const adaylar: string[] = [];
+  for (const m of metin.matchAll(/\b(\d{4})\b(\s*(litre|lt|kg|kilo|ton|adet|paket|varil|m3))?/gi)) {
+    if (!m[2]) adaylar.push(m[1]); // birim yoksa UN adayı
+  }
+  return Array.from(new Set(adaylar)).slice(0, 10);
+}
+
+/** Metinden miktar bilgisini çıkarır (örn. "3000 litre" -> 3000). */
+function miktarCikar(metin: string): number | null {
+  const m = metin.match(/\b(\d{1,7})(?:[.,](\d{1,3}))?\s*(litre|lt|kg|kilo|ton|adet|paket|varil|m3)\b/i);
+  if (!m) return null;
+  const tam = m[1];
+  const ondalik = m[2] ?? "";
+  const sayi = Number(ondalik ? `${tam}.${ondalik}` : tam);
+  return Number.isFinite(sayi) && sayi > 0 ? sayi : null;
 }
 
 /**
@@ -119,15 +140,40 @@ export function yerelNiyetCoz(mesaj: string, firmaBagalamiVar: boolean): LocalIn
   // ---- 1) Karışık yükleme kontrolü -------------------------------------
   // "UN 1203 ile UN 1170 taşınabilir mi", "1203 1170 karışık yükleme"
   const unNumaralari = unNumaralariniCikar(m);
+  const miktar = miktarCikar(m);
+
+  // "taşıma evrakı" açıkça geçiyorsa bu bir BELGE isteğidir, karışık
+  // yükleme sorgusu değil — "taşıma" kelimesindeki "taşı" kökü yüzünden
+  // yanlışlıkla karışık yükleme sanılıyordu.
+  const tasimaEvrakiIstegi = /tasima evrak|tasima evrag|sevkiyat evrak/.test(m);
+
   const karisikIfadeleri = ["karisik yukleme", "birlikte tasi", "beraber tasi", "ayni araca", "birlikte yukle"];
   const karisikNiyeti =
-    karisikIfadeleri.some((k) => m.includes(k)) ||
-    (unNumaralari.length >= 2 && /(tasi|yukle|olur mu|uygun mu|mumkun mu)/.test(m));
+    !tasimaEvrakiIstegi &&
+    (karisikIfadeleri.some((k) => m.includes(k)) ||
+      (unNumaralari.length >= 2 && /(birlikte|beraber|olur mu|uygun mu|mumkun mu|tasinabilir)/.test(m)));
 
   if (karisikNiyeti && unNumaralari.length >= 2) {
     return {
       action: { type: "open_karisik_yukleme", un_numbers: unNumaralari },
       cevap: `Karışık yükleme kontrolünü UN ${unNumaralari.join(", ")} için açıyorum.`,
+    };
+  }
+
+  // ---- 1b) Taşıma Evrakı isteği (UN + miktar) --------------------------
+  // "Taşıma evrakı penceresine UN 1203 eklensin, miktar 3000 litre"
+  if (tasimaEvrakiIstegi && firmaBagalamiVar) {
+    const parcalar: string[] = ["Taşıma Evrakı ekranını açıyorum"];
+    if (unNumaralari.length > 0) parcalar.push(`UN ${unNumaralari.join(", ")} envanterde aranacak`);
+    if (miktar) parcalar.push(`miktar ${miktar} olarak dolduruldu`);
+    return {
+      action: {
+        type: "open_firm_tab",
+        tab: "adr_transport",
+        ...(unNumaralari.length > 0 ? { un_numbers: unNumaralari } : {}),
+        ...(miktar ? { quantity: miktar } : {}),
+      },
+      cevap: parcalar.join(", ") + ". Kontrol edip \"Kalem Ekle\"ye basman yeterli.",
     };
   }
 

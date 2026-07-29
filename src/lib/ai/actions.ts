@@ -26,8 +26,8 @@ export type FirmTabKey = (typeof VALID_FIRM_TABS)[number];
 export type AssistantAction =
   | { type: "open_belge_olustur" }
   | { type: "open_karisik_yukleme"; un_numbers: string[] }
-  | { type: "open_firm_tab"; tab: FirmTabKey; un_numbers?: string[] }
-  | { type: "open_firm"; firm_id?: string; firm_name: string; tab?: FirmTabKey; un_numbers?: string[] }
+  | { type: "open_firm_tab"; tab: FirmTabKey; un_numbers?: string[]; quantity?: number }
+  | { type: "open_firm"; firm_id?: string; firm_name: string; tab?: FirmTabKey; un_numbers?: string[]; quantity?: number }
   | { type: "prefill_task"; title: string };
 
 // Kapanışlı blok: ```eylem {...} ```
@@ -143,6 +143,7 @@ export function actionToUrl(action: AssistantAction, firmId: string | null): str
       if (action.un_numbers && action.un_numbers.length > 0) {
         params.set("evrak_un", action.un_numbers.join(","));
       }
+      if (action.quantity) params.set("evrak_miktar", String(action.quantity));
       return `/firms/${firmId}?${params.toString()}`;
     }
     case "prefill_task": {
@@ -163,6 +164,7 @@ export function actionToUrl(action: AssistantAction, firmId: string | null): str
       if (action.un_numbers && action.un_numbers.length > 0) {
         params.set("evrak_un", action.un_numbers.join(","));
       }
+      if (action.quantity) params.set("evrak_miktar", String(action.quantity));
       const qs = params.toString();
       return `/firms/${action.firm_id}${qs ? `?${qs}` : ""}`;
     }

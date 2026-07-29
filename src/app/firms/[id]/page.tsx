@@ -181,6 +181,35 @@ function FirmDetailInner({
   const [tab, setTab] = useState<TabKey>("belge_takip");
   const [adrAltSekme, setAdrAltSekme] = useState<"evrak" | "envanter">("evrak");
   const [evrakPrefillUns, setEvrakPrefillUns] = useState<string[]>([]);
+  const [evrakPrefillMiktar, setEvrakPrefillMiktar] = useState<number | undefined>(undefined);
+
+  // Firma içinden hızlı görev ekleme (Görevler sekmesi)
+  const [yeniGorevBaslik, setYeniGorevBaslik] = useState("");
+  const [gorevEkleniyor, setGorevEkleniyor] = useState(false);
+  const [gorevHatasi, setGorevHatasi] = useState("");
+
+  async function gorevEkle() {
+    const baslik = yeniGorevBaslik.trim();
+    if (!baslik) return;
+    setGorevEkleniyor(true);
+    setGorevHatasi("");
+
+    const { error } = await supabase.from("tasks").insert({
+      title: baslik,
+      firm_id: id,
+      status: "todo",
+      priority: "medium",
+    });
+
+    setGorevEkleniyor(false);
+
+    if (error) {
+      setGorevHatasi(hataCevir(error.message));
+      return;
+    }
+    setYeniGorevBaslik("");
+    loadRows("tasks");
+  }
 
   // ADR Asistani veya harici baglantilar icin: /firms/<id>?tab=belge_olustur
   // gibi bir URL, dogrudan o sekmeyi acar. ?evrak_un=1203,1170 ise Tasima
@@ -199,6 +228,11 @@ function FirmDetailInner({
     const evrakUnParam = searchParams.get("evrak_un");
     if (evrakUnParam) {
       setEvrakPrefillUns(evrakUnParam.split(",").map((s) => s.trim()).filter(Boolean));
+    }
+    const evrakMiktarParam = searchParams.get("evrak_miktar");
+    if (evrakMiktarParam) {
+      const sayi = Number(evrakMiktarParam);
+      if (Number.isFinite(sayi) && sayi > 0) setEvrakPrefillMiktar(sayi);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
@@ -1376,7 +1410,31 @@ function FirmDetailInner({
 
       {/* GÖREVLER — basit salt okunur liste (görev CRUD'u /tasks Kanban ekranında) */}
       {tab === "tasks" && (
-        <div className="border rounded-xl overflow-hidden">
+        <div>
+          {canWrite && (
+            <div className="border rounded-xl p-4 mb-4 bg-gray-50">
+              <div className="flex gap-2">
+                <input
+                  className="flex-1 border p-2 rounded text-sm"
+                  placeholder="Yeni görev başlığı (örn. Ziyaret raporu sisteme girilecek)"
+                  value={yeniGorevBaslik}
+                  onChange={(e) => setYeniGorevBaslik(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && yeniGorevBaslik.trim()) gorevEkle();
+                  }}
+                />
+                <button
+                  onClick={gorevEkle}
+                  disabled={!yeniGorevBaslik.trim() || gorevEkleniyor}
+                  className="px-4 py-2 bg-black text-white rounded text-sm disabled:opacity-40 whitespace-nowrap"
+                >
+                  {gorevEkleniyor ? "Ekleniyor..." : "+ Görev Ekle"}
+                </button>
+              </div>
+              {gorevHatasi && <p className="text-xs text-red-600 mt-2">{gorevHatasi}</p>}
+            </div>
+          )}
+          <div className="border rounded-xl overflow-hidden">
           <table className="w-full text-sm">
             <thead className="bg-gray-50">
               <tr>
@@ -1415,12 +1473,13 @@ function FirmDetailInner({
             </tbody>
           </table>
           <p className="text-xs text-gray-400 p-3 border-t">
-            Görev eklemek/düzenlemek için{" "}
+            Görevleri düzenlemek/silmek için{" "}
             <Link href="/tasks" className="text-blue-600 underline">
               Görevler
             </Link>{" "}
             ekranını kullan.
           </p>
+          </div>
         </div>
       )}
 
@@ -1513,7 +1572,12 @@ function FirmDetailInner({
             </div>
           )}
           {adrAltSekme === "evrak" && firm && (
-            <TasimaEvraki firmId={id} firmaAdi={firm.name} prefillUnNumbers={evrakPrefillUns} />
+            <TasimaEvraki
+              firmId={id}
+              firmaAdi={firm.name}
+              prefillUnNumbers={evrakPrefillUns}
+              prefillMiktar={evrakPrefillMiktar}
+            />
           )}
         </div>
       )}

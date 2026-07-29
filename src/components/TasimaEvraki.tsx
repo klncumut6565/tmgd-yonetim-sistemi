@@ -285,6 +285,7 @@ export default function TasimaEvraki({
   firmId,
   firmaAdi,
   prefillUnNumbers,
+  prefillMiktar,
 }: {
   firmId: string;
   firmaAdi: string;
@@ -292,6 +293,8 @@ export default function TasimaEvraki({
    * bulunan ilk eşleşme otomatik seçilir, miktar girişi kullanıcıda kalır
    * (gerçek bir taşıma belgesi olduğu için miktarı asistan uydurmaz). */
   prefillUnNumbers?: string[];
+  /** Asistandan gelen miktar — forma doldurulur, onay yine kullanıcıda. */
+  prefillMiktar?: number;
 }) {
   const { canWrite } = useUser();
 
@@ -378,6 +381,7 @@ export default function TasimaEvraki({
 
     if (ilkEslesme) {
       setSeciliKimyasal(ilkEslesme.id);
+      if (prefillMiktar && prefillMiktar > 0) setMiktar(String(prefillMiktar));
     }
 
     const parcalar: string[] = [];
@@ -394,7 +398,7 @@ export default function TasimaEvraki({
       parcalar.push(`⚠️ UN ${bulunmayanlar.join(", ")} firmanın Kimyasal Envanterinde bulunamadı, önce envantere eklenmesi gerekiyor.`);
     }
     if (parcalar.length > 0) setMesaj(parcalar.join(" "));
-  }, [envanter, prefillUnNumbers]);
+  }, [envanter, prefillUnNumbers, prefillMiktar]);
 
 
   // Canlı ADR hesabı — her kalem değişikliğinde otomatik
