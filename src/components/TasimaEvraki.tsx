@@ -32,6 +32,19 @@ import {
 } from "@/lib/pdfFonts";
 
 // ── Tipler ────────────────────────────────────────────────────────────────
+/** ADR Tablo A satırı (adr_un_numbers tablosu) */
+type TabloARow = {
+  id: string;
+  un_number: string;
+  proper_shipping_name: string;
+  class: string | null;
+  classification_code: string | null;
+  packing_group: string | null;
+  tunnel_code: string | null;
+  transport_category: string | null;
+  labels: string | null;
+};
+
 type Envanter = {
   id: string;
   un_number: string;
@@ -319,6 +332,14 @@ export default function TasimaEvraki({
 
   // Yeni kalem formu
   const [seciliKimyasal, setSeciliKimyasal] = useState("");
+
+  // ADR Tablo A'dan arama — envanterde olmayan bir madde de taşıma
+  // evrakına eklenebilmeli. 2.939 kayıt olduğu için dropdown yerine
+  // arama kullanılıyor.
+  const [tabloAArama, setTabloAArama] = useState("");
+  const [tabloASonuclar, setTabloASonuclar] = useState<TabloARow[]>([]);
+  const [tabloAAraniyor, setTabloAAraniyor] = useState(false);
+  const [seciliTabloA, setSeciliTabloA] = useState<TabloARow | null>(null);
   const [ambalajTuru, setAmbalajTuru] = useState("");
   const [ambalajAdet, setAmbalajAdet] = useState("1");
   const [miktar, setMiktar] = useState("");
@@ -353,6 +374,33 @@ export default function TasimaEvraki({
 
   useEffect(() => { yukle(); }, [yukle]);
 
+  // Tablo A araması (debounce'lu)
+  useEffect(() => {
+    const q = tabloAArama.trim();
+    if (q.length < 2) {
+      setTabloASonuclar([]);
+      return;
+    }
+    let iptal = false;
+    setTabloAAraniyor(true);
+    const zamanlayici = setTimeout(async () => {
+      const sayiMi = /^\d+$/.test(q);
+      const { data } = await supabase
+        .from("adr_un_numbers")
+        .select("id, un_number, proper_shipping_name, class, classification_code, packing_group, tunnel_code, transport_category, labels")
+        .or(sayiMi ? `un_number.ilike.%${q}%` : `proper_shipping_name.ilike.%${q}%`)
+        .limit(25);
+      if (!iptal) {
+        setTabloASonuclar((data as TabloARow[]) ?? []);
+        setTabloAAraniyor(false);
+      }
+    }, 300);
+    return () => {
+      iptal = true;
+      clearTimeout(zamanlayici);
+    };
+  }, [tabloAArama]);
+
   // ADR Asistanı'ndan "UN X'i ekle" geldiyse: envanterde bulunan İLK
   // eşleşmeyi otomatik seç, miktarı BOŞ bırak (kullanıcı girmeli — gerçek
   // bir taşıma belgesi, miktarı asistan uydurmamalı). Aynı prefill isteği
@@ -361,43 +409,63 @@ export default function TasimaEvraki({
   const prefillIslendiRef = useRef<string>("");
   useEffect(() => {
     const istek = (prefillUnNumbers ?? []).join(",");
-    if (!istek || envanter.length === 0) return;
+    if (!istek) return;
     if (prefillIslendiRef.current === istek) return;
     prefillIslendiRef.current = istek;
 
-    const bulunanlar: string[] = [];
-    const bulunmayanlar: string[] = [];
-    let ilkEslesme: Envanter | null = null;
+    (async () => {
+      const bulunanlar: string[] = [];
+      let ilkEslesme: Envanter | null = null;
+      const envanterdeOlmayan: string[] = [];
 
-    for (const un of prefillUnNumbers ?? []) {
-      const eslesme = envanter.find((e) => e.un_number === un);
-      if (eslesme) {
-        bulunanlar.push(un);
-        if (!ilkEslesme) ilkEslesme = eslesme;
+      for (const un of prefillUnNumbers ?? []) {
+        const eslesme = envanter.find((e) => e.un_number === un);
+        if (eslesme) {
+          bulunanlar.push(un);
+          if (!ilkEslesme) ilkEslesme = eslesme;
+        } else {
+          envanterdeOlmayan.push(un);
+        }
+      }
+
+      if (ilkEslesme) {
+        setSeciliKimyasal(ilkEslesme.id);
+        if (prefillMiktar && prefillMiktar > 0) setMiktar(String(prefillMiktar));
+        const ek = envanterdeOlmayan.length > 0
+          ? ` (UN ${envanterdeOlmayan.join(", ")} envanterde yok — Tablo A aramasından ekleyebilirsin.)`
+          : "";
+        setMesaj(
+          `🤖 UN ${ilkEslesme.un_number} envanterden seçildi. Miktarı kontrol edip "Ürünü ekle"ye bas.${ek}`
+        );
+        return;
+      }
+
+      // Envanterde yok — ADR Tablo A'dan dene. Envanterde bulunmayan bir
+      // madde de taşınabilir; kullanıcıyı "önce envantere ekle" diye
+      // engellemek yerine doğrudan Tablo A'dan seçili getiriyoruz.
+      const ilkUn = (prefillUnNumbers ?? [])[0];
+      if (!ilkUn) return;
+
+      const { data } = await supabase
+        .from("adr_un_numbers")
+        .select("id, un_number, proper_shipping_name, class, classification_code, packing_group, tunnel_code, transport_category, labels")
+        .eq("un_number", ilkUn)
+        .limit(1);
+
+      const satir = (data as TabloARow[] | null)?.[0];
+      if (satir) {
+        setSeciliTabloA(satir);
+        setSeciliKimyasal("");
+        setTabloAArama(`UN ${satir.un_number} — ${satir.proper_shipping_name}`);
+        if (prefillMiktar && prefillMiktar > 0) setMiktar(String(prefillMiktar));
+        setMesaj(
+          `🤖 UN ${satir.un_number} envanterde yoktu, ADR Tablo A'dan seçildi: ${satir.proper_shipping_name}. ` +
+            `Miktarı kontrol edip "Ürünü ekle"ye bas.`
+        );
       } else {
-        bulunmayanlar.push(un);
+        setMesaj(`⚠️ UN ${ilkUn} ne envanterde ne de ADR Tablo A'da bulunabildi. Numarayı kontrol et.`);
       }
-    }
-
-    if (ilkEslesme) {
-      setSeciliKimyasal(ilkEslesme.id);
-      if (prefillMiktar && prefillMiktar > 0) setMiktar(String(prefillMiktar));
-    }
-
-    const parcalar: string[] = [];
-    if (bulunanlar.length > 0) {
-      parcalar.push(
-        `🤖 ADR Asistanı: UN ${bulunanlar.join(", ")} envanterde bulundu` +
-          (ilkEslesme ? ` — UN ${ilkEslesme.un_number} formda seçildi, miktarı girip "Kalem Ekle"ye bas.` : ".")
-      );
-      if (bulunanlar.length > 1) {
-        parcalar.push(`Diğerlerini eklemek için önce bunu ekleyip sonra tekrar seçmen gerekiyor.`);
-      }
-    }
-    if (bulunmayanlar.length > 0) {
-      parcalar.push(`⚠️ UN ${bulunmayanlar.join(", ")} firmanın Kimyasal Envanterinde bulunamadı, önce envantere eklenmesi gerekiyor.`);
-    }
-    if (parcalar.length > 0) setMesaj(parcalar.join(" "));
+    })();
   }, [envanter, prefillUnNumbers, prefillMiktar]);
 
 
@@ -452,26 +520,48 @@ export default function TasimaEvraki({
   const seciliArac = araclar.find((a) => a.id === aracId) || null;
 
   function kalemEkle() {
+    // İki kaynak: firmanın envanteri VEYA doğrudan ADR Tablo A.
+    // Tablo A'dan gelenlerde firm_chemical_id null olur (envanter kaydı
+    // değil) — evrak yine de üretilebilir.
     const kim = envanter.find((e) => e.id === seciliKimyasal);
-    if (!kim) return;
+    const secim = kim
+      ? {
+          firm_chemical_id: kim.id,
+          un_number: kim.un_number,
+          proper_shipping_name: kim.proper_shipping_name,
+          adr_class: kim.adr_class,
+          classification_code: kim.classification_code,
+          labels: kim.labels,
+          packing_group: kim.packing_group,
+          tunnel_code: kim.tunnel_code,
+          transport_category: kim.transport_category,
+        }
+      : seciliTabloA
+        ? {
+            firm_chemical_id: null,
+            un_number: seciliTabloA.un_number,
+            proper_shipping_name: seciliTabloA.proper_shipping_name,
+            adr_class: seciliTabloA.class,
+            classification_code: seciliTabloA.classification_code,
+            labels: seciliTabloA.labels,
+            packing_group: seciliTabloA.packing_group,
+            tunnel_code: seciliTabloA.tunnel_code,
+            transport_category: seciliTabloA.transport_category,
+          }
+        : null;
+
+    if (!secim) { setMesaj("Önce bir kimyasal seç (envanterden ya da Tablo A'dan)."); return; }
     const q = parseFloat(miktar);
     if (isNaN(q) || q <= 0) { setMesaj("Geçerli bir miktar gir."); return; }
     setMesaj("");
     setKalemler((prev) => [...prev, {
-      firm_chemical_id: kim.id,
-      un_number: kim.un_number,
-      proper_shipping_name: kim.proper_shipping_name,
-      adr_class: kim.adr_class,
-      classification_code: kim.classification_code,
-      labels: kim.labels,
-      packing_group: kim.packing_group,
-      tunnel_code: kim.tunnel_code,
-      transport_category: kim.transport_category,
+      ...secim,
       packaging_type: ambalajTuru.trim(),
       packaging_count: Math.max(1, parseInt(ambalajAdet) || 1),
       quantity: q, unit: birim, is_lq: lq, is_eq: eq,
     }]);
-    setSeciliKimyasal(""); setAmbalajTuru(""); setAmbalajAdet("1");
+    setSeciliKimyasal(""); setSeciliTabloA(null); setTabloAArama("");
+    setAmbalajTuru(""); setAmbalajAdet("1");
     setMiktar(""); setLq(false); setEq(false);
   }
 
@@ -641,13 +731,71 @@ export default function TasimaEvraki({
           {canWrite && (
             <div className="border rounded-lg p-3 bg-gray-50 mb-3">
               <p className="text-xs text-gray-500 mb-2">
-                Ürünler firmanın Kimyasal Envanterinden seçilir
-                {envanter.length === 0 && " — envanter boş, önce Kimyasal Envanter sekmesinden madde ekle"}.
+                Ürünü firmanın Kimyasal Envanterinden seç ya da ADR Tablo A&apos;da ara.
               </p>
+
+              {/* ADR Tablo A araması — envanterde olmayan maddeler için */}
+              <div className="mb-2">
+                <input
+                  className="border p-2 rounded text-sm w-full"
+                  placeholder="🔍 ADR Tablo A'da ara (UN numarası veya madde adı)..."
+                  value={tabloAArama}
+                  onChange={(e) => {
+                    setTabloAArama(e.target.value);
+                    setSeciliTabloA(null);
+                    setSeciliKimyasal("");
+                  }}
+                />
+                {tabloAAraniyor && <p className="text-xs text-gray-400 mt-1">Aranıyor...</p>}
+                {!tabloAAraniyor && tabloAArama.trim().length >= 2 && tabloASonuclar.length === 0 && (
+                  <p className="text-xs text-gray-400 mt-1">Tablo A&apos;da eşleşme bulunamadı.</p>
+                )}
+                {tabloASonuclar.length > 0 && (
+                  <div className="border rounded mt-1 max-h-44 overflow-y-auto bg-white">
+                    {tabloASonuclar.map((r) => (
+                      <button
+                        key={r.id}
+                        onClick={() => {
+                          setSeciliTabloA(r);
+                          setSeciliKimyasal("");
+                          setTabloASonuclar([]);
+                          setTabloAArama(`UN ${r.un_number} — ${r.proper_shipping_name}`);
+                        }}
+                        className="block w-full text-left px-2 py-1.5 text-xs hover:bg-blue-50 border-b last:border-b-0"
+                      >
+                        <span className="font-mono font-semibold">UN {r.un_number}</span>{" "}
+                        {r.proper_shipping_name}
+                        <span className="text-gray-400">
+                          {r.class ? ` · Sınıf ${r.class}` : ""}
+                          {r.packing_group ? ` · AG ${r.packing_group}` : ""}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {seciliTabloA && (
+                  <p className="text-xs text-blue-700 bg-blue-50 border border-blue-200 rounded p-1.5 mt-1">
+                    ✓ Tablo A&apos;dan seçildi: UN {seciliTabloA.un_number} — {seciliTabloA.proper_shipping_name}
+                    <button
+                      onClick={() => { setSeciliTabloA(null); setTabloAArama(""); }}
+                      className="ml-2 underline text-blue-600"
+                    >
+                      kaldır
+                    </button>
+                  </p>
+                )}
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-6 gap-2 items-center">
                 <select className="border p-2 rounded text-sm md:col-span-2"
-                  value={seciliKimyasal} onChange={(e) => setSeciliKimyasal(e.target.value)}>
-                  <option value="">Kimyasal seç...</option>
+                  value={seciliKimyasal}
+                  onChange={(e) => {
+                    setSeciliKimyasal(e.target.value);
+                    if (e.target.value) { setSeciliTabloA(null); setTabloAArama(""); }
+                  }}>
+                  <option value="">
+                    {envanter.length === 0 ? "Envanter boş — Tablo A'dan ara" : "Envanterden seç..."}
+                  </option>
                   {envanter.map((e) => (
                     <option key={e.id} value={e.id}>
                       UN {e.un_number} — {(e.trade_name || e.proper_shipping_name).slice(0, 48)}
@@ -674,7 +822,7 @@ export default function TasimaEvraki({
                   <input type="checkbox" checked={eq} onChange={(e) => setEq(e.target.checked)} />
                   EQ (İstisnai Miktar)
                 </label>
-                <button onClick={kalemEkle} disabled={!seciliKimyasal}
+                <button onClick={kalemEkle} disabled={!seciliKimyasal && !seciliTabloA}
                   className="ml-auto px-3 py-1.5 rounded bg-blue-600 text-white text-xs hover:bg-blue-700 disabled:opacity-40">
                   Ürünü ekle
                 </button>
