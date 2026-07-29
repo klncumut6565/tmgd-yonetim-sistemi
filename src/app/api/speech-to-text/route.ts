@@ -26,8 +26,11 @@ export const dynamic = 'force-dynamic'
 export const maxDuration = 25
 
 const TALIMAT =
-  'Bu ses kaydını Türkçe olarak birebir yazıya dök. SADECE konuşulan metni yaz — ' +
-  'açıklama, yorum, tırnak işareti veya başka hiçbir şey ekleme. Ses anlaşılmıyorsa boş döndür.'
+  'Bu ses kaydı TÜRKÇE konuşmadır. Duyduğun Türkçe konuşmayı birebir Türkçe yazıya dök. ' +
+  'ÇEVİRİ YAPMA — başka dile çevirme, olduğu gibi Türkçe yaz. ' +
+  'SADECE konuşulan metni yaz: açıklama, yorum, tırnak işareti, giriş cümlesi ekleme. ' +
+  'Ses anlaşılmıyorsa veya sessizse HİÇBİR ŞEY YAZMA, tamamen boş döndür. ' +
+  'Sessizliği doldurmak için metin UYDURMA.'
 
 
 /**
@@ -144,6 +147,8 @@ async function geminiDene(
       },
     ],
     generationConfig: { maxOutputTokens: 300, temperature: 0 },
+    // Not: temperature 0 — transkripsiyonda yaratıcılık istemiyoruz,
+    // uydurma metin riskini en aza indirir.
   })
 
   // 503/429 geçici olabilir — ama zaman bütçesi dar, sadece 1 tekrar

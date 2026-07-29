@@ -123,6 +123,40 @@ const CALLERS: Record<ProviderKey, (apiKey: string, model: string, systemPrompt:
  * veya güvenlik meta etiketleri ("User Safety: safe"). Bunlar kullanıcıya
  * ASLA gösterilmemeli.
  */
+
+/**
+ * Metin belirgin şekilde İNGİLİZCE mi?
+ *
+ * Asistanın her zaman Türkçe cevap vermesi gerekiyor. Sistem promptunda
+ * bu açıkça belirtiliyor ama bazı modeller yine de İngilizceye kayabiliyor.
+ * O durumda cevabı kullanıcıya göstermek yerine bir sonraki motoru
+ * denemek daha doğru.
+ *
+ * YANLIŞ POZİTİF RİSKİ: Kısa cevaplarda ("Tamam.") karar vermek yanıltıcı
+ * olur — bu yüzden yalnızca yeterince uzun ve NET İngilizce metinlerde
+ * true döner.
+ */
+export function belirginIngilizceMi(metin: string): boolean {
+  const t = metin.trim();
+  if (t.length < 40) return false; // kısa metinde karar verme
+
+  const kucuk = t.toLowerCase();
+
+  // Türkçe'ye özgü karakterler veya çok yaygın Türkçe kelimeler
+  const turkceIsaretleri = /[ığşçöü]|(\bbir\b|\bve\b|\biçin\b|\bbu\b|\bile\b|\bolarak\b|\bgerek)/;
+  if (turkceIsaretleri.test(kucuk)) return false;
+
+  // Yaygın İngilizce işlev kelimeleri
+  const ingilizceKelimeler = [
+    "\\bthe\\b", "\\bis\\b", "\\bare\\b", "\\bto\\b", "\\bof\\b",
+    "\\band\\b", "\\bthat\\b", "\\bthis\\b", "\\bwe\\b", "\\byou\\b",
+    "\\bwith\\b", "\\bfor\\b", "\\bcan\\b", "\\bshould\\b",
+  ];
+  const sayac = ingilizceKelimeler.filter((k) => new RegExp(k).test(kucuk)).length;
+
+  return sayac >= 4;
+}
+
 export function modelCiktisiniTemizle(metin: string): string {
   let t = metin;
 
@@ -178,6 +212,17 @@ export async function callWithFallback(
     try {
       const ham = await CALLERS[cfg.provider](cfg.api_key as string, cfg.model, systemPrompt, messages);
       const text = modelCiktisiniTemizle(ham);
+
+      // Türkçe zorunluluğu: model İngilizceye kaydıysa bu cevabı kullanma,
+      // sıradaki motoru dene.
+      if (belirginIngilizceMi(text)) {
+        errors.push({
+          provider: cfg.provider,
+          message: "Model Türkçe yerine İngilizce cevap verdi, sonraki motora geçildi.",
+        });
+        continue;
+      }
+
       return { ok: true, text, provider: cfg.provider, errors };
     } catch (err) {
       errors.push({
