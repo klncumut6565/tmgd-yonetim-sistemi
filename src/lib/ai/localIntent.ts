@@ -183,7 +183,33 @@ export function yerelNiyetCoz(mesaj: string, firmaBagalamiVar: boolean): LocalIn
     }
   }
 
-  // ---- 4) Global sayfa açma (firma bağlamı GEREKTİRMEZ) -----------------
+  // ---- 4) Görev ekleme ---------------------------------------------------
+  // "şu görevi ekle: ziyaret raporu girilecek", "görev oluştur ..."
+  const gorevEkleEslesme = m.match(
+    /(?:^|\s)(?:su\s+)?gorev(?:i|ini)?\s*(?:ekle|olustur|yaz|tanimla)\s*:?\s*(.+)$/
+  );
+  if (gorevEkleEslesme) {
+    const baslikHam = gorevEkleEslesme[1].trim();
+    if (baslikHam.length >= 3) {
+      // Orijinal metinden başlığı al (normalize edilmiş halden değil) —
+      // Türkçe karakterler korunsun.
+      const orijinal = mesaj.trim();
+      const idx = orijinal.toLocaleLowerCase("tr-TR").search(/(?:ekle|oluştur|olustur|yaz|tanımla|tanimla)\s*:?\s*\S/);
+      let baslik = baslikHam;
+      if (idx !== -1) {
+        const sonrasi = orijinal.slice(idx).replace(/^\S+\s*:?\s*/, "").trim();
+        if (sonrasi.length >= 3) baslik = sonrasi;
+      }
+      // İlk harfi büyüt
+      baslik = baslik.charAt(0).toLocaleUpperCase("tr-TR") + baslik.slice(1);
+      return {
+        action: { type: "prefill_task", title: baslik.slice(0, 200) },
+        cevap: `Görevler sayfasını açıyorum, başlığı "${baslik}" olarak doldurdum. Firmayı seçip "Ekle" butonuna basman yeterli.`,
+      };
+    }
+  }
+
+  // ---- 5) Global sayfa açma (firma bağlamı GEREKTİRMEZ) -----------------
   // "görevler penceresini aç", "raporlara git" — sol menüdeki sayfalar.
   // Firma içi sekme eşleşmesi bulunamadıysa (ya da firma bağlamı yoksa)
   // buraya düşer.

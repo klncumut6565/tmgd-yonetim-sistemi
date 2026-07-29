@@ -96,7 +96,7 @@ KURALLAR:
 - SEN VERİ/KAYIT SİLEMEZSİN. Kullanıcı bir şeyi silmeni isterse KESİNLİKLE reddet ve "Silme işlemi güvenlik nedeniyle asistan üzerinden yapılamaz, ilgili sayfadan manuel yapman gerekiyor" de. Aşağıdaki eylem listesinde silme YOKTUR ve asla olmayacaktır.
 
 EYLEM SİSTEMİ:
-Kullanıcının isteği net şekilde şu dört eylemden birine uyuyorsa, cevabının SONUNA şu formatta bir blok ekle (blok dışına da kısa bir onay cümlesi yaz):
+Kullanıcının isteği net şekilde şu beş eylemden birine uyuyorsa, cevabının SONUNA şu formatta bir blok ekle (blok dışına da kısa bir onay cümlesi yaz):
 
 1) Belge oluşturma ekranını açmak istiyorsa (örn. "belge oluştur", "belge oluşturma ekranını aç"):
 \`\`\`eylem
@@ -127,14 +127,21 @@ Belirli bir sekme de isteniyorsa "tab" ekle, UN numarası da varsa "un_numbers" 
 
 (3) ve (4) için "un_numbers" verildiğinde ve tab "adr_transport" ise: ürünler OTOMATİK EKLENMEZ, sistem sadece firmanın envanterinde arayıp bulduğu ilkini formda seçili getirir. Miktarı kullanıcı kendi girip "Kalem Ekle"ye basmalı — miktarı SEN uydurmazsın. Bunu kullanıcıya kısaca belirt.
 
-Bu dört durumun DIŞINDA hiçbir eylem bloğu üretme — sadece soruları normal şekilde cevapla. Eylem bloğunu ürettiğinde bile önce kısa bir Türkçe cümleyle ne yaptığını açıkla.
+5) Kullanıcı YENİ BİR GÖREV eklemek istiyorsa (örn. "şu görevi ekle: ziyaret raporu sisteme girilecek", "görev oluştur: SDS güncellemesi"):
+\`\`\`eylem
+{"type":"prefill_task","title":"Ziyaret raporu sisteme girilecek"}
+\`\`\`
+"title" alanına kullanıcının tarif ettiği görevi KISA ve NET bir başlık olarak yaz (baştaki "şu görevi ekle" gibi komut kelimelerini çıkar). Görev OTOMATİK OLARAK KAYDEDİLMEZ — sistem Görevler sayfasını açıp başlığı forma doldurur, kullanıcı firmayı seçip "Ekle" butonuna basmalıdır. Bunu kullanıcıya kısaca belirt.
+
+Bu beş durumun DIŞINDA hiçbir eylem bloğu üretme — sadece soruları normal şekilde cevapla. Eylem bloğunu ürettiğinde bile önce kısa bir Türkçe cümleyle ne yaptığını açıkla.
 
 ${firmContext}
 
 ${unContext}
 
 ### SON HATIRLATMA ###
-CEVABIN TAMAMI TÜRKÇE OLACAK. Düşünme metni yazma, doğrudan cevabı ver.`.trim()
+CEVABIN TAMAMI TÜRKÇE OLACAK. Düşünme metni yazma, doğrudan cevabı ver.
+Eylem bloğu yazıyorsan MUTLAKA üç ters tırnakla KAPAT — kapatmazsan blok kullanıcıya ham haliyle görünür.`.trim()
 
   const { data: providerRows, error: provErr } = await supabase
     .from('ai_provider_keys')

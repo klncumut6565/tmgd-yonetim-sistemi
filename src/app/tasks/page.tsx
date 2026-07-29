@@ -7,7 +7,8 @@
 //  - YENİ: 🗑 Sil (onaylı)
 //  - YENİ: Durum değiştir (kolonlar arası taşımak için select)
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
 import { useUser } from "@/hooks/useUser";
 import { hataCevir } from "@/lib/hataCevir";
@@ -58,12 +59,32 @@ function isOverdue(task: Task): boolean {
 }
 
 export default function TasksPage() {
+  return (
+    <Suspense fallback={<div className="p-8 text-gray-500">Yükleniyor...</div>}>
+      <TasksPageInner />
+    </Suspense>
+  );
+}
+
+function TasksPageInner() {
+  const searchParams = useSearchParams();
   const { canWrite } = useUser();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [firms, setFirms] = useState<Firm[]>([]);
   const [title, setTitle] = useState("");
   const [firmId, setFirmId] = useState("");
   const [error, setError] = useState("");
+
+  // ADR Asistanı "şu görevi ekle ..." dediğinde buraya yönlendiriyor:
+  // /tasks?baslik=...&firma=... — form ÖNCEDEN DOLDURULUR ama kayıt
+  // otomatik yapılmaz; firma seçimi ve "Ekle" onayı kullanıcıda kalır.
+  useEffect(() => {
+    const baslikParam = searchParams.get("baslik");
+    if (baslikParam) setTitle(baslikParam);
+    const firmaParam = searchParams.get("firma");
+    if (firmaParam) setFirmId(firmaParam);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   // Düzenleme modalı
   const [editing, setEditing] = useState<Task | null>(null);
