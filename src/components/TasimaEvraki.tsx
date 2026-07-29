@@ -26,6 +26,7 @@ import { hataCevir } from "@/lib/hataCevir";
 import { useUser } from "@/hooks/useUser";
 import type { jsPDF as JsPDFType } from "jspdf";
 import { checkPair, CheckResult, UnRow as MixUnRow } from "@/lib/adrMix";
+import { checkSecurityPlan, type SecurityPlanItem } from "@/lib/adrSecurityPlan";
 import {
   LIBERATION_SANS_REGULAR_B64,
   LIBERATION_SANS_BOLD_B64,
@@ -62,6 +63,8 @@ const AMBALAJ_TURLERI = [
   "Plastik kutu (4H1/4H2)",
   "Ahşap kutu (4C1/4C2)",
   "Plastik torba (5H2/5H3)",
+  "Çuval",
+  "Dökme yük",
   "Kompozit ambalaj (6HA1)",
   "IBC - plastik (31H1/31HA1)",
   "IBC - çelik (31A)",
@@ -111,68 +114,20 @@ type Kalem = {
 type Surucu = { id: string; first_name: string; last_name: string; adr_certificate_no: string | null; adr_valid_until: string | null };
 type Arac = { id: string; plate_number: string; brand: string | null; adr_certificate_no: string | null };
 
+
 /**
- * ADR 1.10.3 — YÜKSEK SONUÇLU TEHLİKELİ MAL (emniyet planı gerekliliği)
+ * Otomatik evrak numarası üretir: ADR-YYYYAAGG-SSDDss
+ * Örnek: ADR-20260729-101443
  *
- * Tablo 1.10.3.1.2'deki miktar eşiklerine göre, bir sevkiyatın "yüksek
- * sonuçlu" sayılıp sayılmadığını hesaplar. Yüksek sonuçlu ise ADR
- * 1.10.3.2 uyarınca EMNİYET PLANI hazırlanması gerekir.
- *
- * NOT: Eşikler ambalajlı taşıma içindir. Tank/dökme taşımada eşikler
- * daha düşüktür (3000 lt yerine her miktar). Bu hesap bir ÖN
- * DEĞERLENDİRMEDİR — nihai karar TMGD'ye aittir.
+ * Tarih+saat tabanlı olduğu için veritabanına sormaya gerek kalmadan
+ * benzersizdir ve kronolojik sıralanır.
  */
-function emniyetPlaniGerekli(kalemler: Kalem[]): {
-  gerekli: boolean;
-  sebepler: string[];
-} {
-  const sebepler: string[] = [];
-
-  // Sınıf bazında toplam miktar (kg/lt ayrımı yapılmadan — ADR tablosu
-  // her ikisini de aynı eşikle değerlendirir)
-  const sinifToplam = new Map<string, number>();
-  for (const k of kalemler) {
-    const sinif = (k.adr_class || "").trim();
-    if (!sinif) continue;
-    const mevcut = sinifToplam.get(sinif) ?? 0;
-    sinifToplam.set(sinif, mevcut + (k.quantity || 0));
-  }
-
-  for (const k of kalemler) {
-    const sinif = (k.adr_class || "").trim();
-    const ag = (k.packing_group || "").trim().toUpperCase();
-    const toplam = sinifToplam.get(sinif) ?? 0;
-
-    // Sınıf 6.1 Ambalaj Grubu I — HER MİKTAR yüksek sonuçlu
-    if (sinif.startsWith("6.1") && ag === "I") {
-      sebepler.push(`UN ${k.un_number}: Sınıf 6.1 AG I — her miktarda emniyet planı gerekir`);
-      continue;
-    }
-    // Sınıf 6.2 (bulaşıcı) — kategori A her miktar
-    if (sinif.startsWith("6.2")) {
-      sebepler.push(`UN ${k.un_number}: Sınıf 6.2 — bulaşıcı madde, emniyet planı değerlendirilmeli`);
-      continue;
-    }
-    // Sınıf 7 (radyoaktif) — aktivite eşiğine tabi, TMGD değerlendirmeli
-    if (sinif.startsWith("7")) {
-      sebepler.push(`UN ${k.un_number}: Sınıf 7 — radyoaktif, aktivite eşiği TMGD tarafından kontrol edilmeli`);
-      continue;
-    }
-    // Sınıf 1 (patlayıcı) — 3000 kg
-    if (sinif.startsWith("1") && !sinif.startsWith("1.4S") && toplam > 3000) {
-      sebepler.push(`Sınıf ${sinif}: toplam ${toplam} > 3000 — emniyet planı gerekir`);
-      continue;
-    }
-    // Sınıf 2, 3, 4.2, 4.3, 5.1, 8 — AG I/II için 3000 eşiği
-    const esikliSiniflar = ["2", "3", "4.1", "4.2", "4.3", "5.1", "8"];
-    if (esikliSiniflar.some((c) => sinif.startsWith(c)) && (ag === "I" || ag === "II") && toplam > 3000) {
-      sebepler.push(`Sınıf ${sinif} AG ${ag}: toplam ${toplam} > 3000 — emniyet planı gerekir`);
-    }
-  }
-
-  // Aynı sebep birden çok kez eklenmiş olabilir
-  const benzersiz = Array.from(new Set(sebepler));
-  return { gerekli: benzersiz.length > 0, sebepler: benzersiz };
+function evrakNoUret(): string {
+  const d = new Date();
+  const p = (n: number) => String(n).padStart(2, "0");
+  const tarih = `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}`;
+  const saat = `${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`;
+  return `ADR-${tarih}-${saat}`;
 }
 
 type EvrakOzet = { id: string; document_no: string; transport_date: string | null; status: string | null; total_points: number | null; tunnel_restriction_code: string | null };
@@ -426,7 +381,7 @@ export default function TasimaEvraki({
 
   // Editör durumu
   const [evrakId, setEvrakId] = useState<string | null>(null);
-  const [evrakNo, setEvrakNo] = useState("");
+  const [evrakNo, setEvrakNo] = useState(() => evrakNoUret());
   const [tarih, setTarih] = useState(() => new Date().toISOString().slice(0, 10));
   const [gonderen, setGonderen] = useState(firmaAdi);
   const [alici, setAlici] = useState("");
@@ -636,7 +591,23 @@ export default function TasimaEvraki({
   const karisikYasak = karisikSonuclar.some((r) => r.status === "NO");
 
   // ADR 1.10.3 — Emniyet planı gerekliliği (canlı)
-  const emniyet = useMemo(() => emniyetPlaniGerekli(kalemler), [kalemler]);
+  // ADR 1.10.3 — Emniyet planı gerekliliği (canlı).
+  // Motor: src/lib/adrSecurityPlan.ts — masaüstü uygulamasındaki
+  // doğrulanmış SecurityPlanEngine'in portu. 1.10.4 muafiyeti, taşıma
+  // moduna göre eşikler ve sınıf bazlı özel kurallar dahil.
+  const emniyet = useMemo(() => {
+    const items: SecurityPlanItem[] = kalemler.map((k) => ({
+      un_number: k.un_number,
+      proper_shipping_name: k.proper_shipping_name,
+      adr_class: k.adr_class,
+      classification_code: k.classification_code,
+      packing_group: k.packing_group,
+      packaging_type: k.packaging_type,
+      quantity: k.quantity,
+      unit: k.unit,
+    }));
+    return checkSecurityPlan(items, puan);
+  }, [kalemler, puan]);
 
   const seciliSurucu = suruculer.find((s) => s.id === surucuId) || null;
   const seciliArac = araclar.find((a) => a.id === aracId) || null;
@@ -749,7 +720,7 @@ export default function TasimaEvraki({
   }
 
   function temizle() {
-    setEvrakId(null); setEvrakNo(""); setAlici(""); setAliciAdres(""); setTasiyici("");
+    setEvrakId(null); setEvrakNo(evrakNoUret()); setAlici(""); setAliciAdres(""); setTasiyici("");
     setSurucuId(""); setAracId(""); setNotlar(""); setKalemler([]);
     setGonderen(firmaAdi); setMesaj("");
     setTarih(new Date().toISOString().slice(0, 10));
@@ -898,6 +869,16 @@ export default function TasimaEvraki({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mb-2">
             <input className="border p-2 rounded text-sm" placeholder="Evrak No *"
               value={evrakNo} onChange={(e) => setEvrakNo(e.target.value)} disabled={!canWrite} />
+            {canWrite && (
+              <button
+                type="button"
+                onClick={() => setEvrakNo(evrakNoUret())}
+                title="Yeni evrak numarası üret"
+                className="text-xs text-blue-600 hover:underline -mt-1"
+              >
+                ↻ Yeni no üret
+              </button>
+            )}
             <input type="date" className="border p-2 rounded text-sm"
               value={tarih} onChange={(e) => setTarih(e.target.value)} disabled={!canWrite} />
             <input className="border p-2 rounded text-sm" placeholder="Gönderen"
@@ -1224,22 +1205,35 @@ export default function TasimaEvraki({
           {kalemler.length > 0 && (
             <div className="mt-3 pt-3 border-t">
               <p className="text-xs font-semibold text-gray-700 mb-1.5">Emniyet Planı (ADR 1.10.3)</p>
-              {emniyet.gerekli ? (
-                <div className="text-xs bg-amber-50 border border-amber-200 rounded p-2 text-amber-900">
-                  <p className="font-medium mb-1">⚠ Emniyet planı gerekebilir:</p>
+              {emniyet.required ? (
+                <div className="text-xs bg-red-50 border border-red-200 rounded p-2 text-red-900">
+                  <p className="font-medium mb-1">🛡 EMNİYET PLANI GEREKLİ (ADR 1.10.3)</p>
                   <ul className="space-y-0.5">
-                    {emniyet.sebepler.map((s2, i) => (
+                    {emniyet.reasons.map((s2, i) => (
                       <li key={i}>• {s2}</li>
                     ))}
                   </ul>
-                  <p className="mt-1.5 text-[11px] text-amber-700">
-                    Bu bir ön değerlendirmedir. Tank/dökme taşımada eşikler daha düşüktür — nihai karar TMGD&apos;ye aittir.
-                  </p>
                 </div>
+              ) : emniyet.exempt ? (
+                <p className="text-xs bg-green-50 border border-green-200 rounded p-2 text-green-800">
+                  ✓ Emniyet planı gerekmiyor — ADR 1.10.4 muafiyeti (1.1.3.6 puanı 1000 altında).
+                </p>
               ) : (
                 <p className="text-xs bg-green-50 border border-green-200 rounded p-2 text-green-800">
-                  ✓ Tablo 1.10.3.1.2 eşikleri aşılmıyor — emniyet planı gerekmiyor görünüyor.
+                  ✓ Tablo 1.10.3.1.2 eşikleri aşılmıyor — emniyet planı gerekmiyor.
                 </p>
+              )}
+              {emniyet.details.length > 0 && (
+                <details className="mt-1.5">
+                  <summary className="text-[11px] text-gray-500 cursor-pointer hover:text-gray-700">
+                    Değerlendirme detayı ({emniyet.details.length})
+                  </summary>
+                  <ul className="mt-1 space-y-0.5 text-[11px] text-gray-600">
+                    {emniyet.details.map((d, i) => (
+                      <li key={i}>• {d}</li>
+                    ))}
+                  </ul>
+                </details>
               )}
             </div>
           )}
