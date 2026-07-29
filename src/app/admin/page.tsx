@@ -10,6 +10,7 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase/client";
+import { authFetch } from "@/lib/supabase/authFetch";
 import { useUser } from "@/hooks/useUser";
 import { hataCevir } from "@/lib/hataCevir";
 
@@ -93,6 +94,16 @@ function UsersTab() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
+  // Yeni kullanıcı ekleme formu
+  const [ekleAcik, setEkleAcik] = useState(false);
+  const [yeniEmail, setYeniEmail] = useState("");
+  const [yeniSifre, setYeniSifre] = useState("");
+  const [yeniAd, setYeniAd] = useState("");
+  const [yeniRolSecim, setYeniRolSecim] = useState("viewer");
+  const [ekleniyor, setEkleniyor] = useState(false);
+  const [ekleHata, setEkleHata] = useState("");
+  const [ekleBasari, setEkleBasari] = useState("");
+
   const ROLE_TR: Record<string, string> = {
     super_admin: "Süper Yönetici",
     admin: "Yönetici",
@@ -111,6 +122,40 @@ function UsersTab() {
     { value: "viewer", label: "İzleyici" },
     { value: "company", label: "Firma Kullanıcısı" },
   ];
+
+  async function kullaniciEkle() {
+    setEkleHata("");
+    setEkleBasari("");
+
+    if (!yeniEmail.trim()) { setEkleHata("E-posta zorunlu."); return; }
+    if (yeniSifre.length < 8) { setEkleHata("Şifre en az 8 karakter olmalı."); return; }
+
+    setEkleniyor(true);
+    try {
+      const res = await authFetch("/api/admin/create-user", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: yeniEmail.trim(),
+          password: yeniSifre,
+          full_name: yeniAd.trim(),
+          role: yeniRolSecim,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        setEkleHata(json.error || "Kullanıcı oluşturulamadı.");
+        return;
+      }
+      setEkleBasari(`✓ ${yeniEmail.trim()} oluşturuldu (${ROLE_TR[yeniRolSecim] || yeniRolSecim}).`);
+      setYeniEmail(""); setYeniSifre(""); setYeniAd(""); setYeniRolSecim("viewer");
+      load();
+    } catch (e) {
+      setEkleHata("Bağlantı hatası: " + (e instanceof Error ? e.message : String(e)));
+    } finally {
+      setEkleniyor(false);
+    }
+  }
 
   async function setRole(u: Profile, yeniRol: string) {
     if (yeniRol === u.role) return;
@@ -217,6 +262,98 @@ function UsersTab() {
       {error && (
         <div className="mb-4 p-3 rounded bg-red-50 text-red-700 text-sm">
           {error}
+        </div>
+      )}
+
+      {/* Yeni kullanıcı ekleme — yalnızca süper yönetici */}
+      {isSuperAdmin && (
+        <div className="mb-4">
+          {!ekleAcik ? (
+            <button
+              onClick={() => { setEkleAcik(true); setEkleBasari(""); setEkleHata(""); }}
+              className="px-4 py-2 bg-black text-white rounded text-sm"
+            >
+              + Kullanıcı Ekle
+            </button>
+          ) : (
+            <div className="border rounded-xl p-4 bg-gray-50">
+              <h3 className="font-semibold text-sm mb-3">Yeni Kullanıcı</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <label className="block">
+                  <span className="text-xs text-gray-600">E-posta *</span>
+                  <input
+                    type="email"
+                    className="border p-2 w-full rounded mt-1 text-sm"
+                    placeholder="ornek@firma.com"
+                    value={yeniEmail}
+                    onChange={(e) => setYeniEmail(e.target.value)}
+                  />
+                </label>
+                <label className="block">
+                  <span className="text-xs text-gray-600">Ad Soyad</span>
+                  <input
+                    className="border p-2 w-full rounded mt-1 text-sm"
+                    value={yeniAd}
+                    onChange={(e) => setYeniAd(e.target.value)}
+                  />
+                </label>
+                <label className="block">
+                  <span className="text-xs text-gray-600">Şifre * (en az 8 karakter)</span>
+                  <input
+                    type="text"
+                    className="border p-2 w-full rounded mt-1 text-sm font-mono"
+                    placeholder="Kullanıcıya iletilecek şifre"
+                    value={yeniSifre}
+                    onChange={(e) => setYeniSifre(e.target.value)}
+                  />
+                </label>
+                <label className="block">
+                  <span className="text-xs text-gray-600">Rol *</span>
+                  <select
+                    className="border p-2 w-full rounded mt-1 text-sm"
+                    value={yeniRolSecim}
+                    onChange={(e) => setYeniRolSecim(e.target.value)}
+                  >
+                    {ROLLER.map((r) => (
+                      <option key={r.value} value={r.value}>{r.label}</option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+
+              {ekleHata && (
+                <p className="text-sm text-red-700 bg-red-50 border border-red-200 rounded p-2 mt-3">
+                  {ekleHata}
+                </p>
+              )}
+
+              <p className="text-xs text-gray-500 mt-3">
+                Kullanıcı doğrudan onaylı ve aktif olarak oluşturulur; e-posta doğrulaması
+                beklemeden giriş yapabilir. Şifreyi kendisine güvenli bir kanaldan ilet.
+              </p>
+
+              <div className="flex gap-2 mt-3">
+                <button
+                  onClick={kullaniciEkle}
+                  disabled={ekleniyor}
+                  className="px-4 py-2 bg-black text-white rounded text-sm disabled:opacity-50"
+                >
+                  {ekleniyor ? "Oluşturuluyor..." : "Oluştur"}
+                </button>
+                <button
+                  onClick={() => { setEkleAcik(false); setEkleHata(""); }}
+                  className="px-4 py-2 border rounded text-sm"
+                >
+                  Vazgeç
+                </button>
+              </div>
+            </div>
+          )}
+          {ekleBasari && (
+            <p className="text-sm text-green-800 bg-green-50 border border-green-200 rounded p-2 mt-2">
+              {ekleBasari}
+            </p>
+          )}
         </div>
       )}
 
