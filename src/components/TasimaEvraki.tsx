@@ -407,6 +407,26 @@ export default function TasimaEvraki({
   const [tabloASonuclar, setTabloASonuclar] = useState<TabloARow[]>([]);
   const [tabloAAraniyor, setTabloAAraniyor] = useState(false);
   const [seciliTabloA, setSeciliTabloA] = useState<TabloARow | null>(null);
+
+  /**
+   * Envanter içi arama — TİCARİ AD, sevkiyat adı ve UN numarası üzerinden.
+   * Envanter zaten bellekte olduğu için sunucuya gitmeye gerek yok.
+   * Kullanıcı ürünü ticari adıyla tanıdığı için (Kimyasal Envanter'de
+   * "Kimyasal Adı" olarak geçen alan) arama bu alanı da kapsamalı.
+   */
+  const envanterSonuclar = useMemo(() => {
+    const q = tabloAArama.trim().toLocaleLowerCase("tr-TR");
+    if (q.length < 2) return [];
+    // Bir kayıt zaten seçilmişse (arama kutusu seçim metnini gösteriyor) listeleme
+    if (seciliTabloA || seciliKimyasal) return [];
+    return envanter
+      .filter((e) => {
+        const ticari = (e.trade_name || "").toLocaleLowerCase("tr-TR");
+        const sevkiyat = (e.proper_shipping_name || "").toLocaleLowerCase("tr-TR");
+        return ticari.includes(q) || sevkiyat.includes(q) || e.un_number.includes(q);
+      })
+      .slice(0, 15);
+  }, [tabloAArama, envanter, seciliTabloA, seciliKimyasal]);
   const [ambalajTuru, setAmbalajTuru] = useState("");
   const [ambalajDiger, setAmbalajDiger] = useState("");
   const [ambalajAdet, setAmbalajAdet] = useState("1");
@@ -949,7 +969,7 @@ export default function TasimaEvraki({
               <div className="mb-2">
                 <input
                   className="border p-2 rounded text-sm w-full"
-                  placeholder="🔍 ADR Tablo A'da ara (UN numarası veya madde adı)..."
+                  placeholder="🔍 Ürün ara — ticari ad, madde adı veya UN numarası..."
                   value={tabloAArama}
                   onChange={(e) => {
                     setTabloAArama(e.target.value);
@@ -957,12 +977,59 @@ export default function TasimaEvraki({
                     setSeciliKimyasal("");
                   }}
                 />
-                {tabloAAraniyor && <p className="text-xs text-gray-400 mt-1">Aranıyor...</p>}
-                {!tabloAAraniyor && tabloAArama.trim().length >= 2 && tabloASonuclar.length === 0 && (
-                  <p className="text-xs text-gray-400 mt-1">Tablo A&apos;da eşleşme bulunamadı.</p>
+                {/* Firma envanteri sonuçları — üstte, çünkü kullanıcının kendi
+                    ürünleri daha muhtemel bir eşleşmedir */}
+                {envanterSonuclar.length > 0 && (
+                  <div className="border rounded mt-1 bg-white overflow-hidden">
+                    <div className="px-2 py-1 bg-green-50 text-[11px] font-semibold text-green-800 border-b">
+                      📦 Firma Envanteri ({envanterSonuclar.length})
+                    </div>
+                    <div className="max-h-40 overflow-y-auto">
+                      {envanterSonuclar.map((e) => (
+                        <button
+                          key={e.id}
+                          onClick={() => {
+                            setSeciliKimyasal(e.id);
+                            setSeciliTabloA(null);
+                            setTabloASonuclar([]);
+                            setTabloAArama(
+                              `${e.trade_name || e.proper_shipping_name} (UN ${e.un_number})`
+                            );
+                          }}
+                          className="block w-full text-left px-2 py-1.5 text-xs hover:bg-green-50 border-b last:border-b-0"
+                        >
+                          <span className="font-mono font-semibold">UN {e.un_number}</span>{" "}
+                          {e.trade_name ? (
+                            <>
+                              <strong>{e.trade_name}</strong>
+                              <span className="text-gray-400"> · {e.proper_shipping_name}</span>
+                            </>
+                          ) : (
+                            e.proper_shipping_name
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 )}
+
+                {tabloAAraniyor && <p className="text-xs text-gray-400 mt-1">Aranıyor...</p>}
+                {!tabloAAraniyor &&
+                  tabloAArama.trim().length >= 2 &&
+                  tabloASonuclar.length === 0 &&
+                  envanterSonuclar.length === 0 &&
+                  !seciliKimyasal &&
+                  !seciliTabloA && (
+                    <p className="text-xs text-gray-400 mt-1">
+                      Ne envanterde ne Tablo A&apos;da eşleşme bulunamadı.
+                    </p>
+                  )}
                 {tabloASonuclar.length > 0 && (
-                  <div className="border rounded mt-1 max-h-44 overflow-y-auto bg-white">
+                  <div className="border rounded mt-1 bg-white overflow-hidden">
+                    <div className="px-2 py-1 bg-blue-50 text-[11px] font-semibold text-blue-800 border-b">
+                      📖 ADR Tablo A ({tabloASonuclar.length})
+                    </div>
+                    <div className="max-h-40 overflow-y-auto">
                     {tabloASonuclar.map((r) => (
                       <button
                         key={r.id}
@@ -982,7 +1049,19 @@ export default function TasimaEvraki({
                         </span>
                       </button>
                     ))}
+                    </div>
                   </div>
+                )}
+                {seciliKimyasal && (
+                  <p className="text-xs text-green-700 bg-green-50 border border-green-200 rounded p-1.5 mt-1">
+                    ✓ Envanterden seçildi
+                    <button
+                      onClick={() => { setSeciliKimyasal(""); setTabloAArama(""); }}
+                      className="ml-2 underline text-green-600"
+                    >
+                      kaldır
+                    </button>
+                  </p>
                 )}
                 {seciliTabloA && (
                   <p className="text-xs text-blue-700 bg-blue-50 border border-blue-200 rounded p-1.5 mt-1">

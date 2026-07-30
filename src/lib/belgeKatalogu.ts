@@ -227,13 +227,19 @@ function ziyaretAylari(contractStart: string | null): ChecklistItem[] {
   return items;
 }
 
-// Sözleşme başlangıç YILINDAN içinde bulunulan yıla kadar, her yıl için
-// ayrı bir Yıllık Faaliyet Raporu (ADR 1.8.3.3) maddesi üretir.
+// Sözleşme başlangıç YILINDAN GEÇEN YILA kadar, her yıl için ayrı bir
+// Yıllık Faaliyet Raporu (ADR 1.8.3.3) maddesi üretir.
+//
+// İÇİNDE BULUNULAN YIL DAHİL EDİLMEZ: Bir yılın faaliyet raporu, o yıl
+// TAMAMLANDIKTAN sonra hazırlanır ve ertesi yılın Nisan ayı sonuna kadar
+// verilir. Örnek: 2026 raporu, 2027 Nisan sonuna kadar verilir — dolayısıyla
+// 2026 içindeyken bu madde henüz gündemde değildir ve listede görünmemelidir.
+// Son görünen madde: (içinde bulunulan yıl - 1).
 //
 // İSTİSNA: Sözleşme, başlangıç yılının Mayıs ayı veya sonrasında
 // başladıysa, o ilk yılın raporu listeye DAHİL EDİLMEZ — çünkü rapor
-// son tarihi (içinde bulunduğu yılın Nisan sonu) sözleşme başlamadan
-// önce zaten geçmiş olur; bu, önceki TMGD firmasının sorumluluğudur.
+// son tarihi (ertesi yılın Nisan sonu) için sorumluluk önceki TMGD
+// firmasına aittir.
 function yillikFaaliyetRaporlari(contractStart: string | null): ChecklistItem[] {
   const now = new Date();
   const currentYear = now.getFullYear();
@@ -249,8 +255,11 @@ function yillikFaaliyetRaporlari(contractStart: string | null): ChecklistItem[] 
     }
   }
 
+  // Raporlanabilir en son yıl: geçen yıl (bkz. yukarıdaki açıklama)
+  const sonRaporYili = currentYear - 1;
+
   const items: ChecklistItem[] = [];
-  for (let y = startYear; y <= currentYear; y++) {
+  for (let y = startYear; y <= sonRaporYili; y++) {
     if (y === startYear && ilkYiliHaricTut) continue;
     items.push({
       code: "YFR",
