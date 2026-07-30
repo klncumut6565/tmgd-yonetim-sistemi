@@ -1176,6 +1176,22 @@ function baslikTablosuCiz(
   doc.line(M + 38, ustY, M + 38, ustY + yukseklik);
   doc.line(W - M - 45, ustY, W - M - 45, ustY + yukseklik);
 
+  // Orta hücreyi ikiye ayıran yatay çizgi (EK-3 şablonu):
+  // üstte "Doküman Türü", altta "Dokümanın Adı".
+  // KONTROL FORMU türünde tür yazısı basılmadığı için (belge adı zaten
+  // "... Kontrol Formu" içerir) ayırıcı çizgi de çizilmez.
+  const ortaAyirici = ustY + yukseklik / 2;
+  if (sablon.docType !== "KONTROL FORMU") {
+    doc.line(M + 38, ortaAyirici, W - M - 45, ortaAyirici);
+  }
+
+  // Sağ hücre 4 eşit satıra bölünür: Doküman No / Yayın Tarihi /
+  // Revizyon No-Tarihi / Sayfa No
+  const sagSatirY = yukseklik / 4;
+  for (let i = 1; i < 4; i++) {
+    doc.line(W - M - 45, ustY + sagSatirY * i, W - M, ustY + sagSatirY * i);
+  }
+
   // Sol: logo / firma adı
   if (logo) {
     try {
@@ -1209,14 +1225,19 @@ function baslikTablosuCiz(
   const ortaX = M + 38 + (W - 2 * M - 38 - 45) / 2;
   const turuGoster = sablon.docType !== "KONTROL FORMU";
   if (turuGoster) {
+    // Üst yarı: doküman türü (yarı yüksekliğin ortasına hizalı)
     doc.setFontSize(12);
     doc.setFont(FONT, "bold");
     doc.setTextColor(...RENK_VURGU);
-    doc.text(sablon.docType, ortaX, ustY + 8, { align: "center" });
+    doc.text(sablon.docType, ortaX, ustY + yukseklik / 4 + 2, { align: "center" });
     doc.setTextColor(0, 0, 0);
+
+    // Alt yarı: belge adı (çok satırlı olabilir, blok olarak ortalanır)
     doc.setFontSize(9.5);
     doc.setFont(FONT, "bold");
-    doc.text(adLines, ortaX, ustY + 14, { align: "center" });
+    const adBlok = adLines.length * 4.2;
+    const adY = ortaAyirici + yukseklik / 4 - adBlok / 2 + 3;
+    doc.text(adLines, ortaX, adY, { align: "center" });
   } else {
     doc.setFontSize(11);
     doc.setFont(FONT, "bold");
@@ -1233,13 +1254,16 @@ function baslikTablosuCiz(
   const sagX = W - M - 43;
   // Doküman numarası kurum önekiyle yazılır: TMGDK-P1, TMGDK-L1 gibi
   // (referans TMGDK belgelerindeki numaralandırma standardı).
-  doc.text(`Doküman No: TMGDK-${code}`, sagX, ustY + 5);
-  doc.text(`Yayın Tarihi: ${sablon.yayinTarihi}`, sagX, ustY + 10);
-  doc.text(`Revizyon Tarihi: ${bugun}`, sagX, ustY + 15);
+  // Her metin kendi satırının dikey ortasına hizalanır (+1.2 ≈ font yarısı)
+  const sagMetinY = (satirIndex: number) =>
+    ustY + sagSatirY * satirIndex + sagSatirY / 2 + 1.2;
+  doc.text(`Doküman No: TMGDK-${code}`, sagX, sagMetinY(0));
+  doc.text(`Yayın Tarihi: ${sablon.yayinTarihi}`, sagX, sagMetinY(1));
+  doc.text(`Revizyon Tarihi: ${bugun}`, sagX, sagMetinY(2));
   doc.text(
     sayfaEtiketi ?? `Sayfa No: Sayfa ${sayfaNo} / ${toplamSayfa}`,
     sagX,
-    ustY + 20
+    sagMetinY(3)
   );
 }
 

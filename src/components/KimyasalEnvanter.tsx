@@ -420,6 +420,13 @@ export default function KimyasalEnvanter({
         doc.rect(M, M, W - 2 * M, 20);
         doc.line(M + 38, M, M + 38, M + 20);
         doc.line(W - M - 43, M, W - M - 43, M + 20);
+        // Orta hücreyi ikiye ayıran çizgi (EK-3 şablonu): üstte doküman
+        // türü ("LİSTE"), altta dokümanın adı.
+        doc.line(M + 38, M + 10, W - M - 43, M + 10);
+        // Sağ hücre 3 eşit satır: Doküman No / Tarih / Sayfa
+        doc.line(W - M - 43, M + 20 / 3, W - M, M + 20 / 3);
+        doc.line(W - M - 43, M + (20 / 3) * 2, W - M, M + (20 / 3) * 2);
+
         doc.setFont(FONT, "bold");
         doc.setFontSize(8);
         doc.text(firmaAdi, M + 19, M + 10, {
@@ -428,18 +435,18 @@ export default function KimyasalEnvanter({
         });
         doc.setFontSize(12);
         doc.setTextColor(30, 58, 138);
-        doc.text("LİSTE", (M + 38 + (W - M - 43)) / 2, M + 8, { align: "center" });
+        doc.text("LİSTE", (M + 38 + (W - M - 43)) / 2, M + 7, { align: "center" });
         doc.setFontSize(9);
         doc.setTextColor(0, 0, 0);
-        doc.text("Tehlikeli Madde Envanter Listesi", (M + 38 + (W - M - 43)) / 2, M + 14, {
+        doc.text("Tehlikeli Madde Envanter Listesi", (M + 38 + (W - M - 43)) / 2, M + 16, {
           align: "center",
         });
         doc.setFontSize(7);
         doc.setFont(FONT, "normal");
         const sagX = W - M - 41;
-        doc.text("Doküman No: TMGDK-L1", sagX, M + 5);
-        doc.text(`Tarih: ${bugun}`, sagX, M + 10);
-        doc.text(`Sayfa: ${sayfa} / ${toplam}`, sagX, M + 15);
+        doc.text("Doküman No: TMGDK-L1", sagX, M + 4.5);
+        doc.text(`Tarih: ${bugun}`, sagX, M + 11.2);
+        doc.text(`Sayfa: ${sayfa} / ${toplam}`, sagX, M + 17.8);
       };
 
       // Tablo düzeni
