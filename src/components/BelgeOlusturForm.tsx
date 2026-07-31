@@ -24,7 +24,9 @@ import {
   CatalogCategory,
   CatalogItem,
   catalogForActivities,
+  type ActivityKey,
 } from "@/lib/belgeKatalogu";
+import { kapakSayfasiOlustur } from "@/lib/kapakSayfasi";
 import { belgeSablonu, BelgeSablonu } from "@/lib/belgeSablonlari";
 import { BELGE_GORSELLERI } from "@/lib/belgeGorselleri";
 import {
@@ -63,6 +65,8 @@ export default function BelgeOlusturForm({ fixedFirmId, initialFirmId, compact =
   const [onaylayanAdi, setOnaylayanAdi] = useState("");
   const [hazirlayanAdi, setHazirlayanAdi] = useState("");
   const [hazirlayanDurum, setHazirlayanDurum] = useState<"yok" | "bulundu" | "yükleniyor">("yok");
+  const [kapakUretiliyor, setKapakUretiliyor] = useState(false);
+  const [kapakMesaj, setKapakMesaj] = useState("");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
   const [error, setError] = useState("");
@@ -161,6 +165,67 @@ export default function BelgeOlusturForm({ fixedFirmId, initialFirmId, compact =
       items: items.filter((i) => i.category === cat),
     })).filter((g) => g.items.length > 0);
   }, [firm]);
+
+  /**
+   * "İçindekiler_TMGD" kapak sayfasını Excel olarak üretir.
+   *
+   * Tarih alanları firmanın kendi belge takip kayıtlarından (firm_belgeleri)
+   * ve sözleşme başlangıcından doldurulur; karşılığı olmayan alanlar BOŞ
+   * bırakılır — uydurma tarih yazılmaz.
+   */
+  async function kapakIndir() {
+    if (!firm) return;
+    setKapakUretiliyor(true);
+    setKapakMesaj("");
+    try {
+      const { data: belgeler } = await supabase
+        .from("firm_belgeleri")
+        .select("code, period, valid_until")
+        .eq("firm_id", firm.id);
+
+      const belgeTarihleri: Record<string, string | null> = {};
+      let yillikRaporTarihi: string | null = null;
+      let ziyaretRaporTarihi: string | null = null;
+
+      (belgeler ?? []).forEach(
+        (b: { code: string; period: string; valid_until: string | null }) => {
+          if (!b.valid_until) return;
+          if (!b.period) belgeTarihleri[b.code] = b.valid_until;
+          // Dönemli kayıtlarda en güncel tarihi al
+          if (b.code === "YFR" && (!yillikRaporTarihi || b.valid_until > yillikRaporTarihi)) {
+            yillikRaporTarihi = b.valid_until;
+          }
+          if (b.code === "ZR" && (!ziyaretRaporTarihi || b.valid_until > ziyaretRaporTarihi)) {
+            ziyaretRaporTarihi = b.valid_until;
+          }
+        }
+      );
+
+      const blob = await kapakSayfasiOlustur({
+        firmaAdi: firm.name,
+        sozlesmeBaslangic: firm.contract_start,
+        faaliyetler: (firm.activities || []) as ActivityKey[],
+        belgeTarihleri,
+        yillikRaporTarihi,
+        ziyaretRaporTarihi,
+      });
+
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      const temizAd = firm.name.replace(/[^\w\sğüşıöçĞÜŞİÖÇ-]/g, "").trim().replace(/\s+/g, "_");
+      a.download = `Icindekiler_TMGD_${temizAd}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      setKapakMesaj("✓ Kapak sayfası indirildi.");
+    } catch (e) {
+      setKapakMesaj("Kapak üretilemedi: " + (e instanceof Error ? e.message : String(e)));
+    } finally {
+      setKapakUretiliyor(false);
+    }
+  }
 
   function toggle(code: string) {
     setSelected((prev) =>
@@ -434,6 +499,35 @@ export default function BelgeOlusturForm({ fixedFirmId, initialFirmId, compact =
                   </span>
                 ))}
               </div>
+            </div>
+          )}
+
+          {/* İÇİNDEKİLER / KAPAK SAYFASI — Excel çıktısı.
+              Genelge kapsamında istenen bilgi-belge listesinin kapak
+              sayfası; tarihler firmanın belge takip kayıtlarından gelir. */}
+          {firm && (
+            <div className="mb-4 border rounded-lg p-3 bg-emerald-50 border-emerald-200">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-medium text-emerald-900">
+                    📗 İçindekiler (TMGD Kapak Sayfası)
+                  </p>
+                  <p className="text-xs text-emerald-800 mt-0.5">
+                    Genelge kapsamında istenen bilgi/belge listesi. Tarihler Belge Takip
+                    kayıtlarından alınır, kaydı olmayan alanlar boş bırakılır.
+                  </p>
+                </div>
+                <button
+                  onClick={kapakIndir}
+                  disabled={kapakUretiliyor}
+                  className="px-4 py-2 bg-emerald-700 text-white rounded text-sm whitespace-nowrap disabled:opacity-50"
+                >
+                  {kapakUretiliyor ? "Hazırlanıyor..." : "Excel İndir"}
+                </button>
+              </div>
+              {kapakMesaj && (
+                <p className="text-xs mt-2 text-emerald-900">{kapakMesaj}</p>
+              )}
             </div>
           )}
 
