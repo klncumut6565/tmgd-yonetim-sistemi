@@ -34,6 +34,10 @@ const STATUS_TR: Record<string, string> = {
   archived: "Arşiv",
 };
 
+/** Firma silme doğrulama kodu — bilerek basit tutuldu (yanlışlıkla
+ *  silmeyi önlemek için, güvenlik önlemi olarak değil). */
+const SILME_KODU = "0000";
+
 export default function FirmsPage() {
   const router = useRouter();
   const { isSuperAdmin, canWrite } = useUser();
@@ -42,6 +46,12 @@ export default function FirmsPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [error, setError] = useState("");
+
+  // Firma silme onayı
+  const [silinecekFirma, setSilinecekFirma] = useState<Firm | null>(null);
+  const [silmeKodu, setSilmeKodu] = useState("");
+  const [silmeHatasi, setSilmeHatasi] = useState("");
+  const [siliniyor, setSiliniyor] = useState(false);
   const [progressByFirm, setProgressByFirm] = useState<Record<string, Progress>>({});
   const [lastVisitByFirm, setLastVisitByFirm] = useState<Record<string, string>>({});
   const [logoUrlByFirm, setLogoUrlByFirm] = useState<Record<string, string>>({});
@@ -258,18 +268,43 @@ export default function FirmsPage() {
     loadFirms();
   }
 
-  async function deleteFirm(firm: Firm) {
-    const ok = window.confirm(
-      `"${firm.name}" firmasını silmek istediğine emin misin?\n` +
-        "Firmaya bağlı görevler, belgeler, araçlar da silinir."
-    );
-    if (!ok) return;
+  /**
+   * Silme onay penceresini açar.
+   *
+   * Firma silmek geri alınamaz bir işlem (bağlı tüm kayıtlar cascade
+   * siliniyor), bu yüzden tek tıkla onaydan fazlası isteniyor: kullanıcı
+   * ayrıca 4 haneli doğrulama kodunu girmek zorunda. Amaç karmaşık bir
+   * kod hatırlatmak değil, KASITLI bir eylem gerektirmek — yanlışlıkla
+   * basılan bir butonla firma silinmesin.
+   */
+  function silmeOnayiAc(firm: Firm) {
+    setSilinecekFirma(firm);
+    setSilmeKodu("");
+    setSilmeHatasi("");
+  }
 
-    const { error } = await supabase.from("firms").delete().eq("id", firm.id);
-    if (error) {
-      setError("Silinemedi: " + hataCevir(error));
+  function silmeOnayiKapat() {
+    setSilinecekFirma(null);
+    setSilmeKodu("");
+    setSilmeHatasi("");
+  }
+
+  async function silmeyiOnayla() {
+    if (!silinecekFirma) return;
+    if (silmeKodu !== SILME_KODU) {
+      setSilmeHatasi("Kod hatalı. Devam etmek için 4 adet sıfır gir.");
       return;
     }
+
+    setSiliniyor(true);
+    const { error } = await supabase.from("firms").delete().eq("id", silinecekFirma.id);
+    setSiliniyor(false);
+
+    if (error) {
+      setSilmeHatasi("Silinemedi: " + hataCevir(error));
+      return;
+    }
+    silmeOnayiKapat();
     loadFirms();
   }
 
@@ -422,7 +457,7 @@ export default function FirmsPage() {
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            deleteFirm(firm);
+                            silmeOnayiAc(firm);
                           }}
                           className="px-2 py-1 rounded border text-xs hover:bg-gray-100"
                         >
@@ -546,6 +581,72 @@ export default function FirmsPage() {
         </div>
         )}
       </div>
-    </div>
+    
+      {/* FİRMA SİLME ONAYI — geri alınamaz işlem olduğu için kod istenir */}
+      {silinecekFirma && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-5">
+            <h2 className="text-lg font-bold text-red-700 mb-1">⚠ Firma Siliniyor</h2>
+            <p className="text-sm mb-3">
+              <strong>{silinecekFirma.name}</strong>
+            </p>
+
+            <div className="bg-red-50 border border-red-200 rounded p-3 text-sm text-red-900 mb-4">
+              <p className="font-medium mb-1">Bu işlem geri alınamaz.</p>
+              <p>
+                Firmaya bağlı <strong>tüm</strong> kayıtlar da silinir: görevler, belgeler,
+                araçlar, sürücüler, personeller, ziyaretler, kimyasal envanter ve taşıma
+                evrakları.
+              </p>
+            </div>
+
+            <label className="block mb-3">
+              <span className="text-sm font-medium">
+                Onaylamak için <strong>4 adet sıfır</strong> tuşlayın
+              </span>
+              <input
+                autoFocus
+                inputMode="numeric"
+                maxLength={4}
+                placeholder="0000"
+                className="border-2 p-3 w-full rounded mt-1 text-center text-2xl tracking-[0.5em] font-mono"
+                value={silmeKodu}
+                onChange={(e) => {
+                  setSilmeKodu(e.target.value.replace(/\D/g, "").slice(0, 4));
+                  setSilmeHatasi("");
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && silmeKodu === SILME_KODU) silmeyiOnayla();
+                  if (e.key === "Escape") silmeOnayiKapat();
+                }}
+              />
+            </label>
+
+            {silmeHatasi && (
+              <p className="text-sm text-red-700 bg-red-50 border border-red-200 rounded p-2 mb-3">
+                {silmeHatasi}
+              </p>
+            )}
+
+            <div className="flex gap-2 justify-end">
+              <button
+                onClick={silmeOnayiKapat}
+                disabled={siliniyor}
+                className="px-4 py-2 border rounded text-sm"
+              >
+                Vazgeç
+              </button>
+              <button
+                onClick={silmeyiOnayla}
+                disabled={siliniyor || silmeKodu !== SILME_KODU}
+                className="px-4 py-2 bg-red-600 text-white rounded text-sm disabled:opacity-40"
+              >
+                {siliniyor ? "Siliniyor..." : "Firmayı Sil"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+</div>
   );
 }
