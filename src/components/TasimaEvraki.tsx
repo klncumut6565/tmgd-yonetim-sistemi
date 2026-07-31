@@ -27,6 +27,7 @@ import { useUser } from "@/hooks/useUser";
 import type { jsPDF as JsPDFType } from "jspdf";
 import { checkPair, CheckResult, UnRow as MixUnRow } from "@/lib/adrMix";
 import { checkSecurityPlan, type SecurityPlanItem } from "@/lib/adrSecurityPlan";
+import { yasakTasimaKontrolListe } from "@/lib/adrYasakTasima";
 import {
   LIBERATION_SANS_REGULAR_B64,
   LIBERATION_SANS_BOLD_B64,
@@ -615,6 +616,22 @@ export default function TasimaEvraki({
   // Motor: src/lib/adrSecurityPlan.ts — masaüstü uygulamasındaki
   // doğrulanmış SecurityPlanEngine'in portu. 1.10.4 muafiyeti, taşıma
   // moduna göre eşikler ve sınıf bazlı özel kurallar dahil.
+  // ADR — taşınması YASAK madde kontrolü (canlı).
+  // Karışık yükleme yasağından farklı: burada maddenin KENDİSİ taşımaya
+  // kabul edilmiyor (ADR 2.2.x.2 — kuru birincil patlayıcılar, Tip A
+  // organik peroksitler vb.).
+  const yasakKontrol = useMemo(
+    () =>
+      yasakTasimaKontrolListe(
+        kalemler.map((k) => ({
+          un_number: k.un_number,
+          proper_shipping_name: k.proper_shipping_name,
+          adr_class: k.adr_class,
+        }))
+      ),
+    [kalemler]
+  );
+
   const emniyet = useMemo(() => {
     const items: SecurityPlanItem[] = kalemler.map((k) => ({
       un_number: k.un_number,
@@ -1244,6 +1261,48 @@ export default function TasimaEvraki({
             </>
           )}
 
+
+          {/* TAŞIMA YASAĞI — en kritik uyarı, en üstte */}
+          {yasakKontrol.yasaklar.length > 0 && (
+            <div className="mt-3 pt-3 border-t">
+              <div className="bg-red-100 border-2 border-red-400 rounded p-3">
+                <p className="text-sm font-bold text-red-800 mb-1.5">
+                  ⛔ TAŞINMASI YASAK MADDE
+                </p>
+                <ul className="space-y-1 text-xs text-red-900">
+                  {yasakKontrol.yasaklar.map((y, i) => (
+                    <li key={i}>
+                      <strong>UN {y.un}</strong> — {y.ad}
+                      <br />
+                      <span className="text-red-700">↳ {y.sebep}</span>
+                    </li>
+                  ))}
+                </ul>
+                <p className="mt-2 text-[11px] text-red-700">
+                  Bu madde ADR kapsamında karayolu ile taşınamaz. Evrak
+                  düzenlemeden önce doğru UN numarasını (örn. ıslatılmış/
+                  flegmatize edilmiş hâli) kontrol et.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {yasakKontrol.kontroller.length > 0 && (
+            <div className="mt-3 pt-3 border-t">
+              <div className="bg-amber-50 border border-amber-300 rounded p-2.5">
+                <p className="text-xs font-semibold text-amber-900 mb-1">
+                  ⚠ Taşıma uygunluğu kontrol edilmeli
+                </p>
+                <ul className="space-y-1 text-[11px] text-amber-900">
+                  {yasakKontrol.kontroller.map((k, i) => (
+                    <li key={i}>
+                      <strong>UN {k.un}</strong> — {k.sebep}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          )}
 
           {/* SÜRÜCÜ / ARAÇ BELGE KONTROLÜ — ADR 8.2.1 (SRC-5) */}
           {(surucuUyari || aracUyari) && (

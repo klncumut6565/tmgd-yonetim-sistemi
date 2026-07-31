@@ -17,6 +17,7 @@
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
+import { yasakTasimaKontrol } from "@/lib/adrYasakTasima";
 import {
   UnRow,
   CalcItem,
@@ -275,6 +276,31 @@ function AdrPageInner() {
               <div className="border rounded-xl p-5 space-y-3">
                 <div><div className="text-xs text-gray-400">UN NUMARASI</div><div className="text-2xl font-bold">UN {selected.un_number}</div></div>
                 <div className="text-sm font-medium">{selected.proper_shipping_name}</div>
+                {(() => {
+                  // ADR — maddenin KENDİSİNİN taşınmasının yasak olup
+                  // olmadığı (karışık yükleme yasağından ayrı bir konu)
+                  const yk = yasakTasimaKontrol({
+                    un_number: selected.un_number,
+                    proper_shipping_name: selected.proper_shipping_name,
+                    adr_class: selected.class,
+                  });
+                  if (yk.yasak) {
+                    return (
+                      <div className="bg-red-100 border-2 border-red-400 rounded p-2.5 text-xs">
+                        <p className="font-bold text-red-800">⛔ TAŞINMASI YASAK</p>
+                        <p className="text-red-900 mt-0.5">{yk.sebep}</p>
+                      </div>
+                    );
+                  }
+                  if (yk.kontrolGerekli) {
+                    return (
+                      <div className="bg-amber-50 border border-amber-300 rounded p-2 text-xs text-amber-900">
+                        ⚠ {yk.sebep}
+                      </div>
+                    );
+                  }
+                  return null;
+                })()}
                 <span className={`inline-block text-sm font-bold px-3 py-1 rounded-full ${CLASS_COLOR[selected.class]||"bg-gray-100"}`}>⚠ Sınıf {selected.class}</span>
                 <div className="grid grid-cols-2 gap-2 text-sm">
                   {([["Sınıflandırma Kodu",selected.classification_code],["Ambalaj Grubu",selected.packing_group||"—"],
