@@ -132,7 +132,10 @@ export function extractAction(text: string): { cleanText: string; action: Assist
 export function actionToUrl(action: AssistantAction, firmId: string | null): string | null {
   switch (action.type) {
     case "open_belge_olustur":
-      return firmId ? `/firms/${firmId}?tab=belge_olustur` : "/belge-olustur";
+      // Global /belge-olustur sayfası menüden kaldırıldı (firma bağlamı
+      // olmadan kullanışlı değildi). Firma seçili değilse null dönüyoruz;
+      // widget kullanıcıdan önce bir firma açmasını istiyor.
+      return firmId ? `/firms/${firmId}?tab=belge_olustur` : null;
     case "open_karisik_yukleme": {
       const uns = action.un_numbers.join(",");
       return `/adr?tab=karisik${uns ? `&uns=${encodeURIComponent(uns)}` : ""}`;

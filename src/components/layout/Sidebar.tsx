@@ -8,8 +8,12 @@ const menu = [
   { title: "Gösterge Paneli", href: "/dashboard" },
   { title: "Firmalar", href: "/firms" },
   { title: "Görevler", href: "/tasks" },
-  { title: "Belgeler", href: "/documents" },
-  { title: "Belge Oluştur", href: "/belge-olustur" },
+  // NOT: "Belgeler" (/documents) ve "Belge Oluştur" (/belge-olustur)
+  // menüden kaldırıldı — firma bağlamı olmadan kullanışlı değillerdi
+  // (her ikisinde de önce firma seçmek gerekiyordu). Aynı işlevler firma
+  // detay sayfasında "Belgeler" ve "Belge Oluştur" sekmeleri olarak
+  // kullanılmaya devam ediyor. Sayfalar silinmedi; doğrudan URL ile hâlâ
+  // erişilebilir.
   { title: "Araçlar", href: "/vehicles" },
   { title: "Sürücüler", href: "/drivers" },
   { title: "Personeller", href: "/employees" },

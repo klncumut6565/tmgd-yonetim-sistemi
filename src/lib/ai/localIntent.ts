@@ -36,8 +36,10 @@ const GLOBAL_SAYFALAR: { anahtarlar: string[]; url: string; ad: string }[] = [
   { anahtarlar: ["gosterge paneli", "dashboard", "ana sayfa", "anasayfa"], url: "/dashboard", ad: "Gösterge Paneli" },
   { anahtarlar: ["firmalar", "firma listesi", "musteriler"], url: "/firms", ad: "Firmalar" },
   { anahtarlar: ["gorev", "gorevler", "is listesi"], url: "/tasks", ad: "Görevler" },
-  { anahtarlar: ["belge olustur", "belge olusturma", "yeni belge"], url: "/belge-olustur", ad: "Belge Oluştur" },
-  { anahtarlar: ["belgeler", "dokuman", "dokumanlar"], url: "/documents", ad: "Belgeler" },
+  // NOT: "Belge Oluştur" ve "Belgeler" global sayfaları menüden kaldırıldı
+  // (firma bağlamı olmadan kullanışlı değillerdi). Bu istekler artık firma
+  // içi sekmeye yönlendiriliyor — bkz. SEKME_ESLESMELERI.
+  { anahtarlar: ["mevzuat", "yonetmelik", "genelge", "kanun", "teblig"], url: "/mevzuat", ad: "Mevzuat" },
   { anahtarlar: ["arac", "araclar", "tasit", "tasitlar"], url: "/vehicles", ad: "Araçlar" },
   { anahtarlar: ["surucu", "surucular", "sofor", "soforler"], url: "/drivers", ad: "Sürücüler" },
   { anahtarlar: ["personel", "personeller", "calisan", "calisanlar"], url: "/employees", ad: "Personeller" },
