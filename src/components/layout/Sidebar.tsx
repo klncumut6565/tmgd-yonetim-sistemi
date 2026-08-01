@@ -51,6 +51,7 @@ export default function Sidebar() {
             Uygulamalar
           </p>
           {[
+            { title: "Sefer Bildirim", href: "https://seferaktarimbosaltmakontroldestekli.streamlit.app", icon: "🚛" },
             { title: "Kimyasal Envanter", href: "https://kimyasal-envanter-xejzjdukscnznm6dgtmvp5.streamlit.app", icon: "🧪" },
             { title: "MSDS Özetleyici", href: "https://msds-ozetleyici-vzsrtfijrpnj9y5zqrupht.streamlit.app", icon: "📄" },
             { title: "Karışık Yükleme", href: "/adr?tab=karisik", icon: "⚠" },
