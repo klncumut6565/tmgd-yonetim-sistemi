@@ -46,8 +46,10 @@ const TALIMAT =
  * uydurma sohbet döngüsü başlar.
  */
 const HALUSINASYON_KALIPLARI: RegExp[] = [
-  /izlediğiniz için teşekkür/i,
-  /izlediginiz icin tesekkur/i,
+  /izlediginiz icin tesekkur/i,   // sadeleştirilmiş metinde yakalanır
+  /izlediğiniz için teşekkür/i,   // ham metinde yakalanır
+  /izleyip destek/i,
+  /videoyu izle/i,
   /altyazı\s*[:.]?\s*m\.?k\.?/i,
   /altyazi\s*[:.]?\s*m\.?k\.?/i,
   /^altyazı/i,

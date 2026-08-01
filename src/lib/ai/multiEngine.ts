@@ -11,6 +11,21 @@
 
 export type ProviderKey = 'grok' | 'gemini' | 'openrouter';
 
+/**
+ * Yanıt uzunluğu sınırı — sağlayıcıya göre.
+ *
+ * Daha önce hepsi 400'e düşürülmüştü (OpenRouter'ın biten kredisi
+ * yüzünden), ama bu cevapların cümle ortasında kesilmesine yol açıyordu.
+ * Artık kredi/kota bakımından cömert olan sağlayıcılarda daha yüksek
+ * sınır kullanılıyor; OpenRouter yalnızca son çare olduğu için düşük
+ * kalıyor.
+ */
+const MAX_TOKENS: Record<ProviderKey, number> = {
+  grok: 1200,
+  gemini: 1200,
+  openrouter: 600,
+};
+
 export type ProviderConfig = {
   provider: ProviderKey;
   api_key: string | null;
@@ -40,7 +55,7 @@ async function callGrok(apiKey: string, model: string, systemPrompt: string, mes
     body: JSON.stringify({
       model,
       messages: [{ role: 'system', content: systemPrompt }, ...messages],
-      max_tokens: 400,
+      max_tokens: MAX_TOKENS.grok,
     }),
   });
 
@@ -69,7 +84,7 @@ async function callGemini(apiKey: string, model: string, systemPrompt: string, m
     body: JSON.stringify({
       systemInstruction: { parts: [{ text: systemPrompt }] },
       contents,
-      generationConfig: { maxOutputTokens: 400 },
+      generationConfig: { maxOutputTokens: MAX_TOKENS.gemini },
     }),
   });
 
@@ -94,7 +109,7 @@ async function callOpenRouter(apiKey: string, model: string, systemPrompt: strin
     body: JSON.stringify({
       model,
       messages: [{ role: 'system', content: systemPrompt }, ...messages],
-      max_tokens: 400,
+      max_tokens: MAX_TOKENS.openrouter,
     }),
   });
 
