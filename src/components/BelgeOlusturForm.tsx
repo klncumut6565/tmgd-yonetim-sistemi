@@ -1262,13 +1262,20 @@ function baslikTablosuCiz(
   adLines: string[],
   sayfaEtiketi?: string
 ) {
-  const ustY = M; // başlık kutusu üst kenarı (çerçevenin hemen altı)
+  // Başlık kutusu, dış çerçeveyle BİTİŞİK olmalı (EK-3 şablonu): sol, üst
+  // ve sağ kenarları çerçevenin kenarlarıyla çakışır, alt kenarı da içerik
+  // alanını ayıran çizgi olur. Önceden M (=12.4) kullanılıyordu; çerçeve
+  // 8.5'ten başladığı için başlık kutusu çerçevenin içinde 3.9mm boşlukla
+  // yüzüyordu.
+  const solKenar = CERCEVE_KENAR;
+  const kutuGenislik = W - 2 * CERCEVE_KENAR;
+  const ustY = CERCEVE_KENAR;
 
   doc.setDrawColor(0, 0, 0);
   doc.setLineWidth(0.3);
-  doc.rect(M, ustY, W - 2 * M, yukseklik);
-  doc.line(M + 38, ustY, M + 38, ustY + yukseklik);
-  doc.line(W - M - 45, ustY, W - M - 45, ustY + yukseklik);
+  doc.rect(solKenar, ustY, kutuGenislik, yukseklik);
+  doc.line(solKenar + 38, ustY, solKenar + 38, ustY + yukseklik);
+  doc.line(W - solKenar - 45, ustY, W - solKenar - 45, ustY + yukseklik);
 
   // Orta hücreyi ikiye ayıran yatay çizgi (EK-3 şablonu):
   // üstte "Doküman Türü", altta "Dokümanın Adı".
@@ -1276,14 +1283,14 @@ function baslikTablosuCiz(
   // "... Kontrol Formu" içerir) ayırıcı çizgi de çizilmez.
   const ortaAyirici = ustY + yukseklik / 2;
   if (sablon.docType !== "KONTROL FORMU") {
-    doc.line(M + 38, ortaAyirici, W - M - 45, ortaAyirici);
+    doc.line(solKenar + 38, ortaAyirici, W - solKenar - 45, ortaAyirici);
   }
 
   // Sağ hücre 4 eşit satıra bölünür: Doküman No / Yayın Tarihi /
   // Revizyon No-Tarihi / Sayfa No
   const sagSatirY = yukseklik / 4;
   for (let i = 1; i < 4; i++) {
-    doc.line(W - M - 45, ustY + sagSatirY * i, W - M, ustY + sagSatirY * i);
+    doc.line(W - solKenar - 45, ustY + sagSatirY * i, W - solKenar, ustY + sagSatirY * i);
   }
 
   // Sol: logo / firma adı
@@ -1297,7 +1304,7 @@ function baslikTablosuCiz(
       const alanY = Math.min(yukseklik - 2 * kenar, 22);
       const box = logoAlanaSigdir(
         logo.enBoyOrani,
-        M + kenar,
+        solKenar + kenar,
         ustY + kenar,
         alanG,
         alanY
@@ -1310,13 +1317,13 @@ function baslikTablosuCiz(
     doc.setFontSize(7);
     doc.setFont(FONT, "bold");
     const firmLines = doc.splitTextToSize(firmAdi, 34);
-    doc.text(firmLines, M + 2, ustY + yukseklik / 2 - (firmLines.length - 1) * 2);
+    doc.text(firmLines, solKenar + 2, ustY + yukseklik / 2 - (firmLines.length - 1) * 2);
   }
 
   // Orta: doküman türü + belge adı (dikey ortalanmış).
   // KONTROL FORMU türünde tür yazısı basılmaz (belge adı zaten "... Kontrol
   // Formu" içerir); belge adı kutu içinde dikey ortalanır.
-  const ortaX = M + 38 + (W - 2 * M - 38 - 45) / 2;
+  const ortaX = solKenar + 38 + (kutuGenislik - 38 - 45) / 2;
   const turuGoster = sablon.docType !== "KONTROL FORMU";
   if (turuGoster) {
     // Üst yarı: doküman türü (yarı yüksekliğin ortasına hizalı)
@@ -1345,7 +1352,7 @@ function baslikTablosuCiz(
   // Sağ: doküman no / tarihler / sayfa no
   doc.setFontSize(7);
   doc.setFont(FONT, "normal");
-  const sagX = W - M - 43;
+  const sagX = W - solKenar - 43;
   // Doküman numarası kurum önekiyle yazılır: TMGDK-P1, TMGDK-L1 gibi
   // (referans TMGDK belgelerindeki numaralandırma standardı).
   // Her metin kendi satırının dikey ortasına hizalanır (+1.2 ≈ font yarısı)
@@ -1569,7 +1576,9 @@ async function renderYapilandirilmisBelge(
   // Başlık kutusu yüksekliği belge adına göre değişir (uzun adlarda taşmayı önler);
   // içerik başlangıç Y'si buna göre dinamik olarak ayarlanır.
   const { yukseklik: baslikYukseklik, adLines } = baslikYuksekligiHesapla(doc, belgeAdi);
-  const headerAlt = 8 + baslikYukseklik + 8; // kutunun altı + boşluk
+  // Başlık kutusu artık CERCEVE_KENAR (8.5) hizasından başlıyor; içerik
+  // kutunun alt kenarından sonra makul bir nefes payıyla devam eder.
+  const headerAlt = CERCEVE_KENAR + baslikYukseklik + 8;
 
   const sayfalar = sayfalaraBol(doc, satirlar, headerAlt);
   const toplamSayfa = sayfalar.length;
