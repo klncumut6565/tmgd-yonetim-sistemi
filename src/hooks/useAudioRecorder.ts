@@ -84,12 +84,30 @@ export function useAudioRecorder() {
    * Hiç konuşma algılanmadıysa onTamamlandi(null) döner.
    */
   const baslat = useCallback(
-    async (onTamamlandi: (ses: Blob | null) => void) => {
+    async (
+      onTamamlandi: (ses: Blob | null) => void,
+      opsiyon?: {
+        /**
+         * Kullanıcı konuşmaya başladığı anda tetiklenir.
+         *
+         * "Barge-in" için: asistan konuşurken kayıt açık tutulur ve kullanıcı
+         * araya girdiğinde bu geri çağırma ile asistanın sesi kesilir.
+         */
+        onKonusmaBasladi?: () => void;
+        /**
+         * Sessizlik eşiğini çarpar. Asistan konuşurken hoparlör sesinin
+         * mikrofona sızma ihtimaline karşı eşik yükseltilir (örn. 2.5) —
+         * böylece asistanın kendi sesi "kullanıcı konuşuyor" sanılmaz.
+         */
+        esikCarpani?: number;
+      }
+    ) => {
       if (!desteklenir) {
         setHata("Bu tarayıcı ses kaydını desteklemiyor.");
         return;
       }
       setHata("");
+      const etkinEsik = SESSIZLIK_ESIGI * (opsiyon?.esikCarpani ?? 1);
       konusmaAlgilandiRef.current = false;
       konusmaSuresiRef.current = 0;
       sonOlcumRef.current = 0;
@@ -134,11 +152,15 @@ export function useAudioRecorder() {
           setSeviye(Math.min(1, rms * 6));
 
           const simdi = Date.now();
-          if (rms > SESSIZLIK_ESIGI) {
+          if (rms > etkinEsik) {
             // Gerçek konuşma süresini biriktir — tek bir "tık" sesi değil,
             // anlamlı bir konuşma olduğundan emin olmak için.
             if (sonOlcumRef.current > 0) {
               konusmaSuresiRef.current += simdi - sonOlcumRef.current;
+            }
+            if (!konusmaAlgilandiRef.current) {
+              // İlk kez konuşma algılandı — barge-in için haber ver
+              opsiyon?.onKonusmaBasladi?.();
             }
             konusmaAlgilandiRef.current = true;
             sessizlikBaslangicRef.current = null;

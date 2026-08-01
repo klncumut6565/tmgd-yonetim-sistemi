@@ -209,20 +209,39 @@ export default function ADRAssistantWidget() {
     }
   }
 
-  function dinlemeyeBasla() {
+  /**
+   * Dinlemeyi başlatır.
+   *
+   * @param asistanKonusurken true ise "barge-in" modu: asistan konuşurken
+   *   mikrofon açık tutulur, kullanıcı araya girdiğinde asistanın sesi
+   *   kesilir. Bu modda eşik yükseltilir (2.5x) — hoparlörden sızan
+   *   asistan sesi "kullanıcı konuşuyor" sanılmasın diye.
+   */
+  function dinlemeyeBasla(asistanKonusurken = false) {
     if (sunucuTranskripsiyon) {
-      kayitBaslat((ses) => {
-        if (!ses) {
-          // Hiç konuşma algılanmadı — görüşme aktifse tekrar dinlemeye geç
-          if (sesliGorusmeRef.current) {
-            setTimeout(() => {
-              if (sesliGorusmeRef.current) dinlemeyeBasla();
-            }, 300);
+      kayitBaslat(
+        (ses) => {
+          if (!ses) {
+            // Hiç konuşma algılanmadı — görüşme aktifse tekrar dinlemeye geç
+            if (sesliGorusmeRef.current) {
+              setTimeout(() => {
+                if (sesliGorusmeRef.current) dinlemeyeBasla();
+              }, 300);
+            }
+            return;
           }
-          return;
-        }
-        sesiMetneCevir(ses);
-      });
+          sesiMetneCevir(ses);
+        },
+        asistanKonusurken
+          ? {
+              esikCarpani: 2.5,
+              onKonusmaBasladi: () => {
+                // Kullanıcı araya girdi — asistanı sustur, sözü ona bırak
+                ttsDurdur();
+              },
+            }
+          : undefined
+      );
       return;
     }
     // Yedek yol: Web Speech API (yalnızca MediaRecorder yoksa)
@@ -230,6 +249,29 @@ export default function ADRAssistantWidget() {
       setSesizDenemeSayisi(0);
       gonder(metin);
     }, false);
+  }
+
+  /**
+   * Asistanın cevabını seslendirir ve AYNI ANDA mikrofonu açık tutar.
+   *
+   * "Barge-in": kullanıcı asistan konuşurken araya girerse asistan susar
+   * ve kullanıcının yeni cümlesi kaydedilir (ChatGPT sesli modundaki
+   * davranış). Konuşma bitince kayıt kapatılır; kayıt akışı zaten boş
+   * sonuçta normal dinlemeye geri döner.
+   */
+  function seslendirVeDinle(metin: string) {
+    if (!sesliGorusmeRef.current || !ttsDesteklenir) return;
+
+    konus(metin, () => {
+      // Seslendirme bitti: barge-in kaydını kapat. Kullanıcı bu sırada
+      // konuşmadıysa kayıt boş döner ve akış normal dinlemeye geçer.
+      if (sesliGorusmeRef.current) kayitDurdur();
+    });
+
+    // Seslendirmeyle eş zamanlı dinleme (yalnızca MediaRecorder yolunda;
+    // Web Speech API yedeğinde tarayıcı kendi sesini dinleyeceği için
+    // barge-in uygulanmaz).
+    if (sunucuTranskripsiyon) dinlemeyeBasla(true);
   }
 
   // Web Speech API yedek yolundaki hata yönetimi (yalnızca o yol aktifse).
@@ -307,9 +349,7 @@ export default function ADRAssistantWidget() {
         ]);
         router.push(yerel.url);
         if (sesliGorusmeRef.current && ttsDesteklenir) {
-          konus(yerel.cevap, () => {
-            if (sesliGorusmeRef.current) dinlemeyeBasla();
-          });
+          seslendirVeDinle(yerel.cevap);
         }
         return;
       }
@@ -333,9 +373,7 @@ export default function ADRAssistantWidget() {
             { id: crypto.randomUUID(), role: "assistant", content: mesaj },
           ]);
           if (sesliGorusmeRef.current && ttsDesteklenir) {
-            konus("Birden fazla firma eşleşti, hangisini kastettiğini belirtir misin?", () => {
-              if (sesliGorusmeRef.current) dinlemeyeBasla();
-            });
+            seslendirVeDinle("Birden fazla firma eşleşti, hangisini kastettiğini belirtir misin?");
           }
           return;
         } else {
@@ -345,9 +383,7 @@ export default function ADRAssistantWidget() {
             { id: crypto.randomUUID(), role: "assistant", content: mesaj, error: true },
           ]);
           if (sesliGorusmeRef.current && ttsDesteklenir) {
-            konus(mesaj, () => {
-              if (sesliGorusmeRef.current) dinlemeyeBasla();
-            });
+            seslendirVeDinle(mesaj);
           }
           return;
         }
@@ -361,9 +397,7 @@ export default function ADRAssistantWidget() {
         ]);
         router.push(url);
         if (sesliGorusmeRef.current && ttsDesteklenir) {
-          konus(yerel.cevap, () => {
-            if (sesliGorusmeRef.current) dinlemeyeBasla();
-          });
+          seslendirVeDinle(yerel.cevap);
         }
         return;
       }
@@ -399,9 +433,7 @@ export default function ADRAssistantWidget() {
           { id: crypto.randomUUID(), role: "assistant", content: hataMetni, error: true },
         ]);
         if (sesliGorusmeRef.current && ttsDesteklenir) {
-          konus("Bir hata oluştu, lütfen tekrar dener misin.", () => {
-            if (sesliGorusmeRef.current) dinlemeyeBasla();
-          });
+          seslendirVeDinle("Bir hata oluştu, lütfen tekrar dener misin.");
         }
       } else {
         setMessages((prev) => [
@@ -413,9 +445,7 @@ export default function ADRAssistantWidget() {
           // Cevap seslendirilir; bitince GÖRÜŞME hâlâ aktifse otomatik
           // olarak tekrar dinlemeye geçilir — gerçek karşılıklı konuşma,
           // kullanıcının tekrar mikrofona basmasına gerek kalmaz.
-          konus(json.answer as string, () => {
-            if (sesliGorusmeRef.current) dinlemeyeBasla();
-          });
+          seslendirVeDinle(json.answer as string);
         }
 
         if (json.action) {
@@ -446,9 +476,7 @@ export default function ADRAssistantWidget() {
         },
       ]);
       if (sesliGorusmeRef.current && ttsDesteklenir) {
-        konus("Bağlantı hatası oluştu.", () => {
-          if (sesliGorusmeRef.current) dinlemeyeBasla();
-        });
+        seslendirVeDinle("Bağlantı hatası oluştu.");
       }
     } finally {
       setSending(false);
@@ -579,7 +607,8 @@ export default function ADRAssistantWidget() {
                 <span className="w-1 h-3 bg-indigo-500 rounded-full animate-pulse [animation-delay:150ms]" />
                 <span className="w-1 h-3 bg-indigo-500 rounded-full animate-pulse [animation-delay:300ms]" />
               </span>
-              🔊 Konuşuyor...
+              🔊 Konuşuyor
+              <span className="text-[11px] text-indigo-500">— araya girebilirsin</span>
               <button onClick={ttsDurdur} className="ml-1 text-xs underline text-indigo-500">
                 Durdur
               </button>
@@ -611,7 +640,8 @@ export default function ADRAssistantWidget() {
         )}
         {!sesliGorusmeAktif && herhangiSesDestegi && !sending && (
           <p className="text-xs text-gray-400 mb-1">
-            🎤 Mikrofona bas — konuş, sustuğunda otomatik gönderilir, cevap sesli gelir.
+            🎤 Mikrofona bas — konuş, sustuğunda otomatik gönderilir. Cevap sesli gelir;
+            araya girip sözünü kesebilirsin.
           </p>
         )}
         {!herhangiSesDestegi && (
