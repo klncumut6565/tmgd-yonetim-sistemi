@@ -51,7 +51,6 @@ export default function Sidebar() {
             Uygulamalar
           </p>
           {[
-            { title: "Sefer Bildirim", href: "https://seferaktarimbosaltmakontroldestekli.streamlit.app", icon: "🚛" },
             { title: "Kimyasal Envanter", href: "https://kimyasal-envanter-xejzjdukscnznm6dgtmvp5.streamlit.app", icon: "🧪" },
             { title: "MSDS Özetleyici", href: "https://msds-ozetleyici-vzsrtfijrpnj9y5zqrupht.streamlit.app", icon: "📄" },
             { title: "Karışık Yükleme", href: "/adr?tab=karisik", icon: "⚠" },
@@ -68,6 +67,24 @@ export default function Sidebar() {
               {app.href.startsWith("http") && <span className="ml-auto text-gray-300 text-xs">↗</span>}
             </a>
           ))}
+        </div>
+
+        {/* Mevzuat — kanun/yönetmelik/genelge kütüphanesi.
+            Herkes görüntüler; yükleme yetkisi sayfa içinde admin ve
+            super_admin ile sınırlı. */}
+        <div className="mt-4 pt-4 border-t border-gray-200">
+          <Link
+            href="/mevzuat"
+            className={
+              "flex items-center gap-2 px-3 py-2 rounded-lg text-sm " +
+              (pathname === "/mevzuat"
+                ? "bg-black text-white"
+                : "text-gray-600 hover:bg-gray-100")
+            }
+          >
+            <span>📚</span>
+            <span>Mevzuat</span>
+          </Link>
         </div>
 
         {/* Süper admin veya yönetici görür */}

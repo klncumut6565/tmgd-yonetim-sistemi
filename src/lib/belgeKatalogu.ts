@@ -48,6 +48,14 @@ export type CatalogItem = {
   name: string;
   category: CatalogCategory;
   activities: ActivityKey[]; // boş = tüm firmalar
+  /**
+   * true → belge listelerde GÖRÜNMEZ (Belge Oluştur, Belge Takip).
+   *
+   * Silmek yerine pasif bırakılır: kodu ve şablonu yerinde kalır, daha önce
+   * bu koda ait oluşturulmuş/yüklenmiş kayıtlar bozulmaz ve ileride tek
+   * satır değişiklikle geri açılabilir.
+   */
+  pasif?: boolean;
 };
 
 export const CATEGORY_LABELS: Record<CatalogCategory, string> = {
@@ -109,9 +117,15 @@ export const CATALOG: CatalogItem[] = [
   { code: "L4", name: "Ekipman / Ambalaj Takip Listesi", category: "L", activities: ["paketleyen", "dolduran"] },
 
   // ---------------- SEFER / AKTARIM ----------------
-  { code: "SA1", name: "Sefer Takip Formu", category: "SA", activities: ["tasimaci"] },
-  { code: "SA2", name: "Aktarım Kaydı", category: "SA", activities: ["bosaltan", "yukleyen"] },
-  { code: "SA3", name: "ADR Belge Kaydı", category: "SA", activities: [] },
+  // SEFER / AKTARIM (SA) — PASİF.
+  // Bu üç belge, Bakanlık genelgesinde istenen bilgi/belge listesinde yer
+  // almıyor (genelge yalnızca gönderen/taşımacı/alıcı/boşaltan gibi ROLLERE
+  // göre doküman istiyor; "sefer" veya "aktarım" başlığı geçmiyor).
+  // Silinmedi çünkü şablonları ve daha önce üretilmiş kayıtlar korunmalı —
+  // gerekirse pasif:false ile tek satırda geri açılır.
+  { code: "SA1", name: "Sefer Takip Formu", category: "SA", activities: ["tasimaci"], pasif: true },
+  { code: "SA2", name: "Aktarım Kaydı", category: "SA", activities: ["bosaltan", "yukleyen"], pasif: true },
+  { code: "SA3", name: "ADR Belge Kaydı", category: "SA", activities: [], pasif: true },
 ];
 
 // Faaliyete göre katalog filtresi
@@ -120,6 +134,7 @@ export const CATALOG: CatalogItem[] = [
 // çünkü bu firmalar tehlikeli maddeyi stoklamaz, yalnızca taşır.
 export function catalogForActivities(activities: string[]): CatalogItem[] {
   return CATALOG.filter((item) => {
+    if (item.pasif) return false; // pasif belgeler hiçbir listede görünmez
     if (item.code === "L1") return envanterGerekli(activities);
     return (
       item.activities.length === 0 ||
