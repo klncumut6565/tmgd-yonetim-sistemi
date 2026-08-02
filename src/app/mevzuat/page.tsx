@@ -16,6 +16,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase/client";
 import { useUser } from "@/hooks/useUser";
 import { hataCevir } from "@/lib/hataCevir";
+import { pdfMetniCikar } from "@/lib/pdfMetin";
 
 type Mevzuat = {
   id: string;
@@ -29,6 +30,8 @@ type Mevzuat = {
   file_name: string;
   file_size: number | null;
   mime_type: string | null;
+  metin_durumu: string | null;
+  sayfa_sayisi: number | null;
   created_at: string;
 };
 
@@ -80,6 +83,7 @@ export default function MevzuatPage() {
   const [dosya, setDosya] = useState<File | null>(null);
   const [yukleniyor, setYukleniyor] = useState(false);
   const [mesaj, setMesaj] = useState("");
+  const [metinIlerleme, setMetinIlerleme] = useState("");
   const dosyaRef = useRef<HTMLInputElement>(null);
 
   const yukle = useCallback(async () => {
@@ -147,7 +151,7 @@ export default function MevzuatPage() {
       return;
     }
 
-    const { error: insErr } = await supabase.from("mevzuat").insert({
+    const { data: yeniKayit, error: insErr } = await supabase.from("mevzuat").insert({
       baslik: baslik.trim(),
       tur,
       hiyerarsi: TUR_BILGI[tur]?.hiyerarsi ?? 99,
@@ -159,7 +163,7 @@ export default function MevzuatPage() {
       file_size: dosya.size,
       mime_type: dosya.type || null,
       yukleyen: profile?.id ?? null,
-    });
+    }).select("id").single();
 
     setYukleniyor(false);
 
@@ -170,7 +174,60 @@ export default function MevzuatPage() {
       return;
     }
 
-    setMesaj("✓ Mevzuat eklendi.");
+    const yeniId = (yeniKayit as { id: string } | null)?.id;
+    if (!yeniId) {
+      setMesaj("Kayıt oluşturuldu ancak kimliği alınamadı; metin çıkarma atlandı.");
+      yukle();
+      return;
+    }
+
+    // ---- METİN ÇIKARMA ----
+    // Asistanın bu belgeden cevap verebilmesi için metin sayfa sayfa
+    // çıkarılıp kaydedilir. Tarayıcıda yapılıyor: dosya zaten burada,
+    // sunucuya ikinci kez göndermeye ve zaman aşımı riskine gerek yok.
+    if ((dosya.type || "").includes("pdf")) {
+      try {
+        setMetinIlerleme("Metin çıkarılıyor...");
+        const { sayfalar, toplamSayfa } = await pdfMetniCikar(dosya, (islenen, toplam) => {
+          setMetinIlerleme(`Metin çıkarılıyor... ${islenen}/${toplam} sayfa`);
+        });
+
+        if (sayfalar.length > 0) {
+          // Büyük belgelerde tek seferde binlerce satır göndermemek için
+          // parçalar hâlinde yaz
+          const PARCA = 50;
+          for (let i = 0; i < sayfalar.length; i += PARCA) {
+            const dilim = sayfalar.slice(i, i + PARCA).map((sf) => ({
+              mevzuat_id: yeniId,
+              sayfa_no: sf.sayfa_no,
+              icerik: sf.icerik,
+            }));
+            await supabase.from("mevzuat_metin").insert(dilim);
+          }
+          await supabase
+            .from("mevzuat")
+            .update({ metin_durumu: "tamam", sayfa_sayisi: toplamSayfa })
+            .eq("id", yeniId);
+          setMesaj(`✓ Mevzuat eklendi. ${sayfalar.length} sayfa metin işlendi — asistan bu belgeden cevap verebilir.`);
+        } else {
+          // Taranmış (görüntü) PDF'lerde metin katmanı yoktur
+          await supabase
+            .from("mevzuat")
+            .update({ metin_durumu: "desteklenmiyor", sayfa_sayisi: toplamSayfa })
+            .eq("id", yeniId);
+          setMesaj("✓ Mevzuat eklendi. Ancak metin çıkarılamadı (taranmış görüntü olabilir) — asistan bu belgeyi okuyamaz.");
+        }
+      } catch {
+        await supabase.from("mevzuat").update({ metin_durumu: "hata" }).eq("id", yeniId);
+        setMesaj("✓ Mevzuat eklendi, ancak metin çıkarılamadı — belge yine de indirilebilir.");
+      } finally {
+        setMetinIlerleme("");
+      }
+    } else {
+      await supabase.from("mevzuat").update({ metin_durumu: "desteklenmiyor" }).eq("id", yeniId);
+      setMesaj("✓ Mevzuat eklendi. (Metin araması yalnızca PDF için çalışır.)");
+    }
+
     setBaslik(""); setSayiNo(""); setYayimTarihi(""); setAciklama(""); setDosya(null);
     if (dosyaRef.current) dosyaRef.current.value = "";
     setFormAcik(false);
@@ -299,6 +356,9 @@ export default function MevzuatPage() {
             </label>
           </div>
 
+          {metinIlerleme && (
+            <p className="text-sm mt-3 text-blue-700">{metinIlerleme}</p>
+          )}
           {mesaj && <p className="text-sm mt-3 text-gray-700">{mesaj}</p>}
 
           <div className="flex gap-2 mt-3">
@@ -378,6 +438,13 @@ export default function MevzuatPage() {
                           tarihYaz(m.yayim_tarihi),
                           m.file_name,
                           boyutYaz(m.file_size),
+                          m.metin_durumu === "tamam" && m.sayfa_sayisi
+                            ? `🔍 ${m.sayfa_sayisi} sayfa aranabilir`
+                            : m.metin_durumu === "desteklenmiyor"
+                              ? "⚠ metin yok (asistan okuyamaz)"
+                              : m.metin_durumu === "hata"
+                                ? "⚠ metin çıkarılamadı"
+                                : null,
                         ]
                           .filter(Boolean)
                           .join(" · ")}

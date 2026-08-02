@@ -78,6 +78,40 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  // ---- MEVZUAT ARAMASI ----
+  // Kullanıcının yüklediği GERÇEK mevzuat belgelerinde arama yapılır ve
+  // yalnızca ilgili bölümler prompt'a eklenir. Belgenin tamamını göndermek
+  // token sınırını aşacağı için sayfa bazlı, skora göre ilk birkaç parça
+  // alınır. Böylece asistan kendi eğitim bilgisinden değil, resmî metinden
+  // konuşur ve kaynak gösterebilir.
+  let mevzuatContext = ''
+  try {
+    const { data: parcalar } = await supabase.rpc('mevzuat_ara', {
+      p_sorgu: question,
+      p_limit: 4,
+    })
+
+    if (parcalar && parcalar.length > 0) {
+      mevzuatContext =
+        'YÜKLÜ MEVZUAT BELGELERİNDEN İLGİLİ BÖLÜMLER:\n' +
+        (parcalar as {
+          baslik: string
+          tur: string
+          sayi_no: string | null
+          sayfa_no: number
+          icerik: string
+        }[])
+          .map(
+            (p, i) =>
+              `[${i + 1}] ${p.baslik}${p.sayi_no ? ` (${p.sayi_no})` : ''} — sayfa ${p.sayfa_no}:\n${p.icerik}`
+          )
+          .join('\n\n')
+    }
+  } catch {
+    // Migration 038 çalıştırılmamışsa veya arama başarısızsa sessizce geç —
+    // asistan mevzuat bağlamı olmadan çalışmaya devam etsin.
+  }
+
   const systemPrompt = `### DİL KURALI — EN ÖNEMLİ KURAL ###
 SEN SADECE TÜRKÇE KONUŞURSUN. Her cevabın istisnasız TÜRKÇE olmalı.
 - Kullanıcı hangi dilde yazarsa yazsın, sen TÜRKÇE cevap verirsin.
@@ -93,6 +127,7 @@ KURALLAR:
 - KARIŞIK YÜKLEME UYUMLULUĞU (bir aracta iki farklı maddenin birlikte taşınıp taşınamayacağı) sorularına SEN KESİN HÜKÜM VERMEZSİN — bunun yerine aşağıdaki EYLEM sistemiyle gerçek uyumluluk aracını (ADR 7.5.2 matrisi) açarsın.
 - Regülasyon maddesi numarası verirken kesin değilsen belirt.
 - Kısa, pratik, TMGD'nin günlük işine yarayacak şekilde cevap ver.
+- Sana "YÜKLÜ MEVZUAT BELGELERİNDEN İLGİLİ BÖLÜMLER" verilmişse cevabını ÖNCELİKLE o metne dayandır ve sonunda kaynağı belirt (örn. "Kaynak: [1] Tehlikeli Madde Yönetmeliği, sayfa 12"). Verilen bölümlerde cevap yoksa bunu açıkça söyle, uydurma.
 - CÜMLELERİNİ MUTLAKA TAMAMLA. Uzun bir konuyu anlatman gerekiyorsa az madde yaz ama her cümleyi bitir — yarım kalmış cümle bırakma. Anlatım uzayacaksa özetle, kesme.
 - SEN VERİ/KAYIT SİLEMEZSİN. Kullanıcı bir şeyi silmeni isterse KESİNLİKLE reddet ve "Silme işlemi güvenlik nedeniyle asistan üzerinden yapılamaz, ilgili sayfadan manuel yapman gerekiyor" de. Aşağıdaki eylem listesinde silme YOKTUR ve asla olmayacaktır.
 
@@ -139,6 +174,8 @@ Bu beş durumun DIŞINDA hiçbir eylem bloğu üretme — sadece soruları norma
 ${firmContext}
 
 ${unContext}
+
+${mevzuatContext}
 
 ### SON HATIRLATMA ###
 CEVABIN TAMAMI TÜRKÇE OLACAK. Düşünme metni yazma, doğrudan cevabı ver.
