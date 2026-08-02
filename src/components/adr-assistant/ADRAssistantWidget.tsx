@@ -29,6 +29,7 @@ import { useTextToSpeech } from "@/hooks/useTextToSpeech";
 import type { ChatMessage } from "@/lib/ai/multiEngine";
 import { actionToUrl } from "@/lib/ai/actions";
 import { yerelNiyetCoz } from "@/lib/ai/localIntent";
+import { halusinasyonMu } from "@/lib/ai/halusinasyon";
 
 type DisplayMessage = ChatMessage & { id: string; pending?: boolean; error?: boolean };
 
@@ -262,9 +263,15 @@ export default function ADRAssistantWidget() {
       );
       return;
     }
-    // Yedek yol: Web Speech API (yalnızca MediaRecorder yoksa)
+    // Yedek yol: Web Speech API (yalnızca MediaRecorder yoksa).
+    // Bu yol da halüsinasyon filtresinden geçirilir — tarayıcının konuşma
+    // servisi de sessizlikte uydurma metin üretebiliyor.
     sesBaslat((metin) => {
       setSesizDenemeSayisi(0);
+      if (halusinasyonMu(metin)) {
+        if (sesliGorusmeRef.current) dinlemeyeBasla();
+        return;
+      }
       gonder(metin);
     }, false);
   }
@@ -347,6 +354,15 @@ export default function ADRAssistantWidget() {
   async function gonder(overrideText?: string) {
     const question = (overrideText ?? input).trim();
     if (!question || sending) return;
+
+    // SON SAVUNMA: Halüsinasyon metni hiçbir yoldan sohbete girmesin.
+    // Bir kez geçmişe girerse model onu bağlam sanıp taklit edebiliyor.
+    // (Yazıyla girilen mesajlar bu kontrolden muaf — kullanıcı bilerek
+    // yazmışsa engellenmemeli.)
+    if (overrideText && halusinasyonMu(overrideText)) {
+      if (sesliGorusmeRef.current) dinlemeyeBasla();
+      return;
+    }
 
     setInput("");
 

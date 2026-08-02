@@ -21,6 +21,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getSuperAdminFromRequest } from '@/lib/supabase/verifySuperAdmin'
+import { halusinasyonMu } from '@/lib/ai/halusinasyon'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 25
@@ -33,46 +34,8 @@ const TALIMAT =
   'Sessizliği doldurmak için metin UYDURMA.'
 
 
-/**
- * WHISPER HALÜSİNASYON FİLTRESİ
- *
- * Whisper modelleri sessizlik veya anlamsız gürültü aldığında, eğitim
- * verisindeki YouTube altyazılarından öğrendikleri kalıpları UYDURUR.
- * Türkçe'de en sık görülenler: "İzlediğiniz için teşekkür ederim",
- * "Altyazı M.K.", "Abone olmayı unutmayın".
- *
- * Bu metinler kullanıcının söylediği bir şey DEĞİLDİR. Filtrelenmezse
- * asistana gider, asistan cevap verir ve sesli modda sonsuz bir
- * uydurma sohbet döngüsü başlar.
- */
-const HALUSINASYON_KALIPLARI: RegExp[] = [
-  /izlediginiz icin tesekkur/i,   // sadeleştirilmiş metinde yakalanır
-  /izlediğiniz için teşekkür/i,   // ham metinde yakalanır
-  /izleyip destek/i,
-  /videoyu izle/i,
-  /altyazı\s*[:.]?\s*m\.?k\.?/i,
-  /altyazi\s*[:.]?\s*m\.?k\.?/i,
-  /^altyazı/i,
-  /^altyazi/i,
-  /abone olmayı unutmayın/i,
-  /abone olmayi unutmayin/i,
-  /bir sonraki (video|bölüm)/i,
-  /kanalıma abone/i,
-  /thanks? for watching/i,
-  /please subscribe/i,
-  /subtitles? by/i,
-  /^\s*(teşekkürler|tesekkurler|thank you|thanks)\s*[.!]?\s*$/i,
-  /^\s*(altyazı|altyazi|subtitle)s?\s*[:.]/i,
-];
-
-/** Metin bir Whisper halüsinasyonu mu? */
-function halusinasyonMu(metin: string): boolean {
-  const t = metin.trim();
-  if (!t) return true;
-  // Çok kısa çıktılar da genelde gürültüden gelir
-  if (t.length < 3) return true;
-  return HALUSINASYON_KALIPLARI.some((k) => k.test(t));
-}
+// Halüsinasyon filtresi ortak modüle taşındı: src/lib/ai/halusinasyon.ts
+// (hem burada hem istemcideki Web Speech API yedek yolunda kullanılıyor)
 
 function bekle(ms: number) {
   return new Promise((r) => setTimeout(r, ms))
