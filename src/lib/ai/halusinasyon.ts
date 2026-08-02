@@ -102,3 +102,45 @@ export function halusinasyonMu(metin: string): boolean {
 
   return KALIPLAR.some((k) => k.test(sade));
 }
+
+
+/**
+ * YANKI TESPİTİ — asistanın kendi sesi mi geri geldi?
+ *
+ * Sesli görüşmede hoparlörden çıkan asistan sesi mikrofona sızabiliyor.
+ * Whisper bunu yazıya döküyor ve asistan kendi cümlesini "kullanıcı sordu"
+ * sanıp kendine cevap veriyor — kendi kendine konuşma döngüsü.
+ *
+ * Transkripsiyon genelde bozuk gelir ("Hoş geldiniz" → "Heldik"), bu yüzden
+ * birebir karşılaştırma işe yaramaz. Bunun yerine ANLAMLI KELİME ÖRTÜŞMESİNE
+ * bakılır: transkripsiyondaki uzun kelimelerin çoğu, asistanın az önce
+ * söylediği metinde de geçiyorsa bu bir yankıdır.
+ *
+ * @param transkript Mikrofondan gelen metin
+ * @param sonAsistanMetni Asistanın en son seslendirdiği metin
+ */
+export function yankiMi(transkript: string, sonAsistanMetni: string | null): boolean {
+  if (!sonAsistanMetni) return false;
+
+  const t = trNormalize(transkript);
+  const a = trNormalize(sonAsistanMetni);
+  if (!t || !a) return false;
+
+  // Yankı transkripsiyonu bozuk gelir ("kuralları" → "kuraltık"), bu yüzden
+  // tam kelime yerine KÖK (ilk 5 harf) karşılaştırılır.
+  const kok = (k: string) => k.slice(0, 5);
+
+  // Kısa kelimeler (ve, bir, için...) her metinde geçtiği için elenir
+  const transkriptKokleri = t.split(" ").filter((k) => k.length >= 5).map(kok);
+  if (transkriptKokleri.length < 3) return false; // çok kısa metinde karar verme
+
+  const asistanKokleri = new Set(a.split(" ").filter((k) => k.length >= 5).map(kok));
+  if (asistanKokleri.size === 0) return false;
+
+  const ortak = transkriptKokleri.filter((k) => asistanKokleri.has(k)).length;
+  const oran = ortak / transkriptKokleri.length;
+
+  // Anlamlı kelime köklerinin %40'ından fazlası asistanın az önce söylediği
+  // metinde geçiyorsa bu kullanıcının değil, asistanın kendi sesidir.
+  return oran >= 0.4;
+}

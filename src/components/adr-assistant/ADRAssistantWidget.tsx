@@ -29,7 +29,7 @@ import { useTextToSpeech } from "@/hooks/useTextToSpeech";
 import type { ChatMessage } from "@/lib/ai/multiEngine";
 import { actionToUrl } from "@/lib/ai/actions";
 import { yerelNiyetCoz } from "@/lib/ai/localIntent";
-import { halusinasyonMu } from "@/lib/ai/halusinasyon";
+import { halusinasyonMu, yankiMi } from "@/lib/ai/halusinasyon";
 
 type DisplayMessage = ChatMessage & { id: string; pending?: boolean; error?: boolean };
 
@@ -81,6 +81,12 @@ export default function ADRAssistantWidget() {
    * geçmiş buradan okunuyor.
    */
   const messagesRef = useRef<DisplayMessage[]>([]);
+  /**
+   * Asistanın en son seslendirdiği metin — yankı tespiti için.
+   * Hoparlörden sızan ses mikrofona girip yazıya döküldüğünde, bu metinle
+   * karşılaştırılıp elenir (asistanın kendi kendine konuşmasını önler).
+   */
+  const sonSeslendirilenRef = useRef<string | null>(null);
   useEffect(() => {
     messagesRef.current = messages;
   }, [messages]);
@@ -182,6 +188,15 @@ export default function ADRAssistantWidget() {
       }
 
       const metin = (json.text ?? "").trim();
+
+      // YANKI KONTROLÜ: gelen metin asistanın az önce söylediğine çok
+      // benziyorsa bu kullanıcının sesi değil, hoparlörden sızan asistan
+      // sesidir — yok say ve dinlemeye devam et.
+      if (metin && yankiMi(metin, sonSeslendirilenRef.current)) {
+        if (sesliGorusmeRef.current) dinlemeyeBasla();
+        return;
+      }
+
       if (!metin) {
         // Ses anlaşılmadı ya da halüsinasyon olarak filtrelendi.
         // Üst üste 3 kez olursa görüşmeyi durdur — aksi halde sessiz bir
@@ -236,6 +251,22 @@ export default function ADRAssistantWidget() {
     if (sunucuTranskripsiyon) {
       kayitBaslat(
         (ses) => {
+          // BARGE-IN KAYDI ATILIR:
+          // Bu kayıt, asistan konuşurken açıldığı için hoparlörden sızan
+          // asistan sesini de içeriyor. Yazıya dökülürse asistan kendi
+          // cümlesini "kullanıcı sordu" sanıp kendine cevap veriyor
+          // (kendi kendine konuşma döngüsü). O yüzden içeriği KULLANILMAZ;
+          // yalnızca "kullanıcı araya girdi" sinyali olarak iş görür.
+          // Asistan sustuktan sonra TEMİZ bir kayıt başlatılır.
+          if (asistanKonusurken) {
+            if (sesliGorusmeRef.current) {
+              setTimeout(() => {
+                if (sesliGorusmeRef.current) dinlemeyeBasla(false);
+              }, 250);
+            }
+            return;
+          }
+
           if (!ses) {
             // Hiç konuşma algılanmadı — görüşme aktifse tekrar dinlemeye geç
             if (sesliGorusmeRef.current) {
@@ -256,7 +287,10 @@ export default function ADRAssistantWidget() {
               esikCarpani: 5,
               minSesSuresiMs: 600,
               onKonusmaBasladi: () => {
+                // Asistanı sustur ve bu (kirli) kaydı sonlandır — üstteki
+                // geri çağırma temiz bir kayıt başlatacak.
                 ttsDurdur();
+                kayitDurdur();
               },
             }
           : undefined
@@ -286,6 +320,7 @@ export default function ADRAssistantWidget() {
    */
   function seslendirVeDinle(metin: string) {
     if (!sesliGorusmeRef.current || !ttsDesteklenir) return;
+    sonSeslendirilenRef.current = metin;
 
     konus(metin, () => {
       // Seslendirme bitti: barge-in kaydını kapat. Kullanıcı bu sırada
