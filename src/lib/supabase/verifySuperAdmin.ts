@@ -50,3 +50,49 @@ export async function getSuperAdminFromRequest(
 
   return { id: user.id, email: user.email ?? null }
 }
+
+
+/**
+ * İstek sahibini doğrular ve ROLÜNÜ döndürür — admin veya super_admin.
+ *
+ * `getSuperAdminFromRequest`ten farkı: yönetici (admin) rolünü de kabul
+ * eder. Çağıran taraf dönen role bakarak kendi kısıtlamasını uygulayabilir
+ * (örn. admin'in super_admin hesabı açmasını engellemek).
+ */
+export async function getYoneticiFromRequest(
+  req: Request
+): Promise<{ id: string; email: string | null; role: 'admin' | 'super_admin' } | null> {
+  const authHeader = req.headers.get('authorization')
+  const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null
+  if (!token) return null
+
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  if (!url || !anonKey) return null
+
+  const anonClient = createSupabaseClient(url, anonKey)
+  const { data: { user }, error } = await anonClient.auth.getUser(token)
+  if (error || !user) return null
+
+  const admin = createAdminClient()
+  const { data: profile } = await admin
+    .from('profiles')
+    .select('role, approval_status, is_active')
+    .eq('id', user.id)
+    .single()
+
+  if (
+    !profile ||
+    profile.approval_status !== 'approved' ||
+    !profile.is_active ||
+    !['admin', 'super_admin'].includes(profile.role)
+  ) {
+    return null
+  }
+
+  return {
+    id: user.id,
+    email: user.email ?? null,
+    role: profile.role as 'admin' | 'super_admin',
+  }
+}

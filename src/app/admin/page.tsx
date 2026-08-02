@@ -21,6 +21,7 @@ type Profile = {
   role: string;
   approval_status: string;
   is_active: boolean;
+  olusturma_yontemi: string | null;
   created_at: string;
 };
 
@@ -90,6 +91,7 @@ export default function AdminPage() {
 // ---------------------------------------------------------------------
 function UsersTab() {
   const { profile: benimProfilim, isSuperAdmin } = useUser();
+  const isAdmin = benimProfilim?.role === "admin";
   const [users, setUsers] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -265,8 +267,11 @@ function UsersTab() {
         </div>
       )}
 
-      {/* Yeni kullanıcı ekleme — yalnızca süper yönetici */}
-      {isSuperAdmin && (
+      {/* Yeni kullanıcı ekleme — yönetici ve süper yönetici.
+          NOT: Yönetici rolündeki bir hesap, süper yönetici veya yönetici
+          hesabı AÇAMAZ (yetki yükseltmeyi önlemek için); bu kısıtlama hem
+          aşağıdaki rol listesinde hem sunucu tarafında uygulanır. */}
+      {(isSuperAdmin || isAdmin) && (
         <div className="mb-4">
           {!ekleAcik ? (
             <button
@@ -314,7 +319,10 @@ function UsersTab() {
                     value={yeniRolSecim}
                     onChange={(e) => setYeniRolSecim(e.target.value)}
                   >
-                    {ROLLER.map((r) => (
+                    {ROLLER.filter(
+                      // Yönetici, kendi seviyesinde veya üstünde hesap açamaz
+                      (r) => isSuperAdmin || (r.value !== "super_admin" && r.value !== "admin")
+                    ).map((r) => (
                       <option key={r.value} value={r.value}>{r.label}</option>
                     ))}
                   </select>
@@ -370,10 +378,31 @@ function UsersTab() {
             </tr>
           </thead>
           <tbody>
-            {users.map((u) => (
-              <tr key={u.id} className="border-b last:border-0">
-                <td className="p-3">{u.full_name || "—"}</td>
-                <td className="p-3">{u.email}</td>
+            {users.map((u) => {
+              // Yönetim panelinden AÇILMAYAN hesaplar (kişi kendi kayıt
+              // olmuş) altın sarısı gösterilir — yöneticinin denetimli
+              // eklenenlerle dışarıdan kayıt olanları bir bakışta ayırması
+              // için. Eski kayıtların tamamı 'kayit' sayılır (bkz. migration 039).
+              const kendiKayit = u.olusturma_yontemi !== "yonetici";
+              return (
+              <tr
+                key={u.id}
+                className={"border-b last:border-0 " + (kendiKayit ? "bg-amber-50" : "")}
+              >
+                <td className="p-3">
+                  <span className={kendiKayit ? "text-amber-700 font-medium" : ""}>
+                    {u.full_name || "—"}
+                  </span>
+                  {kendiKayit && (
+                    <span
+                      className="ml-2 text-[10px] bg-amber-200 text-amber-900 px-1.5 py-0.5 rounded"
+                      title="Bu hesap yönetim panelinden açılmadı; kişi kendisi kayıt oldu."
+                    >
+                      kendi kaydı
+                    </span>
+                  )}
+                </td>
+                <td className={"p-3 " + (kendiKayit ? "text-amber-700" : "")}>{u.email}</td>
                 <td className="p-3">
                   {isSuperAdmin ? (
                     <select
@@ -450,7 +479,8 @@ function UsersTab() {
                   )}
                 </td>
               </tr>
-            ))}
+              );
+            })}
             {users.length === 0 && (
               <tr>
                 <td colSpan={6} className="p-4 text-gray-500">

@@ -10,7 +10,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { getSuperAdminFromRequest } from '@/lib/supabase/verifySuperAdmin'
+import { getYoneticiFromRequest } from '@/lib/supabase/verifySuperAdmin'
 
 export const dynamic = 'force-dynamic'
 
@@ -18,9 +18,9 @@ export const dynamic = 'force-dynamic'
 const GECERLI_ROLLER = ['super_admin', 'admin', 'tmgd', 'assistant', 'viewer', 'company']
 
 export async function POST(req: NextRequest) {
-  const yonetici = await getSuperAdminFromRequest(req)
+  const yonetici = await getYoneticiFromRequest(req)
   if (!yonetici) {
-    return NextResponse.json({ error: 'Bu işlem için süper yönetici yetkisi gerekli.' }, { status: 401 })
+    return NextResponse.json({ error: 'Bu işlem için yönetici yetkisi gerekli.' }, { status: 401 })
   }
 
   const govde = await req.json().catch(() => null)
@@ -38,6 +38,21 @@ export async function POST(req: NextRequest) {
   }
   if (!role || !GECERLI_ROLLER.includes(role)) {
     return NextResponse.json({ error: 'Geçersiz rol.' }, { status: 400 })
+  }
+
+  // YETKİ YÜKSELTME KORUMASI:
+  // Yönetici (admin) kendi seviyesinde veya üstünde bir hesap AÇAMAZ.
+  // Aksi hâlde bir admin, super_admin hesabı oluşturup o hesapla giriş
+  // yaparak kendi yetkisini yükseltebilirdi.
+  if (yonetici.role === 'admin' && (role === 'super_admin' || role === 'admin')) {
+    return NextResponse.json(
+      {
+        error:
+          'Yönetici rolündeki bir hesap, süper yönetici veya yönetici hesabı oluşturamaz. ' +
+          'Bu roller yalnızca süper yönetici tarafından atanabilir.',
+      },
+      { status: 403 }
+    )
   }
 
   const supabase = createAdminClient()
@@ -79,6 +94,9 @@ export async function POST(req: NextRequest) {
         role,
         approval_status: 'approved', // yönetici açtığı için onaylı başlar
         is_active: true,
+        // Listede ayırt edilebilsin diye kaydediliyor: bu hesap yönetim
+        // panelinden açıldı, kişi kendi kayıt olmadı.
+        olusturma_yontemi: 'yonetici',
       },
       { onConflict: 'id' }
     )
