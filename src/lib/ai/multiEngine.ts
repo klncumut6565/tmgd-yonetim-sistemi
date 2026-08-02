@@ -151,9 +151,36 @@ const CALLERS: Record<ProviderKey, (apiKey: string, model: string, systemPrompt:
  * olur — bu yüzden yalnızca yeterince uzun ve NET İngilizce metinlerde
  * true döner.
  */
+/**
+ * Bir SATIRIN İngilizce olup olmadığına bakar (kaba ama yeterli sezgisel).
+ * Türkçe cevap içinde geçen İngilizce alıntılar tek satırı etkilese de,
+ * satırların ÇOĞU İngilizceyse bu bir muhakeme sızıntısıdır.
+ */
+function satirIngilizceMi(satir: string): boolean {
+  const s = satir.trim().toLowerCase();
+  if (s.length < 15) return false;
+  if (/[ığşçöü]/.test(s)) return false; // Türkçe karakter → Türkçe say
+  const ingKelimeler = [
+    "\\bthe\\b", "\\bis\\b", "\\bare\\b", "\\bwas\\b", "\\bto\\b",
+    "\\bof\\b", "\\band\\b", "\\bthat\\b", "\\bthis\\b", "\\bwe\\b",
+    "\\byou\\b", "\\bwith\\b", "\\bfor\\b", "\\bcan\\b", "\\bshould\\b",
+    "\\bthey\\b", "\\bwhat\\b", "\\bwhich\\b", "\\bthen\\b", "\\bfrom\\b",
+  ];
+  return ingKelimeler.filter((k) => new RegExp(k).test(s)).length >= 3;
+}
+
 export function belirginIngilizceMi(metin: string): boolean {
   const t = metin.trim();
   if (t.length < 40) return false; // kısa metinde karar verme
+
+  // Satırların çoğu İngilizceyse muhakeme sızıntısıdır — Türkçe alıntılar
+  // (kullanıcının mesajının tekrarı gibi) tek başına yanıltmasın diye
+  // ORAN'a bakılıyor.
+  const satirlar = t.split("\n").filter((x) => x.trim().length >= 15);
+  if (satirlar.length >= 3) {
+    const ingSayisi = satirlar.filter(satirIngilizceMi).length;
+    if (ingSayisi / satirlar.length >= 0.5) return true;
+  }
 
   const kucuk = t.toLowerCase();
 
@@ -186,16 +213,31 @@ export function modelCiktisiniTemizle(metin: string): string {
 
   // 3) İngilizce düşünme kalıplarıyla başlayan satırları at
   const dusunmeKaliplari = [
-    /^we (need|should|must|have) to\b/i,
-    /^the user (wants|is asking|asks|said)\b/i,
+    /^we (need|should|must|have|can|could) to?\b/i,
+    /^the user (wants|is asking|asks|said|might|probably|may)\b/i,
     /^let'?s\b/i,
-    /^okay,? (so|the user)\b/i,
+    /^let me\b/i,
+    /^okay,? (so|the user|let)\b/i,
     /^first,? (i|we) (need|should)\b/i,
-    /^i should\b/i,
-    /^according to the rules\b/i,
-    /^based on the (rules|policy|context)\b/i,
-    /^in the context of\b/i,
+    /^i (should|need to|must|have to|will|can)\b/i,
+    /^according to the (rules|instructions|system)\b/i,
+    /^based on the (rules|policy|context|history|conversation)\b/i,
+    /^in the (context|history|conversation)\b/i,
     /^there'?s (no|a) rule\b/i,
+    // Muhakeme anlatısı — bunlar sızıntının en sık görülen başlangıçları
+    /^looking back\b/i,
+    /^wait,?\b/i,
+    /^hmm,?\b/i,
+    /^so (the|they|it|my|i)\b/i,
+    /^but (wait|the user|let)\b/i,
+    /^from the (history|context|conversation)\b/i,
+    /^their exact\b/i,
+    /^note:? (there|the user|this)\b/i,
+    /^therefore,? i\b/i,
+    /^my response\b/i,
+    /^the (correct|exact) (response|phrase|answer) is\b/i,
+    /^which translates to\b/i,
+    /^let me (check|reconstruct|confirm|verify)\b/i,
   ];
 
   const dizi = t.split("\n");

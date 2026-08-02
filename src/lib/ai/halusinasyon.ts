@@ -81,6 +81,22 @@ export function halusinasyonMu(metin: string): boolean {
   if (!ham) return true;
   if (ham.length < 3) return true; // çok kısa çıktılar genelde gürültü
 
+  // YABANCI DİL UYDURMASI:
+  // Whisper anlamsız sesi bazen İskandinav/İzlanda dillerine benzeyen
+  // metinlere çeviriyor ("En svo neyðið um hata ljönsson" gibi). Türkçede
+  // hiç kullanılmayan bu karakterler net bir işarettir.
+  if (/[ðþæøåœ]/i.test(ham)) return true;
+
+  // TEKRAR EDEN ANLAMSIZ HECE:
+  // "Henni, henni." / "La la la" gibi çıktılar sessizlik/gürültü
+  // halüsinasyonudur. Aynı kısa kelimenin üst üste tekrarı aranıyor.
+  const kelimeler = trNormalize(ham).split(" ").filter(Boolean);
+  if (kelimeler.length >= 2 && kelimeler.length <= 6) {
+    const benzersiz = new Set(kelimeler);
+    // Tüm kelimeler aynı (ya da tek kelimenin tekrarı) ve kısa
+    if (benzersiz.size === 1 && kelimeler[0].length <= 8) return true;
+  }
+
   const sade = trNormalize(ham);
   if (!sade) return true;
 
