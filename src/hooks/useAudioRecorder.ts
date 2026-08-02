@@ -95,6 +95,15 @@ export function useAudioRecorder() {
          */
         onKonusmaBasladi?: () => void;
         /**
+         * onKonusmaBasladi tetiklenmeden önce sesin KESİNTİSİZ olarak bu
+         * süre kadar eşik üstünde kalması gerekir (ms).
+         *
+         * Rüzgâr, kapı, araç gibi çevre sesleri anlıktır; konuşma
+         * süreklidir. Bu koşul olmadan tek bir gürültü darbesi asistanın
+         * sözünü kesiyordu.
+         */
+        minSesSuresiMs?: number;
+        /**
          * Sessizlik eşiğini çarpar. Asistan konuşurken hoparlör sesinin
          * mikrofona sızma ihtimaline karşı eşik yükseltilir (örn. 2.5) —
          * böylece asistanın kendi sesi "kullanıcı konuşuyor" sanılmaz.
@@ -108,6 +117,10 @@ export function useAudioRecorder() {
       }
       setHata("");
       const etkinEsik = SESSIZLIK_ESIGI * (opsiyon?.esikCarpani ?? 1);
+      const minSesSuresi = opsiyon?.minSesSuresiMs ?? 0;
+      // Kesintisiz ses başlangıcı ve barge-in'in bir kez tetiklenmesi için
+      let sesBaslangic: number | null = null;
+      let bargeInBildirildi = false;
       konusmaAlgilandiRef.current = false;
       konusmaSuresiRef.current = 0;
       sonOlcumRef.current = 0;
@@ -158,13 +171,30 @@ export function useAudioRecorder() {
             if (sonOlcumRef.current > 0) {
               konusmaSuresiRef.current += simdi - sonOlcumRef.current;
             }
-            if (!konusmaAlgilandiRef.current) {
-              // İlk kez konuşma algılandı — barge-in için haber ver
-              opsiyon?.onKonusmaBasladi?.();
+            // Kesintisiz ses süresini takip et
+            if (sesBaslangic === null) sesBaslangic = simdi;
+
+            // Barge-in: yalnızca ses YETERİNCE UZUN sürdüyse haber ver.
+            // Böylece anlık gürültüler (rüzgâr, araç, kapı) asistanın
+            // sözünü kesmiyor.
+            if (
+              !bargeInBildirildi &&
+              opsiyon?.onKonusmaBasladi &&
+              simdi - sesBaslangic >= minSesSuresi
+            ) {
+              bargeInBildirildi = true;
+              opsiyon.onKonusmaBasladi();
             }
+
             konusmaAlgilandiRef.current = true;
             sessizlikBaslangicRef.current = null;
-          } else if (konusmaAlgilandiRef.current) {
+          } else {
+            // Ses eşiğin altına düştü — kesintisiz sayaç sıfırlanır, böylece
+            // aralıklı gürültüler birikip barge-in'i tetikleyemez
+            sesBaslangic = null;
+          }
+
+          if (rms <= etkinEsik && konusmaAlgilandiRef.current) {
             // Sadece bir kez konuşma algılandıktan SONRA sessizliği say
             if (sessizlikBaslangicRef.current === null) {
               sessizlikBaslangicRef.current = simdi;

@@ -69,6 +69,20 @@ export default function ADRAssistantWidget() {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<DisplayMessage[]>([]);
+  /**
+   * Mesaj listesinin GÜNCEL kopyası.
+   *
+   * Sesli akışta gonder() bir geri çağırma zincirinin içinden çağrılıyor
+   * (kayıt bitti → transkripsiyon → gonder). Bu closure kurulduğu andaki
+   * `messages` değerini yakalar; sohbet ilerledikçe o değer bayatlar ve
+   * API'ye BOŞ/eski geçmiş gider — asistan her seferinde konuşmayı
+   * sıfırdan başlamış gibi davranır. Ref her zaman güncel olduğu için
+   * geçmiş buradan okunuyor.
+   */
+  const messagesRef = useRef<DisplayMessage[]>([]);
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const { firmId, firmName } = useCurrentFirm();
@@ -234,9 +248,13 @@ export default function ADRAssistantWidget() {
         },
         asistanKonusurken
           ? {
-              esikCarpani: 2.5,
+              // Asistan konuşurken çevre gürültüsüne karşı çok daha sıkı ol:
+              // eşik 5 katı VE sesin kesintisiz 600ms sürmesi şartı. Rüzgâr,
+              // araç, kapı gibi anlık sesler artık sözünü kesemiyor;
+              // gerçek bir cümle ise rahatlıkla yakalanıyor.
+              esikCarpani: 5,
+              minSesSuresiMs: 600,
               onKonusmaBasladi: () => {
-                // Kullanıcı araya girdi — asistanı sustur, sözü ona bırak
                 ttsDurdur();
               },
             }
@@ -405,8 +423,10 @@ export default function ADRAssistantWidget() {
 
     setSending(true);
 
-    // Geçmiş — sadece rol/içerik (API'ye giden format)
-    const history: ChatMessage[] = [...messages, userMsg].map((m) => ({
+    // Geçmiş — sadece rol/içerik (API'ye giden format).
+    // messagesRef kullanılıyor: state doğrudan okunursa sesli akıştaki
+    // callback zinciri yüzünden bayat liste gider (bkz. messagesRef notu).
+    const history: ChatMessage[] = [...messagesRef.current, userMsg].map((m) => ({
       role: m.role,
       content: m.content,
     }));
