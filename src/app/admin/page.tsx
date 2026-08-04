@@ -380,10 +380,11 @@ function UsersTab() {
           <tbody>
             {users.map((u) => {
               // Yönetim panelinden AÇILMAYAN hesaplar (kişi kendi kayıt
-              // olmuş) altın sarısı gösterilir — yöneticinin denetimli
-              // eklenenlerle dışarıdan kayıt olanları bir bakışta ayırması
-              // için. Eski kayıtların tamamı 'kayit' sayılır (bkz. migration 039).
-              const kendiKayit = u.olusturma_yontemi !== "yonetici";
+              // olmuş) altın sarısı gösterilir — ama SADECE süper yöneticiye.
+              // Yönetici (admin) bu ayrımı görmez, eskisi gibi düz liste
+              // görür (kullanıcının talebi: "adminde eskisi gibi siyah renk
+              // yazı stiliyle liste şeklinde gözüksün").
+              const kendiKayit = isSuperAdmin && u.olusturma_yontemi !== "yonetici";
               return (
               <tr
                 key={u.id}
