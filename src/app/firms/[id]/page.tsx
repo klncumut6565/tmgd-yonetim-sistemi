@@ -10,6 +10,7 @@ import { Suspense, use, useCallback, useEffect, useMemo, useState } from "react"
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase/client";
+import { authFetch } from "@/lib/supabase/authFetch";
 import { useUser } from "@/hooks/useUser";
 import { hataCevir } from "@/lib/hataCevir";
 import {
@@ -439,6 +440,52 @@ function FirmDetailInner({
     // bu tarihe göre yeniden üretilir.
     const { data } = await supabase.from("firms").select("*").eq("id", id).single();
     if (data) setFirm(data as Firm);
+  }
+
+  /**
+   * Ortam değişkeni NEXT_PUBLIC_TARAYICI_URL ayarlıysa mobil tarama
+   * butonu gösterilir. Ayarlı değilse (tarayici_ios henüz deploy
+   * edilmemişse) buton hiç görünmez — bozuk bir bağlantı sunulmaz.
+   */
+  const tarayiciYapilandirilmis = !!process.env.NEXT_PUBLIC_TARAYICI_URL;
+
+  /**
+   * Belge Takip satırındaki "📷 Mobilden Tara" butonu.
+   *
+   * Ayrı bir PWA'ya (klncumut6565/tarayici_ios) yönlendirir; tarama
+   * bitince PDF otomatik olarak /api/belge-tarama/callback ucuna
+   * gönderilip bu satıra eklenir — kullanıcı manuel dosya seçmez.
+   *
+   * Pencere ÖNCE (senkron, tıklama olayının içinde) açılır — aradaki
+   * authFetch beklemesi yüzünden sonradan window.open çağırmak mobil
+   * Safari'de açılır pencere engelleyiciye takılabiliyordu.
+   */
+  async function mobildenTara(code: string, period: string) {
+    const pencere = window.open("", "_blank");
+    if (!pencere) {
+      setFileMsg("Yeni sekme açılamadı — tarayıcının açılır pencere engelleyicisini kontrol et.");
+      return;
+    }
+
+    try {
+      const res = await authFetch("/api/belge-tarama/baslat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ firmId: id, code, period }),
+      });
+      const json = await res.json();
+
+      if (!res.ok || !json.url) {
+        pencere.close();
+        setFileMsg(json.error ?? "Tarama başlatılamadı.");
+        return;
+      }
+
+      pencere.location.href = json.url;
+    } catch (e) {
+      pencere.close();
+      setFileMsg("Tarama başlatılamadı: " + (e instanceof Error ? e.message : String(e)));
+    }
   }
 
   async function updateExpiry(code: string, period: string, date: string) {
@@ -1214,6 +1261,17 @@ function FirmDetailInner({
                                   >
                                     📎 Dosya Ekle
                                   </label>
+                                )}
+
+                                {!uploading && canWrite && tarayiciYapilandirilmis && (
+                                  <button
+                                    type="button"
+                                    onClick={() => mobildenTara(it.code, it.period)}
+                                    title="Telefon kamerasıyla tara — belge otomatik PDF olarak buraya eklenir"
+                                    className="text-xs px-2 py-1 rounded border text-gray-500 hover:bg-gray-100"
+                                  >
+                                    📷 Mobilden Tara
+                                  </button>
                                 )}
 
                                 {!uploading && !canWrite && itemFiles.length === 0 && (
