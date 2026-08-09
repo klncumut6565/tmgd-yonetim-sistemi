@@ -24,6 +24,7 @@ import {
 import FirmScopedCrud from "@/components/FirmScopedCrud";
 import KimyasalEnvanter from "@/components/KimyasalEnvanter";
 import TasimaEvraki from "@/components/TasimaEvraki";
+import GorevliListesi from "@/components/GorevliListesi";
 import BelgeOlusturForm from "@/components/BelgeOlusturForm";
 import FirmAuditTab from "@/components/audit/FirmAuditTab";
 import FirmNotesTab from "@/components/notes/FirmNotesTab";
@@ -181,6 +182,7 @@ function FirmDetailInner({
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<TabKey>("belge_takip");
   const [adrAltSekme, setAdrAltSekme] = useState<"evrak" | "envanter">("evrak");
+  const [personelAltSekme, setPersonelAltSekme] = useState<"liste" | "gorevli">("liste");
   const [evrakPrefillUns, setEvrakPrefillUns] = useState<string[]>([]);
   const [evrakPrefillMiktar, setEvrakPrefillMiktar] = useState<number | undefined>(undefined);
 
@@ -1615,15 +1617,38 @@ function FirmDetailInner({
       )}
 
       {tab === "employees" && (
-        <FirmScopedCrud
-          table="employees"
-          title="Personeller"
-          fields={EMPLOYEE_FIELDS}
-          searchKeys={["first_name", "last_name", "department", "position"]}
-          dosyaEki
-          fixedFirmId={id}
-          compact
-        />
+        <div>
+          <div className="flex gap-2 mb-4">
+            {(["liste", "gorevli"] as const).map((alt) => (
+              <button
+                key={alt}
+                onClick={() => setPersonelAltSekme(alt)}
+                className={
+                  "px-3 py-1.5 rounded-lg text-sm border " +
+                  (personelAltSekme === alt
+                    ? "bg-blue-600 text-white border-blue-600"
+                    : "bg-white hover:bg-gray-50")
+                }
+              >
+                {alt === "liste" ? "👤 Personel Listesi" : "📋 Görevli Listesi"}
+              </button>
+            ))}
+          </div>
+          {personelAltSekme === "liste" && (
+            <FirmScopedCrud
+              table="employees"
+              title="Personeller"
+              fields={EMPLOYEE_FIELDS}
+              searchKeys={["first_name", "last_name", "department", "position"]}
+              dosyaEki
+              fixedFirmId={id}
+              compact
+            />
+          )}
+          {personelAltSekme === "gorevli" && firm && (
+            <GorevliListesi firmId={id} firmaAdi={firm.name} />
+          )}
+        </div>
       )}
 
       {tab === "visits" && (
