@@ -8,16 +8,43 @@
 // yansıtır (bkz. tarayici_ios/lib/scannerModule.ts → deliverDocument).
 // Güvenlik modeli migration 040'ta açıklanmıştır: tahmin edilemez +
 // kısa ömürlü + tek kullanımlık token.
+//
+// CORS: tarayici_ios ayrı bir origin'den (kendi Vercel adresi) tarayıcı
+// içinden doğrudan fetch() ile POST attığı için bu uca CORS başlıkları
+// eklenmesi ZORUNLU — yoksa istek sunucuya ulaşıp dosya kaydedilse bile
+// tarayıcı, JS tarafının cevabı okumasını engelliyor ve istemci tarafında
+// "Load failed" / "Failed to fetch" gibi bir hata görünüyor (isteğin
+// kendisi değil, CEVABIN okunması engelleniyor). Kimlik doğrulama burada
+// çerez/oturuma değil, tek kullanımlık token'a dayandığı için `*` ile
+// açmak güvenlik açığı oluşturmuyor (credentials modu zaten kullanılmıyor).
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 
 export const dynamic = 'force-dynamic'
 
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type',
+}
+
+function corsJson(body: Record<string, unknown>, status = 200) {
+  return NextResponse.json(body, { status, headers: corsHeaders })
+}
+
+// Bazı tarayıcılar (özellikle iOS Safari/WKWebView, form alanlarına bağlı
+// olarak) multipart/form-data POST öncesi bir OPTIONS ön-uçuşu (preflight)
+// gönderebilir. Bu olmadan preflight 404/405 alır ve asıl POST hiç
+// denenmez.
+export async function OPTIONS() {
+  return new NextResponse(null, { status: 204, headers: corsHeaders })
+}
+
 export async function POST(req: NextRequest) {
   const form = await req.formData().catch(() => null)
   if (!form) {
-    return NextResponse.json({ error: 'Geçersiz istek gövdesi.' }, { status: 400 })
+    return corsJson({ error: 'Geçersiz istek gövdesi.' }, 400)
   }
 
   const dosya = form.get('file')
@@ -32,7 +59,7 @@ export async function POST(req: NextRequest) {
   // için anlamlı bir yönlendirme sağlamıyor, sadece bilgi amaçlı geliyor.
 
   if (!dosya || !(dosya instanceof Blob) || typeof token !== 'string' || !token) {
-    return NextResponse.json({ error: 'Eksik alan: file veya token.' }, { status: 400 })
+    return corsJson({ error: 'Eksik alan: file veya token.' }, 400)
   }
 
   const supabase = createAdminClient()
@@ -45,13 +72,13 @@ export async function POST(req: NextRequest) {
     .single()
 
   if (oturumHata || !oturum) {
-    return NextResponse.json({ error: 'Geçersiz tarama oturumu.' }, { status: 403 })
+    return corsJson({ error: 'Geçersiz tarama oturumu.' }, 403)
   }
   if (oturum.used_at) {
-    return NextResponse.json({ error: 'Bu tarama oturumu zaten kullanılmış.' }, { status: 403 })
+    return corsJson({ error: 'Bu tarama oturumu zaten kullanılmış.' }, 403)
   }
   if (new Date(oturum.expires_at).getTime() < Date.now()) {
-    return NextResponse.json({ error: 'Tarama oturumunun süresi dolmuş.' }, { status: 403 })
+    return corsJson({ error: 'Tarama oturumunun süresi dolmuş.' }, 403)
   }
 
   // ---- Dosyayı, mevcut manuel yükleme akışıyla AYNI konuma kaydet ----
@@ -67,7 +94,7 @@ export async function POST(req: NextRequest) {
     .upload(yol, dosya, { upsert: true, contentType: 'application/pdf' })
 
   if (yuklemeHata) {
-    return NextResponse.json({ error: 'Dosya kaydedilemedi: ' + yuklemeHata.message }, { status: 500 })
+    return corsJson({ error: 'Dosya kaydedilemedi: ' + yuklemeHata.message }, 500)
   }
 
   const { error: dbHata } = await supabase.from('firm_belge_dosyalari').insert({
@@ -82,7 +109,7 @@ export async function POST(req: NextRequest) {
     // Depoya yüklendi ama kayıt başarısız — dosyayı geri al, yarım kalmış
     // bir durum bırakma.
     await supabase.storage.from('firm-files').remove([yol])
-    return NextResponse.json({ error: 'Belge kaydı oluşturulamadı: ' + dbHata.message }, { status: 500 })
+    return corsJson({ error: 'Belge kaydı oluşturulamadı: ' + dbHata.message }, 500)
   }
 
   // Mevcut manuel akışla aynı: en az bir dosya varsa madde tamamlandı sayılır
@@ -97,5 +124,5 @@ export async function POST(req: NextRequest) {
     .update({ used_at: new Date().toISOString(), file_name: guvenliAd })
     .eq('id', token)
 
-  return NextResponse.json({ ok: true })
+  return corsJson({ ok: true })
 }
