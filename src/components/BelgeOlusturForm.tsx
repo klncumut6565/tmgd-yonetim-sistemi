@@ -1221,15 +1221,30 @@ function sayfalaraBol(
   let mevcutSayfa: Satir[] = [];
   let mevcutYukseklik = 0;
 
-  for (const satir of satirlar) {
-    const yukseklik = satirYuksekligi(doc, satir, genislik);
-    if (mevcutYukseklik + yukseklik > kullanilabilirYukseklik && mevcutSayfa.length > 0) {
+  for (let i = 0; i < satirlar.length; i++) {
+    const satir = satirlar[i];
+    const kendiYuksekligi = satirYuksekligi(doc, satir, genislik);
+
+    // Dul/yetim başlık önleme: bir altbaşlık, hemen altındaki ilk içerik
+    // satırından (paragraf/madde/tablo/görsel) koparılıp sayfa sonunda tek
+    // başına bırakılmasın diye, sığma kontrolü başlık + bir sonraki satırın
+    // TOPLAM yüksekliğiyle yapılır. Sığmıyorsa başlık da bir sonraki sayfaya
+    // atılır (yalnızca kendi yüksekliği değil, ikisi birlikte taşınır).
+    let kontrolYuksekligi = kendiYuksekligi;
+    if (satir.tur === "altbaslik") {
+      const sonraki = satirlar[i + 1];
+      if (sonraki && sonraki.tur !== "altbaslik") {
+        kontrolYuksekligi += satirYuksekligi(doc, sonraki, genislik);
+      }
+    }
+
+    if (mevcutYukseklik + kontrolYuksekligi > kullanilabilirYukseklik && mevcutSayfa.length > 0) {
       sayfalar.push(mevcutSayfa);
       mevcutSayfa = [];
       mevcutYukseklik = 0;
     }
     mevcutSayfa.push(satir);
-    mevcutYukseklik += yukseklik;
+    mevcutYukseklik += kendiYuksekligi;
   }
   if (mevcutSayfa.length > 0) sayfalar.push(mevcutSayfa);
   return sayfalar.length > 0 ? sayfalar : [[]];
