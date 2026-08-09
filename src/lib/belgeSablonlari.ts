@@ -31,6 +31,11 @@ export type BelgeSablonu = {
   kapsam?: string;
   tanimlar?: { terim: string; tanim: string }[];
   blocks: TemplateBlock[];
+  /** Orijinal Word belgesinin sonunda yer alan tam sayfa özet infografik
+   *  posteri (varsa). public/ altındaki bir yol olarak verilir (örn.
+   *  "/belge-posterleri/T6.jpg"); PDF üretiminde tüm içerik sayfalarından
+   *  sonra kendi başına, çerçevesiz/başlıksız bir sayfa olarak eklenir. */
+  posterYolu?: string;
 };
 
 export const BELGE_SABLONLARI: Record<string, BelgeSablonu> = {
@@ -685,6 +690,7 @@ export const BELGE_SABLONLARI: Record<string, BelgeSablonu> = {
   // ==================== T2 — BOŞALTMA SONRASI ARINDIRMA · VANA/KAPAK KAPATMA KONTROL TALİMATI ====================
   T2: {
     docType: "TALİMAT",
+    posterYolu: "/belge-posterleri/T2.jpg",
     yayinTarihi: "01.11.2025",
     amac: "Bu talimat, ambalajlı, dökme ve tank yükleriyle taşınan tehlikeli maddelerin boşaltılmasının ardından taşıt, tank veya konteynerin temizlenmesi, dezenfekte edilmesi, kontrol edilmesi ve bir sonraki yüke güvenli şekilde hazırlanması sürecini standart hale getirmek; personel, çevre ve üçüncü şahıslar açısından oluşabilecek riskleri en aza indirmektir.",
     kapsam: "Bu talimat; ambalajlı, dökme ve tank yüklerinin taşındığı kamyon, tanker, konteyner, IBC, ISO-tank ve benzeri tüm taşıma ekipmanlarını; bu ekipmanların boşaltma sonrası temizlik, dezenfeksiyon, kontrol, onay ve kayıt altına alınması süreçlerinde görev alan tüm personeli (sürücüler, saha operatörleri, tesis sorumluları, kalite/İSG personeli) kapsar.",
@@ -982,6 +988,7 @@ export const BELGE_SABLONLARI: Record<string, BelgeSablonu> = {
   // ==================== T4 — BOŞALTMA ÖNCESİ TAHRİBAT / HASAR KONTROL TALİMATI ====================
   T4: {
     docType: "TALİMAT",
+    posterYolu: "/belge-posterleri/T4.jpg",
     yayinTarihi: "01.11.2025",
     amac: "Bu talimatın amacı; tehlikeli maddelerin karayolu, demiryolu, denizyolu veya havayolu ile taşınması sırasında; ambalaj, tank, taşıt veya konteynerde boşaltma öncesinde ve boşaltma işlemi sırasında meydana gelebilecek her türlü fiziksel tahribatın, deformasyonun, sızıntının veya hasarın sistematik biçimde tespit edilmesini; tespit edilen olumsuz durumlarda alınacak acil önlemleri, bildirim yükümlülüklerini ve düzeltici faaliyetleri tanımlamaktır. Talimatın nihai hedefi; taşıma zincirinin her aşamasında güvenli, çevreye ve insan sağlığına zarar vermeyen bir boşaltma süreci sağlamak; olası kaza, yangın, patlama, sızıntı, çevre kirliliği ve iş kazası risklerini en aza indirmek; ADR/RID/IMDG/IATA mevzuatı ile ulusal mevzuata (Tehlikeli Maddelerin Karayoluyla Taşınması Hakkında Yönetmelik) uyumu sağlamaktır.",
     kapsam: "Bu talimat; ambalajlı yükler, dökme (bulk) yükler ve tank (sarnıç) yükleri de dâhil olmak üzere, tehlikeli madde sınıfına bakılmaksızın (patlayıcılar, gazlar, yanıcı sıvılar, yanıcı katılar, oksitleyici maddeler, zehirli ve bulaşıcı maddeler, radyoaktif maddeler, aşındırıcı maddeler ve diğer tehlikeli maddeler) tüm taşıma operasyonlarını kapsar. Talimat; yükleme noktasından boşaltma noktasına kadar geçen süreçte görev alan sürücüleri, dolum/boşaltım operatörlerini, depo ve terminal personelini, güvenlik danışmanlarını (SRC5/ADR Güvenlik Danışmanı), İSG sorumlularını ve yetkili kişileri bağlar. Kapsam dışı bırakılan hususlar: yükleme öncesi araç/tank uygunluk muayeneleri (ayrı bir talimatla yönetilir) ve boşaltma sonrası temizlik/dekontaminasyon prosedürünün detayları (ilgili talimata referans verilir).",
@@ -1170,6 +1177,7 @@ export const BELGE_SABLONLARI: Record<string, BelgeSablonu> = {
   // ============================= T5 — SEVKİYAT UYGUNLUK TALİMATI =============================
   T5: {
     docType: "TALİMAT",
+    posterYolu: "/belge-posterleri/T5.jpg",
     yayinTarihi: "01.11.2025",
     amac: "Bu talimat, tehlikeli maddelerin karayolu ile taşınması sırasında ADR (Tehlikeli Malların Karayolu ile Uluslararası Taşımacılığına İlişkin Avrupa Anlaşması) ve ilgili ulusal mevzuata uygun olarak güvenli, kesintisiz ve çevreye duyarlı bir sevkiyat sürecinin yürütülmesini sağlamak amacıyla; taşıma araçlarının, ambalajların, basınçlı kapların, yük taşıma birimlerinin, işaretleme/etiketleme/levhalama uygulamalarının ve yükleme-boşaltma işlemlerinin uyması gereken kuralları ortaya koyar. Talimatın temel hedefi; insan sağlığını, çevreyi ve varlıkları tehlikeli madde kaynaklı risklerden korumak, sevkiyat süreçlerinde standart bir uygulama birliği sağlamak ve olası bir kaza, sızıntı veya acil durumda hızlı ve etkin müdahale edilebilmesini garanti altına almaktır.",
     kapsam: "Bu talimat; işletme bünyesinde iştigal edilen tehlikeli maddelerin taşınmasında kullanılan taşıtları, ambalajları ve yük taşıma birimlerini (konteyner, IBC, tank vb.), işaretleme/etiketleme/levha düzenlemelerini, test/muayene/bakım süreçlerini, sevkiyat öncesinde, sırasında ve sonrasında uyulması gereken kuralları kapsar. Talimat; işletme personeli, sevkiyatı gerçekleştiren sürücüler, yükleme-boşaltma faaliyetini yürüten operasyon ekipleri, alt yükleniciler ve taşımacılık hizmeti alınan lojistik firmaları için bağlayıcıdır. Kapsam dışı bırakılan hususlar: muafiyet kapsamındaki taşımalar (sınırlı miktar - LQ, istisnai miktar - EQ) bu talimatın ilgili maddelerinde ayrıca belirtilmiş olup, genel yükleme/etiketleme kurallarına tabi değildir; ancak taşıma evrakında muafiyet durumu mutlaka belirtilir.",
@@ -1571,6 +1579,7 @@ export const BELGE_SABLONLARI: Record<string, BelgeSablonu> = {
   },
   T6: {
     docType: "TALİMAT",
+    posterYolu: "/belge-posterleri/T6.jpg",
     yatay: true, // 5.2.1'deki 18 sütunlu resmi ADR 7.5.2.2 ayırım tablosu dikey sayfaya sığmaz
     yayinTarihi: "01.11.2025",
     amac: "Bu talimat; işletme bünyesinde elleçlenen ve taşınan tehlikeli maddelerin Karayolu ile Tehlikeli Madde Taşımacılığı Hakkında Avrupa Anlaşması (ADR) ve ilgili ulusal mevzuata (Tehlikeli Maddelerin Karayoluyla Taşınması Hakkında Yönetmelik) uygun şekilde yüklenmesini; karışık yükleme yasaklarına ve ayırım kurallarına uyulmasını; konteyner ve araçların doğru şekilde işaretlenmesini; hasarlı veya sızdırma riski taşıyan ambalajların güvenli biçimde yönetilmesini ve ADR Bölüm 7.5'te tanımlanan yükleme, boşaltma ve elleçleme emniyet kurallarının eksiksiz uygulanmasını sağlamaktır. Talimatın nihai hedefi; insan sağlığını, çevreyi ve işletme varlıklarını tehlikeli madde kaynaklı kaza, sızıntı, yangın, patlama veya kirlenme risklerine karşı korumak ve yasal uyumluluğu sürekli kılmaktır.",
@@ -1777,6 +1786,7 @@ export const BELGE_SABLONLARI: Record<string, BelgeSablonu> = {
 
   T7: {
     docType: "TALİMAT",
+    posterYolu: "/belge-posterleri/T7.jpg",
     yayinTarihi: "01.11.2025",
     amac: "Bu talimat; konteyner, ambalaj ve tehlikeli madde taşıyan karayolu araçları üzerinde bulunması gereken tehlike ikaz levhalarının (etiketlerin) seçimi, yerleştirilmesi ve bakımı ile araçlarda kullanılan turuncu plakaların (Kemler kodu / UN numarası taşıyan işaretleme plakaları) doğru şekilde uygulanmasına ilişkin usul ve esasları belirlemektedir. Talimatın temel amacı; ADR (Tehlikeli Malların Karayolu ile Uluslararası Taşımacılığına İlişkin Avrupa Anlaşması) ve bu anlaşmanın iç mevzuatımıza yansıması olan Tehlikeli Maddelerin Karayoluyla Taşınması Hakkında Yönetmelik hükümlerine tam uyumu sağlayarak; personel, çevre, araç ve yük güvenliğini en üst düzeye çıkarmak, olası kaza, sızıntı, yangın veya patlama risklerini yükleme öncesinde bertaraf etmektir.",
     kapsam: "Bu talimat; tehlikeli maddelerin yüklendiği, boşaltıldığı, elleçlendiği veya taşındığı tüm konteynerler, ambalajlar (IBC, varil, bidon, kutu vb.), tank konteynerler, üstü açık/kapalı karayolu taşıma araçları (kamyon, çekici-dorse, tanker) ile bu araçları kullanan sürücüler, sevkiyat, depo ve terminal personelini kapsar. Talimat; işletmenin tüm depo, antrepo, liman terminali, yükleme rampası ve açık sahalarında, tehlikeli madde taşıma faaliyeti yürüten tüm alt yüklenici ve nakliye firmaları için de bağlayıcıdır.",
@@ -1941,6 +1951,7 @@ export const BELGE_SABLONLARI: Record<string, BelgeSablonu> = {
 
   T8: {
     docType: "TALİMAT",
+    posterYolu: "/belge-posterleri/T8.jpg",
     yayinTarihi: "01.11.2025",
     amac: "Bu talimatın amacı; işletme bünyesinde tehlikeli madde içeren ambalajlı, dökme veya tank yüklerinin araçlara yüklenmesi, istiflenmesi, sabitlenmesi ve boşaltılması sırasında uyulması gereken emniyet kurallarını; hasarlı, sızdıran, boş veya temizlenmemiş ambalajların tespiti, izolasyonu, bertarafı ve raporlanmasına ilişkin esasları; ADR Bölüm 7.5 (Yükleme, Boşaltma ve Elleçleme) hükümlerinin sahada uygulanmasını sağlamak ve bu süreçlerde görev alan personelin, aracın, tesisin ve çevrenin güvenliğini teminat altına almaktır. Bu talimat ayrıca kaza, yaralanma, çevresel kirlenme, yangın/patlama riskini önlemeyi ve olası bir uygunsuzluk durumunda alınacak acil önlemleri ve idari süreçleri tanımlamayı hedefler.",
     kapsam: "Bu talimat; işletmenin tesis, depo, dolum-boşaltım sahası ve araç yükleme rampalarında gerçekleştirilen tüm tehlikeli madde yükleme, istifleme, boşaltma ve elleçleme faaliyetlerini kapsar: ambalajlı (kolili) tehlikeli madde yükleri (IBC, varil, bidon, kutu, tüp vb.); dökme yükler (bulk) taşımacılığı; tank araçları ve tank-konteynerler ile yapılan taşımalar; boş, temizlenmemiş ambalaj ve tankların (uygun işaretlemeye tabi) taşınması; yükleme/boşaltma faaliyetinde görev alan tüm sürücü, yükleyen, dolduran, ambar memuru, forklift operatörü ve saha personeli. Bu talimat; işletmenin kendi personeli kadar, sahada görevlendirilen alt yüklenici, nakliyeci ve ziyaretçi sürücüler için de bağlayıcıdır.",
@@ -2155,6 +2166,7 @@ export const BELGE_SABLONLARI: Record<string, BelgeSablonu> = {
 
   T9: {
     docType: "TALİMAT",
+    posterYolu: "/belge-posterleri/T9.jpg",
     yayinTarihi: "01.11.2025",
     amac: "Bu talimatın amacı; işletme bünyesinde tehlikeli madde taşımacılığında kullanılan veya bu faaliyetle ilişkili olarak bulundurulan basınçlı ekipmanların (tank, tank konteyner, sarnıçlı araç/tanker, tüp, basınçlı kap, IBC, yangın söndürme tüpü vb.) ADR (Tehlikeli Malların Karayolu ile Uluslararası Taşımacılığına İlişkin Avrupa Anlaşması) ve Tehlikeli Maddelerin Karayoluyla Taşınması Hakkında Yönetmelik ile ilgili diğer mevzuat hükümlerine uygun olarak; ilk muayene, periyodik muayene, ara muayene ve sızdırmazlık testlerinin zamanında, eksiksiz ve kayıt altına alınarak yaptırılmasını, süresi dolan ekipmanların tespit edilip hizmet dışı bırakılmasını sağlamaktır.",
     kapsam: "Bu talimat; işletmenin sahip olduğu veya kiraladığı, tehlikeli madde taşımacılığında (yükleme, boşaltma, depolama, nakliye) kullanılan tüm basınçlı ekipmanları, bu ekipmanların periyodik test/muayenelerinin planlanması, takibi, kayıt altına alınması ve süresi dolan ekipmanların devre dışı bırakılması süreçlerini kapsar. Talimat; işletme merkezi, depo, dolum tesisi ve saha faaliyetlerinde görevli tüm personeli, taşeron/alt yüklenici firmaları ve ilgili yönetim kademelerini bağlar.",
@@ -2489,6 +2501,7 @@ export const BELGE_SABLONLARI: Record<string, BelgeSablonu> = {
   },
   T10: {
     docType: "TALİMAT",
+    posterYolu: "/belge-posterleri/T10.jpg",
     yayinTarihi: "01.11.2025",
     amac: "Bu talimatın amacı; işletme bünyesinde tehlikeli madde taşımacılığında kullanılan ve muayene (periyodik/ara/istisnai) geçerlilik süresi dolmuş, muayeneden geçemeyen, hasarlı, tadilat görmüş veya teknik ömrünü tamamlamış tüp, tüp demeti, basınçlı kap, portatif tank, tank konteyner, sabit/değişebilir tank, tank gövdesi ve tehlikeli madde taşıyan araç üst yapılarının (aşağıda \"ekipman\" olarak anılacaktır) tespitini, kullanım dışı bırakılmasını, boşaltılıp arındırılmasını, kullanılamaz hale getirilmesini (hurdaya ayrılmasını) ve mevzuata uygun şekilde bertaraf/geri dönüşümünün sağlanmasını; bu süreçte iş sağlığı ve güvenliği ile çevre mevzuatına uyumu güvence altına almaktır.",
     kapsam: "Bu talimat; işletmenin mülkiyetinde veya kullanımında bulunan, ADR ve Tehlikeli Maddelerin Karayoluyla Taşınması Hakkında Yönetmelik kapsamına giren aşağıdaki ekipmanları kapsar: basınçlı gaz tüpleri ve manifoldlu tüp demetleri (ADR Bölüm 6.2 kapsamı basınçlı kaplar); portatif tanklar, çok elemanlı gaz konteynerleri (ÇEGK), tank konteynerler, tank takas gövdeleri (ADR Bölüm 6.7); sabit tanklar (tankerler) ve batarya araçlar, tüplü gaz tankerleri ile bunlara ait üst yapılar (ADR Bölüm 6.8); ambalajlar üzerinde bulunan ve periyodik muayeneye tabi basınçlı ekipman ve teçhizat (vanalar, emniyet ventilleri vb.). Talimat; muayene geçerlilik tarihi geçen, muayeneden 'ret' (uygunsuz) sonucu ile çıkan, onarımı ekonomik/teknik olarak mümkün olmayan veya yetkili muayene/onay kuruluşunca kullanılamaz olduğuna karar verilen tüm ekipmanlar için geçerlidir. Halihazırda geçerli muayene belgesi bulunan ve süresi devam eden ekipmanlar bu talimatın kapsamı dışındadır.",
@@ -2628,6 +2641,7 @@ export const BELGE_SABLONLARI: Record<string, BelgeSablonu> = {
 
   T11: {
     docType: "TALİMAT",
+    posterYolu: "/belge-posterleri/T11.jpg",
     yayinTarihi: "01.11.2025",
     amac: "Bu talimatın amacı; farklı tehlikeli maddelerin veya tehlikeli madde ile tehlikeli olmayan maddelerin aynı dış ambalaj (kombine ambalaj) içerisinde birlikte paketlenmesi (karışık paketleme) faaliyetinin, ADR Bölüm 4.1.10 hükümleri ile Tehlikeli Maddelerin Karayoluyla Taşınması Hakkında Yönetmelik hükümlerine uygun, güvenli ve standart bir şekilde yürütülmesini sağlamaktır. Talimat; karışık paketlemenin ne zaman yapılabileceğini, hangi hâllerde kesinlikle yasak olduğunu, uygulanacak kontrol adımlarını ve ilgili tarafların sorumluluklarını tanımlar.",
     kapsam: "Bu talimat; işletme bünyesinde tehlikeli madde paketleyen, dolduran, gönderen veya bu amaçla ambalaj hazırlayan tüm birim ve personeli kapsar. Talimat; iç ambalaj / dış ambalajlardan oluşan kombine ambalajlarda birden fazla UN numarasına veya kaleme ait maddenin bir arada bulunduğu sevkiyatları kapsar. Aşağıdaki konular bu talimatın kapsamı DIŞINDADIR ve ilgili ayrı talimatlarla yönetilir: farklı tehlikeli maddelerin aynı taşıt/konteynerde birlikte taşınması ('karışık yükleme' — ADR Bölüm 7.5.2); bu, karışık paketlemeden farklı bir konudur ve karıştırılmamalıdır. Sınırlı miktar (LQ) ve istisnai miktar (EQ) sevkiyatlarına ilişkin özel paketleme/işaretleme kuralları. Dökme yük ve tank taşımacılığı.",
@@ -2770,6 +2784,7 @@ export const BELGE_SABLONLARI: Record<string, BelgeSablonu> = {
 
   T12: {
     docType: "TALİMAT",
+    posterYolu: "/belge-posterleri/T12.jpg",
     yayinTarihi: "01.11.2025",
     amac: "Bu talimatın amacı; işletme bünyesinde ambalajlanan, doldurulan, yüklenen, gönderilen veya taşınan tehlikeli maddelerin ambalajlarının (iç ambalaj, dış ambalaj, kombine ambalaj, orta boy hacimli konteyner - IBC ve büyük ambalajlar dâhil) işaretlenmesi ve etiketlenmesine ilişkin usul ve esasları; Tehlikeli Maddelerin Karayoluyla Taşınması Hakkında Yönetmelik ile bu Yönetmeliğin doğrudan atıfta bulunduğu Avrupa Tehlikeli Malların Karayolu ile Uluslararası Taşımacılığına İlişkin Avrupa Anlaşması (ADR) hükümlerine uygun biçimde tanımlamak ve uygulama birliği sağlamaktır.",
     kapsam: "Bu talimat; işletme bünyesinde tehlikeli madde dolduran, ambalajlayan, gönderen, yükleyen, boşaltan ve taşıyan tüm birim, alt yüklenici ve personeli; ADR Sınıf 1 ilâ Sınıf 9 arasında yer alan tüm tehlike sınıflarına giren maddelerin parça/koli, varil, bidon, IBC ve büyük ambalajlarla yapılan (dökme veya tank taşımacılığı dışındaki) sevkiyatlarını; sınırlı miktar (Limited Quantities - LQ) ve istisna miktar (Excepted Quantities - EQ) kapsamında yapılan gönderileri kapsar. Tank, dökme yük taşımacılığı ve araç/konteyner üzerindeki turuncu plaka-tehlike levhası uygulamalarının detayları ayrı bir 'Araç ve Konteyner İşaretleme Talimatı' ile düzenlenmekte olup, bu talimatın 6.5 bölümünde yalnızca referans amacıyla özetlenmiştir.",
@@ -2942,6 +2957,7 @@ export const BELGE_SABLONLARI: Record<string, BelgeSablonu> = {
 
   T13: {
     docType: "TALİMAT",
+    posterYolu: "/belge-posterleri/T13.jpg",
     yayinTarihi: "01.11.2025",
     amac: "Bu talimatın amacı; tehlikeli madde dolumu yapılacak sabit tank, tank-konteyner ve taşınabilir tanklara dolum işlemi başlamadan önce, tankın periyodik muayene (YTB) durumunun, taşıma/tank kodu uygunluğunun ve iç yüzey temizliğinin kontrol edilmesini, kontrol sonuçlarının kayıt altına alınmasını ve yalnızca uygun bulunan tanklara dolum yapılmasını sağlayarak; ADR (Tehlikeli Malların Karayolu ile Uluslararası Taşımacılığına İlişkin Avrupa Anlaşması) ve Tehlikeli Maddelerin Karayoluyla Taşınması Hakkında Yönetmelik hükümlerine uygunluğu güvence altına almaktır.",
     kapsam: "Bu talimat; tesis bünyesinde dolum yapılan tüm sabit üstü sarnıçlar (tank araçlar), demonte/battaniye tanklar, tank-konteynerler ve taşınabilir tankları (portatif tanklar) kapsar. Talimat; dolum operatörünü, vardiya sorumlusunu, sevkiyat/lojistik personelini ve Tehlikeli Madde Güvenlik Danışmanını (TMGD) bağlar.",
@@ -3032,6 +3048,7 @@ export const BELGE_SABLONLARI: Record<string, BelgeSablonu> = {
 
   T14: {
     docType: "TALİMAT",
+    posterYolu: "/belge-posterleri/T14.jpg",
     yayinTarihi: "01.11.2025",
     amac: "Bu talimatın amacı; dolum tesisinde dolum işlemi öncesinde tank/tanker/araç üzerinde bulunması gereken tehlike ikaz etiketleri, tehlike sınıfı plakatları (levha) ve turuncu renkli kimlik plakalarının (Kemler No. + UN No.) kontrolünü, mevcut olmayan veya yanlış olanların kaldırılıp doğru olanlarla değiştirilmesini, doğru şekilde takılmasını ve dolum öncesi son kontrolünün yapılmasını; ADR (Tehlikeli Malların Karayolu ile Uluslararası Taşımacılığına İlişkin Avrupa Anlaşması) ve Tehlikeli Maddelerin Karayoluyla Taşınması Hakkında Yönetmelik hükümlerine uygun, standart ve izlenebilir bir uygulama hâline getirmektir.",
     kapsam: "Bu talimat; tesiste dolum yapılacak olan tüm tank araçları (tanker), römork/yarı römorklar, tank-konteynerler, portatif tanklar, tüplü gaz tankerleri ve çok elemanlı gaz konteynerlerini (MEGC) kapsar. Talimat; dolum operatörünü, sevkiyat/lojistik personelini, saha güvenlik görevlisini, sürücüyü ve Tehlikeli Madde Güvenlik Danışmanını (TMGD) ilgilendirir.",
@@ -3162,6 +3179,7 @@ export const BELGE_SABLONLARI: Record<string, BelgeSablonu> = {
 
   T15: {
     docType: "TALİMAT",
+    posterYolu: "/belge-posterleri/T15.jpg",
     yayinTarihi: "01.11.2025",
     amac: "Bu talimatın amacı; birden fazla bölmeye (kompartımana) sahip tank/tanker araçlarının dolumu sırasında, her bölmenin ADR Bölüm 4.3.2 hükümlerinde belirtilen azami doldurma derecesine uygun şekilde, sıvı maddenin sıcaklığa bağlı hacimsel genleşmesine yetecek boş hacim bırakılarak; taşma, sızıntı, aşırı basınç oluşumu ve bölmeler arasında istenmeyen madde karışımı gibi risklerin önlenmesi amacıyla uygulanacak usul ve esasları belirlemektir.",
     kapsam: "Bu talimat; işletme bünyesinde veya işletme adına faaliyet gösteren, birden fazla bölmesi bulunan tanker/tank konteyner/portatif tank araçlarına tehlikeli madde dolumu yapan tüm dolum tesisleri, dolduran personel, tank/araç işletmecisi, taşımacı ve taşıt sürücülerini kapsar. Talimat; sınıf ve ambalaj bakımından ADR'ye tabi tüm sıvı (ve gerektiğinde sıvılaştırılmış gaz) dökme yüklerin bölmeli tanklara dolumunda uygulanır.",
@@ -3272,6 +3290,7 @@ export const BELGE_SABLONLARI: Record<string, BelgeSablonu> = {
 
   T16: {
     docType: "TALİMAT",
+    posterYolu: "/belge-posterleri/T16.jpg",
     yayinTarihi: "01.11.2025",
     amac: "Bu talimatın amacı; tehlikeli madde dolumu tamamlanmış tank, tanker ve tank konteynerlerin karayoluna sevk edilmeden önce sızdırmazlık durumunun ve dış yüzeyde/dolum ağzı çevresinde bulaşma (kontaminasyon) bulunup bulunmadığının, ADR (Tehlikeli Malların Karayolu ile Uluslararası Taşımacılığına İlişkin Avrupa Anlaşması) ve Tehlikeli Maddelerin Karayoluyla Taşınması Hakkında Yönetmelik hükümlerine uygun şekilde kontrol edilmesini, bulaşma tespiti halinde arındırma yapılmasını ve tüm sürecin kayıt altına alınmasını sağlamaktır. Bu talimat, insan sağlığını, çevreyi ve taşıma güvenliğini korumayı; uygunsuz araçların sevkinin önlenmesini hedefler.",
     kapsam: "Bu talimat aşağıdakileri kapsar: tesis bünyesinde tehlikeli/tehlikesiz sıvı, gaz veya katı dökme yük dolumu yapılan tüm tank araçları, tankerler, tank konteynerler (portatif tanklar) ve IBC/dökme yük araçları; dolum sonrası sevke çıkmadan önceki her aşama; dolum operatörü, sevkiyat sorumlusu, kalite kontrol personeli ve ADR Güvenlik Danışmanının görev ve sorumlulukları.",
@@ -3371,6 +3390,7 @@ export const BELGE_SABLONLARI: Record<string, BelgeSablonu> = {
 
   T17: {
     docType: "TALİMAT",
+    posterYolu: "/belge-posterleri/T17.jpg",
     yayinTarihi: "01.11.2025",
     amac: "Bu talimatın amacı; ADR (Tehlikeli Malların Karayolu ile Uluslararası Taşımacılığına İlişkin Avrupa Anlaşması) Bölüm 7.3 kapsamında yürütülen dökme (bulk) dolum işlemlerinde uyulması gereken kuralları, Tehlikeli Maddelerin Karayoluyla Taşınması Hakkında Yönetmelik hükümleri doğrultusunda tesis içi uygulama esaslarını ve dolum öncesinde taşımacı firmanın Tehlikeli Madde Faaliyet Belgesi (TMFB) ile araç/sürücü belgelerinin kontrol usulünü tanımlamaktır. Talimat; dolum güvenliğinin sağlanması, çevreye ve insan sağlığına yönelik risklerin önlenmesi, yalnızca mevzuata uygun ve yetkili taşımacılara dolum/teslim yapılmasının güvence altına alınması ve yapılan kontrollerin izlenebilir şekilde kayıt altına alınmasını hedefler.",
     kapsam: "Bu talimat; tesis bünyesinde dökme yük taşıyan araçlara (açık/kapalı kasa araç, konteyner, tank-konteyner, silobas vb. taşıma birimlerine) yapılan tüm dolum işlemlerini, dolum öncesi belge kontrollerini, dolum/boşaltma sırasında alınacak önlemleri ve K7 Dolum Kontrol Formu ile yapılan kayıt işlemlerini kapsar. Talimat; dolum sahasında görevli tüm personeli, vardiya amirlerini, ADR Güvenlik Danışmanını, güvenlik/kapı kontrol personelini ve tesise dolum/boşaltma amacıyla gelen taşımacı firma sürücülerini bağlar.",
@@ -3624,6 +3644,7 @@ export const BELGE_SABLONLARI: Record<string, BelgeSablonu> = {
 
   T18: {
     docType: "TALİMAT",
+    posterYolu: "/belge-posterleri/T18.jpg",
     yayinTarihi: "01.11.2025",
     amac: "Bu talimatın amacı; tehlikeli madde taşımacılığında kullanılan araçlara ait ADR/Taşıt Uygunluk Belgesi ile yük taşıma birimlerinin (tank, konteyner, IBC vb.) test ve muayene süreçlerinin, tehlike ikaz etiket/levha ve turuncu plaka uygulamalarının, ayrıca taşıma öncesi yapılması gereken fiziksel (sızıntı-hasar) kontrollerin usul ve esaslarını; Tehlikeli Malların Karayolu ile Uluslararası Taşımacılığına İlişkin Avrupa Anlaşması (ADR) ve Tehlikeli Maddelerin Karayoluyla Taşınması Hakkında Yönetmelik hükümleri çerçevesinde tanımlamaktır. Bu talimat ile amaçlanan; yükleme, taşıma ve boşaltma faaliyetlerinin mevzuata uygun, güvenli ve izlenebilir şekilde yürütülmesi; olası kaza, sızıntı, yangın veya çevresel kirlilik risklerinin önlenmesidir.",
     kapsam: "Bu talimat; tehlikeli madde taşıyan tüm karayolu taşıtlarını (tanker, sabit tanklı araç, konteyner taşıyıcı, ambalajlı yük taşıyan araçlar dahil), bu araçlara ait yük taşıma birimlerini (tank, tank-konteyner, portatif tank, IBC — Orta Boy Hacimli Konteyner, çok elemanlı gaz konteynerleri vb.) ve bu birimlerin yüklenmesi, boşaltılması, etiketlenmesi ile ilgili tüm personel, sürücü, sevkiyat ve saha görevlilerini kapsar. Talimat; işletme bünyesinde gerçekleştirilen yurt içi ve/veya uluslararası ADR kapsamındaki tüm karayolu taşımalarında uygulanır.",
@@ -3782,6 +3803,7 @@ export const BELGE_SABLONLARI: Record<string, BelgeSablonu> = {
 
   T19: {
     docType: "TALİMAT",
+    posterYolu: "/belge-posterleri/T19.jpg",
     yayinTarihi: "01.11.2025",
     amac: "Bu talimat; ADR (Tehlikeli Malların Karayolu ile Uluslararası Taşımacılığına İlişkin Avrupa Anlaşması) Bölüm 8.1.4 ve 8.1.5 hükümleri ile Tehlikeli Maddelerin Karayoluyla Taşınması Hakkında Yönetmelik esas alınarak; tehlikeli madde taşıyan araçlarda bulundurulması zorunlu olan genel yangınla mücadele teçhizatı ile kişisel koruyucu donanımın kapsamını, asgari niteliklerini, kontrol sıklığını ve sorumluları belirlemek amacıyla hazırlanmıştır.",
     kapsam: "Bu talimat; işletme bünyesinde veya işletme adına tehlikeli madde taşıyan (ADR'ye tabi) tüm kara taşıtlarını, bu araçlarda görev yapan sürücü ve araç mürettebatını, taşıma öncesi/sırası/sonrası teçhizat kontrolünden sorumlu tüm personeli kapsar. Tam veya kısmi muafiyet kapsamındaki taşımalar için ADR 1.1.3'te belirtilen istisnalar ayrıca değerlendirilir.",
@@ -3920,6 +3942,7 @@ export const BELGE_SABLONLARI: Record<string, BelgeSablonu> = {
 
   T20: {
     docType: "TALİMAT",
+    posterYolu: "/belge-posterleri/T20.jpg",
     yatay: true, // 19 sütunlu resmi ADR 7.5.2.2 ayırım matrisi dikey sayfaya sığmaz
     yayinTarihi: "01.11.2025",
     amac: "Bu talimatın amacı; tehlikeli madde taşımacılığında yükleme ve karışık yükleme sınırlamalarına (ADR Bölüm 7.5) uyulmasını, taşıma sırasında tespit edilen mevzuata aykırılık/güvenlik ihlallerinde (ADR Bölüm 1.8.5 ve 8.3) izlenecek adımları ve boş/temizlenmemiş yük taşıma birimlerinin (YTB) sevkiyatında düzenlenmesi gereken taşıma evrakı asgari içeriğini (ADR Bölüm 5.4.1.1.6) tanımlamaktır. Talimat, Tehlikeli Maddelerin Karayoluyla Taşınması Hakkında Yönetmelik ve ilgili ADR (Tehlikeli Malların Karayolu ile Uluslararası Taşımacılığına İlişkin Avrupa Anlaşması) hükümleri esas alınarak hazırlanmıştır.",

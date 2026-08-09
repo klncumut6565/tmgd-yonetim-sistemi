@@ -1663,4 +1663,56 @@ async function renderYapilandirilmisBelge(
       }
     }
   });
+
+  // Orijinal Word belgesinin sonundaki tam sayfa özet poster (varsa),
+  // tüm içerik sayfalarından sonra kendi başına son sayfa olarak eklenir.
+  if (sablon.posterYolu) {
+    await posterSayfasiEkle(doc, sablon.posterYolu);
+  }
+}
+
+/** Orijinal belgedeki tam sayfa özet posterini (varsa) PDF'in en son
+ *  sayfası olarak ekler. Poster kendi başına tasarlanmış, kenarlıksız bir
+ *  görsel olduğundan uygulamanın başlık/çerçeve/imza kutuları çizilmez;
+ *  sayfa yönü görselin gerçek en/boy oranına göre (yatay/dikey) seçilir.
+ *  Poster yüklenemezse hata fırlatmaz — belge posteri olmadan üretilmeye
+ *  devam eder. */
+async function posterSayfasiEkle(doc: JsPDFType, yol: string): Promise<void> {
+  try {
+    const res = await fetch(yol);
+    if (!res.ok) return;
+    const blob = await res.blob();
+    const dataUrl = await new Promise<string>((resolve, reject) => {
+      const r = new FileReader();
+      r.onload = () => resolve(r.result as string);
+      r.onerror = reject;
+      r.readAsDataURL(blob);
+    });
+    const { width, height } = await new Promise<{ width: number; height: number }>((resolve) => {
+      const img = new Image();
+      img.onload = () =>
+        resolve({ width: img.naturalWidth || 1, height: img.naturalHeight || 1 });
+      img.onerror = () => resolve({ width: 1, height: 1 });
+      img.src = dataUrl;
+    });
+
+    const yatayMi = width > height;
+    doc.addPage("a4", yatayMi ? "landscape" : "portrait");
+    const sayfaG = yatayMi ? 297 : 210;
+    const sayfaY = yatayMi ? 210 : 297;
+
+    // Görseli sayfaya, oranı koruyarak ve tam kaplayacak şekilde (full-bleed) yerleştir.
+    const oran = width / height;
+    let cizimG = sayfaG;
+    let cizimY = sayfaG / oran;
+    if (cizimY < sayfaY) {
+      cizimY = sayfaY;
+      cizimG = sayfaY * oran;
+    }
+    const x = (sayfaG - cizimG) / 2;
+    const y = (sayfaY - cizimY) / 2;
+    doc.addImage(dataUrl, "JPEG", x, y, cizimG, cizimY);
+  } catch {
+    // Poster yüklenemezse belge yine de eksiksiz üretilir; sessizce atlanır.
+  }
 }
