@@ -22,11 +22,10 @@ CREATE TABLE IF NOT EXISTS public.firm_gorevli_listesi (
   gorev_basligi           TEXT NOT NULL,
   yapilacak_gorevler      TEXT,
   bagli_oldugu_birim      TEXT,
-  -- Sorumlu personel(ler): employees.id dizisi. Personel silinirse dizide
-  -- yetim id kalabilir; UI tarafinda personel listesiyle join edilirken
-  -- bulunamayan id'ler sessizce atlanir (FK zorunlu kilinmadi, cunku
-  -- Postgres dizi uzerinde native FK desteklemiyor).
-  sorumlu_personel_ids    UUID[] NOT NULL DEFAULT '{}',
+  -- Sorumlu personel(ler): serbest metin (elle girilir). Kullanicinin
+  -- talebi uzerine employees tablosundan secim yerine dogrudan isim
+  -- yazilir — "seçenek olmasın, elle doldurulsun".
+  sorumlu_kisiler         TEXT,
   doldurulacak_dokuman_no TEXT,
   egitim_tarihi           DATE,
   created_at              TIMESTAMPTZ NOT NULL DEFAULT now(),

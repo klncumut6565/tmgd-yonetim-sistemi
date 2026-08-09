@@ -3,10 +3,21 @@
 // GÖREVLİ LİSTESİ (TMGDK-G1)
 //
 // Personeller menüsü altındaki alt sekme. Excel/PDF çıktısındaki tabloyla
-// BİREBİR aynı görünüm: sütun başlıkları (Sıra No / Görev Başlığı / ...) ve
-// hemen altlarında (aynı hücrede) o sütuna ait giriş kontrolü (select /
-// input / textarea / tarih / çoklu personel listesi) yer alır — ayrı bir
-// "yeni satır ekle" formu YOK, her şey doğrudan tablonun içinde.
+// BİREBİR aynı görünüm: sütun başlıkları ve hemen altlarında (aynı hücrede)
+// o sütuna ait giriş kontrolü yer alır — ayrı bir "yeni satır ekle" formu
+// YOK, her şey doğrudan tablonun içinde.
+//
+// Sütun kontrolleri:
+//   - Görev Başlığı         : seçenekli (Gönderen/Alıcı/.../Diğer serbest metin)
+//   - Yapılacak Görevler    : seçenekli (örnek TMFB belgesindeki standart
+//                             görev tanımları + Diğer serbest metin)
+//   - Bağlı Olduğu Birim    : serbest metin
+//   - Sorumlu Kişi/ler      : SERBEST METİN (elle yazılır, seçenek YOK —
+//                             kullanıcı talebi üzerine employees listesi
+//                             kaldırıldı)
+//   - Doldurulacak Döküman No: seçenekli (örnek belgedeki standart
+//                             döküman tanımları + Diğer serbest metin)
+//   - Eğitim Tarihi         : tarih seçici
 //
 // Satır davranışı (Google E-Tablolar mantığı):
 //   - Var olan satırlar hücre bazında düzenlenir; bir alan blur olduğunda
@@ -15,18 +26,11 @@
 //     doldurulup o satırdan çıkıldığında satır veritabanına eklenir ve
 //     altına yeni bir boş satır eklenir.
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase/client";
 import { hataCevir } from "@/lib/hataCevir";
 import { gorevliListesiExcelOlustur } from "@/lib/gorevliListesiExcel";
 import { gorevliListesiPdfOlustur, type LogoData } from "@/lib/gorevliListesiPdf";
-
-type Employee = {
-  id: string;
-  first_name: string;
-  last_name: string;
-  status: string | null;
-};
 
 type GorevliKaydi = {
   id: string;
@@ -35,7 +39,7 @@ type GorevliKaydi = {
   gorev_basligi: string;
   yapilacak_gorevler: string | null;
   bagli_oldugu_birim: string | null;
-  sorumlu_personel_ids: string[];
+  sorumlu_kisiler: string | null;
   doldurulacak_dokuman_no: string | null;
   egitim_tarihi: string | null;
 };
@@ -51,15 +55,34 @@ const GOREV_BASLIKLARI = [
 const DIGER = "Diğer (serbest metin)";
 const GOREV_SECENEKLERI = [...GOREV_BASLIKLARI, DIGER];
 
+// Örnek TMFB Faaliyetleri Görevli Listesi belgesinden alınan standart görev
+// tanımları (bkz. kullanıcının paylaştığı Ariteks örneği).
+const YAPILACAK_GOREVLER_SECENEKLERI = [
+  "Talimatlara uyulması\nTaşıma Evrakları Formunun Doldurulması\nAraç Kontrol Formlarının Doldurulması\nTaşıma Kontrol Listesinin Doldurulması",
+  "Talimatlara uyulması\nAraç Kontrol Formlarının Doldurulması",
+  "Talimatlara uyulması\nPaketleyen Kontrol Formlarının Doldurulması",
+  "Yapılan İş ve İşlemlerin Kontrolü",
+  "Tehlikeli Madde Miktarlarının Tedariği",
+];
+const YAPILACAK_GOREVLER_SECIMLERI = [...YAPILACAK_GOREVLER_SECENEKLERI, DIGER];
+
+const DOKUMAN_NO_SECENEKLERI = [
+  "ADR Bölüm 5.4.1'e göre düzenlenen taşıma evrakları",
+  "ADR Sözleşmesi ve Tehlikeli Maddelerin Karayolu Yönetmeliği Kapsamında Hazırlanan Kontrol Formu doldurulması ve talimatlara uyulması",
+];
+const DOKUMAN_NO_SECIMLERI = [...DOKUMAN_NO_SECENEKLERI, DIGER];
+
 type SatirState = {
   key: string; // React key — db id veya "yeni-N"
   id: string | null; // veritabanı id'si; null ise henüz kaydedilmedi
   gorevSecim: string;
   gorevSerbest: string;
-  yapilacak_gorevler: string;
+  yapilacakSecim: string;
+  yapilacakSerbest: string;
   bagli_oldugu_birim: string;
-  personel_ids: string[];
-  doldurulacak_dokuman_no: string;
+  sorumlu_kisiler: string;
+  dokumanSecim: string;
+  dokumanSerbest: string;
   egitim_tarihi: string;
   kaydediliyor: boolean;
 };
@@ -72,33 +95,50 @@ function bosSatir(): SatirState {
     id: null,
     gorevSecim: GOREV_BASLIKLARI[0],
     gorevSerbest: "",
-    yapilacak_gorevler: "",
+    yapilacakSecim: YAPILACAK_GOREVLER_SECENEKLERI[0],
+    yapilacakSerbest: "",
     bagli_oldugu_birim: "",
-    personel_ids: [],
-    doldurulacak_dokuman_no: "",
+    sorumlu_kisiler: "",
+    dokumanSecim: DOKUMAN_NO_SECENEKLERI[0],
+    dokumanSerbest: "",
     egitim_tarihi: "",
     kaydediliyor: false,
   };
 }
 
+/** Bir değer listede birebir varsa o seçeneği, yoksa "Diğer" + serbest metni döndürür. */
+function secimVeSerbestCoz(
+  deger: string | null,
+  secenekler: string[]
+): { secim: string; serbest: string } {
+  const v = deger || "";
+  if (v && secenekler.includes(v)) return { secim: v, serbest: "" };
+  if (!v) return { secim: secenekler[0], serbest: "" };
+  return { secim: DIGER, serbest: v };
+}
+
 function kayittanSatir(k: GorevliKaydi): SatirState {
-  const serbest = !GOREV_BASLIKLARI.includes(k.gorev_basligi);
+  const gorev = secimVeSerbestCoz(k.gorev_basligi, GOREV_BASLIKLARI);
+  const yapilacak = secimVeSerbestCoz(k.yapilacak_gorevler, YAPILACAK_GOREVLER_SECENEKLERI);
+  const dokuman = secimVeSerbestCoz(k.doldurulacak_dokuman_no, DOKUMAN_NO_SECENEKLERI);
   return {
     key: k.id,
     id: k.id,
-    gorevSecim: serbest ? DIGER : k.gorev_basligi,
-    gorevSerbest: serbest ? k.gorev_basligi : "",
-    yapilacak_gorevler: k.yapilacak_gorevler || "",
+    gorevSecim: gorev.secim,
+    gorevSerbest: gorev.serbest,
+    yapilacakSecim: yapilacak.secim,
+    yapilacakSerbest: yapilacak.serbest,
     bagli_oldugu_birim: k.bagli_oldugu_birim || "",
-    personel_ids: k.sorumlu_personel_ids || [],
-    doldurulacak_dokuman_no: k.doldurulacak_dokuman_no || "",
+    sorumlu_kisiler: k.sorumlu_kisiler || "",
+    dokumanSecim: dokuman.secim,
+    dokumanSerbest: dokuman.serbest,
     egitim_tarihi: k.egitim_tarihi || "",
     kaydediliyor: false,
   };
 }
 
-function etkinGorevBasligi(s: SatirState): string {
-  return (s.gorevSecim === DIGER ? s.gorevSerbest : s.gorevSecim).trim();
+function etkinMetin(secim: string, serbest: string): string {
+  return (secim === DIGER ? serbest : secim).trim();
 }
 
 function ensureTrailingBlank(rows: SatirState[]): SatirState[] {
@@ -130,7 +170,6 @@ export default function GorevliListesi({
   firmId: string;
   firmaAdi: string;
 }) {
-  const [employees, setEmployees] = useState<Employee[]>([]);
   const [rows, setRows] = useState<SatirState[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -146,12 +185,7 @@ export default function GorevliListesi({
       setLoading(true);
       setError("");
       try {
-        const [empRes, kayitRes, firmRes] = await Promise.all([
-          supabase
-            .from("employees")
-            .select("id, first_name, last_name, status")
-            .eq("firm_id", firmId)
-            .order("first_name"),
+        const [kayitRes, firmRes] = await Promise.all([
           supabase
             .from("firm_gorevli_listesi")
             .select("*")
@@ -160,9 +194,7 @@ export default function GorevliListesi({
           supabase.from("firms").select("logo_url").eq("id", firmId).single(),
         ]);
         if (iptal) return;
-        if (empRes.error) throw empRes.error;
         if (kayitRes.error) throw kayitRes.error;
-        setEmployees((empRes.data as Employee[]) || []);
         const yuklenen = ((kayitRes.data as GorevliKaydi[]) || []).map(kayittanSatir);
         setRows(ensureTrailingBlank(yuklenen));
         setLogoUrl((firmRes.data as { logo_url: string | null } | null)?.logo_url ?? null);
@@ -183,25 +215,12 @@ export default function GorevliListesi({
     };
   }, [firmId]);
 
-  const personelAdi = useMemo(() => {
-    const harita = new Map<string, string>();
-    employees.forEach((e) => harita.set(e.id, `${e.first_name} ${e.last_name}`));
-    return harita;
-  }, [employees]);
-
-  function isimleriGetir(ids: string[]): string {
-    return ids
-      .map((id) => personelAdi.get(id))
-      .filter((v): v is string => Boolean(v))
-      .join(", ");
-  }
-
   function updateRow(key: string, patch: Partial<SatirState>) {
     setRows((prev) => prev.map((r) => (r.key === key ? { ...r, ...patch } : r)));
   }
 
   async function kaydet(satir: SatirState, siraNo: number) {
-    const gorevBasligi = etkinGorevBasligi(satir);
+    const gorevBasligi = etkinMetin(satir.gorevSecim, satir.gorevSerbest);
     if (!gorevBasligi) return; // henüz yeterli veri yok, kaydetme
 
     setRows((prev) => prev.map((r) => (r.key === satir.key ? { ...r, kaydediliyor: true } : r)));
@@ -211,10 +230,10 @@ export default function GorevliListesi({
         firm_id: firmId,
         sira_no: siraNo,
         gorev_basligi: gorevBasligi,
-        yapilacak_gorevler: satir.yapilacak_gorevler.trim() || null,
+        yapilacak_gorevler: etkinMetin(satir.yapilacakSecim, satir.yapilacakSerbest) || null,
         bagli_oldugu_birim: satir.bagli_oldugu_birim.trim() || null,
-        sorumlu_personel_ids: satir.personel_ids,
-        doldurulacak_dokuman_no: satir.doldurulacak_dokuman_no.trim() || null,
+        sorumlu_kisiler: satir.sorumlu_kisiler.trim() || null,
+        doldurulacak_dokuman_no: etkinMetin(satir.dokumanSecim, satir.dokumanSerbest) || null,
         egitim_tarihi: satir.egitim_tarihi || null,
       };
 
@@ -306,11 +325,11 @@ export default function GorevliListesi({
   function satirlariHazirla() {
     return kayitliSatirlar.map((r, idx) => ({
       sira_no: idx + 1,
-      gorev_basligi: etkinGorevBasligi(r),
-      yapilacak_gorevler: r.yapilacak_gorevler,
+      gorev_basligi: etkinMetin(r.gorevSecim, r.gorevSerbest),
+      yapilacak_gorevler: etkinMetin(r.yapilacakSecim, r.yapilacakSerbest),
       bagli_oldugu_birim: r.bagli_oldugu_birim,
-      sorumluIsimler: isimleriGetir(r.personel_ids),
-      doldurulacak_dokuman_no: r.doldurulacak_dokuman_no,
+      sorumluIsimler: r.sorumlu_kisiler,
+      doldurulacak_dokuman_no: etkinMetin(r.dokumanSecim, r.dokumanSerbest),
       egitim_tarihi: trTarih(r.egitim_tarihi),
     }));
   }
@@ -425,8 +444,8 @@ export default function GorevliListesi({
               </th>
               <th className="p-2 border text-left w-56">Yapılacak Görevler</th>
               <th className="p-2 border text-left w-36">Bağlı Olduğu Birim</th>
-              <th className="p-2 border text-left w-48">Sorumlu Kişi/ler</th>
-              <th className="p-2 border text-left w-40">Doldurulacak Döküman No</th>
+              <th className="p-2 border text-left w-40">Sorumlu Kişi/ler</th>
+              <th className="p-2 border text-left w-56">Doldurulacak Döküman No</th>
               <th className="p-2 border text-left w-32">Eğitim Tarihi</th>
               <th className="p-2 border w-10"></th>
             </tr>
@@ -471,16 +490,39 @@ export default function GorevliListesi({
                     )}
                   </td>
 
+                  {/* Yapılacak Görevler: seçenek doğrudan hücrede, altında serbest metin */}
                   <td className="p-1.5 border align-top">
-                    <textarea
-                      value={row.yapilacak_gorevler}
-                      onChange={(e) =>
-                        updateRow(row.key, { yapilacak_gorevler: e.target.value })
-                      }
-                      onBlur={() => kaydet(row, idx + 1)}
-                      rows={2}
+                    <select
+                      value={row.yapilacakSecim}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        updateRow(row.key, { yapilacakSecim: val });
+                        if (val !== DIGER) {
+                          kaydet({ ...row, yapilacakSecim: val }, idx + 1);
+                        }
+                      }}
                       className={HUCRE_INPUT}
-                    />
+                    >
+                      {YAPILACAK_GOREVLER_SECIMLERI.map((g) => (
+                        <option key={g} value={g}>
+                          {g.length > 40
+                            ? g.slice(0, 40).replace(/\n/g, " ") + "…"
+                            : g.replace(/\n/g, " ")}
+                        </option>
+                      ))}
+                    </select>
+                    {row.yapilacakSecim === DIGER && (
+                      <textarea
+                        value={row.yapilacakSerbest}
+                        onChange={(e) =>
+                          updateRow(row.key, { yapilacakSerbest: e.target.value })
+                        }
+                        onBlur={() => kaydet(row, idx + 1)}
+                        placeholder="Görev tanımı yazın"
+                        rows={2}
+                        className={HUCRE_INPUT + " mt-1"}
+                      />
+                    )}
                   </td>
 
                   <td className="p-1.5 border align-top">
@@ -495,45 +537,51 @@ export default function GorevliListesi({
                     />
                   </td>
 
-                  {/* Sorumlu Kişi/ler: seçenekler doğrudan hücrenin altında görünür liste */}
-                  <td className="p-1.5 border align-top">
-                    <select
-                      multiple
-                      size={Math.min(4, Math.max(2, employees.length || 2))}
-                      value={row.personel_ids}
-                      onChange={(e) => {
-                        const secililer = Array.from(e.target.selectedOptions).map(
-                          (o) => o.value
-                        );
-                        updateRow(row.key, { personel_ids: secililer });
-                      }}
-                      onBlur={() => kaydet(row, idx + 1)}
-                      className={HUCRE_INPUT}
-                    >
-                      {employees.length === 0 && (
-                        <option disabled value="">
-                          Kayıtlı personel yok
-                        </option>
-                      )}
-                      {employees.map((e) => (
-                        <option key={e.id} value={e.id}>
-                          {e.first_name} {e.last_name}
-                          {e.status === "inactive" ? " (pasif)" : ""}
-                        </option>
-                      ))}
-                    </select>
-                  </td>
-
+                  {/* Sorumlu Kişi/ler: SERBEST METİN — seçenek yok, elle yazılır */}
                   <td className="p-1.5 border align-top">
                     <input
                       type="text"
-                      value={row.doldurulacak_dokuman_no}
+                      value={row.sorumlu_kisiler}
                       onChange={(e) =>
-                        updateRow(row.key, { doldurulacak_dokuman_no: e.target.value })
+                        updateRow(row.key, { sorumlu_kisiler: e.target.value })
                       }
                       onBlur={() => kaydet(row, idx + 1)}
+                      placeholder="Ad Soyad (birden fazlaysa virgülle ayırın)"
                       className={HUCRE_INPUT}
                     />
+                  </td>
+
+                  {/* Doldurulacak Döküman No: seçenek doğrudan hücrede, altında serbest metin */}
+                  <td className="p-1.5 border align-top">
+                    <select
+                      value={row.dokumanSecim}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        updateRow(row.key, { dokumanSecim: val });
+                        if (val !== DIGER) {
+                          kaydet({ ...row, dokumanSecim: val }, idx + 1);
+                        }
+                      }}
+                      className={HUCRE_INPUT}
+                    >
+                      {DOKUMAN_NO_SECIMLERI.map((g) => (
+                        <option key={g} value={g}>
+                          {g.length > 40 ? g.slice(0, 40) + "…" : g}
+                        </option>
+                      ))}
+                    </select>
+                    {row.dokumanSecim === DIGER && (
+                      <textarea
+                        value={row.dokumanSerbest}
+                        onChange={(e) =>
+                          updateRow(row.key, { dokumanSerbest: e.target.value })
+                        }
+                        onBlur={() => kaydet(row, idx + 1)}
+                        placeholder="Döküman no / tanımı yazın"
+                        rows={2}
+                        className={HUCRE_INPUT + " mt-1"}
+                      />
+                    )}
                   </td>
 
                   <td className="p-1.5 border align-top">
