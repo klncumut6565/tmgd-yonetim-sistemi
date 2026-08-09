@@ -23,6 +23,14 @@ export async function POST(req: NextRequest) {
   const dosya = form.get('file')
   const token = form.get('token')
 
+  // NOT: tarayici_ios, kullanıcının tarama ekranında seçtiği "Belge Türü"
+  // (SDS/ADR/Fatura/...) bilgisini `docType` form alanı olarak da gönderir.
+  // Burada BİLİNÇLİ OLARAK okunmuyor: bu entegrasyon yolunda hedef belge
+  // türü (code/period) zaten oturum oluşturulurken (/baslat ucunda, kullanıcı
+  // Belge Takip'teki spesifik satıra tıkladığında) sunucu tarafında
+  // sabitleniyor — tarayıcı tarafındaki genel "Belge Türü" seçimi bu akış
+  // için anlamlı bir yönlendirme sağlamıyor, sadece bilgi amaçlı geliyor.
+
   if (!dosya || !(dosya instanceof Blob) || typeof token !== 'string' || !token) {
     return NextResponse.json({ error: 'Eksik alan: file veya token.' }, { status: 400 })
   }

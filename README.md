@@ -24,6 +24,30 @@ proje planının **düzenli bir proje iskeletine** dönüştürülmüş hâlidir
 3. Table Editor'da tabloların oluştuğunu kontrol et (70+ tablo oluşacak)
 4. Geliştirme/test ortamındaysanız dosyanın en alındaki **BÖLÜM 19 (SEED)**
    örnek veriyi de ekler. **Üretimde bu bölümü çalıştırmayın.**
+5. Sonra **`database/` klasörünün kökündeki** numaralı dosyaları sırayla
+   çalıştır: `002_onay_yetki.sql` → ... → `027_adr_transport_envanter.sql`.
+6. En son **`database/migrations/` alt klasöründeki** dosyaları sırayla
+   çalıştır: `024_audit_log.sql` → ... → `040_belge_tarama_oturumlari.sql`.
+
+   ⚠️ **Numaralandırma dikkat gerektirir:** bu iki klasördeki dosya
+   numaraları BİRBİRİYLE ÇAKIŞIYOR (ör. hem `database/027_...` hem
+   `database/migrations/024...040` var) ama içerikleri tamamen farklı —
+   `database/migrations/` klasörü kronolojik olarak `database/`
+   kökündeki tüm dosyalardan SONRA eklenmiştir (git tarihine göre
+   doğrulandı). Sıralama önemli: önce kökteki 002-027, sonra
+   migrations/ altındaki 024-040. Dosyaları `ls database/**/*.sql | sort`
+   gibi tek bir komutla numaraya göre otomatik sıralamaya ÇALIŞMAYIN,
+   iki klasörü ayrı ayrı ve yukarıdaki sırayla çalıştırın.
+
+   `schema.sql` yalnızca projenin belirli bir zamandaki (yaklaşık 074.
+   teslimat, 2026-06-23) anlık görüntüsüdür; yukarıdaki iki klasördeki
+   her dosya o tarihten SONRA eklenen ayrı bir özelliktir ve `schema.sql`
+   içine geri katılmamıştır. Bu adımlar atlanırsa bazı özellikler (örn.
+   mobil tarama entegrasyonu — `belge_tarama_oturumlari` tablosu olmadan
+   çalışmaz, denetim günlüğü, ADR asistanı) "tablo bulunamadı" hatasıyla
+   çalışmaz. Dosyalar idempotent yazılmıştır (`IF NOT EXISTS` /
+   `CREATE OR REPLACE` / `ON CONFLICT`), ikinci kez çalıştırmak zarar
+   vermez.
 
 ### 2) Next.js projesi
 
@@ -44,7 +68,32 @@ npm run dev
 
 ---
 
-## TESLİMAT → Dosya Haritası
+## Mobil Belge Tarama Entegrasyonu (tarayici_ios)
+
+Belge Takip'teki bir satırda "📷 Mobilden Tara" butonu, ayrı bir PWA olan
+[`klncumut6565/tarayici_ios`](https://github.com/klncumut6565/tarayici_ios)'a
+yönlendirir: kullanıcı telefon kamerasıyla tarar, PDF otomatik olarak bu
+sisteme geri gönderilir — manuel dosya seçip yüklemeye gerek kalmaz.
+
+**Kurulum:**
+1. `tarayici_ios` reposunu ayrıca Vercel'e deploy et.
+2. Bu projede `NEXT_PUBLIC_TARAYICI_URL` ortam değişkenini o deploy'un
+   adresine ayarla (bkz. `.env.local.example`).
+3. `database/migrations/040_belge_tarama_oturumlari.sql`'in çalıştırılmış
+   olduğundan emin ol (yukarıdaki Kurulum → Veritabanı adımlarına dahil).
+
+Ayarlanmazsa buton hiç görünmez, sistemin geri kalanı etkilenmez.
+
+**Akış:** `/api/belge-tarama/baslat` kısa ömürlü/tek kullanımlık bir token
+üretir → kullanıcı ayrı sekmede tarayici_ios'a yönlendirilir → tarama
+bitince PDF `/api/belge-tarama/callback`'e otomatik POST edilir (Supabase
+oturumu taşımaz, güvenlik token'a dayanır — bkz. migration 040'taki
+yorumlar) → kullanıcı bu sayfaya geri döner. Detaylar için ilgili route
+dosyalarındaki yorumlara bakın.
+
+---
+
+
 
 | Teslimat | İçerik | Bu projede |
 |---|---|---|
