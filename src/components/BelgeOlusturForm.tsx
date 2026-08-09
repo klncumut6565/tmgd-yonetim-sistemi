@@ -1596,8 +1596,13 @@ async function renderYapilandirilmisBelge(
   const headerAlt = CERCEVE_KENAR + baslikYukseklik + 8;
 
   const sayfalar = sayfalaraBol(doc, satirlar, headerAlt);
-  const toplamSayfa = sayfalar.length;
   const genislik = W - 2 * M;
+
+  // Orijinal Word belgesindeki tam sayfa özet poster (varsa) önceden
+  // getirilir; böylece toplam sayfa sayısı (ve dolayısıyla "Sayfa X/Y"
+  // numaralandırması) poster dahil doğru hesaplanır.
+  const posterVeri = sablon.posterYolu ? await posterGorseliGetir(sablon.posterYolu) : null;
+  const toplamSayfa = sayfalar.length + (posterVeri ? 1 : 0);
 
   // Kapak sayfası her belgenin ilk sayfasıdır; içerik ondan sonra başlar.
   kapakSayfasiCiz(
@@ -1664,23 +1669,42 @@ async function renderYapilandirilmisBelge(
     }
   });
 
-  // Orijinal Word belgesinin sonundaki tam sayfa özet poster (varsa),
-  // tüm içerik sayfalarından sonra kendi başına son sayfa olarak eklenir.
-  if (sablon.posterYolu) {
-    await posterSayfasiEkle(doc, sablon.posterYolu);
+  // Orijinal Word belgesinin sonundaki tam sayfa özet poster (varsa), diğer
+  // içerik sayfalarıyla AYNI çerçeve/başlık/imza tablosuyla son sayfa olarak
+  // eklenir — böylece Hazırlayan/Onaylayan bilgisi ve sayfa numarası burada
+  // da görünür kalır. Görsel, içerik kutusuna ORANI KORUNARAK (taşmadan)
+  // sığdırılır.
+  if (posterVeri) {
+    doc.addPage();
+    cerceveCiz(doc);
+    baslikTablosuCiz(doc, firmAdi, code, belgeAdi, sablon, logo, bugun, toplamSayfa, toplamSayfa, baslikYukseklik, adLines);
+    altTabloCiz(doc, hazirlayanAdi, onaylayanAdi);
+
+    const kutuG = genislik;
+    const kutuY = FOOTER_UST - headerAlt;
+    const oran = posterVeri.width / posterVeri.height;
+    let cizimG = kutuG;
+    let cizimY = kutuG / oran;
+    if (cizimY > kutuY) {
+      // Yükseklik kutuya sığmıyor — yüksekliğe göre yeniden ölçekle.
+      cizimY = kutuY;
+      cizimG = kutuY * oran;
+    }
+    const x = M + (kutuG - cizimG) / 2;
+    const y = headerAlt + (kutuY - cizimY) / 2;
+    doc.addImage(posterVeri.dataUrl, "JPEG", x, y, cizimG, cizimY);
   }
 }
 
-/** Orijinal belgedeki tam sayfa özet posterini (varsa) PDF'in en son
- *  sayfası olarak ekler. Poster kendi başına tasarlanmış, kenarlıksız bir
- *  görsel olduğundan uygulamanın başlık/çerçeve/imza kutuları çizilmez;
- *  sayfa yönü görselin gerçek en/boy oranına göre (yatay/dikey) seçilir.
- *  Poster yüklenemezse hata fırlatmaz — belge posteri olmadan üretilmeye
- *  devam eder. */
-async function posterSayfasiEkle(doc: JsPDFType, yol: string): Promise<void> {
+/** Orijinal belgedeki tam sayfa özet posterini (varsa) getirir ve dataURL +
+ *  gerçek piksel boyutlarını döndürür. Poster yüklenemezse null döner —
+ *  belge bu durumda posteri olmadan, hatasız üretilmeye devam eder. */
+async function posterGorseliGetir(
+  yol: string
+): Promise<{ dataUrl: string; width: number; height: number } | null> {
   try {
     const res = await fetch(yol);
-    if (!res.ok) return;
+    if (!res.ok) return null;
     const blob = await res.blob();
     const dataUrl = await new Promise<string>((resolve, reject) => {
       const r = new FileReader();
@@ -1695,24 +1719,8 @@ async function posterSayfasiEkle(doc: JsPDFType, yol: string): Promise<void> {
       img.onerror = () => resolve({ width: 1, height: 1 });
       img.src = dataUrl;
     });
-
-    const yatayMi = width > height;
-    doc.addPage("a4", yatayMi ? "landscape" : "portrait");
-    const sayfaG = yatayMi ? 297 : 210;
-    const sayfaY = yatayMi ? 210 : 297;
-
-    // Görseli sayfaya, oranı koruyarak ve tam kaplayacak şekilde (full-bleed) yerleştir.
-    const oran = width / height;
-    let cizimG = sayfaG;
-    let cizimY = sayfaG / oran;
-    if (cizimY < sayfaY) {
-      cizimY = sayfaY;
-      cizimG = sayfaY * oran;
-    }
-    const x = (sayfaG - cizimG) / 2;
-    const y = (sayfaY - cizimY) / 2;
-    doc.addImage(dataUrl, "JPEG", x, y, cizimG, cizimY);
+    return { dataUrl, width, height };
   } catch {
-    // Poster yüklenemezse belge yine de eksiksiz üretilir; sessizce atlanır.
+    return null;
   }
 }
