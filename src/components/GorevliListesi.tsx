@@ -2,14 +2,18 @@
 
 // GÖREVLİ LİSTESİ (TMGDK-G1)
 //
-// Personeller menüsü altındaki alt sekme. Firmadaki kayıtlı personellerden
-// (employees tablosu) seçim yapılarak "Tehlikeli Madde İş ve İşlemlerinde
-// Görevli Personel Listesi" satırları oluşturulur. Her satır bir görev
-// başlığına (Gönderen/Alıcı/Boşaltan/Paketleyen/Dolduran/Yükleyen veya
-// serbest metin) karşılık gelir ve bir veya birden fazla personel atanabilir.
+// Personeller menüsü altındaki alt sekme. Excel/PDF çıktısındaki tabloyla
+// BİREBİR aynı görünüm: sütun başlıkları (Sıra No / Görev Başlığı / ...) ve
+// hemen altlarında (aynı hücrede) o sütuna ait giriş kontrolü (select /
+// input / textarea / tarih / çoklu personel listesi) yer alır — ayrı bir
+// "yeni satır ekle" formu YOK, her şey doğrudan tablonun içinde.
 //
-// Canlı önizleme + Excel/PDF export (bkz. gorevliListesiExcel.ts,
-// gorevliListesiPdf.ts).
+// Satır davranışı (Google E-Tablolar mantığı):
+//   - Var olan satırlar hücre bazında düzenlenir; bir alan blur olduğunda
+//     (veya select değiştiğinde) otomatik kaydedilir.
+//   - Tablonun en altında her zaman BOŞ bir satır durur; Görev Başlığı
+//     doldurulup o satırdan çıkıldığında satır veritabanına eklenir ve
+//     altına yeni bir boş satır eklenir.
 
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase/client";
@@ -43,18 +47,66 @@ const GOREV_BASLIKLARI = [
   "Paketleyen",
   "Dolduran",
   "Yükleyen",
-  "Diğer (serbest metin)",
 ];
+const DIGER = "Diğer (serbest metin)";
+const GOREV_SECENEKLERI = [...GOREV_BASLIKLARI, DIGER];
 
-const bosForm = {
-  gorev_basligi: GOREV_BASLIKLARI[0],
-  gorev_basligi_serbest: "",
-  yapilacak_gorevler: "",
-  bagli_oldugu_birim: "",
-  doldurulacak_dokuman_no: "",
-  egitim_tarihi: "",
-  personel_ids: [] as string[],
+type SatirState = {
+  key: string; // React key — db id veya "yeni-N"
+  id: string | null; // veritabanı id'si; null ise henüz kaydedilmedi
+  gorevSecim: string;
+  gorevSerbest: string;
+  yapilacak_gorevler: string;
+  bagli_oldugu_birim: string;
+  personel_ids: string[];
+  doldurulacak_dokuman_no: string;
+  egitim_tarihi: string;
+  kaydediliyor: boolean;
 };
+
+let yeniSayac = 0;
+function bosSatir(): SatirState {
+  yeniSayac += 1;
+  return {
+    key: `yeni-${yeniSayac}`,
+    id: null,
+    gorevSecim: GOREV_BASLIKLARI[0],
+    gorevSerbest: "",
+    yapilacak_gorevler: "",
+    bagli_oldugu_birim: "",
+    personel_ids: [],
+    doldurulacak_dokuman_no: "",
+    egitim_tarihi: "",
+    kaydediliyor: false,
+  };
+}
+
+function kayittanSatir(k: GorevliKaydi): SatirState {
+  const serbest = !GOREV_BASLIKLARI.includes(k.gorev_basligi);
+  return {
+    key: k.id,
+    id: k.id,
+    gorevSecim: serbest ? DIGER : k.gorev_basligi,
+    gorevSerbest: serbest ? k.gorev_basligi : "",
+    yapilacak_gorevler: k.yapilacak_gorevler || "",
+    bagli_oldugu_birim: k.bagli_oldugu_birim || "",
+    personel_ids: k.sorumlu_personel_ids || [],
+    doldurulacak_dokuman_no: k.doldurulacak_dokuman_no || "",
+    egitim_tarihi: k.egitim_tarihi || "",
+    kaydediliyor: false,
+  };
+}
+
+function etkinGorevBasligi(s: SatirState): string {
+  return (s.gorevSecim === DIGER ? s.gorevSerbest : s.gorevSecim).trim();
+}
+
+function ensureTrailingBlank(rows: SatirState[]): SatirState[] {
+  if (rows.length === 0 || rows[rows.length - 1].id !== null) {
+    return [...rows, bosSatir()];
+  }
+  return rows;
+}
 
 function trTarih(iso: string | null): string {
   if (!iso) return "";
@@ -68,6 +120,9 @@ function bugununTarihi(): string {
   return trTarih(new Date().toISOString());
 }
 
+const HUCRE_INPUT =
+  "w-full border rounded px-1.5 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-400";
+
 export default function GorevliListesi({
   firmId,
   firmaAdi,
@@ -76,15 +131,11 @@ export default function GorevliListesi({
   firmaAdi: string;
 }) {
   const [employees, setEmployees] = useState<Employee[]>([]);
-  const [kayitlar, setKayitlar] = useState<GorevliKaydi[]>([]);
+  const [rows, setRows] = useState<SatirState[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [mesaj, setMesaj] = useState("");
   const [busy, setBusy] = useState(false);
-
-  const [form, setForm] = useState({ ...bosForm });
-  const [duzenlenenId, setDuzenlenenId] = useState<string | null>(null);
-  const [formAcik, setFormAcik] = useState(false);
 
   const [hazirlayanAdi, setHazirlayanAdi] = useState("");
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
@@ -112,7 +163,8 @@ export default function GorevliListesi({
         if (empRes.error) throw empRes.error;
         if (kayitRes.error) throw kayitRes.error;
         setEmployees((empRes.data as Employee[]) || []);
-        setKayitlar((kayitRes.data as GorevliKaydi[]) || []);
+        const yuklenen = ((kayitRes.data as GorevliKaydi[]) || []).map(kayittanSatir);
+        setRows(ensureTrailingBlank(yuklenen));
         setLogoUrl((firmRes.data as { logo_url: string | null } | null)?.logo_url ?? null);
 
         const { data: tmgdAdi } = await supabase.rpc("get_firm_tmgd_name", {
@@ -144,98 +196,80 @@ export default function GorevliListesi({
       .join(", ");
   }
 
-  function formuSifirla() {
-    setForm({ ...bosForm });
-    setDuzenlenenId(null);
-    setFormAcik(false);
+  function updateRow(key: string, patch: Partial<SatirState>) {
+    setRows((prev) => prev.map((r) => (r.key === key ? { ...r, ...patch } : r)));
   }
 
-  function duzenlemeyeBasla(k: GorevliKaydi) {
-    const serbest = !GOREV_BASLIKLARI.slice(0, 6).includes(k.gorev_basligi);
-    setForm({
-      gorev_basligi: serbest ? GOREV_BASLIKLARI[6] : k.gorev_basligi,
-      gorev_basligi_serbest: serbest ? k.gorev_basligi : "",
-      yapilacak_gorevler: k.yapilacak_gorevler || "",
-      bagli_oldugu_birim: k.bagli_oldugu_birim || "",
-      doldurulacak_dokuman_no: k.doldurulacak_dokuman_no || "",
-      egitim_tarihi: k.egitim_tarihi || "",
-      personel_ids: k.sorumlu_personel_ids || [],
-    });
-    setDuzenlenenId(k.id);
-    setFormAcik(true);
-  }
+  async function kaydet(satir: SatirState, siraNo: number) {
+    const gorevBasligi = etkinGorevBasligi(satir);
+    if (!gorevBasligi) return; // henüz yeterli veri yok, kaydetme
 
-  async function kaydet() {
+    setRows((prev) => prev.map((r) => (r.key === satir.key ? { ...r, kaydediliyor: true } : r)));
     setError("");
-    setMesaj("");
-    const gorevBasligi =
-      form.gorev_basligi === "Diğer (serbest metin)"
-        ? form.gorev_basligi_serbest.trim()
-        : form.gorev_basligi;
-    if (!gorevBasligi) {
-      setError("Görev başlığı boş olamaz.");
-      return;
-    }
-    setBusy(true);
     try {
       const govde = {
         firm_id: firmId,
-        sira_no: duzenlenenId
-          ? kayitlar.find((k) => k.id === duzenlenenId)?.sira_no ?? kayitlar.length + 1
-          : kayitlar.length + 1,
+        sira_no: siraNo,
         gorev_basligi: gorevBasligi,
-        yapilacak_gorevler: form.yapilacak_gorevler.trim() || null,
-        bagli_oldugu_birim: form.bagli_oldugu_birim.trim() || null,
-        sorumlu_personel_ids: form.personel_ids,
-        doldurulacak_dokuman_no: form.doldurulacak_dokuman_no.trim() || null,
-        egitim_tarihi: form.egitim_tarihi || null,
+        yapilacak_gorevler: satir.yapilacak_gorevler.trim() || null,
+        bagli_oldugu_birim: satir.bagli_oldugu_birim.trim() || null,
+        sorumlu_personel_ids: satir.personel_ids,
+        doldurulacak_dokuman_no: satir.doldurulacak_dokuman_no.trim() || null,
+        egitim_tarihi: satir.egitim_tarihi || null,
       };
 
-      if (duzenlenenId) {
-        const { data, error: err } = await supabase
+      if (satir.id) {
+        const { error: err } = await supabase
           .from("firm_gorevli_listesi")
           .update(govde)
-          .eq("id", duzenlenenId)
-          .select("*")
-          .single();
+          .eq("id", satir.id);
         if (err) throw err;
-        setKayitlar((prev) =>
-          prev.map((k) => (k.id === duzenlenenId ? (data as GorevliKaydi) : k))
+        setRows((prev) =>
+          prev.map((r) => (r.key === satir.key ? { ...r, kaydediliyor: false } : r))
         );
-        setMesaj("✓ Satır güncellendi.");
       } else {
         const { data, error: err } = await supabase
           .from("firm_gorevli_listesi")
           .insert(govde)
-          .select("*")
+          .select("id")
           .single();
         if (err) throw err;
-        setKayitlar((prev) => [...prev, data as GorevliKaydi]);
-        setMesaj("✓ Satır eklendi.");
+        const yeniId = (data as { id: string }).id;
+        setRows((prev) => {
+          const guncellenmis = prev.map((r) =>
+            r.key === satir.key ? { ...r, id: yeniId, kaydediliyor: false } : r
+          );
+          return ensureTrailingBlank(guncellenmis);
+        });
       }
-      formuSifirla();
+      setMesaj("");
     } catch (e) {
       setError(hataCevir(e as { message?: string }));
-    } finally {
-      setBusy(false);
+      setRows((prev) =>
+        prev.map((r) => (r.key === satir.key ? { ...r, kaydediliyor: false } : r))
+      );
     }
   }
 
-  async function sil(id: string) {
+  async function sil(satir: SatirState) {
+    if (!satir.id) return;
     if (!confirm("Bu satırı silmek istediğinize emin misiniz?")) return;
-    setBusy(true);
+    setRows((prev) =>
+      prev.map((r) => (r.key === satir.key ? { ...r, kaydediliyor: true } : r))
+    );
     setError("");
     try {
       const { error: err } = await supabase
         .from("firm_gorevli_listesi")
         .delete()
-        .eq("id", id);
+        .eq("id", satir.id);
       if (err) throw err;
-      setKayitlar((prev) => prev.filter((k) => k.id !== id));
+      setRows((prev) => ensureTrailingBlank(prev.filter((r) => r.key !== satir.key)));
     } catch (e) {
       setError(hataCevir(e as { message?: string }));
-    } finally {
-      setBusy(false);
+      setRows((prev) =>
+        prev.map((r) => (r.key === satir.key ? { ...r, kaydediliyor: false } : r))
+      );
     }
   }
 
@@ -267,15 +301,17 @@ export default function GorevliListesi({
     }
   }
 
+  const kayitliSatirlar = rows.filter((r) => r.id !== null);
+
   function satirlariHazirla() {
-    return kayitlar.map((k) => ({
-      sira_no: k.sira_no,
-      gorev_basligi: k.gorev_basligi,
-      yapilacak_gorevler: k.yapilacak_gorevler || "",
-      bagli_oldugu_birim: k.bagli_oldugu_birim || "",
-      sorumluIsimler: isimleriGetir(k.sorumlu_personel_ids || []),
-      doldurulacak_dokuman_no: k.doldurulacak_dokuman_no || "",
-      egitim_tarihi: trTarih(k.egitim_tarihi),
+    return kayitliSatirlar.map((r, idx) => ({
+      sira_no: idx + 1,
+      gorev_basligi: etkinGorevBasligi(r),
+      yapilacak_gorevler: r.yapilacak_gorevler,
+      bagli_oldugu_birim: r.bagli_oldugu_birim,
+      sorumluIsimler: isimleriGetir(r.personel_ids),
+      doldurulacak_dokuman_no: r.doldurulacak_dokuman_no,
+      egitim_tarihi: trTarih(r.egitim_tarihi),
     }));
   }
 
@@ -343,25 +379,26 @@ export default function GorevliListesi({
   }
 
   return (
-    <div className="max-w-5xl">
+    <div>
       <div className="flex items-center justify-between mb-3">
         <div>
           <h2 className="text-lg font-bold">📋 Görevli Listesi</h2>
           <p className="text-sm text-gray-500">
-            TMGDK-G1 — Tehlikeli madde iş ve işlemlerinde görevli personel listesi.
+            TMGDK-G1 — hücrelere doğrudan yazın; Görev Başlığı doldurulup satırdan
+            çıkıldığında otomatik kaydedilir.
           </p>
         </div>
         <div className="flex gap-2">
           <button
             onClick={excelIndir}
-            disabled={busy || kayitlar.length === 0}
+            disabled={busy || kayitliSatirlar.length === 0}
             className="px-3 py-1.5 rounded-lg text-sm border bg-white hover:bg-gray-50 disabled:opacity-50"
           >
             📊 Excel İndir
           </button>
           <button
             onClick={pdfIndir}
-            disabled={busy || kayitlar.length === 0}
+            disabled={busy || kayitliSatirlar.length === 0}
             className="px-3 py-1.5 rounded-lg text-sm border bg-white hover:bg-gray-50 disabled:opacity-50"
           >
             📄 PDF İndir
@@ -376,201 +413,166 @@ export default function GorevliListesi({
         <div className="mb-3 p-2 rounded-lg bg-green-50 text-green-700 text-sm">{mesaj}</div>
       )}
 
-      {/* Önizleme tablosu */}
-      <div className="overflow-x-auto border rounded-lg mb-4">
-        <table className="w-full text-sm">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="p-2 text-left w-10">#</th>
-              <th className="p-2 text-left">Görev Başlığı</th>
-              <th className="p-2 text-left">Yapılacak Görevler</th>
-              <th className="p-2 text-left">Bağlı Olduğu Birim</th>
-              <th className="p-2 text-left">Sorumlu Kişi/ler</th>
-              <th className="p-2 text-left">Döküman No</th>
-              <th className="p-2 text-left">Eğitim Tarihi</th>
-              <th className="p-2 w-20"></th>
+      <div className="overflow-x-auto border rounded-lg">
+        <table className="w-full text-xs border-collapse">
+          <thead>
+            <tr className="bg-blue-50">
+              <th className="p-2 border text-left w-10">Sıra No</th>
+              <th className="p-2 border text-left w-40">
+                Tehlikeli Madde
+                <br />
+                Görev Başlığı
+              </th>
+              <th className="p-2 border text-left w-56">Yapılacak Görevler</th>
+              <th className="p-2 border text-left w-36">Bağlı Olduğu Birim</th>
+              <th className="p-2 border text-left w-48">Sorumlu Kişi/ler</th>
+              <th className="p-2 border text-left w-40">Doldurulacak Döküman No</th>
+              <th className="p-2 border text-left w-32">Eğitim Tarihi</th>
+              <th className="p-2 border w-10"></th>
             </tr>
           </thead>
           <tbody>
-            {kayitlar.length === 0 && (
-              <tr>
-                <td colSpan={8} className="p-4 text-center text-gray-400">
-                  Henüz satır eklenmedi.
-                </td>
-              </tr>
-            )}
-            {kayitlar.map((k) => (
-              <tr key={k.id} className="border-t">
-                <td className="p-2">{k.sira_no}</td>
-                <td className="p-2">{k.gorev_basligi}</td>
-                <td className="p-2">{k.yapilacak_gorevler}</td>
-                <td className="p-2">{k.bagli_oldugu_birim}</td>
-                <td className="p-2">{isimleriGetir(k.sorumlu_personel_ids || [])}</td>
-                <td className="p-2">{k.doldurulacak_dokuman_no}</td>
-                <td className="p-2">{trTarih(k.egitim_tarihi)}</td>
-                <td className="p-2 text-right whitespace-nowrap">
-                  <button
-                    onClick={() => duzenlemeyeBasla(k)}
-                    className="text-blue-600 hover:underline text-xs mr-2"
-                  >
-                    Düzenle
-                  </button>
-                  <button
-                    onClick={() => sil(k.id)}
-                    className="text-red-600 hover:underline text-xs"
-                  >
-                    Sil
-                  </button>
-                </td>
-              </tr>
-            ))}
+            {rows.map((row, idx) => {
+              const yeniMi = row.id === null;
+              return (
+                <tr key={row.key} className={yeniMi ? "bg-gray-50/60" : "bg-white"}>
+                  <td className="p-1.5 border text-center align-top text-gray-500">
+                    {yeniMi ? "—" : idx + 1}
+                  </td>
+
+                  {/* Görev Başlığı: seçenek doğrudan hücrede, altında serbest metin */}
+                  <td className="p-1.5 border align-top">
+                    <select
+                      value={row.gorevSecim}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        updateRow(row.key, { gorevSecim: val });
+                        if (val !== DIGER) {
+                          kaydet({ ...row, gorevSecim: val }, idx + 1);
+                        }
+                      }}
+                      className={HUCRE_INPUT}
+                    >
+                      {GOREV_SECENEKLERI.map((g) => (
+                        <option key={g} value={g}>
+                          {g}
+                        </option>
+                      ))}
+                    </select>
+                    {row.gorevSecim === DIGER && (
+                      <input
+                        type="text"
+                        value={row.gorevSerbest}
+                        onChange={(e) => updateRow(row.key, { gorevSerbest: e.target.value })}
+                        onBlur={() => kaydet(row, idx + 1)}
+                        placeholder="Görev başlığı yazın"
+                        className={HUCRE_INPUT + " mt-1"}
+                      />
+                    )}
+                  </td>
+
+                  <td className="p-1.5 border align-top">
+                    <textarea
+                      value={row.yapilacak_gorevler}
+                      onChange={(e) =>
+                        updateRow(row.key, { yapilacak_gorevler: e.target.value })
+                      }
+                      onBlur={() => kaydet(row, idx + 1)}
+                      rows={2}
+                      className={HUCRE_INPUT}
+                    />
+                  </td>
+
+                  <td className="p-1.5 border align-top">
+                    <input
+                      type="text"
+                      value={row.bagli_oldugu_birim}
+                      onChange={(e) =>
+                        updateRow(row.key, { bagli_oldugu_birim: e.target.value })
+                      }
+                      onBlur={() => kaydet(row, idx + 1)}
+                      className={HUCRE_INPUT}
+                    />
+                  </td>
+
+                  {/* Sorumlu Kişi/ler: seçenekler doğrudan hücrenin altında görünür liste */}
+                  <td className="p-1.5 border align-top">
+                    <select
+                      multiple
+                      size={Math.min(4, Math.max(2, employees.length || 2))}
+                      value={row.personel_ids}
+                      onChange={(e) => {
+                        const secililer = Array.from(e.target.selectedOptions).map(
+                          (o) => o.value
+                        );
+                        updateRow(row.key, { personel_ids: secililer });
+                      }}
+                      onBlur={() => kaydet(row, idx + 1)}
+                      className={HUCRE_INPUT}
+                    >
+                      {employees.length === 0 && (
+                        <option disabled value="">
+                          Kayıtlı personel yok
+                        </option>
+                      )}
+                      {employees.map((e) => (
+                        <option key={e.id} value={e.id}>
+                          {e.first_name} {e.last_name}
+                          {e.status === "inactive" ? " (pasif)" : ""}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
+
+                  <td className="p-1.5 border align-top">
+                    <input
+                      type="text"
+                      value={row.doldurulacak_dokuman_no}
+                      onChange={(e) =>
+                        updateRow(row.key, { doldurulacak_dokuman_no: e.target.value })
+                      }
+                      onBlur={() => kaydet(row, idx + 1)}
+                      className={HUCRE_INPUT}
+                    />
+                  </td>
+
+                  <td className="p-1.5 border align-top">
+                    <input
+                      type="date"
+                      value={row.egitim_tarihi}
+                      onChange={(e) => updateRow(row.key, { egitim_tarihi: e.target.value })}
+                      onBlur={() => kaydet(row, idx + 1)}
+                      className={HUCRE_INPUT}
+                    />
+                  </td>
+
+                  <td className="p-1.5 border text-center align-top">
+                    {row.kaydediliyor && (
+                      <span className="text-gray-400" title="Kaydediliyor…">
+                        ⏳
+                      </span>
+                    )}
+                    {!row.kaydediliyor && row.id && (
+                      <button
+                        onClick={() => sil(row)}
+                        title="Satırı sil"
+                        className="text-red-600 hover:underline"
+                      >
+                        🗑
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
 
-      {!formAcik && (
-        <button
-          onClick={() => setFormAcik(true)}
-          className="px-3 py-1.5 rounded-lg text-sm border bg-blue-600 text-white hover:bg-blue-700"
-        >
-          + Yeni Satır Ekle
-        </button>
-      )}
-
-      {formAcik && (
-        <div className="border rounded-lg p-4 bg-gray-50 space-y-3">
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">
-                Tehlikeli Madde Görev Başlığı
-              </label>
-              <select
-                value={form.gorev_basligi}
-                onChange={(e) => setForm((f) => ({ ...f, gorev_basligi: e.target.value }))}
-                className="w-full border rounded-lg px-2 py-1.5 text-sm"
-              >
-                {GOREV_BASLIKLARI.map((g) => (
-                  <option key={g} value={g}>
-                    {g}
-                  </option>
-                ))}
-              </select>
-              {form.gorev_basligi === "Diğer (serbest metin)" && (
-                <input
-                  type="text"
-                  value={form.gorev_basligi_serbest}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, gorev_basligi_serbest: e.target.value }))
-                  }
-                  placeholder="Görev başlığını yazın"
-                  className="w-full border rounded-lg px-2 py-1.5 text-sm mt-2"
-                />
-              )}
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">
-                Bağlı Olduğu Birim
-              </label>
-              <input
-                type="text"
-                value={form.bagli_oldugu_birim}
-                onChange={(e) => setForm((f) => ({ ...f, bagli_oldugu_birim: e.target.value }))}
-                className="w-full border rounded-lg px-2 py-1.5 text-sm"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">
-              Yapılacak Görevler
-            </label>
-            <textarea
-              value={form.yapilacak_gorevler}
-              onChange={(e) => setForm((f) => ({ ...f, yapilacak_gorevler: e.target.value }))}
-              rows={3}
-              className="w-full border rounded-lg px-2 py-1.5 text-sm"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">
-              Sorumlu Kişi/ler ({employees.length} kayıtlı personel)
-            </label>
-            <div className="border rounded-lg p-2 max-h-48 overflow-y-auto bg-white">
-              {employees.length === 0 && (
-                <p className="text-xs text-gray-400">
-                  Bu firmada kayıtlı personel yok. Önce Personel Listesi&apos;nden ekleyin.
-                </p>
-              )}
-              {employees.map((e) => (
-                <label key={e.id} className="flex items-center gap-2 py-1 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={form.personel_ids.includes(e.id)}
-                    onChange={(ev) => {
-                      setForm((f) => ({
-                        ...f,
-                        personel_ids: ev.target.checked
-                          ? [...f.personel_ids, e.id]
-                          : f.personel_ids.filter((id) => id !== e.id),
-                      }));
-                    }}
-                  />
-                  {e.first_name} {e.last_name}
-                  {e.status === "inactive" && (
-                    <span className="text-xs text-gray-400">(pasif)</span>
-                  )}
-                </label>
-              ))}
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">
-                Doldurulacak Döküman No
-              </label>
-              <input
-                type="text"
-                value={form.doldurulacak_dokuman_no}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, doldurulacak_dokuman_no: e.target.value }))
-                }
-                className="w-full border rounded-lg px-2 py-1.5 text-sm"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">
-                Eğitim Tarihi
-              </label>
-              <input
-                type="date"
-                value={form.egitim_tarihi}
-                onChange={(e) => setForm((f) => ({ ...f, egitim_tarihi: e.target.value }))}
-                className="w-full border rounded-lg px-2 py-1.5 text-sm"
-              />
-            </div>
-          </div>
-
-          <div className="flex gap-2 pt-2">
-            <button
-              onClick={kaydet}
-              disabled={busy}
-              className="px-3 py-1.5 rounded-lg text-sm bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
-            >
-              {duzenlenenId ? "Güncelle" : "Ekle"}
-            </button>
-            <button
-              onClick={formuSifirla}
-              disabled={busy}
-              className="px-3 py-1.5 rounded-lg text-sm border bg-white hover:bg-gray-50"
-            >
-              Vazgeç
-            </button>
-          </div>
-        </div>
-      )}
+      <p className="text-xs text-gray-400 mt-2">
+        Yukarıda Belirtilen Formda kişi/kişiler değişmesi halinde en geç 7 gün içerisinde
+        yazılı olarak Tehlikeli Madde Güvenlik Danışmanına haber verilmesi gerekmektedir.
+      </p>
     </div>
   );
 }
