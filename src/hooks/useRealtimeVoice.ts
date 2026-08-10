@@ -87,9 +87,10 @@ export function useRealtimeVoice() {
     guncelle({ state: "connecting", error: undefined });
     try {
       const res = await authFetch("/api/assistant/realtime/session", { method: "POST" });
-      const sessionData = (await res.json()) as RealtimeSessionResponse & { error?: string };
+      const sessionData = (await res.json()) as RealtimeSessionResponse & { error?: string; details?: string };
       if (!res.ok || !sessionData.token) {
-        throw new Error(sessionData.error ?? "Oturum başlatılamadı.");
+        const mesaj = [sessionData.error, sessionData.details].filter(Boolean).join(" — ");
+        throw new Error(mesaj || "Oturum başlatılamadı.");
       }
 
       const provider = new GeminiLiveProvider();

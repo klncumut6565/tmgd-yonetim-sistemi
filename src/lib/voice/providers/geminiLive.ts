@@ -28,8 +28,6 @@ import { GEMINI_FUNCTION_DECLARATIONS, GEMINI_LIVE_SYSTEM_INSTRUCTION } from "..
 
 const GEMINI_LIVE_MODEL = "models/gemini-3.1-flash-live-preview";
 const WS_HOST = "generativelanguage.googleapis.com";
-const WS_PATH =
-  "/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent";
 
 type ToolCallHandler = (name: string, args: Record<string, unknown>) => Promise<unknown>;
 
@@ -50,7 +48,12 @@ export class GeminiLiveProvider implements RealtimeProvider {
   }
 
   async connect(session: RealtimeSessionResponse): Promise<void> {
-    const url = `wss://${WS_HOST}${WS_PATH}?key=${encodeURIComponent(session.token)}`;
+    // Token hangi API sürümüyle üretildiyse (bkz. /api/assistant/realtime/
+    // session — v1beta/v1alpha arasında otomatik seçim yapabiliyor) WebSocket
+    // yolu da AYNI sürümü kullanmalı, aksi halde token reddedilebilir.
+    const surum = session.apiVersion || "v1beta";
+    const wsPath = `/ws/google.ai.generativelanguage.${surum}.GenerativeService.BidiGenerateContent`;
+    const url = `wss://${WS_HOST}${wsPath}?key=${encodeURIComponent(session.token)}`;
 
     await new Promise<void>((resolve, reject) => {
       const ws = new WebSocket(url);

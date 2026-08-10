@@ -71,49 +71,73 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  const expireTime = new Date(Date.now() + TOKEN_GECERLILIK_DK * 60_000).toISOString()
+  // Google'ın dokümantasyonundaki örnek format "YYYY-MM-DDTHH:MM:SSZ"
+  // (milisaniyesiz) — Date.toISOString() milisaniyeli üretir
+  // ("...T12:34:56.789Z"), bazı katı RFC3339 doğrulayıcıları bunu
+  // reddedebiliyor. Milisaniye kısmını atıp örnek formatla birebir
+  // eşleştiriyoruz.
+  const expireTime = new Date(Date.now() + TOKEN_GECERLILIK_DK * 60_000)
+    .toISOString()
+    .replace(/\.\d{3}Z$/, 'Z')
+
+  const govde = JSON.stringify({
+    uses: 1,
+    expireTime,
+    liveConnectConstraints: {
+      model: GEMINI_LIVE_MODEL,
+      config: {
+        sessionResumption: {},
+        responseModalities: ['AUDIO'],
+      },
+    },
+  })
+
+  // API sürümü: resmi dokümantasyon v1beta gösteriyor, ancak bazı hesap/
+  // anahtar türlerinde ephemeral token üretimi yalnızca v1alpha ile
+  // çalışıyor (Google geliştirici forumunda tekrar eden rapor). multiEngine.ts
+  // ile AYNI felsefe: önce dokümante edilen sürümü dene, 400 ile başarısız
+  // olursa diğerine düş.
+  const denenecekSurumler = ['v1beta', 'v1alpha']
+  const hatalar: string[] = []
 
   try {
-    const res = await fetch('https://generativelanguage.googleapis.com/v1beta/auth_tokens', {
-      method: 'POST',
-      headers: {
-        'x-goog-api-key': apiKey,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        uses: 1,
-        expireTime,
-        liveConnectConstraints: {
-          model: GEMINI_LIVE_MODEL,
-          config: {
-            sessionResumption: {},
-            responseModalities: ['AUDIO'],
-          },
+    for (const surum of denenecekSurumler) {
+      const res = await fetch(`https://generativelanguage.googleapis.com/${surum}/auth_tokens`, {
+        method: 'POST',
+        headers: {
+          'x-goog-api-key': apiKey,
+          'Content-Type': 'application/json',
         },
-      }),
-    })
+        body: govde,
+      })
 
-    if (!res.ok) {
+      if (res.ok) {
+        const json = (await res.json()) as { name?: string; expireTime?: string }
+        if (!json.name) {
+          return NextResponse.json(
+            { error: 'Gemini Live oturum token\'ı alınamadı — beklenmeyen yanıt.' },
+            { status: 502 }
+          )
+        }
+        return NextResponse.json({
+          sessionId: crypto.randomUUID(),
+          token: json.name,
+          expiresAt: json.expireTime ?? expireTime,
+          apiVersion: surum,
+        })
+      }
+
       const body = await res.text().catch(() => '')
-      return NextResponse.json(
-        { error: `Gemini Live oturumu başlatılamadı (HTTP ${res.status}).`, details: body.slice(0, 300) },
-        { status: 502 }
-      )
+      hatalar.push(`${surum}: HTTP ${res.status} — ${body.slice(0, 300)}`)
     }
 
-    const json = (await res.json()) as { name?: string; expireTime?: string }
-    if (!json.name) {
-      return NextResponse.json(
-        { error: 'Gemini Live oturum token\'ı alınamadı — beklenmeyen yanıt.' },
-        { status: 502 }
-      )
-    }
-
-    return NextResponse.json({
-      sessionId: crypto.randomUUID(),
-      token: json.name,
-      expiresAt: json.expireTime ?? expireTime,
-    })
+    return NextResponse.json(
+      {
+        error: 'Gemini Live oturumu başlatılamadı (v1beta ve v1alpha ikisi de denendi).',
+        details: hatalar.join(' | '),
+      },
+      { status: 502 }
+    )
   } catch (e) {
     return NextResponse.json(
       { error: 'Gemini Live oturumu başlatılamadı.', details: e instanceof Error ? e.message : String(e) },

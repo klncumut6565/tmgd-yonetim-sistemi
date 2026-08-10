@@ -76,6 +76,11 @@ export interface RealtimeSessionResponse {
   token: string;
   /** ISO 8601 — token bu zamandan sonra geçersiz olur. */
   expiresAt: string;
+  /** Token'ın üretildiği API sürümü (örn. "v1beta" / "v1alpha") —
+   *  WebSocket bağlantısı MUTLAKA aynı sürümü kullanmalı, aksi halde
+   *  token geçersiz sayılabilir. Gemini Live'a özgüdür, diğer
+   *  sağlayıcılarda kullanılmayabilir. */
+  apiVersion?: string;
 }
 
 export interface RealtimeProvider {
