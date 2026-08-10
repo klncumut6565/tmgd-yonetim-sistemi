@@ -114,8 +114,9 @@ export const CATALOG: CatalogItem[] = [
   // ---------------- LİSTELER ----------------
   { code: "L1", name: "Tehlikeli Madde Envanter Listesi", category: "L", activities: [] },
   { code: "L2", name: "Araç / Taşımacı Listesi ve Taşıma Evrakı Kayıtları", category: "L", activities: ["gonderen", "tasimaci"] },
-  { code: "L3", name: "Ambalaj Bilgi Listesi (ADR Tablo A Değerlendirmesi)", category: "L", activities: ["tasimaci"] },
+  { code: "L3", name: "Sürücü Listesi (SRC5 Kayıtları)", category: "L", activities: ["tasimaci"] },
   { code: "L4", name: "Ekipman / Ambalaj Takip Listesi", category: "L", activities: ["paketleyen", "dolduran"] },
+  { code: "L5", name: "Ambalaj Bilgi Listesi (ADR Tablo A Değerlendirmesi)", category: "L", activities: ["paketleyen", "dolduran"] },
 
   // ---------------- SEFER / AKTARIM ----------------
   // SEFER / AKTARIM (SA) — PASİF.

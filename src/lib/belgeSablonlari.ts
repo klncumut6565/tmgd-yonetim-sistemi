@@ -4227,11 +4227,11 @@ export const BELGE_SABLONLARI: Record<string, BelgeSablonu> = {
     blocks: [
       { type: "table",
         headers: [
-          "Sıra No", "Ambalaj Kodu", "Hangi Tehlikeli Maddenin Konulduğu", "Ambalaj Türü",
-          "ADR Tablo A Bilgileri", "Sertifika Numarası", "Hacim (L)", "Sertifika Geçerliliği",
+          "Sıra No", "Adı Soyadı", "T.C. Kimlik No", "SRC5 Sertifikası (Var/Yok)",
+          "İşe Giriş Tarihi", "İşten Çıkış Tarihi", "Sertifika Geçerlilik Tarihi",
         ],
-        colWidths: [0.6, 1.1, 2.2, 1.3, 1.6, 1.4, 0.9, 1.4],
-        rows: Array.from({ length: 12 }, () => ["", "", "", "", "", "", "", ""]),
+        colWidths: [0.5, 1.8, 1.1, 1.3, 1.0, 1.0, 1.3],
+        rows: Array.from({ length: 12 }, () => ["", "", "", "", "", "", ""]),
       },
     ],
   },
@@ -4250,6 +4250,22 @@ export const BELGE_SABLONLARI: Record<string, BelgeSablonu> = {
         ],
         colWidths: [1.1, 1.5, 1.2, 1.3, 1.7, 1.7, 1.6, 1.8, 1.4, 0.7],
         rows: Array.from({ length: 11 }, () => ["", "", "", "", "", "", "", "", "", ""]),
+      },
+    ],
+  },
+
+  L5: {
+    docType: "LİSTE",
+    yatay: true,
+    yayinTarihi: "01.11.2025",
+    blocks: [
+      { type: "table",
+        headers: [
+          "Sıra No", "Ambalaj Kodu", "Hangi Tehlikeli Maddenin Konulduğu", "Ambalaj Türü",
+          "ADR Tablo A Bilgileri", "Sertifika Numarası", "Hacim (L)", "Sertifika Geçerliliği",
+        ],
+        colWidths: [0.6, 1.1, 2.2, 1.3, 1.6, 1.4, 0.9, 1.4],
+        rows: Array.from({ length: 12 }, () => ["", "", "", "", "", "", "", ""]),
       },
     ],
   },
