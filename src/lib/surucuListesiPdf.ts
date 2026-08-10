@@ -25,12 +25,22 @@ export type SurucuListesiPdfSatiri = {
 
 export type LogoData = { data: string; fmt: "PNG" | "JPEG"; enBoyOrani: number } | null;
 
+/** Bir sürücüye ait yüklenmiş SRC5 veya Ehliyet dosyasının, ana PDF'e ek
+ *  sayfa olarak eklenecek hazır (fetch edilmiş, gerekiyorsa PDF->görsel
+ *  çevrilmiş) hâli. */
+export type SurucuBelgeEki = {
+  adSoyad: string;
+  tur: "SRC5 Sertifikası" | "Ehliyet";
+  dataUrl: string; // JPEG/PNG dataURL
+};
+
 export type SurucuListesiPdfVerisi = {
   firmaAdi: string;
   hazirlayanAdi: string;
   bugun: string;
   satirlar: SurucuListesiPdfSatiri[];
   logo?: LogoData;
+  ekler?: SurucuBelgeEki[];
 };
 
 function fontuKaydet(doc: JsPDFType) {
@@ -50,6 +60,56 @@ function logoKutusuHesapla(enBoyOrani: number, kutuBoyut: number) {
     w = h * oran;
   }
   return { w, h };
+}
+
+/** Bir dataURL'in gerçek piksel en/boy oranını okur (tarayıcının Image
+ *  nesnesi üzerinden) — ek belge sayfasında görsel taşmadan (contain)
+ *  sığdırılabilsin diye. */
+function gorselEnBoyOraniOku(dataUrl: string): Promise<number> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () =>
+      resolve(img.naturalWidth && img.naturalHeight ? img.naturalWidth / img.naturalHeight : 1);
+    img.onerror = () => resolve(1);
+    img.src = dataUrl;
+  });
+}
+
+/** Bir sürücü belgesi ekini (SRC5/Ehliyet) ayrı bir sayfa olarak ekler.
+ *  Görsel, içerik kutusuna ORANI KORUNARAK ve TAŞMADAN (contain) sığdırılır
+ *  — bkz. belge posteri mekanizmasındaki AYNI dul/taşma düzeltmesi. */
+async function belgeEkiSayfasiEkle(doc: JsPDFType, ek: SurucuBelgeEki) {
+  doc.addPage();
+  fontuKaydet(doc);
+
+  doc.setFontSize(12);
+  doc.setFont(FONT, "bold");
+  doc.setTextColor(...RENK_VURGU);
+  doc.text(`EK — ${ek.adSoyad} — ${ek.tur}`, W / 2, 18, { align: "center" });
+  doc.setDrawColor(200, 200, 200);
+  doc.line(M, 22, W - M, 22);
+
+  const kutuUst = 28;
+  const kutuG = W - 2 * M;
+  const kutuY = H - kutuUst - 15;
+
+  const oran = await gorselEnBoyOraniOku(ek.dataUrl);
+  let cizimG = kutuG;
+  let cizimY = kutuG / oran;
+  if (cizimY > kutuY) {
+    cizimY = kutuY;
+    cizimG = kutuY * oran;
+  }
+  const x = M + (kutuG - cizimG) / 2;
+  const y = kutuUst + (kutuY - cizimY) / 2;
+  try {
+    doc.addImage(ek.dataUrl, "JPEG", x, y, cizimG, cizimY);
+  } catch {
+    doc.setFontSize(9);
+    doc.setFont(FONT, "normal");
+    doc.setTextColor(150, 0, 0);
+    doc.text("Belge görüntülenemedi.", W / 2, kutuUst + 10, { align: "center" });
+  }
 }
 
 function kapakSayfasiCiz(doc: JsPDFType, veri: SurucuListesiPdfVerisi) {
@@ -186,6 +246,11 @@ export async function surucuListesiPdfOlustur(veri: SurucuListesiPdfVerisi): Pro
   doc.text("Hazırlayan (TMGD):", M, imzaY);
   doc.setFont(FONT, "normal");
   doc.text(veri.hazirlayanAdi || "—", M + 38, imzaY);
+
+  // SRC5/Ehliyet ekleri — tabloya ait sayfalardan SONRA, sürücü sırasına göre.
+  for (const ek of veri.ekler ?? []) {
+    await belgeEkiSayfasiEkle(doc, ek);
+  }
 
   return doc.output("blob");
 }

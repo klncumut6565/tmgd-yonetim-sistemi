@@ -21,7 +21,8 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase/client";
 import { hataCevir } from "@/lib/hataCevir";
 import { surucuListesiExcelOlustur } from "@/lib/surucuListesiExcel";
-import { surucuListesiPdfOlustur, type LogoData } from "@/lib/surucuListesiPdf";
+import { surucuListesiPdfOlustur, type LogoData, type SurucuBelgeEki } from "@/lib/surucuListesiPdf";
+import { pdfIlkSayfayiGorselYap } from "@/lib/pdfSayfaGorseli";
 
 type SurucuKaydi = {
   id: string;
@@ -33,6 +34,10 @@ type SurucuKaydi = {
   ise_giris_tarihi: string | null;
   isten_cikis_tarihi: string | null;
   sertifika_gecerlilik_tarihi: string | null;
+  src5_dosya_yolu: string | null;
+  src5_dosya_adi: string | null;
+  ehliyet_dosya_yolu: string | null;
+  ehliyet_dosya_adi: string | null;
 };
 
 const SRC5_SECENEKLERI = ["Var", "Yok"];
@@ -46,6 +51,10 @@ type SatirState = {
   ise_giris_tarihi: string;
   isten_cikis_tarihi: string;
   sertifika_gecerlilik_tarihi: string;
+  src5_dosya_yolu: string | null;
+  src5_dosya_adi: string | null;
+  ehliyet_dosya_yolu: string | null;
+  ehliyet_dosya_adi: string | null;
   kaydediliyor: boolean;
 };
 
@@ -61,6 +70,10 @@ function bosSatir(): SatirState {
     ise_giris_tarihi: "",
     isten_cikis_tarihi: "",
     sertifika_gecerlilik_tarihi: "",
+    src5_dosya_yolu: null,
+    src5_dosya_adi: null,
+    ehliyet_dosya_yolu: null,
+    ehliyet_dosya_adi: null,
     kaydediliyor: false,
   };
 }
@@ -75,6 +88,10 @@ function kayittanSatir(k: SurucuKaydi): SatirState {
     ise_giris_tarihi: k.ise_giris_tarihi || "",
     isten_cikis_tarihi: k.isten_cikis_tarihi || "",
     sertifika_gecerlilik_tarihi: k.sertifika_gecerlilik_tarihi || "",
+    src5_dosya_yolu: k.src5_dosya_yolu || null,
+    src5_dosya_adi: k.src5_dosya_adi || null,
+    ehliyet_dosya_yolu: k.ehliyet_dosya_yolu || null,
+    ehliyet_dosya_adi: k.ehliyet_dosya_adi || null,
     kaydediliyor: false,
   };
 }
@@ -230,6 +247,85 @@ export default function SurucuListesi({
     }
   }
 
+  // --- SRC5 / Ehliyet dosya yükleme, görüntüleme, silme ---------------------
+  // "firm-files" bucket'ı — FirmScopedCrud'daki dosyaEki ile AYNI bucket,
+  // ayrı bir alt yol altında (firmId/firm_surucu_listesi/rowId/...).
+
+  const BELGE_ALANLARI = {
+    src5: { yol: "src5_dosya_yolu", ad: "src5_dosya_adi", etiket: "SRC5 Sertifikası" },
+    ehliyet: { yol: "ehliyet_dosya_yolu", ad: "ehliyet_dosya_adi", etiket: "Ehliyet" },
+  } as const;
+  type BelgeTuru = keyof typeof BELGE_ALANLARI;
+
+  async function belgeYukle(satir: SatirState, tur: BelgeTuru, file: File) {
+    if (!satir.id) {
+      setError("Dosya yüklemeden önce satırı kaydetmek için önce Adı Soyadı girin.");
+      return;
+    }
+    setRows((prev) => prev.map((r) => (r.key === satir.key ? { ...r, kaydediliyor: true } : r)));
+    setError("");
+    try {
+      const uzanti = file.name.includes(".") ? file.name.split(".").pop() : "";
+      const guvenliAd = `${tur}_${Date.now()}${uzanti ? "." + uzanti : ""}`;
+      const yol = `${firmId}/firm_surucu_listesi/${satir.id}/${guvenliAd}`;
+
+      const { error: upErr } = await supabase.storage
+        .from("firm-files")
+        .upload(yol, file, { upsert: false });
+      if (upErr) throw upErr;
+
+      const alan = BELGE_ALANLARI[tur];
+      const { error: dbErr } = await supabase
+        .from("firm_surucu_listesi")
+        .update({ [alan.yol]: yol, [alan.ad]: file.name })
+        .eq("id", satir.id);
+      if (dbErr) {
+        await supabase.storage.from("firm-files").remove([yol]);
+        throw dbErr;
+      }
+
+      setRows((prev) =>
+        prev.map((r) =>
+          r.key === satir.key
+            ? { ...r, [alan.yol]: yol, [alan.ad]: file.name, kaydediliyor: false }
+            : r
+        )
+      );
+      setMesaj(`✓ ${alan.etiket} yüklendi.`);
+    } catch (e) {
+      setError(hataCevir(e as { message?: string }));
+      setRows((prev) =>
+        prev.map((r) => (r.key === satir.key ? { ...r, kaydediliyor: false } : r))
+      );
+    }
+  }
+
+  async function belgeSil(satir: SatirState, tur: BelgeTuru) {
+    const alan = BELGE_ALANLARI[tur];
+    const yol = satir[alan.yol as "src5_dosya_yolu" | "ehliyet_dosya_yolu"];
+    if (!satir.id || !yol) return;
+    if (!confirm(`${alan.etiket} dosyasını silmek istediğinize emin misiniz?`)) return;
+    setError("");
+    try {
+      const { error: dbErr } = await supabase
+        .from("firm_surucu_listesi")
+        .update({ [alan.yol]: null, [alan.ad]: null })
+        .eq("id", satir.id);
+      if (dbErr) throw dbErr;
+      await supabase.storage.from("firm-files").remove([yol]);
+      setRows((prev) =>
+        prev.map((r) => (r.key === satir.key ? { ...r, [alan.yol]: null, [alan.ad]: null } : r))
+      );
+    } catch (e) {
+      setError(hataCevir(e as { message?: string }));
+    }
+  }
+
+  async function belgeGoruntule(yol: string) {
+    const { data } = await supabase.storage.from("firm-files").createSignedUrl(yol, 600);
+    if (data?.signedUrl) window.open(data.signedUrl, "_blank");
+  }
+
   async function logoDataUrl(): Promise<LogoData> {
     if (!logoUrl) return null;
     try {
@@ -302,17 +398,60 @@ export default function SurucuListesi({
     }
   }
 
+  /** Bir dosyayı (image veya PDF) fetch edip SurucuBelgeEki için hazır bir
+   *  JPEG dataURL'e çevirir. PDF ise ilk sayfası rastere edilir. */
+  async function belgeEkiHazirla(
+    yol: string,
+    adSoyad: string,
+    tur: SurucuBelgeEki["tur"]
+  ): Promise<SurucuBelgeEki | null> {
+    try {
+      const { data: signed } = await supabase.storage.from("firm-files").createSignedUrl(yol, 600);
+      if (!signed?.signedUrl) return null;
+      const res = await fetch(signed.signedUrl);
+      const blob = await res.blob();
+
+      let dataUrl: string;
+      if (blob.type === "application/pdf" || yol.toLowerCase().endsWith(".pdf")) {
+        dataUrl = await pdfIlkSayfayiGorselYap(await blob.arrayBuffer());
+      } else {
+        dataUrl = await new Promise<string>((resolve, reject) => {
+          const r = new FileReader();
+          r.onload = () => resolve(r.result as string);
+          r.onerror = reject;
+          r.readAsDataURL(blob);
+        });
+      }
+      return { adSoyad, tur, dataUrl };
+    } catch {
+      return null; // bir ek hazırlanamazsa PDF yine de eksiksiz üretilir
+    }
+  }
+
   async function pdfIndir() {
     setBusy(true);
     setError("");
     try {
       const logo = await logoDataUrl();
+
+      const ekIstekleri: Promise<SurucuBelgeEki | null>[] = [];
+      for (const r of kayitliSatirlar) {
+        if (r.src5_dosya_yolu) {
+          ekIstekleri.push(belgeEkiHazirla(r.src5_dosya_yolu, r.ad_soyad, "SRC5 Sertifikası"));
+        }
+        if (r.ehliyet_dosya_yolu) {
+          ekIstekleri.push(belgeEkiHazirla(r.ehliyet_dosya_yolu, r.ad_soyad, "Ehliyet"));
+        }
+      }
+      const ekler = (await Promise.all(ekIstekleri)).filter((e): e is SurucuBelgeEki => e !== null);
+
       const blob = await surucuListesiPdfOlustur({
         firmaAdi,
         hazirlayanAdi,
         bugun: bugununTarihi(),
         satirlar: satirlariHazirla(),
         logo,
+        ekler,
       });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -323,7 +462,11 @@ export default function SurucuListesi({
       a.click();
       a.remove();
       URL.revokeObjectURL(url);
-      setMesaj("✓ PDF indirildi.");
+      setMesaj(
+        ekler.length > 0
+          ? `✓ PDF indirildi (${ekler.length} belge eki dahil).`
+          : "✓ PDF indirildi."
+      );
     } catch (e) {
       setError(hataCevir(e as { message?: string }));
     } finally {
@@ -381,6 +524,8 @@ export default function SurucuListesi({
               <th className="p-2 border text-left w-32">İşe Giriş Tarihi</th>
               <th className="p-2 border text-left w-32">İşten Çıkış Tarihi</th>
               <th className="p-2 border text-left w-36">Sertifika Geçerlilik Tarihi</th>
+              <th className="p-2 border text-left w-32">SRC5 Belgesi</th>
+              <th className="p-2 border text-left w-32">Ehliyet</th>
               <th className="p-2 border w-10"></th>
             </tr>
           </thead>
@@ -466,6 +611,59 @@ export default function SurucuListesi({
                       className={HUCRE_INPUT}
                     />
                   </td>
+
+                  {/* SRC5 Belgesi ve Ehliyet: dosya yükleme/görüntüleme/silme.
+                      Satır henüz kaydedilmemişse (id yok) yükleme yapılamaz —
+                      önce Adı Soyadı girilip satırın kaydedilmesi gerekir. */}
+                  {(["src5", "ehliyet"] as const).map((tur) => {
+                    const yol = tur === "src5" ? row.src5_dosya_yolu : row.ehliyet_dosya_yolu;
+                    const ad = tur === "src5" ? row.src5_dosya_adi : row.ehliyet_dosya_adi;
+                    return (
+                      <td key={tur} className="p-1.5 border align-top">
+                        {yol ? (
+                          <div className="flex items-center gap-1 text-xs">
+                            <button
+                              type="button"
+                              onClick={() => belgeGoruntule(yol)}
+                              title={ad || "Belgeyi görüntüle"}
+                              className="text-blue-600 hover:underline truncate max-w-[80px]"
+                            >
+                              📎 {ad || "Belge"}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => belgeSil(row, tur)}
+                              title="Belgeyi kaldır"
+                              className="text-red-500 hover:text-red-700 shrink-0"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        ) : (
+                          <label
+                            className={
+                              "inline-flex items-center gap-1 text-xs cursor-pointer " +
+                              (row.id ? "text-blue-600 hover:underline" : "text-gray-300 cursor-not-allowed")
+                            }
+                            title={row.id ? "Dosya yükle" : "Önce Adı Soyadı girip satırı kaydedin"}
+                          >
+                            📎 Yükle
+                            <input
+                              type="file"
+                              accept="image/*,.pdf"
+                              className="hidden"
+                              disabled={!row.id}
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) belgeYukle(row, tur, file);
+                                e.target.value = "";
+                              }}
+                            />
+                          </label>
+                        )}
+                      </td>
+                    );
+                  })}
 
                   <td className="p-1.5 border text-center align-top">
                     {row.kaydediliyor && (
