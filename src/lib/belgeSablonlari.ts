@@ -1464,18 +1464,20 @@ export const BELGE_SABLONLARI: Record<string, BelgeSablonu> = {
   // ============================= L2 — ARAÇ / TAŞIMACI LİSTESİ VE TAŞIMA EVRAKI KAYITLARI =============================
   L2: {
     docType: "LİSTE",
+    yatay: true,
     yayinTarihi: "01.11.2025",
-    amac: "Bu liste, tehlikeli madde sevkiyatlarında kullanılan taşıma evrakı, işletme bilgileri, ADR/Taşıt uygunluk belgesi ve ambalaj sertifikası bilgilerinin firma bazında takip edilmesi amacıyla tutulur.",
     blocks: [
-      { type: "paragraph", text: "Aşağıdaki alanlar her sevkiyat için ayrı bir satırda kayıt altına alınır:" },
-      { type: "bullet", items: [
-        "Taşımacı İşletme Unvanı", "Vergi Numarası", "Araç Plakası", "Taşıma Türü",
-        "Tank/Ambalaj/Konteyner Sertifika Numarası", "Sertifika Numaraları Geçerlilik Tarihi",
-        "Yük Taşıma Birimi Muayene Tarihi", "Basınçlı Kap Mevcut ise Uygunluk Durumu",
-        "Basınçlı Kap Muayene Tarihi", "Taşıma Evrağı Numarası", "Muafiyet Kapsamında Taşıma mı?",
-        "SRC5 Belgeli Şoför", "Yük Miktarı (ton)", "Taşıma Tarihi",
-      ]},
-      { type: "paragraph", text: "Bu liste düzenli olarak güncellenir; her sevkiyat sonrası ilgili satır doldurularak kayıt altına alınır ve en az 5 yıl saklanır." },
+      { type: "table",
+        headers: [
+          "Sıra No", "Taşıma Tarihi", "Taşımacı İşletme Unvanı", "Araç Plakası", "Taşıma Türü",
+          "TMFB Geçerlilik Tarihi", "Tank/Ambalaj/Konteyner Sertifika Numarası",
+          "Sertifika Numaraları Geçerlilik Tarihi", "Yük Taşıma Birimi Muayene Tarihi",
+          "Taşıma Evrağı Numarası", "Muafiyet Kapsamında Taşıma mı?", "SRC5 Belgeli Şoför",
+          "Yük Miktarı (KG)", "Kontrol Formunu Dolduran Kişi",
+        ],
+        colWidths: [0.6, 1.1, 2.0, 1.1, 1.0, 1.2, 1.6, 1.4, 1.4, 1.2, 1.3, 1.0, 1.0, 1.6],
+        rows: Array.from({ length: 11 }, (_, i) => [String(i + 1), "", "", "", "", "", "", "", "", "", "", "", "", ""]),
+      },
     ],
   },
 
@@ -4122,48 +4124,51 @@ export const BELGE_SABLONLARI: Record<string, BelgeSablonu> = {
 
   L1: {
     docType: "LİSTE",
+    yatay: true,
     yayinTarihi: "01.11.2025",
-    amac: "Bu liste, işletmede bulunan/iştigal edilen tüm tehlikeli maddelerin ADR sınıf, UN numarası ve miktar bilgileriyle güncel şekilde envanterinin tutulmasını sağlar.",
-    kapsam: "İşletmenin faaliyet konusuna giren tüm tehlikeli maddeler için geçerlidir.",
     blocks: [
-      { type: "paragraph", text: "Envanterde her madde için aşağıdaki bilgiler tutulur:" },
-      { type: "bullet", items: [
-        "Madde Adı / Ticari Adı", "UN Numarası", "ADR Sınıfı", "Ambalaj Grubu (PG)",
-        "Yıllık Ortalama/Azami Miktar", "Depolama/Kullanım Yeri", "Güvenlik Bilgi Formu (SDS) Mevcudiyeti",
-        "Muafiyet Kapsamında Olup Olmadığı (ADR 1.1.3.6)",
-      ]},
-      { type: "paragraph", text: "Envanter, yeni madde eklendiğinde/çıkarıldığında güncellenir ve en az yılda bir kez TMGD tarafından gözden geçirilir." },
+      { type: "table",
+        headers: [
+          "No", "Kimyasal Adı", "H KODLARI", "Fonksiyonu", "Ambalaj/Tank/Dökme",
+          "MSDS/SDS TARİHİ", "UN NUMARASI", "SINIFI", "ADR_İŞARETİ", "Sorumlu Bölüm",
+        ],
+        colWidths: [0.5, 2.2, 1.2, 1.2, 1.4, 1.3, 1.1, 0.8, 1.1, 1.3],
+        rows: Array.from({ length: 12 }, () => ["", "", "", "", "", "", "", "", "", ""]),
+      },
     ],
   },
 
   L3: {
     docType: "LİSTE",
+    yatay: true,
     yayinTarihi: "01.11.2025",
-    amac: "Bu liste, işletme adına tehlikeli madde taşıyan sürücülerin bilgilerinin ve ADR/SRC5 eğitim durumlarının takip edilmesi amacıyla tutulur.",
-    kapsam: "Tehlikeli madde taşıma faaliyetinde görev alan tüm sürücüler için geçerlidir.",
     blocks: [
-      { type: "paragraph", text: "Listede her sürücü için aşağıdaki bilgiler tutulur:" },
-      { type: "bullet", items: [
-        "Ad Soyad", "T.C. Kimlik No", "Ehliyet Sınıfı ve Geçerlilik Tarihi",
-        "SRC5 Belge No ve Geçerlilik Tarihi", "Bağlı Olduğu Araç Plakası",
-        "Giriş/Çıkış (İşe Başlama/Ayrılış) Tarihi",
-      ]},
-      { type: "paragraph", text: "SRC5 veya ehliyet geçerlilik süresi dolan sürücüler, yenileme sağlanana kadar tehlikeli madde taşıma görevinde çalıştırılmaz. Liste düzenli olarak güncellenir." },
+      { type: "table",
+        headers: [
+          "Sıra No", "Ambalaj Kodu", "Hangi Tehlikeli Maddenin Konulduğu", "Ambalaj Türü",
+          "ADR Tablo A Bilgileri", "Sertifika Numarası", "Hacim (L)", "Sertifika Geçerliliği",
+        ],
+        colWidths: [0.6, 1.1, 2.2, 1.3, 1.6, 1.4, 0.9, 1.4],
+        rows: Array.from({ length: 12 }, () => ["", "", "", "", "", "", "", ""]),
+      },
     ],
   },
 
   L4: {
     docType: "LİSTE",
+    yatay: true,
     yayinTarihi: "01.11.2025",
-    amac: "Bu liste, paketleme ve dolum süreçlerinde kullanılan ambalaj/ekipman envanterinin ve muayene durumlarının takibi amacıyla tutulur.",
-    kapsam: "Paketleyen ve dolduran faaliyetlerinde kullanılan tüm ambalaj ve basınçlı ekipmanlar için geçerlidir.",
     blocks: [
-      { type: "paragraph", text: "Listede her ekipman/ambalaj türü için aşağıdaki bilgiler tutulur:" },
-      { type: "bullet", items: [
-        "Ekipman/Ambalaj Tanımlama No", "Türü (ambalaj / basınçlı kap / tank)", "UN Sertifika No (varsa)",
-        "Son Muayene/Test Tarihi", "Bir Sonraki Muayene Tarihi", "Durum (Kullanımda / Hizmet Dışı / Bertaraf Edildi)",
-      ]},
-      { type: "paragraph", text: "Muayene tarihi yaklaşan veya geçen ekipmanlar bu listeden takip edilerek T9/T10 talimatlarına göre işlem yapılır." },
+      { type: "table",
+        headers: [
+          "Kontrol Tarihi", "Ekipman/Madde Adı", "Seri/UN Numarası", "Periyodik Muayene Tarihi",
+          "Etiket ve İşaretleme Uygunluğu (Evet/Hayır)", "Paketleme Talimatına Uygunluk (Evet/Hayır)",
+          "Karışık Paketleme Kontrolü (Evet/Hayır)", "Uygunsuzluk Varsa Açıklama",
+          "Kontrol Eden Personelin Adı", "İmza",
+        ],
+        colWidths: [1.1, 1.5, 1.2, 1.3, 1.7, 1.7, 1.6, 1.8, 1.4, 0.7],
+        rows: Array.from({ length: 11 }, () => ["", "", "", "", "", "", "", "", "", ""]),
+      },
     ],
   },
 
