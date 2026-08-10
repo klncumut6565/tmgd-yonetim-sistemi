@@ -25,6 +25,7 @@ import FirmScopedCrud from "@/components/FirmScopedCrud";
 import KimyasalEnvanter from "@/components/KimyasalEnvanter";
 import TasimaEvraki from "@/components/TasimaEvraki";
 import GorevliListesi from "@/components/GorevliListesi";
+import SurucuListesi from "@/components/SurucuListesi";
 import BelgeOlusturForm from "@/components/BelgeOlusturForm";
 import FirmAuditTab from "@/components/audit/FirmAuditTab";
 import FirmNotesTab from "@/components/notes/FirmNotesTab";
@@ -183,6 +184,7 @@ function FirmDetailInner({
   const [tab, setTab] = useState<TabKey>("belge_takip");
   const [adrAltSekme, setAdrAltSekme] = useState<"evrak" | "envanter">("evrak");
   const [personelAltSekme, setPersonelAltSekme] = useState<"liste" | "gorevli">("liste");
+  const [surucuAltSekme, setSurucuAltSekme] = useState<"liste" | "surucu_listesi">("liste");
   const [evrakPrefillUns, setEvrakPrefillUns] = useState<string[]>([]);
   const [evrakPrefillMiktar, setEvrakPrefillMiktar] = useState<number | undefined>(undefined);
 
@@ -1605,15 +1607,38 @@ function FirmDetailInner({
       )}
 
       {tab === "drivers" && (
-        <FirmScopedCrud
-          table="drivers"
-          title="Sürücüler"
-          fields={DRIVER_FIELDS}
-          searchKeys={["first_name", "last_name", "phone", "national_id"]}
-          dosyaEki
-          fixedFirmId={id}
-          compact
-        />
+        <div>
+          <div className="flex gap-2 mb-4">
+            {(["liste", "surucu_listesi"] as const).map((alt) => (
+              <button
+                key={alt}
+                onClick={() => setSurucuAltSekme(alt)}
+                className={
+                  "px-3 py-1.5 rounded-lg text-sm border " +
+                  (surucuAltSekme === alt
+                    ? "bg-blue-600 text-white border-blue-600"
+                    : "bg-white hover:bg-gray-50")
+                }
+              >
+                {alt === "liste" ? "🚗 Sürücü Kayıtları" : "🚚 Sürücü Listesi"}
+              </button>
+            ))}
+          </div>
+          {surucuAltSekme === "liste" && (
+            <FirmScopedCrud
+              table="drivers"
+              title="Sürücüler"
+              fields={DRIVER_FIELDS}
+              searchKeys={["first_name", "last_name", "phone", "national_id"]}
+              dosyaEki
+              fixedFirmId={id}
+              compact
+            />
+          )}
+          {surucuAltSekme === "surucu_listesi" && firm && (
+            <SurucuListesi firmId={id} firmaAdi={firm.name} />
+          )}
+        </div>
       )}
 
       {tab === "employees" && (
