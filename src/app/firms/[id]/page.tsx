@@ -26,6 +26,7 @@ import KimyasalEnvanter from "@/components/KimyasalEnvanter";
 import TasimaEvraki from "@/components/TasimaEvraki";
 import GorevliListesi from "@/components/GorevliListesi";
 import SurucuListesi from "@/components/SurucuListesi";
+import AracEvraklari from "@/components/AracEvraklari";
 import BelgeOlusturForm from "@/components/BelgeOlusturForm";
 import FirmAuditTab from "@/components/audit/FirmAuditTab";
 import FirmNotesTab from "@/components/notes/FirmNotesTab";
@@ -185,6 +186,7 @@ function FirmDetailInner({
   const [adrAltSekme, setAdrAltSekme] = useState<"evrak" | "envanter">("evrak");
   const [personelAltSekme, setPersonelAltSekme] = useState<"liste" | "gorevli">("liste");
   const [surucuAltSekme, setSurucuAltSekme] = useState<"liste" | "surucu_listesi">("liste");
+  const [aracAltSekme, setAracAltSekme] = useState<"liste" | "arac_evraki">("liste");
   const [evrakPrefillUns, setEvrakPrefillUns] = useState<string[]>([]);
   const [evrakPrefillMiktar, setEvrakPrefillMiktar] = useState<number | undefined>(undefined);
 
@@ -1595,15 +1597,38 @@ function FirmDetailInner({
       {/* ARAÇLAR / SÜRÜCÜLER / PERSONELLER / ZİYARETLER — bu firmaya sabitlenmiş,
           tam CRUD (ekle/düzenle/sil) destekli gömülü bileşenler. */}
       {tab === "vehicles" && (
-        <FirmScopedCrud
-          table="vehicles"
-          title="Araçlar"
-          fields={VEHICLE_FIELDS}
-          searchKeys={["plate_number", "brand", "model", "vehicle_type"]}
-          dosyaEki
-          fixedFirmId={id}
-          compact
-        />
+        <div>
+          <div className="flex gap-2 mb-4">
+            {(["liste", "arac_evraki"] as const).map((alt) => (
+              <button
+                key={alt}
+                onClick={() => setAracAltSekme(alt)}
+                className={
+                  "px-3 py-1.5 rounded-lg text-sm border " +
+                  (aracAltSekme === alt
+                    ? "bg-blue-600 text-white border-blue-600"
+                    : "bg-white hover:bg-gray-50")
+                }
+              >
+                {alt === "liste" ? "🚚 Araçlar" : "📁 Araç Evrakı Oluştur"}
+              </button>
+            ))}
+          </div>
+          {aracAltSekme === "liste" && (
+            <FirmScopedCrud
+              table="vehicles"
+              title="Araçlar"
+              fields={VEHICLE_FIELDS}
+              searchKeys={["plate_number", "brand", "model", "vehicle_type"]}
+              dosyaEki
+              fixedFirmId={id}
+              compact
+            />
+          )}
+          {aracAltSekme === "arac_evraki" && firm && (
+            <AracEvraklari firmId={id} firmaAdi={firm.name} />
+          )}
+        </div>
       )}
 
       {tab === "drivers" && (
