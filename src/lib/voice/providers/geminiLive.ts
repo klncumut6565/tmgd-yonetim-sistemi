@@ -1,0 +1,240 @@
+"use client";
+
+// src/lib/voice/providers/geminiLive.ts
+//
+// RealtimeProvider arayüzünün (bkz. src/lib/voice/types.ts) Gemini Live
+// API uygulaması. Ham WebSocket protokolünü konuşur — SDK kullanmıyoruz
+// (bundle boyutu ve kontrol için), Google'ın resmi WebSocket rehberindeki
+// mesaj formatına birebir uyar:
+//   https://ai.google.dev/gemini-api/docs/live-api/get-started-websocket
+//
+// SES FORMATI (Google'ın sabit gereksinimi, değiştirilemez):
+//   Giriş (mikrofon) : ham 16-bit PCM, 16kHz, mono, little-endian
+//   Çıkış (TTS)       : ham 16-bit PCM, 24kHz, mono
+//
+// ÖNEMLİ NOT — CANLI TEST GEREKİYOR: Aşağıdaki mesaj şemaları Google'ın
+// güncel (2026) resmi dokümantasyonundan alınmıştır, ancak WebSocket
+// URL'sindeki API versiyonu (v1beta) ve `serverContent.interrupted`
+// alanının tam davranışı gerçek bir bağlantıyla doğrulanmalıdır — bu
+// dosya bir tarayıcıda gerçek mikrofon/ses testi olmadan bu ortamda
+// çalıştırılamadı.
+
+import type {
+  RealtimeProvider,
+  RealtimeSessionResponse,
+  TranscriptEvent,
+} from "../types";
+import { GEMINI_FUNCTION_DECLARATIONS, GEMINI_LIVE_SYSTEM_INSTRUCTION } from "../geminiTools";
+
+const GEMINI_LIVE_MODEL = "models/gemini-3.1-flash-live-preview";
+const WS_HOST = "generativelanguage.googleapis.com";
+const WS_PATH =
+  "/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent";
+
+type ToolCallHandler = (name: string, args: Record<string, unknown>) => Promise<unknown>;
+
+export class GeminiLiveProvider implements RealtimeProvider {
+  private ws: WebSocket | null = null;
+  private transcriptHandler: ((e: TranscriptEvent) => void) | null = null;
+  private audioHandler: ((chunk: ArrayBuffer) => void) | null = null;
+  private errorHandler: ((message: string) => void) | null = null;
+  private interruptedHandler: (() => void) | null = null;
+  private toolCallHandler: ToolCallHandler | null = null;
+  private setupDone = false;
+  private setupResolve: (() => void) | null = null;
+
+  /** Gerçek araç çalıştırma mantığını dışarıdan (hook'tan) alır — bu sınıf
+   *  yalnızca protokolü konuşur, veri erişimine karışmaz. */
+  onToolCall(handler: ToolCallHandler) {
+    this.toolCallHandler = handler;
+  }
+
+  async connect(session: RealtimeSessionResponse): Promise<void> {
+    const url = `wss://${WS_HOST}${WS_PATH}?key=${encodeURIComponent(session.token)}`;
+
+    await new Promise<void>((resolve, reject) => {
+      const ws = new WebSocket(url);
+      ws.binaryType = "arraybuffer";
+      this.ws = ws;
+      this.setupResolve = resolve;
+
+      ws.onopen = () => {
+        // İlk mesaj her zaman "setup" olmalı — sunucu setupComplete
+        // dönene kadar başka mesaj gönderilmez.
+        ws.send(
+          JSON.stringify({
+            setup: {
+              model: GEMINI_LIVE_MODEL,
+              responseModalities: ["AUDIO"],
+              systemInstruction: { parts: [{ text: GEMINI_LIVE_SYSTEM_INSTRUCTION }] },
+              generationConfig: {
+                // Kullanıcıya hem sesli hem yazılı transcript gösterebilmek için.
+                inputAudioTranscription: {},
+                outputAudioTranscription: {},
+              },
+              tools: [{ functionDeclarations: GEMINI_FUNCTION_DECLARATIONS }],
+            },
+          })
+        );
+      };
+
+      ws.onerror = () => {
+        reject(new Error("Gemini Live bağlantı hatası."));
+      };
+
+      ws.onclose = (ev) => {
+        if (!this.setupDone) reject(new Error(`Bağlantı kapandı (${ev.code}).`));
+        this.errorHandler?.(`Bağlantı kapandı${ev.reason ? `: ${ev.reason}` : "."}`);
+      };
+
+      ws.onmessage = (ev) => this.handleMessage(ev);
+    });
+  }
+
+  private async handleMessage(ev: MessageEvent) {
+    // Metin (JSON) veya Blob (ses) gelebilir — resmi rehberdeki desen.
+    let payload: string;
+    if (ev.data instanceof Blob) {
+      payload = await ev.data.text();
+    } else if (ev.data instanceof ArrayBuffer) {
+      payload = new TextDecoder().decode(ev.data);
+    } else {
+      payload = ev.data as string;
+    }
+
+    let msg: Record<string, unknown>;
+    try {
+      msg = JSON.parse(payload);
+    } catch {
+      return; // ayrıştırılamayan mesajı sessizce atla
+    }
+
+    if (msg.setupComplete) {
+      this.setupDone = true;
+      this.setupResolve?.();
+      return;
+    }
+
+    if (msg.toolCall) {
+      await this.handleToolCall(msg.toolCall as { functionCalls?: { id: string; name: string; args?: Record<string, unknown> }[] });
+      return;
+    }
+
+    if (msg.serverContent) {
+      this.handleServerContent(
+        msg.serverContent as {
+          modelTurn?: { parts?: { inlineData?: { data: string; mimeType: string } }[] };
+          interrupted?: boolean;
+          turnComplete?: boolean;
+        }
+      );
+    }
+
+    if (msg.inputTranscription) {
+      const t = (msg.inputTranscription as { text?: string }).text ?? "";
+      if (t) this.transcriptHandler?.({ type: "partial", text: t });
+    }
+
+    if (msg.outputTranscription) {
+      const t = (msg.outputTranscription as { text?: string }).text ?? "";
+      if (t) this.transcriptHandler?.({ type: "final", text: t });
+    }
+
+    if (msg.goAway) {
+      this.errorHandler?.("Oturum süresi doluyor, yeniden bağlanılması gerekecek.");
+    }
+  }
+
+  private handleServerContent(content: {
+    modelTurn?: { parts?: { inlineData?: { data: string; mimeType: string } }[] };
+    interrupted?: boolean;
+    turnComplete?: boolean;
+  }) {
+    // Kullanıcı araya girdiğinde (barge-in) sunucu bunu bildirir — kuyruktaki
+    // sesin ANINDA durdurulması hook tarafında yapılmalı (bkz. interrupt()).
+    if (content.interrupted) {
+      this.interruptedHandler?.();
+      return;
+    }
+
+    const parts = content.modelTurn?.parts ?? [];
+    for (const part of parts) {
+      if (part.inlineData?.data) {
+        const bytes = Uint8Array.from(atob(part.inlineData.data), (c) => c.charCodeAt(0));
+        this.audioHandler?.(bytes.buffer);
+      }
+    }
+  }
+
+  private async handleToolCall(toolCall: {
+    functionCalls?: { id: string; name: string; args?: Record<string, unknown> }[];
+  }) {
+    const calls = toolCall.functionCalls ?? [];
+    if (calls.length === 0) return;
+
+    // Not: gemini-3.1-flash-live-preview için function calling SENKRON —
+    // model, tool cevabı gelene kadar konuşmaya devam etmez. Bu yüzden
+    // tüm çağrılar burada beklenip TEK seferde toolResponse ile dönülür.
+    const responses = await Promise.all(
+      calls.map(async (call) => {
+        try {
+          const result = this.toolCallHandler
+            ? await this.toolCallHandler(call.name, call.args ?? {})
+            : { error: "Araç çalıştırıcı tanımlı değil." };
+          return { id: call.id, name: call.name, response: result as Record<string, unknown> };
+        } catch (e) {
+          return {
+            id: call.id,
+            name: call.name,
+            response: { error: e instanceof Error ? e.message : String(e) },
+          };
+        }
+      })
+    );
+
+    this.ws?.send(JSON.stringify({ toolResponse: { functionResponses: responses } }));
+  }
+
+  sendAudio(chunk: ArrayBuffer): void {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
+    const base64 = btoa(String.fromCharCode(...new Uint8Array(chunk)));
+    this.ws.send(
+      JSON.stringify({
+        realtimeInput: { audio: { data: base64, mimeType: "audio/pcm;rate=16000" } },
+      })
+    );
+  }
+
+  interrupt(): void {
+    // Gemini Live'ın kendi VAD'ı mikrofon sesini algılayıp modeli otomatik
+    // keser (bkz. handleServerContent -> interruptedHandler). Client
+    // tarafında yapılması gereken tek şey ses göndermeye devam etmek —
+    // protokolde ayrıca bir "dur" mesajı YOK. Buradaki çağrı, hook'un
+    // yerel ses kuyruğunu (henüz çalınmamış parçaları) proaktif olarak
+    // hemen temizlemesi için de aynı sinyali tetikler (kullanıcı deneyimi
+    // olarak sunucu onayını beklemeden anında sessizliğe geçilsin diye).
+    this.interruptedHandler?.();
+  }
+
+  onTranscript(handler: (event: TranscriptEvent) => void): void {
+    this.transcriptHandler = handler;
+  }
+
+  onAudio(handler: (chunk: ArrayBuffer) => void): void {
+    this.audioHandler = handler;
+  }
+
+  onError(handler: (message: string) => void): void {
+    this.errorHandler = handler;
+  }
+
+  onInterrupted(handler: () => void): void {
+    this.interruptedHandler = handler;
+  }
+
+  async disconnect(): Promise<void> {
+    this.ws?.close();
+    this.ws = null;
+    this.setupDone = false;
+  }
+}

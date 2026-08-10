@@ -16,6 +16,7 @@ import { getSuperAdminFromRequest } from '@/lib/supabase/verifySuperAdmin'
 import { callWithFallback, type ProviderConfig, type ChatMessage } from '@/lib/ai/multiEngine'
 import { extractAction } from '@/lib/ai/actions'
 import { checkPair, type UnRow, type CheckResult } from '@/lib/adrMix'
+import { searchFirm, getFirmTaskSummary, getFirmMissingDocuments } from '@/lib/ai/dataTools'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 30
@@ -169,7 +170,22 @@ Belirli bir sekme de isteniyorsa "tab" ekle, UN numarası da varsa "un_numbers" 
 \`\`\`
 "title" alanına kullanıcının tarif ettiği görevi KISA ve NET bir başlık olarak yaz (baştaki "şu görevi ekle" gibi komut kelimelerini çıkar). Görev OTOMATİK OLARAK KAYDEDİLMEZ — sistem Görevler sayfasını açıp başlığı forma doldurur, kullanıcı firmayı seçip "Ekle" butonuna basmalıdır. Bunu kullanıcıya kısaca belirt.
 
-Bu beş durumun DIŞINDA hiçbir eylem bloğu üretme — sadece soruları normal şekilde cevapla. Eylem bloğunu ürettiğinde bile önce kısa bir Türkçe cümleyle ne yaptığını açıkla.
+6) Kullanıcı bir firmanın GÖREV SAYISINI/DURUMUNU soruyorsa (örn. "ABC'nin kaç gecikmiş görevi var", "bugün hangi görevlerim var", "XYZ'nin yaklaşan görevleri neler"):
+\`\`\`eylem
+{"type":"get_task_summary","firm_name":"ABC","scope":"overdue"}
+\`\`\`
+"scope" değerleri: "overdue" (gecikmiş), "today" (bugün), "upcoming" (yaklaşan/gelecek), "all" (tümü — tamamlanmış/iptal hariç). Bu eylemi ürettiğinde SAYIYI VEYA GÖREV İSİMLERİNİ SEN YAZMA (tahmin etme) — sistem bu eylemi gördüğünde gerçek veritabanı sorgusunu otomatik çalıştırıp sonucu cevabına ekleyecek. Sen sadece "Kontrol ediyorum..." gibi kısa bir cümle yaz.
+
+7) Kullanıcı bir firmanın EKSİK/TAMAMLANMAMIŞ BELGELERİNİ soruyorsa (örn. "ABC'nin eksik belgeleri neler", "XYZ'de hangi belgeler tamamlanmadı"):
+\`\`\`eylem
+{"type":"get_missing_documents","firm_name":"ABC"}
+\`\`\`
+Aynı şekilde: liste veya sayıyı SEN UYDURMA, sistem gerçek sorguyu çalıştırıp ekleyecek.
+
+Bu yedi durumun DIŞINDA hiçbir eylem bloğu üretme — sadece soruları normal şekilde cevapla. Eylem bloğunu ürettiğinde bile önce kısa bir Türkçe cümleyle ne yaptığını açıkla.
+
+### HALÜSİNASYON YASAĞI — OPERASYONEL VERİLER (KRİTİK) ###
+Firma görev sayısı, belge durumu, tarih, denetim sonucu gibi operasyonel TMGD verilerini SEN ASLA TAHMİN ETMEZSİN. Bu tür bir soru geldiğinde YUKARIDAKİ (6) veya (7) eylemini üretmeden kesinlikle sayı/isim/tarih söyleme. Sana bu bilgi az önce "GERÇEK SİSTEM SONUCU" olarak verilmemişse ve ilgili eylemi de üretmiyorsan, "Bu bilgiyi kontrol etmem gerekiyor" de.
 
 ${firmContext}
 
@@ -223,13 +239,9 @@ Eylem bloğu yazıyorsan MUTLAKA üç ters tırnakla KAPAT — kapatmazsan blok 
   //   1 eşleşme  -> firm_id doldurulur, navigasyon güvenle yapılabilir
   //   2+ eşleşme -> belirsiz, kullanıcıya seçenekler listelenir, navigasyon yapılmaz
   if (action?.type === 'open_firm' && !action.firm_id) {
-    const { data: matches } = await supabase
-      .from('firms')
-      .select('id, name')
-      .ilike('name', `%${action.firm_name}%`)
-      .limit(6)
+    const { matches } = await searchFirm(supabase, action.firm_name)
 
-    if (!matches || matches.length === 0) {
+    if (matches.length === 0) {
       finalAnswer += `\n\n⚠️ "${action.firm_name}" isminde bir firma bulunamadı.`
       action = null
     } else if (matches.length === 1) {
@@ -289,6 +301,58 @@ Eylem bloğu yazıyorsan MUTLAKA üç ters tırnakla KAPAT — kapatmazsan blok 
     } else {
       finalAnswer +=
         '\n\n⚠️ Karışık yükleme hesaplaması yapılamadı — belirtilen UN numaralarından yeterlisi Tablo A\'da bulunamadı.'
+    }
+  }
+
+  // get_task_summary / get_missing_documents eylemleri: LLM'in tahminine
+  // GÜVENME — önce firma adını gerçek firm_id'ye çöz (aynı open_firm
+  // mantığı), sonra dataTools.ts'teki gerçek Supabase sorgusunu çalıştırıp
+  // YAPISAL sonucu cevaba EKLE. Bu, Halüsinasyon Önleme Mimarisi'nin temel
+  // ilkesi: "TOOL RESULT > MODEL MEMORY" — sayı/görev/belge asla modelin
+  // kendi ürettiği metinden gelmez.
+  if (action?.type === 'get_task_summary' || action?.type === 'get_missing_documents') {
+    const firmMatch = await searchFirm(supabase, action.firm_name)
+
+    if (firmMatch.matches.length === 0) {
+      finalAnswer += `\n\n⚠️ "${action.firm_name}" isminde bir firma bulunamadı.`
+      action = null
+    } else if (firmMatch.matches.length > 1) {
+      finalAnswer +=
+        '\n\nBirden fazla eşleşme buldum, hangisini kastettiğini belirtir misin?\n' +
+        firmMatch.matches.map((m) => `• ${m.name}`).join('\n')
+      action = null
+    } else {
+      const firmId = firmMatch.matches[0].id
+      const firmAdi = firmMatch.matches[0].name
+
+      if (action.type === 'get_task_summary') {
+        const sonuc = await getFirmTaskSummary(supabase, firmId, action.scope)
+        const SCOPE_TR: Record<typeof action.scope, string> = {
+          overdue: 'gecikmiş görev',
+          today: 'bugüne ait görev',
+          upcoming: 'yaklaşan görev',
+          all: 'açık görev',
+        }
+        if (sonuc.count === 0) {
+          finalAnswer += `\n\n📊 GERÇEK SİSTEM SONUCU: ${firmAdi} için ${SCOPE_TR[action.scope]} bulunmuyor.`
+        } else {
+          const satirlar = sonuc.tasks
+            .map((t) => `• ${t.title}${t.due_date ? ` — ${t.due_date}` : ''} (${t.status})`)
+            .join('\n')
+          finalAnswer += `\n\n📊 GERÇEK SİSTEM SONUCU: ${firmAdi} — ${sonuc.count} ${SCOPE_TR[action.scope]}:\n${satirlar}`
+        }
+      } else {
+        const sonuc = await getFirmMissingDocuments(supabase, firmId)
+        if (sonuc.count === 0) {
+          finalAnswer += `\n\n📊 GERÇEK SİSTEM SONUCU: ${firmAdi} için eksik/tamamlanmamış belge bulunmuyor.`
+        } else {
+          const satirlar = sonuc.documents.map((d) => `• ${d.code}${d.period ? ` (${d.period})` : ''}`).join('\n')
+          finalAnswer += `\n\n📊 GERÇEK SİSTEM SONUCU: ${firmAdi} — ${sonuc.count} eksik belge:\n${satirlar}`
+        }
+      }
+      // Bunlar navigasyon eylemi değil, veri sorgusu — widget'ın
+      // actionToUrl() ile bir sayfaya gitmeye çalışmaması için temizlenir.
+      action = null
     }
   }
 

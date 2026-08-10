@@ -28,7 +28,15 @@ export type AssistantAction =
   | { type: "open_karisik_yukleme"; un_numbers: string[] }
   | { type: "open_firm_tab"; tab: FirmTabKey; un_numbers?: string[]; quantity?: number }
   | { type: "open_firm"; firm_id?: string; firm_name: string; tab?: FirmTabKey; un_numbers?: string[]; quantity?: number }
-  | { type: "prefill_task"; title: string };
+  | { type: "prefill_task"; title: string }
+  // --- Salt-okunur VERİ eylemleri (Halüsinasyon Önleme Mimarisi) ---
+  // Bunlar navigasyon YAPMAZ; sunucu tarafında (route.ts) gerçek Supabase
+  // sorgusuyla hesaplanıp sonucu cevaba EKLENEN, sonra action=null'a
+  // çevrilen "gruplandırılmış veri" istekleridir — tıpkı open_karisik_
+  // yukleme'nin checkPair() ile çalışma şekli gibi (bkz. Bölüm 5
+  // "Tool-First Architecture", Bölüm 11 "TOOL RESULT > MODEL MEMORY").
+  | { type: "get_task_summary"; firm_name: string; scope: "overdue" | "today" | "upcoming" | "all" }
+  | { type: "get_missing_documents"; firm_name: string };
 
 // Kapanışlı blok: ```eylem {...} ```
 const ACTION_BLOCK_RE = /```eylem\s*([\s\S]*?)```/i;
@@ -116,6 +124,35 @@ export function extractAction(text: string): { cleanText: string; action: Assist
         action: { type: "open_firm", firm_name: parsed.firm_name.trim(), tab, un_numbers: unNumbers },
       };
     }
+
+    const GECERLI_SCOPE = ["overdue", "today", "upcoming", "all"] as const;
+    if (
+      parsed?.type === "get_task_summary" &&
+      typeof parsed.firm_name === "string" &&
+      parsed.firm_name.trim() &&
+      typeof parsed.scope === "string" &&
+      (GECERLI_SCOPE as readonly string[]).includes(parsed.scope)
+    ) {
+      return {
+        cleanText,
+        action: {
+          type: "get_task_summary",
+          firm_name: parsed.firm_name.trim(),
+          scope: parsed.scope as "overdue" | "today" | "upcoming" | "all",
+        },
+      };
+    }
+
+    if (
+      parsed?.type === "get_missing_documents" &&
+      typeof parsed.firm_name === "string" &&
+      parsed.firm_name.trim()
+    ) {
+      return {
+        cleanText,
+        action: { type: "get_missing_documents", firm_name: parsed.firm_name.trim() },
+      };
+    }
   } catch {
     // Geçersiz JSON — eylem yok say, sadece metni temizle
   }
@@ -171,6 +208,12 @@ export function actionToUrl(action: AssistantAction, firmId: string | null): str
       const qs = params.toString();
       return `/firms/${action.firm_id}${qs ? `?${qs}` : ""}`;
     }
+    case "get_task_summary":
+    case "get_missing_documents":
+      // Bunlar navigasyon eylemi DEĞİL, salt-okunur veri sorgusu — route.ts
+      // bunları işleyip cevaba ekledikten sonra action'ı null'a çevirir.
+      // Widget buraya asla bu tiplerle gelmemeli; savunma amaçlı null.
+      return null;
     default:
       return "/dashboard";
   }

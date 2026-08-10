@@ -86,6 +86,14 @@ export interface RealtimeProvider {
   onTranscript(handler: (event: TranscriptEvent) => void): void;
   onAudio(handler: (chunk: ArrayBuffer) => void): void;
   onError(handler: (message: string) => void): void;
+  /** Sunucu, kullanıcının konuşarak modeli kestiğini (barge-in) bildirdiğinde
+   *  tetiklenir. Hook bu sinyali alınca çalma kuyruğundaki henüz seslendirilmemiş
+   *  ses parçalarını ANINDA temizlemelidir. */
+  onInterrupted(handler: () => void): void;
+  /** Sağlayıcı bir tool/fonksiyon çağırmak istediğinde tetiklenir. Handler
+   *  gerçek veriyi getirip Promise ile döner; sağlayıcı sonucu uygun
+   *  protokol mesajıyla sağlayıcıya geri iletir. */
+  onToolCall(handler: (name: string, args: Record<string, unknown>) => Promise<unknown>): void;
 }
 
 // ---------------------------------------------------------------------------
