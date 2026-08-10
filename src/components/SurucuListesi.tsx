@@ -532,10 +532,30 @@ export default function SurucuListesi({
           <tbody>
             {rows.map((row, idx) => {
               const yeniMi = row.id === null;
+              // Durum rengi: kayıtlı bir satırda İşten Çıkış Tarihi doluysa
+              // işten ayrılmış (kırmızı), boşsa hâlâ aktif çalışıyor (yeşil).
+              // Henüz kaydedilmemiş (boş) satırlar nötr gri kalır.
+              const istenCikmisMi = !yeniMi && !!row.isten_cikis_tarihi;
+              const satirRengi = yeniMi
+                ? "bg-gray-50/60"
+                : istenCikmisMi
+                  ? "bg-red-50"
+                  : "bg-green-50";
               return (
-                <tr key={row.key} className={yeniMi ? "bg-gray-50/60" : "bg-white"}>
+                <tr key={row.key} className={satirRengi}>
                   <td className="p-1.5 border text-center align-top text-gray-500">
-                    {yeniMi ? "—" : idx + 1}
+                    <span className="inline-flex items-center gap-1.5">
+                      {!yeniMi && (
+                        <span
+                          className={
+                            "w-2 h-2 rounded-full inline-block shrink-0 " +
+                            (istenCikmisMi ? "bg-red-500" : "bg-green-500")
+                          }
+                          title={istenCikmisMi ? "İşten çıkmış" : "Aktif çalışıyor"}
+                        />
+                      )}
+                      {yeniMi ? "—" : idx + 1}
+                    </span>
                   </td>
 
                   <td className="p-1.5 border align-top">
