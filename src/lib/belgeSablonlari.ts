@@ -4081,6 +4081,88 @@ export const BELGE_SABLONLARI: Record<string, BelgeSablonu> = {
     ],
   },
 
+  T21: {
+    docType: "TALİMAT",
+    posterYolu: "/belge-posterleri/T21.jpg",
+    yayinTarihi: "01.11.2025",
+    amac: "Bu talimatın amacı; işletme adına veya işletme bünyesinde gerçekleştirilen tehlikeli madde taşımalarının, T.C. Ulaştırma ve Altyapı Bakanlığının U-ETDS (Ulaştırma Elektronik Takip ve Denetim Sistemi) e-Devlet hizmeti üzerinden doğru, eksiksiz ve zamanında bildirilmesini sağlamak; sürücü ve sevkiyat sorumlularının U-ETDS Yük Taşıma Kaydı Bildirimi sürecini adım adım ve hatasız şekilde tamamlamasını güvence altına almaktır. Tehlikeli madde taşımalarında bildirimlerin doğru, eksiksiz ve zamanında yapılması yasal bir yükümlülüktür; hatalı veya eksik bildirim idari para cezasına ve taşımanın durdurulmasına sebep olabilir.",
+    kapsam: "Bu talimat; işletme adına veya işletme bünyesinde tehlikeli madde taşıyan tüm araç sürücülerini, sevkiyat/lojistik sorumlularını ve U-ETDS sistemine yük bildirimi yapan tüm personeli kapsar. Talimat; sefer kaydı oluşturma, sefere tehlikeli madde yükü ekleme, alıcı bilgilerinin girilmesi, yük bilgilerinin (UN numarası, paketleme grubu, sınıflandırma kodu, muafiyet türü dâhil) doğru girilmesi, çoklu yük girişi, önizleme/kontrol ve kayıt, kayıt sonrası işlemler (rapor alma, düzeltme, iptal) süreçlerinin tamamını içerir.",
+    tanimlar: [
+      { terim: "U-ETDS", tanim: "Ulaştırma Elektronik Takip ve Denetim Sistemi — T.C. Ulaştırma ve Altyapı Bakanlığının karayolu taşımacılığı faaliyetlerinin elektronik ortamda bildirilmesini ve izlenmesini sağlayan e-Devlet hizmeti." },
+      { terim: "Sefer Kaydı", tanim: "Bir taşıma faaliyetine ait araç, sürücü ve zaman bilgilerini içeren; yük bildirimlerinin bağlı olduğu üst kayıt." },
+      { terim: "Muafiyet Türü", tanim: "Taşınan yükün ADR'de tanımlanan bir muafiyet (örn. sınırlı miktar - LQ, istisnai miktar - EQ, 1.1.3.6 puanlama) kapsamında olup olmadığını belirten U-ETDS alanı." },
+      { terim: "UN Numarası", tanim: "Birleşmiş Milletler tarafından tehlikeli maddelere verilen dört haneli tanımlama numarası." },
+      { terim: "Paketleme Grubu", tanim: "Maddenin taşıdığı tehlike derecesine göre I (yüksek), II (orta) veya III (düşük) olarak sınıflandırılmasıdır." },
+      { terim: "Sınıflandırma Kodu", tanim: "ADR'de maddenin tehlike sınıfı içindeki alt kategorisini gösteren kod." },
+      { terim: "Muhtelif Alıcılar", tanim: "Sefer başladığında alıcı firmanın henüz belli olmadığı veya araç yola çıktıktan sonra netleşeceği durumlarda kullanılan U-ETDS bildirim seçeneği." },
+    ],
+    blocks: [
+      { type: "subheading", text: "4. Sefer Kaydı Oluşturma (Ön Koşul)" },
+      { type: "paragraph", text: "Yük bildirimi yapılmadan önce mutlaka bir sefer kaydı oluşturulmalıdır. Sefer kaydı için aşağıdaki bilgiler girilir:" },
+      { type: "bullet", items: [
+        "1. (ve varsa 2.) Plaka Numarası",
+        "1. (ve varsa 2.) Şoför T.C. Kimlik Numarası",
+        "Sefer Başlangıç tarih ve saati",
+        "Sefer Bitiş (Tahmini) tarih ve saati",
+      ]},
+
+      { type: "subheading", text: "5. Sefere Yük Ekle — 1. Sayfa" },
+      { type: "bullet", items: [
+        "Taşıma Türü olarak \"Tehlikeli Madde\" seçilir.",
+        "Yükün Yükleme/Boşaltma yeri (ülke, il/ilçe) ve tarih-saat bilgileri girilir.",
+      ]},
+
+      { type: "subheading", text: "6. Alıcı Bilgileri" },
+      { type: "bullet", items: [
+        "Alıcı firma biliniyorsa: Vergi Kimlik Numarası ve Unvan girilir.",
+        "Alıcı firma henüz belli değilse veya araç yola çıktıktan sonra netleşecekse: \"Alıcılar sonradan belirlenecek (Muhtelif alıcılar)\" kutucuğu işaretlenir. Bu durumda vergi numarası ve unvan alanları otomatik olarak gizlenir; geçici bilgiyle yapılan bildirim daha sonra güncellenmelidir.",
+      ]},
+
+      { type: "subheading", text: "7. Yük Bilgileri Girişi" },
+      { type: "numbered", items: [
+        "Tehlikeli Madde Taşıma Şekli listeden seçilir (örn. Dökme, Paket vb.).",
+        "Muafiyet Türü seçilir — yük bir muafiyet kapsamında taşınıyorsa uygun tür, taşınmıyorsa \"Muafiyet Yok\" seçilir.",
+        "UN Numarası girilip \"UN No Bilgileri Getir\" butonuna tıklanır.",
+        "Açılan listeden Paketleme Grubu ve Sınıflandırma Koduna göre doğru satır işaretlenir.",
+        "Yükün Miktarı girilir (virgülden sonra en fazla 3 basamak, toplamda en fazla 10 karakter olacak şekilde).",
+        "\"Ekle\" butonuna tıklanarak yük, Yük Listesine eklenir.",
+      ]},
+
+      { type: "subheading", text: "8. Çoklu Yük Girişi (Aynı Gönderici → Aynı Alıcı)" },
+      { type: "paragraph", text: "Aynı araçla, aynı göndericiden aynı alıcıya birden fazla farklı tehlikeli madde taşınıyorsa, her yük için 7. bölümdeki adımlar tekrarlanarak Yük Listesine eklenir. Tüm yükler listeye eklendikten sonra \"Devam Et\" butonuyla Önizleme sayfasına geçilir." },
+
+      { type: "subheading", text: "9. Önizleme ve Kayıt" },
+      { type: "bullet", items: [
+        "Yükleme/Boşaltma Bilgilerini Güncelle → yükleme-boşaltma verilerinde hata varsa düzeltilir.",
+        "Yük Bilgilerini Güncelle → gönderici/alıcı bilgisi veya yük listesi değiştirilir.",
+        "Kaydet → tüm bilgiler U-ETDS sistemine kaydedilir.",
+      ]},
+
+      { type: "subheading", text: "10. Kayıt Sonrası İşlemler" },
+      { type: "bullet", items: [
+        "Sefer Raporu İndir ile bildirim çıktısı alınabilir.",
+        "Yük Detayı ekranından ilgili yükün tüm bilgileri (isim, miktar, taşıma şekli, muafiyet türü, UN No, paketleme grubu, sınıflandırma kodu) görüntülenebilir.",
+        "Hatalı girilen bir yük veya sefer kaydı, ilgili detay ekranındaki İptal Formu üzerinden iptal türü seçilip onay kutusu işaretlenerek iptal edilebilir.",
+      ]},
+
+      { type: "subheading", text: "11. Dikkat Edilecek Hususlar ve Önemli Hatırlatmalar" },
+      { type: "bullet", items: [
+        "UN numarası, paketleme grubu ve sınıflandırma kodu birbiriyle uyumlu olmalıdır.",
+        "Yanlış bilgi girişi idari para cezasına ve taşımanın durdurulmasına sebep olabilir.",
+        "Tehlikeli madde taşımasında tüm bilgiler eksiksiz girilmeden bildirim tamamlanamaz.",
+        "Gerçekleşmeyen veya gerçeğe aykırı bildirim yapılmamalıdır.",
+        "Sefer başlangıç zamanı, aracın hareket edeceği ilk zaman bilgisi esas alınarak girilmelidir.",
+        "Tehlikeli madde taşımasında mevzuata uygun hareket edilmesi hem sizin hem de çevrenizin güvenliği içindir.",
+      ]},
+
+      { type: "subheading", text: "12. İletişim" },
+      { type: "bullet", items: [
+        "Teknik sorunlar için: uetds@uab.gov.tr",
+        "İdari sorular için: uetds.uab.gov.tr portalındaki iletişim bilgileri ve UHDGM bünyesindeki U-ETDS birimine ulaşılabilir.",
+      ]},
+    ],
+  },
+
   K8: {
     docType: "KONTROL FORMU",
     yayinTarihi: "01.11.2025",

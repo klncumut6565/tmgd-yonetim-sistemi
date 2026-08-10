@@ -2,7 +2,7 @@
 // BELGE KATALOĞU — merkezî yapılandırma
 // =====================================================================
 // Kaynak: "Genelge Kapsamında İstenenler" çalışma dosyası.
-// Kod şeması: P1–P8 (Prosedür), T1–T20 (Talimat), K1–K9 (Kontrol Formu),
+// Kod şeması: P1–P8 (Prosedür), T1–T21 (Talimat), K1–K9 (Kontrol Formu),
 //             L1–L4 (Liste), SA1–SA3 (Sefer/Aktarım).
 //
 // ✏️ Belge adlarını / faaliyet eşlemelerini değiştirmek için sadece
@@ -98,6 +98,7 @@ export const CATALOG: CatalogItem[] = [
   { code: "T18", name: "Taşıt Etiket / Levha / Plaka ve Sızıntı-Hasar Kontrol Talimatı", category: "T", activities: ["tasimaci"] },
   { code: "T19", name: "Taşıtta Teçhizat Bulundurma Talimatı (ADR 8.1.4 / 8.1.5)", category: "T", activities: ["tasimaci"] },
   { code: "T20", name: "Karışık Yükleme · İhlal Durumu · Boş YTB Taşıma Evrakı Talimatı", category: "T", activities: ["tasimaci"] },
+  { code: "T21", name: "Tehlikeli Madde Taşıması Bildirim Talimatı (U-ETDS)", category: "T", activities: ["tasimaci"] },
 
   // ---------------- KONTROL FORMLARI ----------------
   { code: "K1", name: "Teslim Alınan Konteyner Kontrol Formu (Alıcı)", category: "K", activities: ["alici"] },
