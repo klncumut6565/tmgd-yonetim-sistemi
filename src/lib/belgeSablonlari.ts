@@ -1580,7 +1580,6 @@ export const BELGE_SABLONLARI: Record<string, BelgeSablonu> = {
   T6: {
     docType: "TALİMAT",
     posterYolu: "/belge-posterleri/T6.jpg",
-    yatay: true, // 5.2.1'deki 18 sütunlu resmi ADR 7.5.2.2 ayırım tablosu dikey sayfaya sığmaz
     yayinTarihi: "01.11.2025",
     amac: "Bu talimat; işletme bünyesinde elleçlenen ve taşınan tehlikeli maddelerin Karayolu ile Tehlikeli Madde Taşımacılığı Hakkında Avrupa Anlaşması (ADR) ve ilgili ulusal mevzuata (Tehlikeli Maddelerin Karayoluyla Taşınması Hakkında Yönetmelik) uygun şekilde yüklenmesini; karışık yükleme yasaklarına ve ayırım kurallarına uyulmasını; konteyner ve araçların doğru şekilde işaretlenmesini; hasarlı veya sızdırma riski taşıyan ambalajların güvenli biçimde yönetilmesini ve ADR Bölüm 7.5'te tanımlanan yükleme, boşaltma ve elleçleme emniyet kurallarının eksiksiz uygulanmasını sağlamaktır. Talimatın nihai hedefi; insan sağlığını, çevreyi ve işletme varlıklarını tehlikeli madde kaynaklı kaza, sızıntı, yangın, patlama veya kirlenme risklerine karşı korumak ve yasal uyumluluğu sürekli kılmaktır.",
     kapsam: "Bu talimat aşağıdaki faaliyetleri kapsar: tehlikeli maddelerin araç, konteyner veya taşıma birimine yüklenmesi, elleçlenmesi ve karışık yüklenmesi; konteyner, araç ve ambalajlar üzerindeki tehlike işaretleri, plakalar (turuncu plaka), etiketler ve levhaların kontrolü; hasarlı, deforme olmuş veya sızdırma riski taşıyan ambalajların tespiti, izolasyonu ve bertaraf/onarım süreçleri; ADR Bölüm 7.5'te belirtilen yükleme, istifleme, sabitleme ve elleçleme emniyet kuralları; yükleme öncesi, sırası ve sonrasında yapılacak kontrol, kayıt ve denetim faaliyetleri. Bu talimat; depo, antrepo, dolum-boşaltım tesisleri, liman/terminal sahaları ve araç yükleme rampalarında görev yapan tüm personel, taşeron firma çalışanları ve sürücüler için bağlayıcıdır.",
@@ -3943,7 +3942,6 @@ export const BELGE_SABLONLARI: Record<string, BelgeSablonu> = {
   T20: {
     docType: "TALİMAT",
     posterYolu: "/belge-posterleri/T20.jpg",
-    yatay: true, // 19 sütunlu resmi ADR 7.5.2.2 ayırım matrisi dikey sayfaya sığmaz
     yayinTarihi: "01.11.2025",
     amac: "Bu talimatın amacı; tehlikeli madde taşımacılığında yükleme ve karışık yükleme sınırlamalarına (ADR Bölüm 7.5) uyulmasını, taşıma sırasında tespit edilen mevzuata aykırılık/güvenlik ihlallerinde (ADR Bölüm 1.8.5 ve 8.3) izlenecek adımları ve boş/temizlenmemiş yük taşıma birimlerinin (YTB) sevkiyatında düzenlenmesi gereken taşıma evrakı asgari içeriğini (ADR Bölüm 5.4.1.1.6) tanımlamaktır. Talimat, Tehlikeli Maddelerin Karayoluyla Taşınması Hakkında Yönetmelik ve ilgili ADR (Tehlikeli Malların Karayolu ile Uluslararası Taşımacılığına İlişkin Avrupa Anlaşması) hükümleri esas alınarak hazırlanmıştır.",
     kapsam: "Bu talimat; şirket bünyesinde veya şirket adına tehlikeli madde taşıyan tüm karayolu araçlarını, bu araçlarda görev yapan sürücü, yükleyici, dolduran, boşaltan ve taşımacı personelini; ambalajlı, dökme, tank/tanker ve konteyner taşımalarını; ayrıca boş/temizlenmemiş yük taşıma birimi (YTB) sevkiyatlarını kapsar.",
