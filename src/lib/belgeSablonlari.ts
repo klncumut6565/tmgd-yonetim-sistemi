@@ -491,7 +491,7 @@ export const BELGE_SABLONLARI: Record<string, BelgeSablonu> = {
         "Bu talimatın uygulanması için gerekli kaynakları (personel, ekipman, eğitim) temin eder.",
         "Talimatın periyodik olarak gözden geçirilmesini sağlar.",
       ]},
-      { type: "subheading", text: "4.2 ADR Güvenlik Danışmanı (ADRSDE)" },
+      { type: "subheading", text: "4.2 Tehlikeli Madde Güvenlik Danışmanı (ADRSDE)" },
       { type: "bullet", items: [
         "Talimatın mevzuata uygunluğunu denetler ve günceller.",
         "Yıllık faaliyet raporunu hazırlar, olay/kaza incelemelerine katılır.",
@@ -631,7 +631,7 @@ export const BELGE_SABLONLARI: Record<string, BelgeSablonu> = {
         "Tüm durumlarda iş yeri hekimi/sağlık birimi ve gerekiyorsa 112 Acil Servis aranır.",
       ]},
       { type: "subheading", text: "8.4 Bildirim Zinciri" },
-      { type: "paragraph", text: "Bir olay meydana geldiğinde bildirim sırası şu şekilde işletilir: Boşaltma Personeli → Boşaltma Sorumlusu / Vardiya Amiri → Tesis Müdürü / İSG Sorumlusu → ADR Güvenlik Danışmanı → (gerekiyorsa) İtfaiye / Çevre ve Şehircilik İl Müdürlüğü / İlgili resmi kurumlar." },
+      { type: "paragraph", text: "Bir olay meydana geldiğinde bildirim sırası şu şekilde işletilir: Boşaltma Personeli → Boşaltma Sorumlusu / Vardiya Amiri → Tesis Müdürü / İSG Sorumlusu → Tehlikeli Madde Güvenlik Danışmanı → (gerekiyorsa) İtfaiye / Çevre ve Şehircilik İl Müdürlüğü / İlgili resmi kurumlar." },
 
       { type: "subheading", text: "9. Çevre Koruma ve Atık Yönetimi" },
       { type: "numbered", items: [
@@ -679,11 +679,11 @@ export const BELGE_SABLONLARI: Record<string, BelgeSablonu> = {
           ["İtfaiye", "110"],
           ["Acil Sağlık (112)", "112"],
           ["Tesis Güvenlik / Vardiya Amiri", "____________"],
-          ["ADR Güvenlik Danışmanı", "____________"],
+          ["Tehlikeli Madde Güvenlik Danışmanı", "____________"],
           ["Çevre Sorumlusu", "____________"],
           ["Ulusal Zehir Danışma Merkezi (UZEM)", "114"],
         ]},
-      { type: "paragraph", text: "Bu talimat, ilgili mevzuatta veya tesis koşullarında meydana gelecek değişikliklere göre ADR Güvenlik Danışmanı tarafından gözden geçirilir ve gerektiğinde revize edilir." },
+      { type: "paragraph", text: "Bu talimat, ilgili mevzuatta veya tesis koşullarında meydana gelecek değişikliklere göre Tehlikeli Madde Güvenlik Danışmanı tarafından gözden geçirilir ve gerektiğinde revize edilir." },
     ],
   },
 
@@ -991,7 +991,7 @@ export const BELGE_SABLONLARI: Record<string, BelgeSablonu> = {
     posterYolu: "/belge-posterleri/T4.jpg",
     yayinTarihi: "01.11.2025",
     amac: "Bu talimatın amacı; tehlikeli maddelerin karayolu, demiryolu, denizyolu veya havayolu ile taşınması sırasında; ambalaj, tank, taşıt veya konteynerde boşaltma öncesinde ve boşaltma işlemi sırasında meydana gelebilecek her türlü fiziksel tahribatın, deformasyonun, sızıntının veya hasarın sistematik biçimde tespit edilmesini; tespit edilen olumsuz durumlarda alınacak acil önlemleri, bildirim yükümlülüklerini ve düzeltici faaliyetleri tanımlamaktır. Talimatın nihai hedefi; taşıma zincirinin her aşamasında güvenli, çevreye ve insan sağlığına zarar vermeyen bir boşaltma süreci sağlamak; olası kaza, yangın, patlama, sızıntı, çevre kirliliği ve iş kazası risklerini en aza indirmek; ADR/RID/IMDG/IATA mevzuatı ile ulusal mevzuata (Tehlikeli Maddelerin Karayoluyla Taşınması Hakkında Yönetmelik) uyumu sağlamaktır.",
-    kapsam: "Bu talimat; ambalajlı yükler, dökme (bulk) yükler ve tank (sarnıç) yükleri de dâhil olmak üzere, tehlikeli madde sınıfına bakılmaksızın (patlayıcılar, gazlar, yanıcı sıvılar, yanıcı katılar, oksitleyici maddeler, zehirli ve bulaşıcı maddeler, radyoaktif maddeler, aşındırıcı maddeler ve diğer tehlikeli maddeler) tüm taşıma operasyonlarını kapsar. Talimat; yükleme noktasından boşaltma noktasına kadar geçen süreçte görev alan sürücüleri, dolum/boşaltım operatörlerini, depo ve terminal personelini, güvenlik danışmanlarını (SRC5/ADR Güvenlik Danışmanı), İSG sorumlularını ve yetkili kişileri bağlar. Kapsam dışı bırakılan hususlar: yükleme öncesi araç/tank uygunluk muayeneleri (ayrı bir talimatla yönetilir) ve boşaltma sonrası temizlik/dekontaminasyon prosedürünün detayları (ilgili talimata referans verilir).",
+    kapsam: "Bu talimat; ambalajlı yükler, dökme (bulk) yükler ve tank (sarnıç) yükleri de dâhil olmak üzere, tehlikeli madde sınıfına bakılmaksızın (patlayıcılar, gazlar, yanıcı sıvılar, yanıcı katılar, oksitleyici maddeler, zehirli ve bulaşıcı maddeler, radyoaktif maddeler, aşındırıcı maddeler ve diğer tehlikeli maddeler) tüm taşıma operasyonlarını kapsar. Talimat; yükleme noktasından boşaltma noktasına kadar geçen süreçte görev alan sürücüleri, dolum/boşaltım operatörlerini, depo ve terminal personelini, güvenlik danışmanlarını (SRC5/Tehlikeli Madde Güvenlik Danışmanı), İSG sorumlularını ve yetkili kişileri bağlar. Kapsam dışı bırakılan hususlar: yükleme öncesi araç/tank uygunluk muayeneleri (ayrı bir talimatla yönetilir) ve boşaltma sonrası temizlik/dekontaminasyon prosedürünün detayları (ilgili talimata referans verilir).",
     tanimlar: [
       { terim: "ADR", tanim: "Tehlikeli Malların Karayolu ile Uluslararası Taşımacılığına İlişkin Avrupa Anlaşması." },
       { terim: "Tahribat / Hasar", tanim: "Ambalaj, tank, taşıt veya konteynerin bütünlüğünü, sızdırmazlığını veya taşıma güvenliğini tehlikeye atan her türlü fiziksel bozulma." },
@@ -1120,7 +1120,7 @@ export const BELGE_SABLONLARI: Record<string, BelgeSablonu> = {
         rows: [
           ["1", "Saha Amiri / Vardiya Sorumlusu", "Tespit eden personel", "Anında"],
           ["2", "İSG Sorumlusu", "Saha Amiri", "15 dakika içinde"],
-          ["3", "ADR Güvenlik Danışmanı", "İSG Sorumlusu", "30 dakika içinde"],
+          ["3", "Tehlikeli Madde Güvenlik Danışmanı", "İSG Sorumlusu", "30 dakika içinde"],
           ["4", "İtfaiye / Acil Durum Ekipleri (gerekiyorsa)", "Saha Amiri", "Anında"],
           ["5", "Yetkili Mercii / Çevre Birimi (mevzuat gereği)", "Güvenlik Danışmanı", "Mevzuata göre"],
           ["6", "Müşteri / Gönderici / Alıcı", "Operasyon Sorumlusu", "2 saat içinde"],
@@ -1137,7 +1137,7 @@ export const BELGE_SABLONLARI: Record<string, BelgeSablonu> = {
       { type: "subheading", text: "11. Eğitim ve Yetkinlik" },
       { type: "bullet", items: [
         "Bu talimat kapsamında görev alan tüm personel (sürücüler dâhil), işe başlamadan önce ve yılda en az bir kez tazeleme eğitimi olmak üzere, tehlikeli madde taşımacılığı, tahribat/hasar tespiti ve acil durum müdahalesi konularında eğitim alır.",
-        "Eğitimler, ADR Güvenlik Danışmanı veya yetkilendirilmiş eğitmenler tarafından verilir ve katılım kayıtları saklanır.",
+        "Eğitimler, Tehlikeli Madde Güvenlik Danışmanı veya yetkilendirilmiş eğitmenler tarafından verilir ve katılım kayıtları saklanır.",
         "Yeni tip ambalaj, tank veya taşıma ekipmanı devreye alındığında, ilgili personele ek eğitim verilir.",
       ]},
 
@@ -1191,7 +1191,7 @@ export const BELGE_SABLONLARI: Record<string, BelgeSablonu> = {
       { terim: "LQ / EQ", tanim: "Sınırlı Miktar / İstisnai Miktar taşıma muafiyetleri." },
       { terim: "Taşıt Uygunluk Belgesi", tanim: "Taşıtın ADR gereklerine uygunluğunu gösteren yetkili kuruluş belgesi." },
       { terim: "Periyodik Muayene", tanim: "Basınçlı kapların yasal aralıklarla yapılan test ve kontrolü." },
-      { terim: "DGSA/ADR Sorumlusu", tanim: "Tehlikeli Madde Güvenlik Danışmanı." },
+      { terim: "TMGD (Tehlikeli Madde Güvenlik Danışmanı)", tanim: "Tehlikeli Madde Güvenlik Danışmanı." },
     ],
     blocks: [
       { type: "subheading", text: "4. İlgili Doküman ve Mevzuat" },
@@ -1209,7 +1209,7 @@ export const BELGE_SABLONLARI: Record<string, BelgeSablonu> = {
         headers: ["Görev / Rol", "Sorumluluk"],
         colWidths: [1.6, 3.4],
         rows: [
-          ["ADR Sorumlusu (DGSA)", "Mevzuata uygunluğun izlenmesi, iç denetimlerin planlanması, eğitim ihtiyaçlarının belirlenmesi, yıllık rapor hazırlanması"],
+          ["TMGD (Tehlikeli Madde Güvenlik Danışmanı)", "Mevzuata uygunluğun izlenmesi, iç denetimlerin planlanması, eğitim ihtiyaçlarının belirlenmesi, yıllık rapor hazırlanması"],
           ["Lojistik/Sevkiyat Sorumlusu", "Sevkiyat planlaması, araç ve ambalaj kontrollerinin organize edilmesi, belgelerin eksiksiz hazırlanması"],
           ["Depo/Yükleme Operatörü", "Yükleme düzeninin ADR uyumluluk tablosuna göre yapılması, sabitleme ve etiketleme kontrolü"],
           ["Sürücü", "Araç kontrol formunun doldurulması, evrakların araçta bulundurulması, güzergah ve hız kurallarına uyulması, acil durum ekipmanlarının kullanılabilir olduğunun teyidi"],
@@ -2534,7 +2534,7 @@ export const BELGE_SABLONLARI: Record<string, BelgeSablonu> = {
         headers: ["Görev / Unvan", "Sorumluluk"],
         colWidths: [1.6, 3.4],
         rows: [
-          ["ADR Güvenlik Danışmanı (TMGD)", "Muayene sürelerinin ADR ve ilgili mevzuata göre takibini yönetir, süresi dolan/geçen ekipmanların tespitinde ve bertaraf sürecinin mevzuata uygunluğunun sağlanmasında teknik danışmanlık verir; yıllık faaliyet raporuna bertaraf edilen ekipmanları işler."],
+          ["Tehlikeli Madde Güvenlik Danışmanı (TMGD)", "Muayene sürelerinin ADR ve ilgili mevzuata göre takibini yönetir, süresi dolan/geçen ekipmanların tespitinde ve bertaraf sürecinin mevzuata uygunluğunun sağlanmasında teknik danışmanlık verir; yıllık faaliyet raporuna bertaraf edilen ekipmanları işler."],
           ["Depo / Ekipman Sorumlusu", "Tüp, tank, basınçlı kap ve üst yapıların muayene tarihlerini ekipman takip kartı/sisteminde günceller, süresi yaklaşan/dolan ekipmanı tespit edip ilgili birime bildirir, ekipmanı kullanım dışı alana ayırır."],
           ["Bakım / Teknik Birim", "Ekipmanın boşaltılması, arındırılması (dekontaminasyon) ve kullanılamaz hale getirilmesi (hurdaya ayırma) işlemlerini bu talimata uygun şekilde yürütür."],
           ["İş Sağlığı ve Güvenliği Birimi", "Bertaraf işlemleri sırasında kişisel koruyucu donanım, havalandırma ve acil durum tedbirlerinin uygulanmasını denetler."],
@@ -3292,13 +3292,13 @@ export const BELGE_SABLONLARI: Record<string, BelgeSablonu> = {
     posterYolu: "/belge-posterleri/T16.jpg",
     yayinTarihi: "01.11.2025",
     amac: "Bu talimatın amacı; tehlikeli madde dolumu tamamlanmış tank, tanker ve tank konteynerlerin karayoluna sevk edilmeden önce sızdırmazlık durumunun ve dış yüzeyde/dolum ağzı çevresinde bulaşma (kontaminasyon) bulunup bulunmadığının, ADR (Tehlikeli Malların Karayolu ile Uluslararası Taşımacılığına İlişkin Avrupa Anlaşması) ve Tehlikeli Maddelerin Karayoluyla Taşınması Hakkında Yönetmelik hükümlerine uygun şekilde kontrol edilmesini, bulaşma tespiti halinde arındırma yapılmasını ve tüm sürecin kayıt altına alınmasını sağlamaktır. Bu talimat, insan sağlığını, çevreyi ve taşıma güvenliğini korumayı; uygunsuz araçların sevkinin önlenmesini hedefler.",
-    kapsam: "Bu talimat aşağıdakileri kapsar: tesis bünyesinde tehlikeli/tehlikesiz sıvı, gaz veya katı dökme yük dolumu yapılan tüm tank araçları, tankerler, tank konteynerler (portatif tanklar) ve IBC/dökme yük araçları; dolum sonrası sevke çıkmadan önceki her aşama; dolum operatörü, sevkiyat sorumlusu, kalite kontrol personeli ve ADR Güvenlik Danışmanının görev ve sorumlulukları.",
+    kapsam: "Bu talimat aşağıdakileri kapsar: tesis bünyesinde tehlikeli/tehlikesiz sıvı, gaz veya katı dökme yük dolumu yapılan tüm tank araçları, tankerler, tank konteynerler (portatif tanklar) ve IBC/dökme yük araçları; dolum sonrası sevke çıkmadan önceki her aşama; dolum operatörü, sevkiyat sorumlusu, kalite kontrol personeli ve Tehlikeli Madde Güvenlik Danışmanının görev ve sorumlulukları.",
     tanimlar: [
       { terim: "ADR", tanim: "Tehlikeli Malların Karayolu ile Uluslararası Taşımacılığına İlişkin Avrupa Anlaşması." },
       { terim: "Bulaşma (Kontaminasyon)", tanim: "Taşınan maddenin, tankın dış yüzeyine, dolum ağzı çevresine, vana/conta bölgelerine veya araç şasisine istenmeyen şekilde bulaşması/damlaması." },
       { terim: "Sızdırmazlık Kontrolü", tanim: "Tank gövdesi, vana, conta, kapak ve bağlantı elemanlarının basınç/görsel/dokunsal yöntemlerle sızıntı yönünden incelenmesi." },
       { terim: "K7 Formu", tanim: "Dolum Kontrol Formu (kurum içi kalite kaydı)." },
-      { terim: "ADR Güvenlik Danışmanı", tanim: "Tehlikeli madde taşımacılığı faaliyetlerinde mevzuata uygunluğu izlemekle yükümlü, Yönetmelik kapsamında atanmış sorumlu kişi." },
+      { terim: "Tehlikeli Madde Güvenlik Danışmanı", tanim: "Tehlikeli madde taşımacılığı faaliyetlerinde mevzuata uygunluğu izlemekle yükümlü, Yönetmelik kapsamında atanmış sorumlu kişi." },
       { terim: "Sevke Çıkarma", tanim: "Aracın yükleme sahasından ayrılarak taşıma güzergâhına çıkması işlemi." },
     ],
     blocks: [
@@ -3319,7 +3319,7 @@ export const BELGE_SABLONLARI: Record<string, BelgeSablonu> = {
           ["Dolum Operatörü", "Dolum sonrası ilk görsel/dokunsal kontrolü yapar, K7 formunu doldurur, anormallik durumunda vardiya amirini bilgilendirir."],
           ["Vardiya Amiri / Sevkiyat Sorumlusu", "Kontrol sonuçlarını onaylar, uygunsuz aracın sevkini durdurur, arındırma sürecini başlatır."],
           ["Kalite Kontrol Personeli", "Periyodik/numune bazlı denetim yapar, K7 kayıtlarının doğruluğunu teyit eder."],
-          ["ADR Güvenlik Danışmanı", "Mevzuata uygunluğu izler, ihlal/olay durumunda kök neden analizi ve raporlama yapar."],
+          ["Tehlikeli Madde Güvenlik Danışmanı", "Mevzuata uygunluğu izler, ihlal/olay durumunda kök neden analizi ve raporlama yapar."],
           ["Sürücü", "Araca teslim alınmadan önce dış yüzey ve vana bölgesini gözle kontrol eder, şüpheli durumda yükü teslim almaz."],
         ]},
 
@@ -3359,7 +3359,7 @@ export const BELGE_SABLONLARI: Record<string, BelgeSablonu> = {
       ]},
       { type: "subheading", text: "6.5 Acil Durum Hükümleri" },
       { type: "bullet", items: [
-        "Sızıntının kontrol altına alınamadığı veya yüksek risk taşıdığı durumlarda, kurumun Acil Durum ve Dökülme Müdahale Talimatı derhal devreye alınır; ADR Güvenlik Danışmanı ve İSG birimi bilgilendirilir.",
+        "Sızıntının kontrol altına alınamadığı veya yüksek risk taşıdığı durumlarda, kurumun Acil Durum ve Dökülme Müdahale Talimatı derhal devreye alınır; Tehlikeli Madde Güvenlik Danışmanı ve İSG birimi bilgilendirilir.",
         "Gerekli görülmesi halinde ilgili resmi mercilere (itfaiye, çevre müdürlüğü vb.) mevzuatta öngörülen bildirimler yapılır.",
       ]},
 
@@ -3372,7 +3372,7 @@ export const BELGE_SABLONLARI: Record<string, BelgeSablonu> = {
       { type: "subheading", text: "9. İzleme ve Denetim" },
       { type: "bullet", items: [
         "Kalite Kontrol birimi, K7 formlarını periyodik olarak (haftalık/aylık) örnekleyerek denetler.",
-        "ADR Güvenlik Danışmanı, yıllık faaliyet raporunda bu talimatın uygulanma durumunu değerlendirir.",
+        "Tehlikeli Madde Güvenlik Danışmanı, yıllık faaliyet raporunda bu talimatın uygulanma durumunu değerlendirir.",
         "Talimat, mevzuat değişikliklerinde (ADR'nin iki yılda bir güncellenmesi dahil) gözden geçirilir ve gerekirse revize edilir.",
       ]},
 
@@ -3392,7 +3392,7 @@ export const BELGE_SABLONLARI: Record<string, BelgeSablonu> = {
     posterYolu: "/belge-posterleri/T17.jpg",
     yayinTarihi: "01.11.2025",
     amac: "Bu talimatın amacı; ADR (Tehlikeli Malların Karayolu ile Uluslararası Taşımacılığına İlişkin Avrupa Anlaşması) Bölüm 7.3 kapsamında yürütülen dökme (bulk) dolum işlemlerinde uyulması gereken kuralları, Tehlikeli Maddelerin Karayoluyla Taşınması Hakkında Yönetmelik hükümleri doğrultusunda tesis içi uygulama esaslarını ve dolum öncesinde taşımacı firmanın Tehlikeli Madde Faaliyet Belgesi (TMFB) ile araç/sürücü belgelerinin kontrol usulünü tanımlamaktır. Talimat; dolum güvenliğinin sağlanması, çevreye ve insan sağlığına yönelik risklerin önlenmesi, yalnızca mevzuata uygun ve yetkili taşımacılara dolum/teslim yapılmasının güvence altına alınması ve yapılan kontrollerin izlenebilir şekilde kayıt altına alınmasını hedefler.",
-    kapsam: "Bu talimat; tesis bünyesinde dökme yük taşıyan araçlara (açık/kapalı kasa araç, konteyner, tank-konteyner, silobas vb. taşıma birimlerine) yapılan tüm dolum işlemlerini, dolum öncesi belge kontrollerini, dolum/boşaltma sırasında alınacak önlemleri ve K7 Dolum Kontrol Formu ile yapılan kayıt işlemlerini kapsar. Talimat; dolum sahasında görevli tüm personeli, vardiya amirlerini, ADR Güvenlik Danışmanını, güvenlik/kapı kontrol personelini ve tesise dolum/boşaltma amacıyla gelen taşımacı firma sürücülerini bağlar.",
+    kapsam: "Bu talimat; tesis bünyesinde dökme yük taşıyan araçlara (açık/kapalı kasa araç, konteyner, tank-konteyner, silobas vb. taşıma birimlerine) yapılan tüm dolum işlemlerini, dolum öncesi belge kontrollerini, dolum/boşaltma sırasında alınacak önlemleri ve K7 Dolum Kontrol Formu ile yapılan kayıt işlemlerini kapsar. Talimat; dolum sahasında görevli tüm personeli, vardiya amirlerini, Tehlikeli Madde Güvenlik Danışmanını, güvenlik/kapı kontrol personelini ve tesise dolum/boşaltma amacıyla gelen taşımacı firma sürücülerini bağlar.",
     tanimlar: [
       { terim: "ADR", tanim: "Tehlikeli Malların Karayolu ile Uluslararası Taşımacılığına İlişkin Avrupa Anlaşması." },
       { terim: "Yönetmelik", tanim: "Tehlikeli Maddelerin Karayoluyla Taşınması Hakkında Yönetmelik (Ulaştırma ve Altyapı Bakanlığı)." },
@@ -3400,7 +3400,7 @@ export const BELGE_SABLONLARI: Record<string, BelgeSablonu> = {
       { terim: "Dökme Yük (Bulk)", tanim: "ADR Bölüm 7.3 kapsamında ambalajsız olarak doğrudan taşıma birimine, konteynere veya tanka yüklenen katı/parça halindeki tehlikeli madde." },
       { terim: "Taşıma Birimi", tanim: "Dökme yükün içine yüklendiği araç kasası, konteyner, değişebilir gövde (swap body) veya tank-konteyner." },
       { terim: "K7 Formu", tanim: "Dolum öncesi/sırası/sonrası yapılan kontrollerin ve TMFB doğrulamasının kaydedildiği iç kontrol formu." },
-      { terim: "ADR Güvenlik Danışmanı", tanim: "Yönetmelik gereği işletmede görevlendirilen, tehlikeli madde faaliyetlerinin mevzuata uygunluğunu izleyen sertifikalı kişi." },
+      { terim: "Tehlikeli Madde Güvenlik Danışmanı", tanim: "Yönetmelik gereği işletmede görevlendirilen, tehlikeli madde faaliyetlerinin mevzuata uygunluğunu izleyen sertifikalı kişi." },
       { terim: "Dolum Sorumlusu / Vardiya Amiri", tanim: "Dolum sahasında TMFB ve araç/sürücü kontrolünü fiilen yürüten ve K7 formunu onaylayan personel." },
     ],
     blocks: [
@@ -3417,7 +3417,7 @@ export const BELGE_SABLONLARI: Record<string, BelgeSablonu> = {
       { type: "subheading", text: "5. Sorumluluklar" },
       { type: "numbered", items: [
         "Dolum Sorumlusu / Vardiya Amiri: Dolum öncesi TMFB ve ilgili belgelerin kontrolünü yapar, K7 formunu doldurur ve onaylar; uygunsuzluk halinde dolumu durdurur.",
-        "ADR Güvenlik Danışmanı: Dolum işlemlerinin ADR ve Yönetmeliğe uygunluğunu periyodik olarak denetler, personel eğitimlerini planlar, K7 kayıtlarını gözden geçirir.",
+        "Tehlikeli Madde Güvenlik Danışmanı: Dolum işlemlerinin ADR ve Yönetmeliğe uygunluğunu periyodik olarak denetler, personel eğitimlerini planlar, K7 kayıtlarını gözden geçirir.",
         "Güvenlik / Kapı Kontrol Personeli: Tesise giriş yapan araç ve sürücünün evrak kontrolünü ilk aşamada gerçekleştirir, eksiklik durumunda dolum sahasına yönlendirmeden ilgili birimi bilgilendirir.",
         "Saha Operatörü: Dolum ve boşaltma işlemini bu talimatta belirtilen teknik kurallara uygun şekilde yürütür, tozuma/saçılma önlemlerini uygular.",
         "Taşımacı Firma / Sürücü: TMFB, araç uygunluk belgesi, SRC5 sertifikası ve taşıma evrakını dolum öncesinde ibraz eder; taşıma biriminin madde ile uyumlu ve sızdırmaz durumda olduğunu beyan eder.",
@@ -3464,21 +3464,21 @@ export const BELGE_SABLONLARI: Record<string, BelgeSablonu> = {
           ["1", "Taşımacı Firma TMFB (Tehlikeli Madde Faaliyet Belgesi)", "Aslı veya onaylı sureti; geçerlilik tarihi ve faaliyet kapsamı (taşımacılık) kontrol edilir"],
           ["2", "Araç ADR Uygunluk Belgesi", "Dökme yük taşıyan taşıma biriminin/aracın ilgili madde sınıfı için uygunluğu kontrol edilir"],
           ["3", "Sürücü ADR Şoför Eğitim Sertifikası (SRC5)", "Geçerlilik tarihi ve taşınacak madde sınıfını kapsayıp kapsamadığı kontrol edilir"],
-          ["4", "ADR Güvenlik Danışmanı Sözleşmesi / Bildirimi", "Taşımacı firmanın güvenlik danışmanı atamasının geçerli olduğu teyit edilir"],
+          ["4", "Tehlikeli Madde Güvenlik Danışmanı Sözleşmesi / Bildirimi", "Taşımacı firmanın güvenlik danışmanı atamasının geçerli olduğu teyit edilir"],
           ["5", "Taşıma Evrakı (Sevk İrsaliyesi / Taşıma Evrakı Taslağı)", "UN numarası, resmi taşıma adı, sınıf, ambalajlama grubu bilgileri ön kontrol için istenir"],
           ["6", "Araç Ruhsatı ve Zorunlu Mali Sorumluluk / Tehlikeli Madde Sigortası", "Geçerlilik ve kapsam kontrol edilir"],
         ]},
       { type: "subheading", text: "7.3 Uygunsuzluk Durumu ve Ret Prosedürü" },
       { type: "paragraph", text: "TMFB'si bulunmayan, süresi dolmuş, faaliyet kapsamı taşınacak madde/işlemle örtüşmeyen veya sahte/şüpheli olduğu değerlendirilen taşımacıya dolum ve teslim yapılmaz." },
       { type: "numbered", items: [
-        "Dolum sorumlusu, tespit edilen uygunsuzluğu derhal vardiya amirine ve ADR Güvenlik Danışmanına bildirir.",
+        "Dolum sorumlusu, tespit edilen uygunsuzluğu derhal vardiya amirine ve Tehlikeli Madde Güvenlik Danışmanına bildirir.",
         "Araç dolum sahasına alınmaz veya dolum sahasında ise işlem derhal durdurulur; araç bekleme alanına yönlendirilir.",
         "Durum, ilgili sevkiyat/lojistik birimine ve gerekiyorsa taşımacı firmaya yazılı olarak bildirilir.",
         "Uygunsuzluk ve alınan aksiyon K7 Dolum Kontrol Formuna eksiksiz işlenir.",
         "Tekrarlayan uygunsuzluk tespit edilen taşımacı firmalar, tedarikçi/taşımacı değerlendirme sürecine dahil edilir ve gerekirse onaylı taşımacı listesinden çıkarılır.",
       ]},
       { type: "subheading", text: "7.4 K7 Dolum Kontrol Formuna Kayıt" },
-      { type: "paragraph", text: "Yapılan TMFB kontrolü ile dolum öncesi/sırası/sonrası tüm kontrol sonuçları K7 Dolum Kontrol Formuna işlenir. Form, dolum sorumlusu tarafından doldurulur ve vardiya amiri veya ADR Güvenlik Danışmanı tarafından onaylanır. Formda asgari olarak: tarih/saat; taşımacı firma unvanı; TMFB numarası ve geçerlilik tarihi; araç plakası; sürücü adı soyadı/SRC5 belge no; taşınacak madde (UN No/Sınıf/PG); taşıma biriminin uygunluğu (sızdırmazlık, temizlik, madde uyumu); TMFB kontrol sonucu (Uygun/Uygun Değil); uygun değilse alınan aksiyon; dolum öncesi genel kontrol; dolum sonrası kontrol (kapak/valf sızdırmazlığı, etiketleme, işaretleme); kontrolü yapan personel; onaylayan bilgileri yer alır." },
+      { type: "paragraph", text: "Yapılan TMFB kontrolü ile dolum öncesi/sırası/sonrası tüm kontrol sonuçları K7 Dolum Kontrol Formuna işlenir. Form, dolum sorumlusu tarafından doldurulur ve vardiya amiri veya Tehlikeli Madde Güvenlik Danışmanı tarafından onaylanır. Formda asgari olarak: tarih/saat; taşımacı firma unvanı; TMFB numarası ve geçerlilik tarihi; araç plakası; sürücü adı soyadı/SRC5 belge no; taşınacak madde (UN No/Sınıf/PG); taşıma biriminin uygunluğu (sızdırmazlık, temizlik, madde uyumu); TMFB kontrol sonucu (Uygun/Uygun Değil); uygun değilse alınan aksiyon; dolum öncesi genel kontrol; dolum sonrası kontrol (kapak/valf sızdırmazlığı, etiketleme, işaretleme); kontrolü yapan personel; onaylayan bilgileri yer alır." },
 
       { type: "subheading", text: "8. Dolum Kontrol Akışı (Özet)" },
       { type: "numbered", items: [
@@ -3492,7 +3492,7 @@ export const BELGE_SABLONLARI: Record<string, BelgeSablonu> = {
       ]},
 
       { type: "subheading", text: "9. Uygunsuzluk ve Acil Durum Yönetimi" },
-      { type: "paragraph", text: "Dolum/boşaltma sırasında dökülme, saçılma, sızıntı veya taşıma birimi arızası gibi bir uygunsuzluk tespit edilmesi halinde işlem derhal durdurulur, saha güvenli hale getirilir ve tesisin acil durum/çevre prosedürleri devreye alınır. Olay, ADR Güvenlik Danışmanına ve ilgili yönetime bildirilir; gerekli görülmesi halinde ilgili resmi mercilere bildirim yükümlülüğü yerine getirilir." },
+      { type: "paragraph", text: "Dolum/boşaltma sırasında dökülme, saçılma, sızıntı veya taşıma birimi arızası gibi bir uygunsuzluk tespit edilmesi halinde işlem derhal durdurulur, saha güvenli hale getirilir ve tesisin acil durum/çevre prosedürleri devreye alınır. Olay, Tehlikeli Madde Güvenlik Danışmanına ve ilgili yönetime bildirilir; gerekli görülmesi halinde ilgili resmi mercilere bildirim yükümlülüğü yerine getirilir." },
 
       { type: "subheading", text: "10. Kayıtların Saklanması" },
       { type: "bullet", items: [
@@ -3502,7 +3502,7 @@ export const BELGE_SABLONLARI: Record<string, BelgeSablonu> = {
       ]},
 
       { type: "subheading", text: "11. Eğitim" },
-      { type: "paragraph", text: "Dolum sahasında görevli tüm personel; ADR Bölüm 7.3 hükümleri, bu talimat ve K7 formunun doldurulması konusunda ADR Güvenlik Danışmanı koordinasyonunda eğitilir. Eğitimler, mevzuat değişikliklerinde ve talimat revizyonlarında güncellenerek tekrarlanır; katılım kayıtları saklanır." },
+      { type: "paragraph", text: "Dolum sahasında görevli tüm personel; ADR Bölüm 7.3 hükümleri, bu talimat ve K7 formunun doldurulması konusunda Tehlikeli Madde Güvenlik Danışmanı koordinasyonunda eğitilir. Eğitimler, mevzuat değişikliklerinde ve talimat revizyonlarında güncellenerek tekrarlanır; katılım kayıtları saklanır." },
     ],
   },
 
@@ -3810,7 +3810,7 @@ export const BELGE_SABLONLARI: Record<string, BelgeSablonu> = {
       { terim: "ADR", tanim: "Tehlikeli Malların Karayolu ile Uluslararası Taşımacılığına İlişkin Avrupa Anlaşması." },
       { terim: "Taşıma Ünitesi", tanim: "Motorlu taşıt tek başına veya bu taşıta bağlı römork/yarı römork ile birlikte oluşan bütün." },
       { terim: "Azami Kütle", tanim: "Aracın/taşıma ünitesinin ruhsatında belirtilen izin verilen en yüksek yüklü ağırlık." },
-      { terim: "ADR Güvenlik Danışmanı (ADRSDE)", tanim: "Tehlikeli madde taşımacılığı faaliyetlerinde güvenlik danışmanlığı yapmakla yetkilendirilmiş kişi." },
+      { terim: "Tehlikeli Madde Güvenlik Danışmanı (ADRSDE)", tanim: "Tehlikeli madde taşımacılığı faaliyetlerinde güvenlik danışmanlığı yapmakla yetkilendirilmiş kişi." },
       { terim: "Yazılı Talimat (Taşıma Talimatı)", tanim: "ADR 5.4.3 uyarınca araç mürettebatına yönelik, tehlike anında izlenecek adımları içeren doküman." },
     ],
     blocks: [
@@ -3821,7 +3821,7 @@ export const BELGE_SABLONLARI: Record<string, BelgeSablonu> = {
         "Teçhizatın periyodik bakım, kontrol ve yenileme süreçlerini planlar ve kaynak tahsis eder.",
         "Sürücülerin teçhizat kullanımı konusunda eğitim almasını sağlar.",
       ]},
-      { type: "subheading", text: "4.2 ADR Güvenlik Danışmanı" },
+      { type: "subheading", text: "4.2 Tehlikeli Madde Güvenlik Danışmanı" },
       { type: "bullet", items: [
         "Talimatın ADR ve ilgili yönetmelik hükümlerine uygunluğunu denetler.",
         "Teçhizat listesinin taşınan madde sınıflarına göre güncel tutulmasını sağlar.",
@@ -3856,7 +3856,7 @@ export const BELGE_SABLONLARI: Record<string, BelgeSablonu> = {
         "Söndürücülerin periyodik bakım ve dolum kontrolleri, üretici/ilgili mevzuat tarafından öngörülen sürelerde yaptırılır.",
         "Her söndürücü üzerinde geçerli kontrol tarihini gösteren mühür/etiket bulunmalıdır.",
         "Kontrol tarihi geçmiş, mührü kırılmış veya basıncı düşük söndürücüler derhal değiştirilir; araç bu durumda sefere çıkarılmaz.",
-        "Kontroller kayıt altına alınır ve ADR Güvenlik Danışmanı tarafından izlenir.",
+        "Kontroller kayıt altına alınır ve Tehlikeli Madde Güvenlik Danışmanı tarafından izlenir.",
       ]},
       { type: "paragraph", text: "DİKKAT: Kontrol tarihi geçmiş veya hasarlı yangın söndürücüyle araç sefere çıkarılamaz. Sorumlu birim derhal bilgilendirilmelidir." },
 
@@ -3883,14 +3883,14 @@ export const BELGE_SABLONLARI: Record<string, BelgeSablonu> = {
         "Kimyasal emici malzemeler / nötrleştirici maddeler.",
         "Acil durum solunum koruma ekipmanı (ilgili özel hükümde belirtilmişse).",
       ]},
-      { type: "paragraph", text: "DİKKAT: Madde bazlı ek teçhizat ihtiyacı, taşıma evrakı ve ADR'nin ilgili taşıma özel hükümleri (Sütun 19 — Tablo A) dikkate alınarak her sevkiyat öncesi ADR Güvenlik Danışmanı/sevkiyat sorumlusu tarafından belirlenir." },
+      { type: "paragraph", text: "DİKKAT: Madde bazlı ek teçhizat ihtiyacı, taşıma evrakı ve ADR'nin ilgili taşıma özel hükümleri (Sütun 19 — Tablo A) dikkate alınarak her sevkiyat öncesi Tehlikeli Madde Güvenlik Danışmanı/sevkiyat sorumlusu tarafından belirlenir." },
 
       { type: "subheading", text: "7. Kullanım, Eğitim ve Bakım Esasları" },
       { type: "numbered", items: [
         "Sürücü ve araç mürettebatı, göreve başlamadan önce tüm teçhizatın yeri, kullanım şekli ve bakım gereklilikleri konusunda eğitilir; eğitimler kayıt altına alınır.",
         "Tehlike anında, yazılı talimatta (ADR 5.4.3) belirtilen adımlar sırasıyla uygulanır.",
         "Teçhizat, her sefer öncesinde sürücü tarafından görsel olarak kontrol edilir (varlık, hasar, son kullanma/kontrol tarihi).",
-        "Eksik, hasarlı, süresi dolmuş veya standart dışı malzemeler tespit edildiğinde araç sefere çıkarılmaz; durum ilgili sorumluya (filo/lojistik yöneticisi ve ADR Güvenlik Danışmanı) bildirilir.",
+        "Eksik, hasarlı, süresi dolmuş veya standart dışı malzemeler tespit edildiğinde araç sefere çıkarılmaz; durum ilgili sorumluya (filo/lojistik yöneticisi ve Tehlikeli Madde Güvenlik Danışmanı) bildirilir.",
         "Periyodik (aylık/üç aylık, işletme prosedürüne göre) detaylı teçhizat kontrolleri yapılır ve kontrol formu ile belgelenir.",
         "Kullanılan, bozulan veya son kullanma tarihi geçen malzemeler gecikmeksizin yenilenir.",
       ]},
@@ -3935,7 +3935,7 @@ export const BELGE_SABLONLARI: Record<string, BelgeSablonu> = {
       ]},
 
       { type: "subheading", text: "10. Yürürlük ve Güncelleme" },
-      { type: "paragraph", text: "Bu talimat onay tarihi itibarıyla yürürlüğe girer. ADR'nin iki yılda bir güncellenen hükümleri ve ilgili ulusal mevzuatta yapılacak değişiklikler doğrultusunda ADR Güvenlik Danışmanı tarafından gözden geçirilir ve gerektiğinde revize edilir." },
+      { type: "paragraph", text: "Bu talimat onay tarihi itibarıyla yürürlüğe girer. ADR'nin iki yılda bir güncellenen hükümleri ve ilgili ulusal mevzuatta yapılacak değişiklikler doğrultusunda Tehlikeli Madde Güvenlik Danışmanı tarafından gözden geçirilir ve gerektiğinde revize edilir." },
     ],
   },
 
@@ -3948,7 +3948,7 @@ export const BELGE_SABLONLARI: Record<string, BelgeSablonu> = {
     tanimlar: [
       { terim: "YTB (Yük Taşıma Birimi)", tanim: "Tank dışında, tehlikeli madde taşınması için kullanılan araç, konteyner, tank-konteyner, portatif tank veya çok elemanlı gaz konteyneri (ÇEGK)." },
       { terim: "ADR", tanim: "Tehlikeli Malların Karayolu ile Uluslararası Taşımacılığına İlişkin Avrupa Anlaşması." },
-      { terim: "DGSA/ADR Güvenlik Danışmanı", tanim: "Yönetmelik uyarınca işletmede görevlendirilmesi zorunlu, tehlikeli madde faaliyetlerinin mevzuata uygunluğunu izleyen sorumlu kişi." },
+      { terim: "TMGD", tanim: "Yönetmelik uyarınca işletmede görevlendirilmesi zorunlu, tehlikeli madde faaliyetlerinin mevzuata uygunluğunu izleyen sorumlu kişi." },
       { terim: "Uyumluluk Grubu", tanim: "Sınıf 1 (patlayıcı) maddeler için ADR 7.5.2.2'de tanımlanan, birlikte taşınabilirliği belirleyen harf kodu (A, B, C, ... S)." },
     ],
     blocks: [
@@ -3982,7 +3982,7 @@ export const BELGE_SABLONLARI: Record<string, BelgeSablonu> = {
         "Sürücü; sızıntı, hasarlı ambalaj, düşen/kayan yük, yanlış/eksik etiketleme, evrak eksikliği veya ADR kurallarına aykırı bir durum tespit ettiğinde aracı derhal, mümkünse trafiği ve çevreyi tehlikeye atmayacak güvenli bir alana çeker.",
         "Motor durdurulur, el freni çekilir, mümkünse uyarı üçgeni/işaretleme yapılır ve yazılı talimatlarda (ADR 5.4.3) belirtilen kişisel koruyucu donanım kullanılır.",
         "İhlal giderilmeden veya emniyetli hale getirilmeden taşımaya devam edilmez; gerekiyorsa yük yeniden sabitlenir, sızıntı söz konusuysa yazılı talimatlarda tanımlanan acil müdahale adımları uygulanır.",
-        "Sürücü durumu derhal işletme/nakliye sorumlusu ve ADR Güvenlik Danışmanına (DGSA) bildirir.",
+        "Sürücü durumu derhal işletme/nakliye sorumlusu ve Tehlikeli Madde Güvenlik Danışmanına (TMGD) bildirir.",
       ]},
       { type: "subheading", text: "4.2 Yetkili Mercilerin Bilgilendirilmesi (ADR Bölüm 1.8.5)" },
       { type: "bullet", items: [
@@ -3993,8 +3993,8 @@ export const BELGE_SABLONLARI: Record<string, BelgeSablonu> = {
       ]},
       { type: "subheading", text: "4.3 İç Bildirim ve Kayıt" },
       { type: "bullet", items: [
-        "Her ihlal, işletmenin ADR Güvenlik Danışmanı tarafından değerlendirilir; kök neden analizi yapılır ve düzeltici/önleyici faaliyet planlanır.",
-        "İhlal kayıtları, DGSA yıllık raporunda özetlenir ve mevzuatta öngörülen süre boyunca saklanır.",
+        "Her ihlal, işletmenin Tehlikeli Madde Güvenlik Danışmanı tarafından değerlendirilir; kök neden analizi yapılır ve düzeltici/önleyici faaliyet planlanır.",
+        "İhlal kayıtları, TMGD yıllık raporunda özetlenir ve mevzuatta öngörülen süre boyunca saklanır.",
       ]},
 
       { type: "subheading", text: "5. Boş ve Temizlenmemiş Yük Taşıma Birimleri İçin Taşıma Evrakı (ADR Bölüm 5.4.1.1.6)" },
@@ -4039,7 +4039,7 @@ export const BELGE_SABLONLARI: Record<string, BelgeSablonu> = {
           ["8", "", "a", "", "", "X", "X", "X", "", "X", "X", "X", "X", "", "X", "X", "X", "X", "X"],
           ["9, 9A", "b", "a", "b", "c", "X", "X", "X", "", "X", "X", "X", "X", "", "X", "X", "X", "X", "X"],
         ],
-        note: "X = Karışık yüklemeye izin verilir. a = 1.4S maddeleri ve nesnelerinin karışık yüklenmesine izin verilir. b = Sınıf 1 kapsamındaki mallarla Sınıf 9 kapsamındaki hayat kurtarıcı araçlar arasında karışık yüklemeye izin verilmiştir (UN No. 2990, 3072 ve 3268). c = Alt Grup 1.4'teki piroteknik, uyumluluk grubu G, emniyet cihazları (UN No. 0503) ile Sınıf 9, elektrikle başlatılan emniyet cihazları (UN No. 3268) arasında karışık yüklemeye izin verilmiştir. d = Tahripli patlayıcılar (UN No. 0083 hariç) ve amonyum nitrat (UN No. 1942/2067), amonyum nitrat emülsiyonu/süspansiyonu/jeli (UN No. 3375) ile alkali metal nitratları (sezyum UN 1451, lityum UN 2722, potasyum UN 1486, rubidyum UN 1477, sodyum UN 1498) ve alkalin toprak metal nitratları (baryum UN 1446, berilyum UN 2464, kalsiyum UN 1454, magnezyum UN 1474, stronsiyum UN 1507) arasında, tümünün Sınıf 1 tahripli patlayıcı muamelesi görmesi koşuluyla karışık yüklemeye izin verilmiştir. ÖNEMLİ: Bu matris, saha personeline hızlı referans sağlamak amacıyla özetlenmiş bir çalışma tablosudur. Nihai yükleme kararı öncesinde, güncel ADR metninin 7.5.2.1 tablosu ve dipnotları ile Sınıf 1 için 7.5.2.2 uyumluluk grubu tablosu mutlaka birebir kontrol edilmeli; tereddüt hâlinde işletmenin ADR Güvenlik Danışmanına (DGSA) danışılmalıdır. ADR metni iki yılda bir güncellenmektedir; yükleme kararları her zaman yürürlükteki en güncel ADR baskısına göre verilmelidir." },
+        note: "X = Karışık yüklemeye izin verilir. a = 1.4S maddeleri ve nesnelerinin karışık yüklenmesine izin verilir. b = Sınıf 1 kapsamındaki mallarla Sınıf 9 kapsamındaki hayat kurtarıcı araçlar arasında karışık yüklemeye izin verilmiştir (UN No. 2990, 3072 ve 3268). c = Alt Grup 1.4'teki piroteknik, uyumluluk grubu G, emniyet cihazları (UN No. 0503) ile Sınıf 9, elektrikle başlatılan emniyet cihazları (UN No. 3268) arasında karışık yüklemeye izin verilmiştir. d = Tahripli patlayıcılar (UN No. 0083 hariç) ve amonyum nitrat (UN No. 1942/2067), amonyum nitrat emülsiyonu/süspansiyonu/jeli (UN No. 3375) ile alkali metal nitratları (sezyum UN 1451, lityum UN 2722, potasyum UN 1486, rubidyum UN 1477, sodyum UN 1498) ve alkalin toprak metal nitratları (baryum UN 1446, berilyum UN 2464, kalsiyum UN 1454, magnezyum UN 1474, stronsiyum UN 1507) arasında, tümünün Sınıf 1 tahripli patlayıcı muamelesi görmesi koşuluyla karışık yüklemeye izin verilmiştir. ÖNEMLİ: Bu matris, saha personeline hızlı referans sağlamak amacıyla özetlenmiş bir çalışma tablosudur. Nihai yükleme kararı öncesinde, güncel ADR metninin 7.5.2.1 tablosu ve dipnotları ile Sınıf 1 için 7.5.2.2 uyumluluk grubu tablosu mutlaka birebir kontrol edilmeli; tereddüt hâlinde işletmenin Tehlikeli Madde Güvenlik Danışmanına (TMGD) danışılmalıdır. ADR metni iki yılda bir güncellenmektedir; yükleme kararları her zaman yürürlükteki en güncel ADR baskısına göre verilmelidir." },
 
       { type: "subheading", text: "7. Ek Bilgi — ADR'ye Göre Araç Tipleri (ADR Bölüm 9.1.1.2)" },
       { type: "bullet", items: [
@@ -4065,7 +4065,7 @@ export const BELGE_SABLONLARI: Record<string, BelgeSablonu> = {
         "Yükleme sınırlamalarına, sabitleme kurallarına ve yazılı talimatlara uymak.",
         "İhlal tespitinde Madde 4'te tanımlanan adımları uygulamak ve derhal bildirimde bulunmak.",
       ]},
-      { type: "subheading", text: "8.4 ADR Güvenlik Danışmanı (DGSA)" },
+      { type: "subheading", text: "8.4 Tehlikeli Madde Güvenlik Danışmanı (TMGD)" },
       { type: "bullet", items: [
         "Bu talimatın uygulanmasını izlemek, ihlalleri değerlendirmek ve yıllık raporda özetlemek.",
         "Personelin ADR eğitimlerinin güncelliğini takip etmek.",
