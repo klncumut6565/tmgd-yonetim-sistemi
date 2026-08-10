@@ -137,6 +137,29 @@ export default function ADRAssistantWidget() {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages, open]);
 
+  /**
+   * Panel açıkken kullanıcı bir süre (60 sn) hiçbir şey yapmazsa (yazmaz,
+   * mesaj göndermez, tıklamaz) otomatik olarak kapanır — sağ alttaki küçük
+   * simgeye geri döner. Sesli görüşme AKTİFKEN kapatılmaz (görüşme sırasında
+   * kullanıcı konuşurken "etkileşim" olmayabilir, bu normal).
+   */
+  const IDLE_KAPANMA_MS = 60_000;
+  const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function idleZamanlayiciyiSifirla() {
+    if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+    if (!open || sesliGorusmeRef.current) return;
+    idleTimerRef.current = setTimeout(() => setOpen(false), IDLE_KAPANMA_MS);
+  }
+
+  useEffect(() => {
+    idleZamanlayiciyiSifirla();
+    return () => {
+      if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, messages, sesliGorusmeAktif]);
+
   const [sesizDenemeSayisi, setSesizDenemeSayisi] = useState(0);
   const [teshisAcik, setTeshisAcik] = useState(false);
   const [cevriliyor, setCevriliyor] = useState(false);
@@ -561,18 +584,23 @@ export default function ADRAssistantWidget() {
     }
   }
 
-  // ---- KAPALI: sağ altta 1 satırlık bar ----
+  // ---- KAPALI: sağ altta küçük, yarı saydam simge — üzerine gelince/
+  // odaklanınca tam etikete genişler. Öncesinde her zaman geniş, tam opak
+  // bir çubuktu; bu, sayfanın o köşesindeki metni seçmeyi zorlaştırıyordu.
   if (!open) {
     return (
       <button
         onClick={() => setOpen(true)}
-        className="fixed bottom-4 right-4 z-50 flex items-center gap-2 px-4 py-2.5 rounded-full bg-black text-white shadow-lg hover:bg-gray-800 transition"
+        title="ADR Asistanı"
+        className="group fixed bottom-4 right-4 z-50 flex items-center gap-2 rounded-full bg-black text-white shadow-lg opacity-45 hover:opacity-100 focus:opacity-100 transition-all duration-300 px-3 py-3 hover:px-4 hover:py-2.5 focus:px-4 focus:py-2.5"
       >
-        <span>🤖</span>
-        <span className="text-sm font-medium">ADR Asistanı</span>
-        {firmName && (
-          <span className="text-xs bg-white/20 px-2 py-0.5 rounded-full">{firmName}</span>
-        )}
+        <span className="text-base leading-none">🤖</span>
+        <span className="max-w-0 group-hover:max-w-[220px] group-focus:max-w-[220px] opacity-0 group-hover:opacity-100 group-focus:opacity-100 overflow-hidden whitespace-nowrap transition-all duration-300 text-sm font-medium">
+          ADR Asistanı
+          {firmName && (
+            <span className="ml-1.5 text-xs bg-white/20 px-2 py-0.5 rounded-full">{firmName}</span>
+          )}
+        </span>
       </button>
     );
   }
@@ -586,7 +614,11 @@ export default function ADRAssistantWidget() {
         className="fixed inset-0 bg-black/30 z-40"
         onClick={() => setOpen(false)}
       />
-      <div className="fixed right-0 top-0 h-full w-[88%] max-w-[420px] bg-white shadow-2xl z-50 flex flex-col border-l">
+      <div
+        className="fixed right-0 top-0 h-full w-[88%] max-w-[420px] bg-white shadow-2xl z-50 flex flex-col border-l"
+        onClick={idleZamanlayiciyiSifirla}
+        onKeyDown={idleZamanlayiciyiSifirla}
+      >
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b bg-gray-50">
         <div>
