@@ -526,28 +526,32 @@ export default function GorevliListesi({
                   </td>
 
                   <td className="p-1.5 border align-top">
-                    <input
-                      type="text"
+                    <textarea
                       value={row.bagli_oldugu_birim}
                       onChange={(e) =>
                         updateRow(row.key, { bagli_oldugu_birim: e.target.value })
                       }
                       onBlur={() => kaydet(row, idx + 1)}
-                      className={HUCRE_INPUT}
+                      rows={Math.max(1, row.bagli_oldugu_birim.split("\n").length)}
+                      placeholder="Birden fazlaysa her satıra bir tane yazın"
+                      className={HUCRE_INPUT + " resize-none leading-4"}
                     />
                   </td>
 
-                  {/* Sorumlu Kişi/ler: SERBEST METİN — seçenek yok, elle yazılır */}
+                  {/* Sorumlu Kişi/ler: SERBEST METİN — seçenek yok, elle yazılır.
+                      Birden fazla isim, her biri kendi satırında (Enter ile) girilir;
+                      textarea satır sayısı içeriğe göre büyür ki tüm isimler her zaman
+                      görünür kalsın (kırpılmasın/kaydırma gerekmesin). */}
                   <td className="p-1.5 border align-top">
-                    <input
-                      type="text"
+                    <textarea
                       value={row.sorumlu_kisiler}
                       onChange={(e) =>
                         updateRow(row.key, { sorumlu_kisiler: e.target.value })
                       }
                       onBlur={() => kaydet(row, idx + 1)}
-                      placeholder="Ad Soyad (birden fazlaysa virgülle ayırın)"
-                      className={HUCRE_INPUT}
+                      rows={Math.max(1, row.sorumlu_kisiler.split("\n").length)}
+                      placeholder="Ad Soyad (birden fazlaysa her satıra bir isim yazın)"
+                      className={HUCRE_INPUT + " resize-none leading-4"}
                     />
                   </td>
 
