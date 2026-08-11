@@ -59,33 +59,50 @@ export async function gorevliListesiExcelOlustur(
     { width: 14 }, // Eğitim Tarihi
   ];
 
-  // --- Belge başlığı bloğu -------------------------------------------
-  ws.mergeCells("A1:G1");
+  // --- Belge başlığı bloğu ------------------------------------------------
+  // Orijinal örnekteki (TMFB_Faaliyetleri_Görevli_Listesi) düzenle birebir:
+  // sol/orta alanda büyük "GÖREVLİ LİSTESİ" başlığı + alt açıklama satırı,
+  // sağ üstte doküman kontrol kutusu (Doküman No / Yayın Tarihi / Revizyon
+  // Tarihi / Sayı No — dört ayrı satır).
+  ws.mergeCells("A1:E1");
   const firmaHucresi = ws.getCell("A1");
   firmaHucresi.value = veri.firmaAdi;
-  firmaHucresi.font = { name: "Calibri", size: 13, bold: true };
-  firmaHucresi.alignment = { horizontal: "center" };
+  firmaHucresi.font = { name: "Calibri", size: 11, bold: true };
+  firmaHucresi.alignment = { horizontal: "left" };
+  ws.getCell("F1").value = "Doküman No:";
+  ws.getCell("F1").font = HUCRE_FONT;
+  ws.getCell("G1").value = "TMGDK-G1";
+  ws.getCell("G1").font = HUCRE_FONT;
 
-  ws.mergeCells("A2:G2");
-  const belgeAdiHucresi = ws.getCell("A2");
-  belgeAdiHucresi.value =
-    "TEHLİKELİ MADDE İŞ VE İŞLEMLERİNDE GÖREVLİ PERSONEL LİSTESİ (TMGDK-G1)";
-  belgeAdiHucresi.font = { name: "Calibri", size: 11, bold: true };
-  belgeAdiHucresi.alignment = { horizontal: "center" };
+  ws.mergeCells("A2:E2");
+  const baslikHucresi = ws.getCell("A2");
+  baslikHucresi.value = "GÖREVLİ LİSTESİ";
+  baslikHucresi.font = { name: "Calibri", size: 15, bold: true, color: { argb: "FF1E40AF" } };
+  baslikHucresi.alignment = { horizontal: "center" };
+  ws.getCell("F2").value = "Yayın Tarihi:";
+  ws.getCell("F2").font = HUCRE_FONT;
+  ws.getCell("G2").value = "01.11.2025";
+  ws.getCell("G2").font = HUCRE_FONT;
 
-  ws.mergeCells("A3:D3");
-  const dokNoHucresi = ws.getCell("A3");
-  dokNoHucresi.value = "Doküman No: TMGDK-G1";
-  dokNoHucresi.font = HUCRE_FONT;
+  ws.mergeCells("A3:E3");
+  const altAciklamaHucresi = ws.getCell("A3");
+  altAciklamaHucresi.value =
+    "TEHLİKELİ MADDELER İLE İLGİLİ İŞ VE İŞLEMLERDE GÖREV ALAN TÜM PERSONELE AİT BİLGİLERİN YER ALDIĞI LİSTE";
+  altAciklamaHucresi.font = { name: "Calibri", size: 9, bold: true };
+  altAciklamaHucresi.alignment = { horizontal: "center", wrapText: true };
+  ws.getRow(3).height = 24;
+  ws.getCell("F3").value = "Revizyon Tarihi:";
+  ws.getCell("F3").font = HUCRE_FONT;
+  ws.getCell("G3").value = veri.bugun;
+  ws.getCell("G3").font = HUCRE_FONT;
 
-  ws.mergeCells("E3:G3");
-  const tarihHucresi = ws.getCell("E3");
-  tarihHucresi.value = `Düzenleme Tarihi: ${veri.bugun}`;
-  tarihHucresi.font = HUCRE_FONT;
-  tarihHucresi.alignment = { horizontal: "right" };
+  ws.getCell("F4").value = "Sayı No:";
+  ws.getCell("F4").font = HUCRE_FONT;
+  ws.getCell("G4").value = "1/1";
+  ws.getCell("G4").font = HUCRE_FONT;
 
   // --- Tablo başlık satırı ---------------------------------------------
-  const basliklarSatiri = 5;
+  const basliklarSatiri = 6;
   const basliklar = [
     "Sıra No",
     "Tehlikeli Madde Görev Başlığı",

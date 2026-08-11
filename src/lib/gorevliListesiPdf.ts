@@ -2,27 +2,39 @@
 //
 // TMGDK-G1 "Tehlikeli Madde İş ve İşlemlerinde Görevli Personel Listesi"
 // belgesinin PDF çıktısını üretir. İki sayfadan oluşur:
-//   1) Kapak sayfası — BelgeOlusturForm.tsx'teki kapak stiline benzer
-//      (firma adı, belge başlığı, hazırlayan bilgisi).
-//   2) Başlık kutusu (Doküman No / Düzenleme Tarihi) + jspdf-autotable ile
-//      çizilen tablo + dipnot + imza satırı.
+//   1) Kapak sayfası (DİKEY) — kullanıcının paylaştığı örnek kapak sayfası
+//      (TM_Görevli_Listesi_Kapak_Sayfası_Örnek_.docx) ile aynı yapıda:
+//      firma logosu + adı, "Formu Düzenleyen Kişi / Düzenleyen Kişinin
+//      Bağlı Olduğu TMGDK / Dokümanın Genelge Kapsamında Karşılığı /
+//      Güncelleme Nedeni" doküman kontrol tablosu, Hazırlayan(TMGD)/
+//      Sorumlu Kişi imza alanı, SİAM TMGDK kurumsal logosu + karekod
+//      (diğer tüm belgelerin kapağıyla AYNI — bkz. kapakVarliklari.ts).
+//   2) Başlık kutusu + tablo (YATAY) — sütunların (özellikle Yapılacak
+//      Görevler ve Doldurulacak Döküman No) uzun metinlerini rahat
+//      sığdırmak için sayfa yatay (landscape) olarak üretilir.
 //
-// Türkçe karakter desteği için LiberationSans gömülü fontu kullanılır
-// (bkz. pdfFonts.ts / BelgeOlusturForm.tsx — aynı kalıcı ders burada da
-// geçerli: jsPDF varsayılan "helvetica" fontu ş/ğ/ı/ö/ü/ç karakterlerini
-// desteklemez).
+// Türkçe karakter desteği için LiberationSans gömülü fontu kullanılır.
 
 import type { jsPDF as JsPDFType } from "jspdf";
 import {
   LIBERATION_SANS_REGULAR_B64,
   LIBERATION_SANS_BOLD_B64,
 } from "./pdfFonts";
+import { SIAM_LOGO_B64, SIAM_LOGO_EN_BOY, SIAM_QR_B64 } from "./kapakVarliklari";
 
 const FONT = "LiberationSans";
 const RENK_VURGU: [number, number, number] = [30, 64, 175];
-const W = 210;
-const H = 297;
 const M = 15;
+
+// Sayfa ölçüleri sayfaya göre değişir (kapak dikey, tablo sayfası yatay) —
+// bu yüzden sabit değil, module-level "let" ve bir yardımcı fonksiyonla
+// ayarlanır (BelgeOlusturForm.tsx'teki AYNI teknik).
+let W = 210;
+let H = 297;
+function sayfaYonunuAyarla(yatay: boolean) {
+  W = yatay ? 297 : 210;
+  H = yatay ? 210 : 297;
+}
 
 export type GorevliListesiPdfSatiri = {
   sira_no: number;
@@ -67,70 +79,100 @@ function logoKutusuHesapla(enBoyOrani: number, kutuBoyut: number) {
   return { w, h };
 }
 
-function kapakSayfasiCiz(
+async function kapakSayfasiCiz(
   doc: JsPDFType,
-  veri: GorevliListesiPdfVerisi
+  veri: GorevliListesiPdfVerisi,
+  autoTable: (doc: JsPDFType, opts: Record<string, unknown>) => void
 ) {
-  doc.setFillColor(30, 64, 175);
+  sayfaYonunuAyarla(false);
+
+  doc.setFillColor(...RENK_VURGU);
   doc.rect(0, 0, W, 4, "F");
 
   if (veri.logo) {
     try {
-      const box = logoKutusuHesapla(veri.logo.enBoyOrani, 26);
-      doc.addImage(veri.logo.data, veri.logo.fmt, M, 16, box.w, box.h);
+      const box = logoKutusuHesapla(veri.logo.enBoyOrani, 24);
+      doc.addImage(veri.logo.data, veri.logo.fmt, M, 14, box.w, box.h);
     } catch {
       /* logo eklenemezse kapak yine üretilsin */
     }
   }
 
-  doc.setFontSize(18);
+  doc.setFontSize(15);
   doc.setFont(FONT, "bold");
   doc.setTextColor(0, 0, 0);
-  doc.text(veri.firmaAdi, W / 2, 70, { align: "center", maxWidth: W - 2 * M });
+  doc.text(veri.firmaAdi, W / 2, 58, { align: "center", maxWidth: W - 2 * M });
+
+  // Doküman kontrol tablosu — örnek kapak sayfasıyla (TM_Görevli_Listesi_
+  // Kapak_Sayfası_Örnek_.docx) birebir aynı 4 satır.
+  autoTable(doc, {
+    startY: 75,
+    margin: { left: M, right: M },
+    theme: "grid",
+    styles: { font: FONT, fontSize: 9, cellPadding: 3, valign: "middle", lineColor: [80, 80, 80] },
+    columnStyles: {
+      0: { cellWidth: 62, fontStyle: "bold" },
+      1: { cellWidth: W - 2 * M - 62 },
+    },
+    body: [
+      ["Formu Düzenleyen Kişi", veri.hazirlayanAdi || "—"],
+      ["Düzenleyen Kişinin Bağlı Olduğu TMGDK", "SİAM TMGDK"],
+      [
+        "Dokümanın Genelge Kapsamında Karşılığı",
+        "Tehlikeli Maddeler İle İlgili İş Ve İşlemlerde Görev Alan Tüm Personele Ait Bilgilerin Yer Aldığı Liste",
+      ],
+      [
+        "Güncelleme Nedeni",
+        "03.09.2024 tarih ve 2148063 sayılı Tehlikeli Madde Taşımacılığına İlişkin İşletme Denetimleri Genelgesi kapsamında",
+      ],
+    ],
+  });
+
+  const kontrolTablosuAlti =
+    (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY;
+
+  // Hazırlayan (TMGD) / Sorumlu Kişi — örnekteki gibi iki sütunlu imza alanı.
+  const imzaY = Math.min(kontrolTablosuAlti + 55, H - 60);
+  doc.setFontSize(9.5);
+  doc.setFont(FONT, "bold");
+  doc.setTextColor(0, 0, 0);
+  doc.text("Hazırlayan (TMGD)", W / 2 - 42, imzaY, { align: "center" });
+  doc.text("Sorumlu Kişi", W / 2 + 42, imzaY, { align: "center" });
+  doc.setFont(FONT, "normal");
+  doc.text(veri.hazirlayanAdi || "—", W / 2 - 42, imzaY + 6, { align: "center" });
+  doc.setDrawColor(180, 180, 180);
+  doc.line(W / 2 + 42 - 22, imzaY + 6, W / 2 + 42 + 22, imzaY + 6); // Sorumlu Kişi — boş imza çizgisi
 
   doc.setFontSize(9.5);
   doc.setFont(FONT, "normal");
   doc.setTextColor(90, 90, 90);
-  doc.text("Doküman No: TMGDK-G1", W / 2, 79, { align: "center" });
+  doc.text("Doküman No: TMGDK-G1", W / 2, H - 34, { align: "center" });
+  doc.text(`Düzenleme Tarihi: ${veri.bugun}`, W / 2, H - 28, { align: "center" });
 
-  doc.setDrawColor(200, 200, 200);
-  doc.line(W / 2 - 40, 86, W / 2 + 40, 86);
-
-  doc.setFontSize(15);
-  doc.setFont(FONT, "bold");
-  doc.setTextColor(...RENK_VURGU);
-  doc.text("GÖREVLİ LİSTESİ", W / 2, 100, { align: "center" });
-
-  doc.setFontSize(10);
-  doc.setFont(FONT, "normal");
-  doc.setTextColor(70, 70, 70);
-  doc.text(
-    "Tehlikeli Madde İş ve İşlemlerinde Görevli Personel Listesi",
-    W / 2,
-    108,
-    { align: "center", maxWidth: W - 2 * M }
-  );
-
-  doc.setTextColor(0, 0, 0);
-  doc.setFontSize(9.5);
-  doc.setFont(FONT, "bold");
-  doc.text("Formu Düzenleyen Kişi", W / 2, 140, { align: "center" });
-  doc.setFont(FONT, "normal");
-  doc.text(veri.hazirlayanAdi || "—", W / 2, 146, { align: "center" });
-
-  doc.setFont(FONT, "bold");
-  doc.text("Düzenleme Tarihi", W / 2, 156, { align: "center" });
-  doc.setFont(FONT, "normal");
-  doc.text(veri.bugun, W / 2, 162, { align: "center" });
-
-  doc.setFontSize(8);
-  doc.setTextColor(140, 140, 140);
-  doc.text(
-    `${veri.firmaAdi} · TMGDK-G1 · TMGD Yönetim Sistemi tarafından ${veri.bugun} tarihinde oluşturuldu`,
-    W / 2,
-    285,
-    { align: "center" }
-  );
+  // Sağ alt köşe: SİAM TMGDK kurumsal logosu + karekod — diğer TÜM
+  // belgelerin kapağıyla AYNI yerleşim (bkz. BelgeOlusturForm.tsx).
+  const qrBoyut = 22;
+  const qrX = W - M - qrBoyut;
+  const qrY = H - qrBoyut - 12;
+  try {
+    doc.addImage(SIAM_QR_B64, "PNG", qrX, qrY, qrBoyut, qrBoyut);
+  } catch {
+    /* karekod eklenemezse belge yine üretilsin */
+  }
+  const logoYukseklik = 11;
+  const logoGenislik = logoYukseklik * SIAM_LOGO_EN_BOY;
+  try {
+    doc.addImage(
+      SIAM_LOGO_B64,
+      "JPEG",
+      qrX - logoGenislik - 4,
+      qrY + (qrBoyut - logoYukseklik) / 2,
+      logoGenislik,
+      logoYukseklik
+    );
+  } catch {
+    /* logo eklenemezse belge yine üretilsin */
+  }
 }
 
 function baslikKutusuCiz(doc: JsPDFType, veri: GorevliListesiPdfVerisi) {
@@ -161,18 +203,19 @@ export async function gorevliListesiPdfOlustur(
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" }) as unknown as JsPDFType;
   fontuKaydet(doc);
 
-  // Sayfa 1 — kapak
-  kapakSayfasiCiz(doc, veri);
+  // Sayfa 1 — kapak (dikey)
+  await kapakSayfasiCiz(doc, veri, autoTable);
 
-  // Sayfa 2 — başlık kutusu + tablo
-  doc.addPage();
+  // Sayfa 2 — başlık kutusu + tablo (YATAY — uzun metinli sütunlar rahat sığsın diye)
+  sayfaYonunuAyarla(true);
+  doc.addPage("a4", "landscape");
   fontuKaydet(doc);
   baslikKutusuCiz(doc, veri);
 
   autoTable(doc, {
     startY: 30,
     margin: { left: M, right: M },
-    styles: { font: FONT, fontSize: 8, cellPadding: 2, valign: "middle" },
+    styles: { font: FONT, fontSize: 8.5, cellPadding: 2.5, valign: "middle" },
     headStyles: {
       font: FONT,
       fontStyle: "bold",
@@ -181,13 +224,13 @@ export async function gorevliListesiPdfOlustur(
       halign: "center",
     },
     columnStyles: {
-      0: { cellWidth: 10, halign: "center" },
-      1: { cellWidth: 26 },
-      2: { cellWidth: 48 },
-      3: { cellWidth: 26 },
-      4: { cellWidth: 36 },
-      5: { cellWidth: 28 },
-      6: { cellWidth: 20, halign: "center" },
+      0: { cellWidth: 14, halign: "center" },
+      1: { cellWidth: 36 },
+      2: { cellWidth: 68 },
+      3: { cellWidth: 36 },
+      4: { cellWidth: 50 },
+      5: { cellWidth: 39 },
+      6: { cellWidth: 24, halign: "center" },
     },
     head: [
       [
@@ -209,8 +252,10 @@ export async function gorevliListesiPdfOlustur(
       s.doldurulacak_dokuman_no,
       s.egitim_tarihi,
     ]),
+    // Not: jsPDF-autotable, tablo bir sayfaya sığmayınca kendi içinde
+    // doc.addPage() çağırır; bu çağrı EK argüman almadığı için mevcut
+    // sayfa biçimini (yatay) korur — ayrıca yön ayarlamaya gerek yok.
     didDrawPage: () => {
-      // Yeni otomatik sayfa eklenirse başlık kutusunu tekrar çiz.
       baslikKutusuCiz(doc, veri);
     },
   });
@@ -218,17 +263,17 @@ export async function gorevliListesiPdfOlustur(
   const sonY =
     (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable
       .finalY + 8;
-  const dipnotY = sonY > H - 40 ? H - 38 : sonY;
+  const dipnotY = sonY > H - 30 ? H - 28 : sonY;
 
   doc.setFontSize(7.5);
-  doc.setFont(FONT, "italic");
+  doc.setFont(FONT, "normal"); // "italic" stili gömülü değil (Türkçe karakterler bozulur), normal kullanılır
   doc.setTextColor(90, 90, 90);
   const dipnotMetni =
     "Yukarıda Belirtilen Formda kişi/kişiler değişmesi halinde en geç 7 gün içerisinde yazılı olarak Tehlikeli Madde Güvenlik Danışmanına Haber verilmesi gerekmektedir.";
   const dipnotSatirlari = doc.splitTextToSize(dipnotMetni, W - 2 * M);
   doc.text(dipnotSatirlari, M, dipnotY);
 
-  const imzaY = dipnotY + dipnotSatirlari.length * 3.6 + 10;
+  const imzaY = dipnotY + dipnotSatirlari.length * 3.6 + 8;
   doc.setTextColor(0, 0, 0);
   doc.setFontSize(9);
   doc.setFont(FONT, "bold");
