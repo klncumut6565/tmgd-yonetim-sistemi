@@ -223,8 +223,9 @@ async function evrakPdfUret(args: {
   doc.text(`Tarih: ${args.tarih}`, W - M, y, { align: "right" });
   y += 6;
 
-  // Gönderen / Alıcı kutuları
-  const kutuY = y, kutuH = 22, kutuW = (W - 2 * M - 4) / 2;
+  // Gönderen / Alıcı kutuları — yükseklik, unvan + adresin (artık ikisi de
+  // isim+adres birleşik basılıyor) rahat sığması için 22->26mm büyütüldü.
+  const kutuY = y, kutuH = 26, kutuW = (W - 2 * M - 4) / 2;
   doc.setDrawColor(180, 180, 180); doc.setLineWidth(0.3);
   doc.rect(M, kutuY, kutuW, kutuH);
   doc.rect(M + kutuW + 4, kutuY, kutuW, kutuH);
@@ -385,6 +386,8 @@ export default function TasimaEvraki({
   const [evrakNo, setEvrakNo] = useState(() => evrakNoUret());
   const [tarih, setTarih] = useState(() => new Date().toISOString().slice(0, 10));
   const [gonderen, setGonderen] = useState(firmaAdi);
+  const [gonderenAdres, setGonderenAdres] = useState("");
+  const [firmaAdresVarsayilan, setFirmaAdresVarsayilan] = useState("");
   const [alici, setAlici] = useState("");
   const [aliciAdres, setAliciAdres] = useState("");
 
@@ -437,7 +440,7 @@ export default function TasimaEvraki({
   const [eq, setEq] = useState(false);
 
   const yukle = useCallback(async () => {
-    const [env, sur, arc, evr, alc] = await Promise.all([
+    const [env, sur, arc, evr, alc, frm] = await Promise.all([
       supabase.from("firm_chemicals")
         .select("id, un_number, proper_shipping_name, adr_class, classification_code, packing_group, tunnel_code, transport_category, labels, trade_name")
         .eq("firm_id", firmId).order("un_number"),
@@ -453,6 +456,9 @@ export default function TasimaEvraki({
       supabase.from("firm_consignees")
         .select("id, title, address")
         .eq("firm_id", firmId).order("title"),
+      supabase.from("firms")
+        .select("address, district, city")
+        .eq("id", firmId).single(),
     ]);
     if (env.error && /does not exist|not find the table/i.test(env.error.message || "")) {
       setHata("Veritabanı güncellemesi (027_adr_transport_envanter.sql) henüz çalıştırılmamış.");
@@ -465,6 +471,17 @@ export default function TasimaEvraki({
     // Alıcı rehberi henüz oluşturulmamışsa (migration 035 çalışmadıysa)
     // sessizce boş geç — evrak düzenleme yine de çalışsın.
     setAliciListesi((alc.data as Consignee[]) || []);
+
+    // Gönderen adresi — Gönderen zaten firmanın kendi unvanına ("firmaAdi")
+    // varsayılan geldiği için, adres de firmanın kendi kayıtlı adresine
+    // varsayılan gelir (Alıcı adresi gibi kullanıcı tarafından
+    // değiştirilebilir). Yalnızca ALAN HENÜZ BOŞSA doldurulur — kullanıcının
+    // girdiği bir değeri sonraki yukle() çağrılarında (kaydetme sonrası) EZMEZ.
+    const frmVeri = frm.data as { address: string | null; district: string | null; city: string | null } | null;
+    const adresParcalari = [frmVeri?.address, frmVeri?.district, frmVeri?.city].filter(Boolean);
+    const varsayilanAdres = adresParcalari.join(", ");
+    setFirmaAdresVarsayilan(varsayilanAdres);
+    setGonderenAdres((mevcut) => mevcut || varsayilanAdres);
   }, [firmId]);
 
   useEffect(() => { yukle(); }, [yukle]);
@@ -759,7 +776,7 @@ export default function TasimaEvraki({
   function temizle() {
     setEvrakId(null); setEvrakNo(evrakNoUret()); setAlici(""); setAliciAdres(""); setTasiyici("");
     setSurucuId(""); setAracId(""); setNotlar(""); setKalemler([]);
-    setGonderen(firmaAdi); setMesaj("");
+    setGonderen(firmaAdi); setGonderenAdres(firmaAdresVarsayilan); setMesaj("");
     setTarih(new Date().toISOString().slice(0, 10));
   }
 
@@ -771,8 +788,18 @@ export default function TasimaEvraki({
     if (!ev) return;
     setEvrakId(ev.id); setEvrakNo(ev.document_no || "");
     setTarih(ev.transport_date || new Date().toISOString().slice(0, 10));
-    setGonderen(ev.consignor || firmaAdi);
     // Kayıtta unvan ve adres tek alanda satır sonuyla ayrılmış tutuluyor
+    // (Alıcı ile AYNI desen). Eski kayıtlarda (adres alanı eklenmeden önce)
+    // consignor sadece unvan içerir — bu durumda adres boş kalır, hatasız.
+    const gonderenTam = ev.consignor || firmaAdi;
+    const gonderenSatirSonu = gonderenTam.indexOf("\n");
+    if (gonderenSatirSonu > -1) {
+      setGonderen(gonderenTam.slice(0, gonderenSatirSonu));
+      setGonderenAdres(gonderenTam.slice(gonderenSatirSonu + 1));
+    } else {
+      setGonderen(gonderenTam);
+      setGonderenAdres(firmaAdresVarsayilan);
+    }
     const aliciTam = ev.consignee || "";
     const ilkSatirSonu = aliciTam.indexOf("\n");
     if (ilkSatirSonu > -1) {
@@ -822,7 +849,7 @@ export default function TasimaEvraki({
     setMesaj("");
     const govde = {
       firm_id: firmId, document_no: evrakNo.trim(), transport_date: tarih,
-      consignor: gonderen.trim(),
+      consignor: gonderenAdres.trim() ? `${gonderen.trim()}\n${gonderenAdres.trim()}` : gonderen.trim(),
       consignee: aliciAdres.trim() ? `${alici.trim()}\n${aliciAdres.trim()}` : alici.trim(),
       carrier: tasiyici.trim(),
       driver_id: surucuId || null, vehicle_id: aracId || null,
@@ -862,7 +889,7 @@ export default function TasimaEvraki({
     const doc = await evrakPdfUret({
       firmaAdi, evrakNo: evrakNo || "(taslak)",
       tarih: tarih.split("-").reverse().join("."),
-      gonderen,
+      gonderen: gonderenAdres.trim() ? `${gonderen}\n${gonderenAdres.trim()}` : gonderen,
       alici: aliciAdres.trim() ? `${alici}\n${aliciAdres.trim()}` : alici,
       tasiyici,
       surucu: seciliSurucu, arac: seciliArac,
@@ -918,8 +945,13 @@ export default function TasimaEvraki({
             )}
             <input type="date" className="border p-2 rounded text-sm"
               value={tarih} onChange={(e) => setTarih(e.target.value)} disabled={!canWrite} />
-            <input className="border p-2 rounded text-sm" placeholder="Gönderen"
-              value={gonderen} onChange={(e) => setGonderen(e.target.value)} disabled={!canWrite} />
+            <div className="md:col-span-1">
+              <input className="border p-2 rounded text-sm w-full" placeholder="Gönderen firma unvanı"
+                value={gonderen} onChange={(e) => setGonderen(e.target.value)} disabled={!canWrite} />
+              <textarea className="border p-2 rounded text-sm w-full mt-1" rows={2}
+                placeholder="Gönderen adresi"
+                value={gonderenAdres} onChange={(e) => setGonderenAdres(e.target.value)} disabled={!canWrite} />
+            </div>
             <div className="md:col-span-1">
               {aliciListesi.length > 0 && (
                 <select

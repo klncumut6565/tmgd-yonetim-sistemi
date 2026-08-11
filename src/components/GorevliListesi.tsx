@@ -8,16 +8,22 @@
 // YOK, her şey doğrudan tablonun içinde.
 //
 // Sütun kontrolleri:
-//   - Görev Başlığı         : seçenekli (Gönderen/Alıcı/.../Diğer serbest metin)
-//   - Yapılacak Görevler    : seçenekli (örnek TMFB belgesindeki standart
-//                             görev tanımları + Diğer serbest metin)
-//   - Bağlı Olduğu Birim    : serbest metin
-//   - Sorumlu Kişi/ler      : SERBEST METİN (elle yazılır, seçenek YOK —
-//                             kullanıcı talebi üzerine employees listesi
-//                             kaldırıldı)
-//   - Doldurulacak Döküman No: seçenekli (örnek belgedeki standart
+//   - Görev Başlığı         : ÇOKLU seçenekli (Gönderen/Alıcı/.../Diğer
+//                             serbest metin) — birden fazla görev birlikte
+//                             işaretlenebilir (örn. Gönderen + Paketleyen +
+//                             Yükleyen), seçilenler hücrede alt alta durur.
+//   - Yapılacak Görevler    : ÇOKLU seçenekli (örnek TMFB belgesindeki
+//                             standart görev tanımları + Diğer serbest metin)
+//   - Bağlı Olduğu Birim    : serbest metin (çok satırlı, otomatik büyür)
+//   - Sorumlu Kişi/ler      : SERBEST METİN (elle yazılır, seçenek YOK)
+//   - Doldurulacak Döküman No: ÇOKLU seçenekli (örnek belgedeki standart
 //                             döküman tanımları + Diğer serbest metin)
 //   - Eğitim Tarihi         : tarih seçici
+//
+// Çoklu seçimler veritabanında TEK bir metin alanında, seçilen her değer
+// kendi satırında olacak şekilde ("\n" ile ayrılmış) saklanır — bu, PDF/
+// Excel çıktısının zaten desteklediği çok satırlı hücre biçimiyle birebir
+// uyumludur (autoTable ve ExcelJS wrapText, \n'i otomatik yeni satıra çevirir).
 //
 // Satır davranışı (Google E-Tablolar mantığı):
 //   - Var olan satırlar hücre bazında düzenlenir; bir alan blur olduğunda
@@ -75,13 +81,13 @@ const DOKUMAN_NO_SECIMLERI = [...DOKUMAN_NO_SECENEKLERI, DIGER];
 type SatirState = {
   key: string; // React key — db id veya "yeni-N"
   id: string | null; // veritabanı id'si; null ise henüz kaydedilmedi
-  gorevSecim: string;
+  gorevSecimler: string[];
   gorevSerbest: string;
-  yapilacakSecim: string;
+  yapilacakSecimler: string[];
   yapilacakSerbest: string;
   bagli_oldugu_birim: string;
   sorumlu_kisiler: string;
-  dokumanSecim: string;
+  dokumanSecimler: string[];
   dokumanSerbest: string;
   egitim_tarihi: string;
   kaydediliyor: boolean;
@@ -93,52 +99,78 @@ function bosSatir(): SatirState {
   return {
     key: `yeni-${yeniSayac}`,
     id: null,
-    gorevSecim: GOREV_BASLIKLARI[0],
+    gorevSecimler: [],
     gorevSerbest: "",
-    yapilacakSecim: YAPILACAK_GOREVLER_SECENEKLERI[0],
+    yapilacakSecimler: [],
     yapilacakSerbest: "",
     bagli_oldugu_birim: "",
     sorumlu_kisiler: "",
-    dokumanSecim: DOKUMAN_NO_SECENEKLERI[0],
+    dokumanSecimler: [],
     dokumanSerbest: "",
     egitim_tarihi: "",
     kaydediliyor: false,
   };
 }
 
-/** Bir değer listede birebir varsa o seçeneği, yoksa "Diğer" + serbest metni döndürür. */
-function secimVeSerbestCoz(
+/** Kaydedilmiş (tek metin, "\n" ile ayrılmış) bir değeri, hangi bilinen
+ *  seçeneklerin işaretli olduğuna ve varsa serbest metin kısmına ayırır.
+ *  Bilinen seçenekler (Yapılacak Görevler gibi) kendi İÇİNDE de "\n"
+ *  barındırabildiği için basit split değil, alt-metin arama kullanılır. */
+function cokluSecimVeSerbestCoz(
   deger: string | null,
   secenekler: string[]
-): { secim: string; serbest: string } {
-  const v = deger || "";
-  if (v && secenekler.includes(v)) return { secim: v, serbest: "" };
-  if (!v) return { secim: secenekler[0], serbest: "" };
-  return { secim: DIGER, serbest: v };
+): { secimler: string[]; serbest: string } {
+  const v = (deger || "").trim();
+  if (!v) return { secimler: [], serbest: "" };
+
+  let kalan = v;
+  const bulunanlar: string[] = [];
+  // En uzun/spesifik seçenekten başlayarak ara — kısa bir seçenek, uzun
+  // birinin alt dizesi olabileceğinden yanlış eşleşmeyi önler.
+  const uzunluguGoreSirali = [...secenekler].sort((a, b) => b.length - a.length);
+  for (const secenek of uzunluguGoreSirali) {
+    if (kalan.includes(secenek)) {
+      bulunanlar.push(secenek);
+      kalan = kalan.replace(secenek, "\u0000").trim();
+    }
+  }
+  kalan = kalan.replace(/\u0000/g, "").replace(/^\n+|\n+$/g, "").trim();
+
+  // Kullanıcıya tutarlı görünmesi için orijinal seçenek sırasına göre diz.
+  const secimler = secenekler.filter((s) => bulunanlar.includes(s));
+  const serbest = kalan;
+  if (serbest) secimler.push(DIGER);
+  return { secimler, serbest };
 }
 
 function kayittanSatir(k: GorevliKaydi): SatirState {
-  const gorev = secimVeSerbestCoz(k.gorev_basligi, GOREV_BASLIKLARI);
-  const yapilacak = secimVeSerbestCoz(k.yapilacak_gorevler, YAPILACAK_GOREVLER_SECENEKLERI);
-  const dokuman = secimVeSerbestCoz(k.doldurulacak_dokuman_no, DOKUMAN_NO_SECENEKLERI);
+  const gorev = cokluSecimVeSerbestCoz(k.gorev_basligi, GOREV_BASLIKLARI);
+  const yapilacak = cokluSecimVeSerbestCoz(k.yapilacak_gorevler, YAPILACAK_GOREVLER_SECENEKLERI);
+  const dokuman = cokluSecimVeSerbestCoz(k.doldurulacak_dokuman_no, DOKUMAN_NO_SECENEKLERI);
   return {
     key: k.id,
     id: k.id,
-    gorevSecim: gorev.secim,
+    gorevSecimler: gorev.secimler,
     gorevSerbest: gorev.serbest,
-    yapilacakSecim: yapilacak.secim,
+    yapilacakSecimler: yapilacak.secimler,
     yapilacakSerbest: yapilacak.serbest,
     bagli_oldugu_birim: k.bagli_oldugu_birim || "",
     sorumlu_kisiler: k.sorumlu_kisiler || "",
-    dokumanSecim: dokuman.secim,
+    dokumanSecimler: dokuman.secimler,
     dokumanSerbest: dokuman.serbest,
     egitim_tarihi: k.egitim_tarihi || "",
     kaydediliyor: false,
   };
 }
 
-function etkinMetin(secim: string, serbest: string): string {
-  return (secim === DIGER ? serbest : secim).trim();
+/** Seçilen değerleri (orijinal seçenek sırasına göre) + varsa serbest metni
+ *  tek bir "\n" ayraçlı metne birleştirir — PDF/Excel bunu otomatik alt alta
+ *  gösterir. */
+function etkinCokluMetin(secimler: string[], serbest: string, secenekler: string[]): string {
+  const sirali = secenekler.filter((s) => secimler.includes(s));
+  const parcalar = [...sirali];
+  if (secimler.includes(DIGER) && serbest.trim()) parcalar.push(serbest.trim());
+  return parcalar.join("\n");
 }
 
 function ensureTrailingBlank(rows: SatirState[]): SatirState[] {
@@ -160,8 +192,12 @@ function bugununTarihi(): string {
   return trTarih(new Date().toISOString());
 }
 
+// Hücre yüksekliği (kullanıcı talebiyle) ÖNCEKİNİN 2 KATINA çıkarıldı:
+// dikey padding py-1 -> py-2 ve tüm hücrelerin p-1.5 -> p-3 olması bunu
+// hem select/textarea kontrollerinde hem de hücre çerçevesinde sağlar.
 const HUCRE_INPUT =
-  "w-full border rounded px-1.5 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-400";
+  "w-full border rounded px-1.5 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-blue-400";
+const HUCRE_TD = "p-3 border align-top";
 
 export default function GorevliListesi({
   firmId,
@@ -220,7 +256,7 @@ export default function GorevliListesi({
   }
 
   async function kaydet(satir: SatirState, siraNo: number) {
-    const gorevBasligi = etkinMetin(satir.gorevSecim, satir.gorevSerbest);
+    const gorevBasligi = etkinCokluMetin(satir.gorevSecimler, satir.gorevSerbest, GOREV_BASLIKLARI);
     if (!gorevBasligi) return; // henüz yeterli veri yok, kaydetme
 
     setRows((prev) => prev.map((r) => (r.key === satir.key ? { ...r, kaydediliyor: true } : r)));
@@ -230,10 +266,13 @@ export default function GorevliListesi({
         firm_id: firmId,
         sira_no: siraNo,
         gorev_basligi: gorevBasligi,
-        yapilacak_gorevler: etkinMetin(satir.yapilacakSecim, satir.yapilacakSerbest) || null,
+        yapilacak_gorevler:
+          etkinCokluMetin(satir.yapilacakSecimler, satir.yapilacakSerbest, YAPILACAK_GOREVLER_SECENEKLERI) ||
+          null,
         bagli_oldugu_birim: satir.bagli_oldugu_birim.trim() || null,
         sorumlu_kisiler: satir.sorumlu_kisiler.trim() || null,
-        doldurulacak_dokuman_no: etkinMetin(satir.dokumanSecim, satir.dokumanSerbest) || null,
+        doldurulacak_dokuman_no:
+          etkinCokluMetin(satir.dokumanSecimler, satir.dokumanSerbest, DOKUMAN_NO_SECENEKLERI) || null,
         egitim_tarihi: satir.egitim_tarihi || null,
       };
 
@@ -325,11 +364,15 @@ export default function GorevliListesi({
   function satirlariHazirla() {
     return kayitliSatirlar.map((r, idx) => ({
       sira_no: idx + 1,
-      gorev_basligi: etkinMetin(r.gorevSecim, r.gorevSerbest),
-      yapilacak_gorevler: etkinMetin(r.yapilacakSecim, r.yapilacakSerbest),
+      gorev_basligi: etkinCokluMetin(r.gorevSecimler, r.gorevSerbest, GOREV_BASLIKLARI),
+      yapilacak_gorevler: etkinCokluMetin(
+        r.yapilacakSecimler,
+        r.yapilacakSerbest,
+        YAPILACAK_GOREVLER_SECENEKLERI
+      ),
       bagli_oldugu_birim: r.bagli_oldugu_birim,
       sorumluIsimler: r.sorumlu_kisiler,
-      doldurulacak_dokuman_no: etkinMetin(r.dokumanSecim, r.dokumanSerbest),
+      doldurulacak_dokuman_no: etkinCokluMetin(r.dokumanSecimler, r.dokumanSerbest, DOKUMAN_NO_SECENEKLERI),
       egitim_tarihi: trTarih(r.egitim_tarihi),
     }));
   }
@@ -403,8 +446,7 @@ export default function GorevliListesi({
         <div>
           <h2 className="text-lg font-bold">📋 Görevli Listesi</h2>
           <p className="text-sm text-gray-500">
-            TMGDK-G1 — hücrelere doğrudan yazın; Görev Başlığı doldurulup satırdan
-            çıkıldığında otomatik kaydedilir.
+            TMGDK-G1 — birden fazla seçeneği aynı anda işaretleyebilirsiniz; seçilenler hücrede alt alta görünür.
           </p>
         </div>
         <div className="flex gap-2">
@@ -455,21 +497,22 @@ export default function GorevliListesi({
               const yeniMi = row.id === null;
               return (
                 <tr key={row.key} className={yeniMi ? "bg-gray-50/60" : "bg-white"}>
-                  <td className="p-1.5 border text-center align-top text-gray-500">
+                  <td className={HUCRE_TD + " text-center text-gray-500"}>
                     {yeniMi ? "—" : idx + 1}
                   </td>
 
-                  {/* Görev Başlığı: seçenek doğrudan hücrede, altında serbest metin */}
-                  <td className="p-1.5 border align-top">
+                  {/* Görev Başlığı: ÇOKLU seçim (checkbox listesi hemen hücrede),
+                      altında "Diğer" işaretliyse serbest metin. */}
+                  <td className={HUCRE_TD}>
                     <select
-                      value={row.gorevSecim}
+                      multiple
+                      size={Math.min(7, GOREV_SECENEKLERI.length)}
+                      value={row.gorevSecimler}
                       onChange={(e) => {
-                        const val = e.target.value;
-                        updateRow(row.key, { gorevSecim: val });
-                        if (val !== DIGER) {
-                          kaydet({ ...row, gorevSecim: val }, idx + 1);
-                        }
+                        const secililer = Array.from(e.target.selectedOptions).map((o) => o.value);
+                        updateRow(row.key, { gorevSecimler: secililer });
                       }}
+                      onBlur={() => kaydet(row, idx + 1)}
                       className={HUCRE_INPUT}
                     >
                       {GOREV_SECENEKLERI.map((g) => (
@@ -478,7 +521,7 @@ export default function GorevliListesi({
                         </option>
                       ))}
                     </select>
-                    {row.gorevSecim === DIGER && (
+                    {row.gorevSecimler.includes(DIGER) && (
                       <input
                         type="text"
                         value={row.gorevSerbest}
@@ -490,17 +533,17 @@ export default function GorevliListesi({
                     )}
                   </td>
 
-                  {/* Yapılacak Görevler: seçenek doğrudan hücrede, altında serbest metin */}
-                  <td className="p-1.5 border align-top">
+                  {/* Yapılacak Görevler: ÇOKLU seçim, altında "Diğer" işaretliyse serbest metin. */}
+                  <td className={HUCRE_TD}>
                     <select
-                      value={row.yapilacakSecim}
+                      multiple
+                      size={Math.min(6, YAPILACAK_GOREVLER_SECIMLERI.length)}
+                      value={row.yapilacakSecimler}
                       onChange={(e) => {
-                        const val = e.target.value;
-                        updateRow(row.key, { yapilacakSecim: val });
-                        if (val !== DIGER) {
-                          kaydet({ ...row, yapilacakSecim: val }, idx + 1);
-                        }
+                        const secililer = Array.from(e.target.selectedOptions).map((o) => o.value);
+                        updateRow(row.key, { yapilacakSecimler: secililer });
                       }}
+                      onBlur={() => kaydet(row, idx + 1)}
                       className={HUCRE_INPUT}
                     >
                       {YAPILACAK_GOREVLER_SECIMLERI.map((g) => (
@@ -511,7 +554,7 @@ export default function GorevliListesi({
                         </option>
                       ))}
                     </select>
-                    {row.yapilacakSecim === DIGER && (
+                    {row.yapilacakSecimler.includes(DIGER) && (
                       <textarea
                         value={row.yapilacakSerbest}
                         onChange={(e) =>
@@ -525,14 +568,14 @@ export default function GorevliListesi({
                     )}
                   </td>
 
-                  <td className="p-1.5 border align-top">
+                  <td className={HUCRE_TD}>
                     <textarea
                       value={row.bagli_oldugu_birim}
                       onChange={(e) =>
                         updateRow(row.key, { bagli_oldugu_birim: e.target.value })
                       }
                       onBlur={() => kaydet(row, idx + 1)}
-                      rows={Math.max(1, row.bagli_oldugu_birim.split("\n").length)}
+                      rows={Math.max(2, row.bagli_oldugu_birim.split("\n").length)}
                       placeholder="Birden fazlaysa her satıra bir tane yazın"
                       className={HUCRE_INPUT + " resize-none leading-4"}
                     />
@@ -542,30 +585,30 @@ export default function GorevliListesi({
                       Birden fazla isim, her biri kendi satırında (Enter ile) girilir;
                       textarea satır sayısı içeriğe göre büyür ki tüm isimler her zaman
                       görünür kalsın (kırpılmasın/kaydırma gerekmesin). */}
-                  <td className="p-1.5 border align-top">
+                  <td className={HUCRE_TD}>
                     <textarea
                       value={row.sorumlu_kisiler}
                       onChange={(e) =>
                         updateRow(row.key, { sorumlu_kisiler: e.target.value })
                       }
                       onBlur={() => kaydet(row, idx + 1)}
-                      rows={Math.max(1, row.sorumlu_kisiler.split("\n").length)}
+                      rows={Math.max(2, row.sorumlu_kisiler.split("\n").length)}
                       placeholder="Ad Soyad (birden fazlaysa her satıra bir isim yazın)"
                       className={HUCRE_INPUT + " resize-none leading-4"}
                     />
                   </td>
 
-                  {/* Doldurulacak Döküman No: seçenek doğrudan hücrede, altında serbest metin */}
-                  <td className="p-1.5 border align-top">
+                  {/* Doldurulacak Döküman No: ÇOKLU seçim, altında "Diğer" işaretliyse serbest metin. */}
+                  <td className={HUCRE_TD}>
                     <select
-                      value={row.dokumanSecim}
+                      multiple
+                      size={Math.min(3, DOKUMAN_NO_SECIMLERI.length)}
+                      value={row.dokumanSecimler}
                       onChange={(e) => {
-                        const val = e.target.value;
-                        updateRow(row.key, { dokumanSecim: val });
-                        if (val !== DIGER) {
-                          kaydet({ ...row, dokumanSecim: val }, idx + 1);
-                        }
+                        const secililer = Array.from(e.target.selectedOptions).map((o) => o.value);
+                        updateRow(row.key, { dokumanSecimler: secililer });
                       }}
+                      onBlur={() => kaydet(row, idx + 1)}
                       className={HUCRE_INPUT}
                     >
                       {DOKUMAN_NO_SECIMLERI.map((g) => (
@@ -574,7 +617,7 @@ export default function GorevliListesi({
                         </option>
                       ))}
                     </select>
-                    {row.dokumanSecim === DIGER && (
+                    {row.dokumanSecimler.includes(DIGER) && (
                       <textarea
                         value={row.dokumanSerbest}
                         onChange={(e) =>
@@ -588,7 +631,7 @@ export default function GorevliListesi({
                     )}
                   </td>
 
-                  <td className="p-1.5 border align-top">
+                  <td className={HUCRE_TD}>
                     <input
                       type="date"
                       value={row.egitim_tarihi}
@@ -598,7 +641,7 @@ export default function GorevliListesi({
                     />
                   </td>
 
-                  <td className="p-1.5 border text-center align-top">
+                  <td className={HUCRE_TD + " text-center"}>
                     {row.kaydediliyor && (
                       <span className="text-gray-400" title="Kaydediliyor…">
                         ⏳
