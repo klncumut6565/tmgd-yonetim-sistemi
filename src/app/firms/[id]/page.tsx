@@ -1213,10 +1213,16 @@ function FirmDetailInner({
                                 <div className="flex items-center gap-1 shrink-0 text-xs text-gray-400">
                                   <span title="Ziyaret Tarihi — Ziyaretler sekmesiyle bağlantılıdır">📅 Ziyaret Tarihi:</span>
                                   <input
+                                    key={"visit:" + it.period + ":" + visitDate}
                                     type="date"
-                                    value={visitDate}
+                                    defaultValue={visitDate}
                                     disabled={!canWrite}
-                                    onChange={(e) => updateVisitDate(it.period, e.target.value)}
+                                    onChange={(e) => {
+                                      if (e.target.value) updateVisitDate(it.period, e.target.value);
+                                    }}
+                                    onBlur={(e) => {
+                                      if (!e.target.value && visitDate) updateVisitDate(it.period, "");
+                                    }}
                                     className="border rounded px-1 py-0.5 text-xs disabled:bg-gray-50 disabled:text-gray-400"
                                   />
                                 </div>
@@ -1232,22 +1238,40 @@ function FirmDetailInner({
                                     📅 Başlangıç:
                                   </span>
                                   <input
+                                    key={"contract:" + (firm?.contract_start ? String(firm.contract_start).slice(0, 10) : "")}
                                     type="date"
-                                    value={firm?.contract_start ? String(firm.contract_start).slice(0, 10) : ""}
+                                    defaultValue={firm?.contract_start ? String(firm.contract_start).slice(0, 10) : ""}
                                     disabled={!canWrite}
-                                    onChange={(e) => updateContractStart(e.target.value)}
+                                    onChange={(e) => {
+                                      if (e.target.value) updateContractStart(e.target.value);
+                                    }}
                                     className="border rounded px-1 py-0.5 text-xs disabled:bg-gray-50 disabled:text-gray-400"
                                   />
                                 </div>
                               ) : (
-                                /* Geçerlilik tarihi — isteğe bağlı */
+                                /* Geçerlilik tarihi — isteğe bağlı.
+                                   
+                                   ÖNEMLİ: uncontrolled (defaultValue + key). Native date
+                                   input, tarih eksikken (örn. yıl tamamlanmamışken)
+                                   onChange'i BOŞ STRING ile tetikler. value= ile controlled
+                                   yapılırsa bu boş string state'e yazılıp input'a geri
+                                   basılıyor — tarayıcı bunu "tüm alanı temizle" olarak
+                                   yorumlayıp gün/ay segmentlerini de siliyordu. key={expiryDate}
+                                   sayesinde veri DIŞARIDAN değiştiğinde (örn. başka sekme/
+                                   supabase realtime) input yine de doğru şekilde yenileniyor. */
                                 <div className="flex items-center gap-1 shrink-0 text-xs text-gray-400">
                                   <span title="Belge Geçerlilik Tarihi (isteğe bağlı)">📅 Geçerlilik:</span>
                                   <input
+                                    key={itemKey + ":" + expiryDate}
                                     type="date"
-                                    value={expiryDate}
+                                    defaultValue={expiryDate}
                                     disabled={!canWrite}
-                                    onChange={(e) => updateExpiry(it.code, it.period, e.target.value)}
+                                    onChange={(e) => {
+                                      if (e.target.value) updateExpiry(it.code, it.period, e.target.value);
+                                    }}
+                                    onBlur={(e) => {
+                                      if (!e.target.value && expiryDate) updateExpiry(it.code, it.period, "");
+                                    }}
                                     className="border rounded px-1 py-0.5 text-xs disabled:bg-gray-50 disabled:text-gray-400"
                                   />
                                 </div>

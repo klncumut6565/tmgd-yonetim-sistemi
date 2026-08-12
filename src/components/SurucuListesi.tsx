@@ -602,32 +602,48 @@ export default function SurucuListesi({
 
                   <td className="p-1.5 border align-top">
                     <input
+                      key={row.key + ":ise:" + row.ise_giris_tarihi}
                       type="date"
-                      value={row.ise_giris_tarihi}
-                      onChange={(e) => updateRow(row.key, { ise_giris_tarihi: e.target.value })}
-                      onBlur={() => kaydet(row, idx + 1)}
+                      defaultValue={row.ise_giris_tarihi}
+                      onChange={(e) => {
+                        if (e.target.value) updateRow(row.key, { ise_giris_tarihi: e.target.value });
+                      }}
+                      onBlur={(e) => {
+                        if (!e.target.value && row.ise_giris_tarihi) updateRow(row.key, { ise_giris_tarihi: "" });
+                        kaydet(row, idx + 1);
+                      }}
                       className={HUCRE_INPUT}
                     />
                   </td>
 
                   <td className="p-1.5 border align-top">
                     <input
+                      key={row.key + ":cikis:" + row.isten_cikis_tarihi}
                       type="date"
-                      value={row.isten_cikis_tarihi}
-                      onChange={(e) => updateRow(row.key, { isten_cikis_tarihi: e.target.value })}
-                      onBlur={() => kaydet(row, idx + 1)}
+                      defaultValue={row.isten_cikis_tarihi}
+                      onChange={(e) => {
+                        if (e.target.value) updateRow(row.key, { isten_cikis_tarihi: e.target.value });
+                      }}
+                      onBlur={(e) => {
+                        if (!e.target.value && row.isten_cikis_tarihi) updateRow(row.key, { isten_cikis_tarihi: "" });
+                        kaydet(row, idx + 1);
+                      }}
                       className={HUCRE_INPUT}
                     />
                   </td>
 
                   <td className="p-1.5 border align-top">
                     <input
+                      key={row.key + ":sert:" + row.sertifika_gecerlilik_tarihi}
                       type="date"
-                      value={row.sertifika_gecerlilik_tarihi}
-                      onChange={(e) =>
-                        updateRow(row.key, { sertifika_gecerlilik_tarihi: e.target.value })
-                      }
-                      onBlur={() => kaydet(row, idx + 1)}
+                      defaultValue={row.sertifika_gecerlilik_tarihi}
+                      onChange={(e) => {
+                        if (e.target.value) updateRow(row.key, { sertifika_gecerlilik_tarihi: e.target.value });
+                      }}
+                      onBlur={(e) => {
+                        if (!e.target.value && row.sertifika_gecerlilik_tarihi) updateRow(row.key, { sertifika_gecerlilik_tarihi: "" });
+                        kaydet(row, idx + 1);
+                      }}
                       className={HUCRE_INPUT}
                     />
                   </td>

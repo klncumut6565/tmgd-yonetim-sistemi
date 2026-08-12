@@ -433,13 +433,15 @@ export default function DocumentsPage() {
               <div className="grid grid-cols-2 gap-3">
                 <label className="block">
                   <span className="text-sm text-gray-600">Geçerlilik Başlangıcı</span>
-                  <input type="date" className="border p-2 w-full rounded mt-1 text-sm"
-                    value={fValidFrom} onChange={(e) => setFValidFrom(e.target.value)} />
+                  <input key={"validfrom:" + fValidFrom} type="date" className="border p-2 w-full rounded mt-1 text-sm"
+                    defaultValue={fValidFrom} 
+                    onChange={(e) => { if (e.target.value) setFValidFrom(e.target.value); }} />
                 </label>
                 <label className="block">
                   <span className="text-sm text-gray-600">Geçerlilik Bitiş *</span>
-                  <input type="date" className="border p-2 w-full rounded mt-1 text-sm"
-                    value={fExpiry} onChange={(e) => setFExpiry(e.target.value)} />
+                  <input key={"expiry:" + fExpiry} type="date" className="border p-2 w-full rounded mt-1 text-sm"
+                    defaultValue={fExpiry} 
+                    onChange={(e) => { if (e.target.value) setFExpiry(e.target.value); }} />
                 </label>
               </div>
 
