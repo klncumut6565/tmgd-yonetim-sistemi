@@ -38,6 +38,50 @@ const STATUS_TR: Record<string, string> = {
   archived: "Arşiv",
 };
 
+/**
+ * ISO tarih (YYYY-MM-DD) → Türkçe görüntü (DD.MM.YYYY)
+ */
+function isoTarihiTurkceGoster(iso: string | null): string {
+  if (!iso) return "";
+  const m = iso.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return "";
+  const [, y, mo, d] = m;
+  return `${d}.${mo}.${y}`;
+}
+
+/**
+ * Türkçe yazı girişi (DD.MM.YYYY) → ISO format (YYYY-MM-DD)
+ * Desteklenen formatlar: DD.MM.YYYY, DD/MM/YYYY, DD-MM-YYYY, YYYY-MM-DD
+ */
+function turkceYaziyiIsoYaCevir(girdi: string): string {
+  if (!girdi || !girdi.trim()) return "";
+  const s = girdi.trim();
+  
+  // ISO formatı (YYYY-MM-DD)
+  if (/^\d{4}-\d{1,2}-\d{1,2}$/.test(s)) {
+    const [y, m, d] = s.split("-").map(Number);
+    if (m >= 1 && m <= 12 && d >= 1 && d <= 31) {
+      return `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+    }
+    return "";
+  }
+  
+  // Türkçe format: DD.MM.YYYY, DD/MM/YYYY, DD-MM-YYYY
+  const m1 = s.match(/^(\d{1,2})([.\/-])(\d{1,2})\2(\d{4})$/);
+  if (m1) {
+    const d = Number(m1[1]);
+    const mo = Number(m1[3]);
+    const y = Number(m1[4]);
+    
+    if (mo >= 1 && mo <= 12 && d >= 1 && d <= 31) {
+      return `${y}-${String(mo).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+    }
+    return "";
+  }
+  
+  return "";
+}
+
 const STATUS_COLORS: Record<string, string> = {
   draft: "bg-gray-100 text-gray-600",
   active: "bg-green-100 text-green-700",
@@ -93,6 +137,10 @@ export default function DocumentsPage() {
   const [fFile, setFFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  
+  // Tarih input'u yazarken — incomplete input'lar için
+  const [editingExpiry, setEditingExpiry] = useState("");
+  const [editingValidFrom, setEditingValidFrom] = useState("");
 
   // Detay genişletme
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -152,7 +200,7 @@ export default function DocumentsPage() {
   function resetForm() {
     setFTitle(""); setFTypeId(docTypes[0]?.id || "");
     setFStatus("active"); setFExpiry(""); setFValidFrom("");
-    setFDesc(""); setFFile(null);
+    setFDesc(""); setFFile(null); setEditingExpiry(""); setEditingValidFrom("");
     if (fileRef.current) fileRef.current.value = "";
   }
 
@@ -433,13 +481,29 @@ export default function DocumentsPage() {
               <div className="grid grid-cols-2 gap-3">
                 <label className="block">
                   <span className="text-sm text-gray-600">Geçerlilik Başlangıcı</span>
-                  <input type="date" className="border p-2 w-full rounded mt-1 text-sm"
-                    value={fValidFrom} onChange={(e) => setFValidFrom(e.target.value)} />
+                  <input type="text" placeholder="GG.AA.YYYY" className="border p-2 w-full rounded mt-1 text-sm"
+                    value={editingValidFrom || isoTarihiTurkceGoster(fValidFrom)} 
+                    onChange={(e) => setEditingValidFrom(e.target.value)}
+                    onBlur={() => {
+                      if (editingValidFrom) {
+                        const donusturulmus = turkceYaziyiIsoYaCevir(editingValidFrom);
+                        setFValidFrom(donusturulmus);
+                        setEditingValidFrom("");
+                      }
+                    }} />
                 </label>
                 <label className="block">
                   <span className="text-sm text-gray-600">Geçerlilik Bitiş *</span>
-                  <input type="date" className="border p-2 w-full rounded mt-1 text-sm"
-                    value={fExpiry} onChange={(e) => setFExpiry(e.target.value)} />
+                  <input type="text" placeholder="GG.AA.YYYY" className="border p-2 w-full rounded mt-1 text-sm"
+                    value={editingExpiry || isoTarihiTurkceGoster(fExpiry)} 
+                    onChange={(e) => setEditingExpiry(e.target.value)}
+                    onBlur={() => {
+                      if (editingExpiry) {
+                        const donusturulmus = turkceYaziyiIsoYaCevir(editingExpiry);
+                        setFExpiry(donusturulmus);
+                        setEditingExpiry("");
+                      }
+                    }} />
                 </label>
               </div>
 
