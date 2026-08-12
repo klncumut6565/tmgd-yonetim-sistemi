@@ -116,40 +116,53 @@ function bugununTarihi(): string {
 }
 
 /**
- * Tarih input'una yazıyla girilmiş değeri YYYY-MM-DD formatına dönüştür.
- * Desteklenen formatlar:
- *   - DD.MM.YYYY (Türkçe)
- *   - DD/MM/YYYY
- *   - DD-MM-YYYY
- *   - YYYY-MM-DD (ISO — zaten doğru)
- * Yanlış veya belirsiz format → boş string döndür (input'un yanlış
- * gösterimi engelle).
+ * ISO tarih (YYYY-MM-DD) → Türkçe görüntü (DD.MM.YYYY)
+ * Input'ta gösterilecek değer
  */
-function tarihiDonustur(girdi: string): string {
+function isoTarihiTurkceGoster(iso: string | null): string {
+  if (!iso) return "";
+  const m = iso.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return "";
+  const [, y, mo, d] = m;
+  return `${d}.${mo}.${y}`;
+}
+
+/**
+ * Türkçe yazı girişi (DD.MM.YYYY) → ISO format (YYYY-MM-DD)
+ * Desteklenen formatlar:
+ *   - DD.MM.YYYY (Türkçe nokta)
+ *   - DD/MM/YYYY (slash)
+ *   - DD-MM-YYYY (tire)
+ *   - YYYY-MM-DD (ISO — zaten doğru)
+ * Yanlış format → boş string döndür
+ */
+function turkceYaziyiIsoYaCevir(girdi: string): string {
   if (!girdi || !girdi.trim()) return "";
   const s = girdi.trim();
   
   // ISO formatı (YYYY-MM-DD) — zaten doğru
   if (/^\d{4}-\d{1,2}-\d{1,2}$/.test(s)) {
     const [y, m, d] = s.split("-").map(Number);
-    // Geçerlilik kontrol
     if (m >= 1 && m <= 12 && d >= 1 && d <= 31) {
       return `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
     }
     return "";
   }
   
-  // Türkçe format (DD.MM.YYYY) veya varyantları (DD/MM/YYYY, DD-MM-YYYY)
-  const m1 = s.match(/^(\d{1,2})[\.\/-](\d{1,2})[\.\/-](\d{4})$/);
+  // Türkçe format: DD.MM.YYYY, DD/MM/YYYY, DD-MM-YYYY
+  // Regex: 1-2 digit (gün) — ayırıcı — 1-2 digit (ay) — ayırıcı — 4 digit (yıl)
+  const m1 = s.match(/^(\d{1,2})([.\/-])(\d{1,2})\2(\d{4})$/);
   if (m1) {
-    const [, d, mo, y] = m1.map(Number);
+    const d = Number(m1[1]);
+    const mo = Number(m1[3]);
+    const y = Number(m1[4]);
+    
     if (mo >= 1 && mo <= 12 && d >= 1 && d <= 31) {
       return `${y}-${String(mo).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
     }
     return "";
   }
   
-  // Diğer formatlar tanınmıyor
   return "";
 }
 
@@ -642,9 +655,9 @@ export default function SurucuListesi({
                     <input
                       type="text"
                       placeholder="GG.AA.YYYY"
-                      value={row.ise_giris_tarihi}
+                      value={isoTarihiTurkceGoster(row.ise_giris_tarihi)}
                       onChange={(e) => {
-                        const donusturulmus = tarihiDonustur(e.target.value);
+                        const donusturulmus = turkceYaziyiIsoYaCevir(e.target.value);
                         updateRow(row.key, { ise_giris_tarihi: donusturulmus });
                       }}
                       onBlur={() => kaydet(row, idx + 1)}
@@ -656,9 +669,9 @@ export default function SurucuListesi({
                     <input
                       type="text"
                       placeholder="GG.AA.YYYY"
-                      value={row.isten_cikis_tarihi}
+                      value={isoTarihiTurkceGoster(row.isten_cikis_tarihi)}
                       onChange={(e) => {
-                        const donusturulmus = tarihiDonustur(e.target.value);
+                        const donusturulmus = turkceYaziyiIsoYaCevir(e.target.value);
                         updateRow(row.key, { isten_cikis_tarihi: donusturulmus });
                       }}
                       onBlur={() => kaydet(row, idx + 1)}
@@ -670,9 +683,9 @@ export default function SurucuListesi({
                     <input
                       type="text"
                       placeholder="GG.AA.YYYY"
-                      value={row.sertifika_gecerlilik_tarihi}
+                      value={isoTarihiTurkceGoster(row.sertifika_gecerlilik_tarihi)}
                       onChange={(e) => {
-                        const donusturulmus = tarihiDonustur(e.target.value);
+                        const donusturulmus = turkceYaziyiIsoYaCevir(e.target.value);
                         updateRow(row.key, { sertifika_gecerlilik_tarihi: donusturulmus });
                       }}
                       onBlur={() => kaydet(row, idx + 1)}

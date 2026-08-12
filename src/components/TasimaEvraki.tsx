@@ -132,10 +132,21 @@ function evrakNoUret(): string {
 }
 
 /**
- * Yazıyla girilmiş tarihi YYYY-MM-DD formatına dönüştür.
+ * ISO tarih (YYYY-MM-DD) → Türkçe görüntü (DD.MM.YYYY)
+ */
+function isoTarihiTurkceGoster(iso: string | null): string {
+  if (!iso) return "";
+  const m = iso.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return "";
+  const [, y, mo, d] = m;
+  return `${d}.${mo}.${y}`;
+}
+
+/**
+ * Türkçe yazı girişi (DD.MM.YYYY) → ISO format (YYYY-MM-DD)
  * Desteklenen formatlar: DD.MM.YYYY, DD/MM/YYYY, DD-MM-YYYY, YYYY-MM-DD
  */
-function tarihiDonustur(girdi: string): string {
+function turkceYaziyiIsoYaCevir(girdi: string): string {
   if (!girdi || !girdi.trim()) return "";
   const s = girdi.trim();
   
@@ -148,10 +159,13 @@ function tarihiDonustur(girdi: string): string {
     return "";
   }
   
-  // Türkçe format (DD.MM.YYYY)
-  const m1 = s.match(/^(\d{1,2})[\.\/-](\d{1,2})[\.\/-](\d{4})$/);
+  // Türkçe format: DD.MM.YYYY, DD/MM/YYYY, DD-MM-YYYY
+  const m1 = s.match(/^(\d{1,2})([.\/-])(\d{1,2})\2(\d{4})$/);
   if (m1) {
-    const [, d, mo, y] = m1.map(Number);
+    const d = Number(m1[1]);
+    const mo = Number(m1[3]);
+    const y = Number(m1[4]);
+    
     if (mo >= 1 && mo <= 12 && d >= 1 && d <= 31) {
       return `${y}-${String(mo).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
     }
@@ -974,7 +988,7 @@ export default function TasimaEvraki({
               </button>
             )}
             <input type="text" placeholder="GG.AA.YYYY" className="border p-2 rounded text-sm"
-              value={tarih} onChange={(e) => setTarih(tarihiDonustur(e.target.value))} disabled={!canWrite} />
+              value={isoTarihiTurkceGoster(tarih)} onChange={(e) => setTarih(turkceYaziyiIsoYaCevir(e.target.value))} disabled={!canWrite} />
             <div className="md:col-span-1">
               <input className="border p-2 rounded text-sm w-full" placeholder="Gönderen firma unvanı"
                 value={gonderen} onChange={(e) => setGonderen(e.target.value)} disabled={!canWrite} />
