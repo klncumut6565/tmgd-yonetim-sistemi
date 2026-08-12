@@ -181,6 +181,10 @@ export default function SurucuListesi({
   const [error, setError] = useState("");
   const [mesaj, setMesaj] = useState("");
   const [busy, setBusy] = useState(false);
+  
+  // Tarih input'u yazarken — editing state (tam format olmayan değerler için)
+  // Key: row.key, Value: { ise_giris_tarihi?: string, isten_cikis_tarihi?: string, sertifika_gecerlilik_tarihi?: string }
+  const [editingDates, setEditingDates] = useState<Record<string, Record<string, string>>>({});
 
   const [hazirlayanAdi, setHazirlayanAdi] = useState("");
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
@@ -655,12 +659,27 @@ export default function SurucuListesi({
                     <input
                       type="text"
                       placeholder="GG.AA.YYYY"
-                      value={isoTarihiTurkceGoster(row.ise_giris_tarihi)}
+                      value={editingDates[row.key]?.ise_giris_tarihi ?? isoTarihiTurkceGoster(row.ise_giris_tarihi)}
                       onChange={(e) => {
-                        const donusturulmus = turkceYaziyiIsoYaCevir(e.target.value);
-                        updateRow(row.key, { ise_giris_tarihi: donusturulmus });
+                        setEditingDates(prev => ({
+                          ...prev,
+                          [row.key]: { ...prev[row.key], ise_giris_tarihi: e.target.value }
+                        }));
                       }}
-                      onBlur={() => kaydet(row, idx + 1)}
+                      onBlur={() => {
+                        const input = editingDates[row.key]?.ise_giris_tarihi;
+                        if (input) {
+                          const donusturulmus = turkceYaziyiIsoYaCevir(input);
+                          updateRow(row.key, { ise_giris_tarihi: donusturulmus });
+                          setEditingDates(prev => {
+                            const n = { ...prev };
+                            if (n[row.key]) delete n[row.key].ise_giris_tarihi;
+                            if (n[row.key] && Object.keys(n[row.key]).length === 0) delete n[row.key];
+                            return n;
+                          });
+                        }
+                        kaydet(row, idx + 1);
+                      }}
                       className={HUCRE_INPUT}
                     />
                   </td>
@@ -669,12 +688,27 @@ export default function SurucuListesi({
                     <input
                       type="text"
                       placeholder="GG.AA.YYYY"
-                      value={isoTarihiTurkceGoster(row.isten_cikis_tarihi)}
+                      value={editingDates[row.key]?.isten_cikis_tarihi ?? isoTarihiTurkceGoster(row.isten_cikis_tarihi)}
                       onChange={(e) => {
-                        const donusturulmus = turkceYaziyiIsoYaCevir(e.target.value);
-                        updateRow(row.key, { isten_cikis_tarihi: donusturulmus });
+                        setEditingDates(prev => ({
+                          ...prev,
+                          [row.key]: { ...prev[row.key], isten_cikis_tarihi: e.target.value }
+                        }));
                       }}
-                      onBlur={() => kaydet(row, idx + 1)}
+                      onBlur={() => {
+                        const input = editingDates[row.key]?.isten_cikis_tarihi;
+                        if (input) {
+                          const donusturulmus = turkceYaziyiIsoYaCevir(input);
+                          updateRow(row.key, { isten_cikis_tarihi: donusturulmus });
+                          setEditingDates(prev => {
+                            const n = { ...prev };
+                            if (n[row.key]) delete n[row.key].isten_cikis_tarihi;
+                            if (n[row.key] && Object.keys(n[row.key]).length === 0) delete n[row.key];
+                            return n;
+                          });
+                        }
+                        kaydet(row, idx + 1);
+                      }}
                       className={HUCRE_INPUT}
                     />
                   </td>
@@ -683,12 +717,27 @@ export default function SurucuListesi({
                     <input
                       type="text"
                       placeholder="GG.AA.YYYY"
-                      value={isoTarihiTurkceGoster(row.sertifika_gecerlilik_tarihi)}
+                      value={editingDates[row.key]?.sertifika_gecerlilik_tarihi ?? isoTarihiTurkceGoster(row.sertifika_gecerlilik_tarihi)}
                       onChange={(e) => {
-                        const donusturulmus = turkceYaziyiIsoYaCevir(e.target.value);
-                        updateRow(row.key, { sertifika_gecerlilik_tarihi: donusturulmus });
+                        setEditingDates(prev => ({
+                          ...prev,
+                          [row.key]: { ...prev[row.key], sertifika_gecerlilik_tarihi: e.target.value }
+                        }));
                       }}
-                      onBlur={() => kaydet(row, idx + 1)}
+                      onBlur={() => {
+                        const input = editingDates[row.key]?.sertifika_gecerlilik_tarihi;
+                        if (input) {
+                          const donusturulmus = turkceYaziyiIsoYaCevir(input);
+                          updateRow(row.key, { sertifika_gecerlilik_tarihi: donusturulmus });
+                          setEditingDates(prev => {
+                            const n = { ...prev };
+                            if (n[row.key]) delete n[row.key].sertifika_gecerlilik_tarihi;
+                            if (n[row.key] && Object.keys(n[row.key]).length === 0) delete n[row.key];
+                            return n;
+                          });
+                        }
+                        kaydet(row, idx + 1);
+                      }}
                       className={HUCRE_INPUT}
                     />
                   </td>

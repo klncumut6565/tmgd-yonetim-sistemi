@@ -429,6 +429,7 @@ export default function TasimaEvraki({
   const [evrakId, setEvrakId] = useState<string | null>(null);
   const [evrakNo, setEvrakNo] = useState(() => evrakNoUret());
   const [tarih, setTarih] = useState(() => new Date().toISOString().slice(0, 10));
+  const [editingTarih, setEditingTarih] = useState(""); // Tarih yazarken — incomplete input için
   const [gonderen, setGonderen] = useState(firmaAdi);
   const [gonderenAdres, setGonderenAdres] = useState("");
   const [firmaAdresVarsayilan, setFirmaAdresVarsayilan] = useState("");
@@ -821,7 +822,7 @@ export default function TasimaEvraki({
     setEvrakId(null); setEvrakNo(evrakNoUret()); setAlici(""); setAliciAdres(""); setTasiyici("");
     setSurucuId(""); setAracId(""); setNotlar(""); setKalemler([]);
     setGonderen(firmaAdi); setGonderenAdres(firmaAdresVarsayilan); setMesaj("");
-    setTarih(new Date().toISOString().slice(0, 10));
+    setTarih(new Date().toISOString().slice(0, 10)); setEditingTarih("");
   }
 
   async function evrakAc(id: string) {
@@ -832,6 +833,7 @@ export default function TasimaEvraki({
     if (!ev) return;
     setEvrakId(ev.id); setEvrakNo(ev.document_no || "");
     setTarih(ev.transport_date || new Date().toISOString().slice(0, 10));
+    setEditingTarih("");
     // Kayıtta unvan ve adres tek alanda satır sonuyla ayrılmış tutuluyor
     // (Alıcı ile AYNI desen). Eski kayıtlarda (adres alanı eklenmeden önce)
     // consignor sadece unvan içerir — bu durumda adres boş kalır, hatasız.
@@ -988,7 +990,16 @@ export default function TasimaEvraki({
               </button>
             )}
             <input type="text" placeholder="GG.AA.YYYY" className="border p-2 rounded text-sm"
-              value={isoTarihiTurkceGoster(tarih)} onChange={(e) => setTarih(turkceYaziyiIsoYaCevir(e.target.value))} disabled={!canWrite} />
+              value={editingTarih || isoTarihiTurkceGoster(tarih)} 
+              onChange={(e) => setEditingTarih(e.target.value)}
+              onBlur={() => {
+                if (editingTarih) {
+                  const donusturulmus = turkceYaziyiIsoYaCevir(editingTarih);
+                  setTarih(donusturulmus);
+                  setEditingTarih("");
+                }
+              }}
+              disabled={!canWrite} />
             <div className="md:col-span-1">
               <input className="border p-2 rounded text-sm w-full" placeholder="Gönderen firma unvanı"
                 value={gonderen} onChange={(e) => setGonderen(e.target.value)} disabled={!canWrite} />
