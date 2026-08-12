@@ -131,6 +131,36 @@ function evrakNoUret(): string {
   return `ADR-${tarih}-${saat}`;
 }
 
+/**
+ * Yazıyla girilmiş tarihi YYYY-MM-DD formatına dönüştür.
+ * Desteklenen formatlar: DD.MM.YYYY, DD/MM/YYYY, DD-MM-YYYY, YYYY-MM-DD
+ */
+function tarihiDonustur(girdi: string): string {
+  if (!girdi || !girdi.trim()) return "";
+  const s = girdi.trim();
+  
+  // ISO formatı (YYYY-MM-DD)
+  if (/^\d{4}-\d{1,2}-\d{1,2}$/.test(s)) {
+    const [y, m, d] = s.split("-").map(Number);
+    if (m >= 1 && m <= 12 && d >= 1 && d <= 31) {
+      return `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+    }
+    return "";
+  }
+  
+  // Türkçe format (DD.MM.YYYY)
+  const m1 = s.match(/^(\d{1,2})[\.\/-](\d{1,2})[\.\/-](\d{4})$/);
+  if (m1) {
+    const [, d, mo, y] = m1.map(Number);
+    if (mo >= 1 && mo <= 12 && d >= 1 && d <= 31) {
+      return `${y}-${String(mo).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+    }
+    return "";
+  }
+  
+  return "";
+}
+
 type EvrakOzet = { id: string; document_no: string; transport_date: string | null; status: string | null; total_points: number | null; tunnel_restriction_code: string | null };
 
 // ── ADR 1.1.3.6 motoru (src/app/adr/page.tsx ile aynı, doğrulanmış) ──────
@@ -943,8 +973,8 @@ export default function TasimaEvraki({
                 ↻ Yeni no üret
               </button>
             )}
-            <input type="date" className="border p-2 rounded text-sm"
-              value={tarih} onChange={(e) => setTarih(e.target.value)} disabled={!canWrite} />
+            <input type="text" placeholder="GG.AA.YYYY" className="border p-2 rounded text-sm"
+              value={tarih} onChange={(e) => setTarih(tarihiDonustur(e.target.value))} disabled={!canWrite} />
             <div className="md:col-span-1">
               <input className="border p-2 rounded text-sm w-full" placeholder="Gönderen firma unvanı"
                 value={gonderen} onChange={(e) => setGonderen(e.target.value)} disabled={!canWrite} />

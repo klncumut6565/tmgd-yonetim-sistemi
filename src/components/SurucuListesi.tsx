@@ -115,6 +115,44 @@ function bugununTarihi(): string {
   return trTarih(new Date().toISOString());
 }
 
+/**
+ * Tarih input'una yazıyla girilmiş değeri YYYY-MM-DD formatına dönüştür.
+ * Desteklenen formatlar:
+ *   - DD.MM.YYYY (Türkçe)
+ *   - DD/MM/YYYY
+ *   - DD-MM-YYYY
+ *   - YYYY-MM-DD (ISO — zaten doğru)
+ * Yanlış veya belirsiz format → boş string döndür (input'un yanlış
+ * gösterimi engelle).
+ */
+function tarihiDonustur(girdi: string): string {
+  if (!girdi || !girdi.trim()) return "";
+  const s = girdi.trim();
+  
+  // ISO formatı (YYYY-MM-DD) — zaten doğru
+  if (/^\d{4}-\d{1,2}-\d{1,2}$/.test(s)) {
+    const [y, m, d] = s.split("-").map(Number);
+    // Geçerlilik kontrol
+    if (m >= 1 && m <= 12 && d >= 1 && d <= 31) {
+      return `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+    }
+    return "";
+  }
+  
+  // Türkçe format (DD.MM.YYYY) veya varyantları (DD/MM/YYYY, DD-MM-YYYY)
+  const m1 = s.match(/^(\d{1,2})[\.\/-](\d{1,2})[\.\/-](\d{4})$/);
+  if (m1) {
+    const [, d, mo, y] = m1.map(Number);
+    if (mo >= 1 && mo <= 12 && d >= 1 && d <= 31) {
+      return `${y}-${String(mo).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+    }
+    return "";
+  }
+  
+  // Diğer formatlar tanınmıyor
+  return "";
+}
+
 const HUCRE_INPUT =
   "w-full border rounded px-1.5 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-400";
 
@@ -602,9 +640,13 @@ export default function SurucuListesi({
 
                   <td className="p-1.5 border align-top">
                     <input
-                      type="date"
+                      type="text"
+                      placeholder="GG.AA.YYYY"
                       value={row.ise_giris_tarihi}
-                      onChange={(e) => updateRow(row.key, { ise_giris_tarihi: e.target.value })}
+                      onChange={(e) => {
+                        const donusturulmus = tarihiDonustur(e.target.value);
+                        updateRow(row.key, { ise_giris_tarihi: donusturulmus });
+                      }}
                       onBlur={() => kaydet(row, idx + 1)}
                       className={HUCRE_INPUT}
                     />
@@ -612,9 +654,13 @@ export default function SurucuListesi({
 
                   <td className="p-1.5 border align-top">
                     <input
-                      type="date"
+                      type="text"
+                      placeholder="GG.AA.YYYY"
                       value={row.isten_cikis_tarihi}
-                      onChange={(e) => updateRow(row.key, { isten_cikis_tarihi: e.target.value })}
+                      onChange={(e) => {
+                        const donusturulmus = tarihiDonustur(e.target.value);
+                        updateRow(row.key, { isten_cikis_tarihi: donusturulmus });
+                      }}
                       onBlur={() => kaydet(row, idx + 1)}
                       className={HUCRE_INPUT}
                     />
@@ -622,11 +668,13 @@ export default function SurucuListesi({
 
                   <td className="p-1.5 border align-top">
                     <input
-                      type="date"
+                      type="text"
+                      placeholder="GG.AA.YYYY"
                       value={row.sertifika_gecerlilik_tarihi}
-                      onChange={(e) =>
-                        updateRow(row.key, { sertifika_gecerlilik_tarihi: e.target.value })
-                      }
+                      onChange={(e) => {
+                        const donusturulmus = tarihiDonustur(e.target.value);
+                        updateRow(row.key, { sertifika_gecerlilik_tarihi: donusturulmus });
+                      }}
                       onBlur={() => kaydet(row, idx + 1)}
                       className={HUCRE_INPUT}
                     />
