@@ -115,57 +115,6 @@ function bugununTarihi(): string {
   return trTarih(new Date().toISOString());
 }
 
-/**
- * ISO tarih (YYYY-MM-DD) → Türkçe görüntü (DD.MM.YYYY)
- * Input'ta gösterilecek değer
- */
-function isoTarihiTurkceGoster(iso: string | null): string {
-  if (!iso) return "";
-  const m = iso.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  if (!m) return "";
-  const [, y, mo, d] = m;
-  return `${d}.${mo}.${y}`;
-}
-
-/**
- * Türkçe yazı girişi (DD.MM.YYYY) → ISO format (YYYY-MM-DD)
- * Desteklenen formatlar:
- *   - DD.MM.YYYY (Türkçe nokta)
- *   - DD/MM/YYYY (slash)
- *   - DD-MM-YYYY (tire)
- *   - YYYY-MM-DD (ISO — zaten doğru)
- * Yanlış format → boş string döndür
- */
-function turkceYaziyiIsoYaCevir(girdi: string): string {
-  if (!girdi || !girdi.trim()) return "";
-  const s = girdi.trim();
-  
-  // ISO formatı (YYYY-MM-DD) — zaten doğru
-  if (/^\d{4}-\d{1,2}-\d{1,2}$/.test(s)) {
-    const [y, m, d] = s.split("-").map(Number);
-    if (m >= 1 && m <= 12 && d >= 1 && d <= 31) {
-      return `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
-    }
-    return "";
-  }
-  
-  // Türkçe format: DD.MM.YYYY, DD/MM/YYYY, DD-MM-YYYY
-  // Regex: 1-2 digit (gün) — ayırıcı — 1-2 digit (ay) — ayırıcı — 4 digit (yıl)
-  const m1 = s.match(/^(\d{1,2})([.\/-])(\d{1,2})\2(\d{4})$/);
-  if (m1) {
-    const d = Number(m1[1]);
-    const mo = Number(m1[3]);
-    const y = Number(m1[4]);
-    
-    if (mo >= 1 && mo <= 12 && d >= 1 && d <= 31) {
-      return `${y}-${String(mo).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
-    }
-    return "";
-  }
-  
-  return "";
-}
-
 const HUCRE_INPUT =
   "w-full border rounded px-1.5 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-400";
 
@@ -181,10 +130,6 @@ export default function SurucuListesi({
   const [error, setError] = useState("");
   const [mesaj, setMesaj] = useState("");
   const [busy, setBusy] = useState(false);
-  
-  // Tarih input'u yazarken — editing state (tam format olmayan değerler için)
-  // Key: row.key, Value: { ise_giris_tarihi?: string, isten_cikis_tarihi?: string, sertifika_gecerlilik_tarihi?: string }
-  const [editingDates, setEditingDates] = useState<Record<string, Record<string, string>>>({});
 
   const [hazirlayanAdi, setHazirlayanAdi] = useState("");
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
@@ -657,96 +602,32 @@ export default function SurucuListesi({
 
                   <td className="p-1.5 border align-top">
                     <input
-                      type="text"
-                      placeholder="GG.AA.YYYY"
-                      value={editingDates[row.key]?.ise_giris_tarihi ?? isoTarihiTurkceGoster(row.ise_giris_tarihi)}
-                      onChange={(e) => {
-                        setEditingDates(prev => ({
-                          ...prev,
-                          [row.key]: { ...prev[row.key], ise_giris_tarihi: e.target.value }
-                        }));
-                      }}
-                      onBlur={() => {
-                        const input = editingDates[row.key]?.ise_giris_tarihi;
-                        if (input) {
-                          const donusturulmus = turkceYaziyiIsoYaCevir(input);
-                          if (donusturulmus) {
-                            updateRow(row.key, { ise_giris_tarihi: donusturulmus });
-                            setEditingDates(prev => {
-                              const n = { ...prev };
-                              if (n[row.key]) delete n[row.key].ise_giris_tarihi;
-                              if (n[row.key] && Object.keys(n[row.key]).length === 0) delete n[row.key];
-                              return n;
-                            });
-                          }
-                          // Conversion başarısızsa editingDates'ı tut, row'ı silme
-                        }
-                        kaydet(row, idx + 1);
-                      }}
+                      type="date"
+                      value={row.ise_giris_tarihi}
+                      onChange={(e) => updateRow(row.key, { ise_giris_tarihi: e.target.value })}
+                      onBlur={() => kaydet(row, idx + 1)}
                       className={HUCRE_INPUT}
                     />
                   </td>
 
                   <td className="p-1.5 border align-top">
                     <input
-                      type="text"
-                      placeholder="GG.AA.YYYY"
-                      value={editingDates[row.key]?.isten_cikis_tarihi ?? isoTarihiTurkceGoster(row.isten_cikis_tarihi)}
-                      onChange={(e) => {
-                        setEditingDates(prev => ({
-                          ...prev,
-                          [row.key]: { ...prev[row.key], isten_cikis_tarihi: e.target.value }
-                        }));
-                      }}
-                      onBlur={() => {
-                        const input = editingDates[row.key]?.isten_cikis_tarihi;
-                        if (input) {
-                          const donusturulmus = turkceYaziyiIsoYaCevir(input);
-                          if (donusturulmus) {
-                            updateRow(row.key, { isten_cikis_tarihi: donusturulmus });
-                            setEditingDates(prev => {
-                              const n = { ...prev };
-                              if (n[row.key]) delete n[row.key].isten_cikis_tarihi;
-                              if (n[row.key] && Object.keys(n[row.key]).length === 0) delete n[row.key];
-                              return n;
-                            });
-                          }
-                          // Conversion başarısızsa editingDates'ı tut, row'ı silme
-                        }
-                        kaydet(row, idx + 1);
-                      }}
+                      type="date"
+                      value={row.isten_cikis_tarihi}
+                      onChange={(e) => updateRow(row.key, { isten_cikis_tarihi: e.target.value })}
+                      onBlur={() => kaydet(row, idx + 1)}
                       className={HUCRE_INPUT}
                     />
                   </td>
 
                   <td className="p-1.5 border align-top">
                     <input
-                      type="text"
-                      placeholder="GG.AA.YYYY"
-                      value={editingDates[row.key]?.sertifika_gecerlilik_tarihi ?? isoTarihiTurkceGoster(row.sertifika_gecerlilik_tarihi)}
-                      onChange={(e) => {
-                        setEditingDates(prev => ({
-                          ...prev,
-                          [row.key]: { ...prev[row.key], sertifika_gecerlilik_tarihi: e.target.value }
-                        }));
-                      }}
-                      onBlur={() => {
-                        const input = editingDates[row.key]?.sertifika_gecerlilik_tarihi;
-                        if (input) {
-                          const donusturulmus = turkceYaziyiIsoYaCevir(input);
-                          if (donusturulmus) {
-                            updateRow(row.key, { sertifika_gecerlilik_tarihi: donusturulmus });
-                            setEditingDates(prev => {
-                              const n = { ...prev };
-                              if (n[row.key]) delete n[row.key].sertifika_gecerlilik_tarihi;
-                              if (n[row.key] && Object.keys(n[row.key]).length === 0) delete n[row.key];
-                              return n;
-                            });
-                          }
-                          // Conversion başarısızsa editingDates'ı tut, row'ı silme
-                        }
-                        kaydet(row, idx + 1);
-                      }}
+                      type="date"
+                      value={row.sertifika_gecerlilik_tarihi}
+                      onChange={(e) =>
+                        updateRow(row.key, { sertifika_gecerlilik_tarihi: e.target.value })
+                      }
+                      onBlur={() => kaydet(row, idx + 1)}
                       className={HUCRE_INPUT}
                     />
                   </td>

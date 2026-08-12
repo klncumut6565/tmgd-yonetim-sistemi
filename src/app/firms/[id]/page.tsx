@@ -158,50 +158,6 @@ function display(value: unknown): string {
   return TR_VALUES[s] || s;
 }
 
-/**
- * ISO tarih (YYYY-MM-DD) → Türkçe görüntü (DD.MM.YYYY)
- */
-function isoTarihiTurkceGoster(iso: string | null): string {
-  if (!iso) return "";
-  const m = iso.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  if (!m) return "";
-  const [, y, mo, d] = m;
-  return `${d}.${mo}.${y}`;
-}
-
-/**
- * Türkçe yazı girişi (DD.MM.YYYY) → ISO format (YYYY-MM-DD)
- * Desteklenen formatlar: DD.MM.YYYY, DD/MM/YYYY, DD-MM-YYYY, YYYY-MM-DD
- */
-function turkceYaziyiIsoYaCevir(girdi: string): string {
-  if (!girdi || !girdi.trim()) return "";
-  const s = girdi.trim();
-
-  // ISO formatı (YYYY-MM-DD)
-  if (/^\d{4}-\d{1,2}-\d{1,2}$/.test(s)) {
-    const [y, m, d] = s.split("-").map(Number);
-    if (m >= 1 && m <= 12 && d >= 1 && d <= 31) {
-      return `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
-    }
-    return "";
-  }
-
-  // Türkçe format: DD.MM.YYYY, DD/MM/YYYY, DD-MM-YYYY
-  const m1 = s.match(/^(\d{1,2})([.\/-])(\d{1,2})\2(\d{4})$/);
-  if (m1) {
-    const d = Number(m1[1]);
-    const mo = Number(m1[3]);
-    const y = Number(m1[4]);
-
-    if (mo >= 1 && mo <= 12 && d >= 1 && d <= 31) {
-      return `${y}-${String(mo).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
-    }
-    return "";
-  }
-
-  return "";
-}
-
 export default function FirmDetailPage({
   params,
 }: {
@@ -314,11 +270,6 @@ function FirmDetailInner({
   const [fileMsg, setFileMsg] = useState("");
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [visitByPeriod, setVisitByPeriod] = useState<Record<string, string>>({});
-  
-  // Tarih input'ları yazarken — incomplete input'lar için (itemKey/period bazında)
-  const [editingExpiryByItem, setEditingExpiryByItem] = useState<Record<string, string>>({});
-  const [editingVisitByPeriod, setEditingVisitByPeriod] = useState<Record<string, string>>({});
-  const [editingContractStart, setEditingContractStart] = useState("");
 
   const loadFirm = useCallback(async () => {
     setLoading(true);
@@ -1262,28 +1213,10 @@ function FirmDetailInner({
                                 <div className="flex items-center gap-1 shrink-0 text-xs text-gray-400">
                                   <span title="Ziyaret Tarihi — Ziyaretler sekmesiyle bağlantılıdır">📅 Ziyaret Tarihi:</span>
                                   <input
-                                    type="text"
-                                    placeholder="GG.AA.YYYY"
-                                    value={editingVisitByPeriod[it.period] ?? isoTarihiTurkceGoster(visitDate)}
+                                    type="date"
+                                    value={visitDate}
                                     disabled={!canWrite}
-                                    onChange={(e) => {
-                                      setEditingVisitByPeriod(prev => ({ ...prev, [it.period]: e.target.value }));
-                                    }}
-                                    onBlur={() => {
-                                      const input = editingVisitByPeriod[it.period];
-                                      if (input !== undefined) {
-                                        const donusturulmus = turkceYaziyiIsoYaCevir(input);
-                                        if (donusturulmus || input === "") {
-                                          updateVisitDate(it.period, donusturulmus);
-                                          setEditingVisitByPeriod(prev => {
-                                            const n = { ...prev };
-                                            delete n[it.period];
-                                            return n;
-                                          });
-                                        }
-                                        // Conversion başarısızsa editingVisitByPeriod'ı tut, silme
-                                      }
-                                    }}
+                                    onChange={(e) => updateVisitDate(it.period, e.target.value)}
                                     className="border rounded px-1 py-0.5 text-xs disabled:bg-gray-50 disabled:text-gray-400"
                                   />
                                 </div>
@@ -1299,21 +1232,10 @@ function FirmDetailInner({
                                     📅 Başlangıç:
                                   </span>
                                   <input
-                                    type="text"
-                                    placeholder="GG.AA.YYYY"
-                                    value={editingContractStart || isoTarihiTurkceGoster(firm?.contract_start ? String(firm.contract_start).slice(0, 10) : "")}
+                                    type="date"
+                                    value={firm?.contract_start ? String(firm.contract_start).slice(0, 10) : ""}
                                     disabled={!canWrite}
-                                    onChange={(e) => setEditingContractStart(e.target.value)}
-                                    onBlur={() => {
-                                      if (editingContractStart) {
-                                        const donusturulmus = turkceYaziyiIsoYaCevir(editingContractStart);
-                                        if (donusturulmus) {
-                                          updateContractStart(donusturulmus);
-                                          setEditingContractStart("");
-                                        }
-                                        // Conversion başarısızsa editingContractStart'ı tut, silme
-                                      }
-                                    }}
+                                    onChange={(e) => updateContractStart(e.target.value)}
                                     className="border rounded px-1 py-0.5 text-xs disabled:bg-gray-50 disabled:text-gray-400"
                                   />
                                 </div>
@@ -1322,28 +1244,10 @@ function FirmDetailInner({
                                 <div className="flex items-center gap-1 shrink-0 text-xs text-gray-400">
                                   <span title="Belge Geçerlilik Tarihi (isteğe bağlı)">📅 Geçerlilik:</span>
                                   <input
-                                    type="text"
-                                    placeholder="GG.AA.YYYY"
-                                    value={editingExpiryByItem[itemKey] ?? isoTarihiTurkceGoster(expiryDate)}
+                                    type="date"
+                                    value={expiryDate}
                                     disabled={!canWrite}
-                                    onChange={(e) => {
-                                      setEditingExpiryByItem(prev => ({ ...prev, [itemKey]: e.target.value }));
-                                    }}
-                                    onBlur={() => {
-                                      const input = editingExpiryByItem[itemKey];
-                                      if (input !== undefined) {
-                                        const donusturulmus = turkceYaziyiIsoYaCevir(input);
-                                        if (donusturulmus || input === "") {
-                                          updateExpiry(it.code, it.period, donusturulmus);
-                                          setEditingExpiryByItem(prev => {
-                                            const n = { ...prev };
-                                            delete n[itemKey];
-                                            return n;
-                                          });
-                                        }
-                                        // Conversion başarısızsa editingExpiryByItem'ı tut, silme
-                                      }
-                                    }}
+                                    onChange={(e) => updateExpiry(it.code, it.period, e.target.value)}
                                     className="border rounded px-1 py-0.5 text-xs disabled:bg-gray-50 disabled:text-gray-400"
                                   />
                                 </div>

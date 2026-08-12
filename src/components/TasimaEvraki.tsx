@@ -131,50 +131,6 @@ function evrakNoUret(): string {
   return `ADR-${tarih}-${saat}`;
 }
 
-/**
- * ISO tarih (YYYY-MM-DD) → Türkçe görüntü (DD.MM.YYYY)
- */
-function isoTarihiTurkceGoster(iso: string | null): string {
-  if (!iso) return "";
-  const m = iso.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  if (!m) return "";
-  const [, y, mo, d] = m;
-  return `${d}.${mo}.${y}`;
-}
-
-/**
- * Türkçe yazı girişi (DD.MM.YYYY) → ISO format (YYYY-MM-DD)
- * Desteklenen formatlar: DD.MM.YYYY, DD/MM/YYYY, DD-MM-YYYY, YYYY-MM-DD
- */
-function turkceYaziyiIsoYaCevir(girdi: string): string {
-  if (!girdi || !girdi.trim()) return "";
-  const s = girdi.trim();
-  
-  // ISO formatı (YYYY-MM-DD)
-  if (/^\d{4}-\d{1,2}-\d{1,2}$/.test(s)) {
-    const [y, m, d] = s.split("-").map(Number);
-    if (m >= 1 && m <= 12 && d >= 1 && d <= 31) {
-      return `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
-    }
-    return "";
-  }
-  
-  // Türkçe format: DD.MM.YYYY, DD/MM/YYYY, DD-MM-YYYY
-  const m1 = s.match(/^(\d{1,2})([.\/-])(\d{1,2})\2(\d{4})$/);
-  if (m1) {
-    const d = Number(m1[1]);
-    const mo = Number(m1[3]);
-    const y = Number(m1[4]);
-    
-    if (mo >= 1 && mo <= 12 && d >= 1 && d <= 31) {
-      return `${y}-${String(mo).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
-    }
-    return "";
-  }
-  
-  return "";
-}
-
 type EvrakOzet = { id: string; document_no: string; transport_date: string | null; status: string | null; total_points: number | null; tunnel_restriction_code: string | null };
 
 // ── ADR 1.1.3.6 motoru (src/app/adr/page.tsx ile aynı, doğrulanmış) ──────
@@ -429,7 +385,6 @@ export default function TasimaEvraki({
   const [evrakId, setEvrakId] = useState<string | null>(null);
   const [evrakNo, setEvrakNo] = useState(() => evrakNoUret());
   const [tarih, setTarih] = useState(() => new Date().toISOString().slice(0, 10));
-  const [editingTarih, setEditingTarih] = useState(""); // Tarih yazarken — incomplete input için
   const [gonderen, setGonderen] = useState(firmaAdi);
   const [gonderenAdres, setGonderenAdres] = useState("");
   const [firmaAdresVarsayilan, setFirmaAdresVarsayilan] = useState("");
@@ -822,7 +777,7 @@ export default function TasimaEvraki({
     setEvrakId(null); setEvrakNo(evrakNoUret()); setAlici(""); setAliciAdres(""); setTasiyici("");
     setSurucuId(""); setAracId(""); setNotlar(""); setKalemler([]);
     setGonderen(firmaAdi); setGonderenAdres(firmaAdresVarsayilan); setMesaj("");
-    setTarih(new Date().toISOString().slice(0, 10)); setEditingTarih("");
+    setTarih(new Date().toISOString().slice(0, 10));
   }
 
   async function evrakAc(id: string) {
@@ -833,7 +788,6 @@ export default function TasimaEvraki({
     if (!ev) return;
     setEvrakId(ev.id); setEvrakNo(ev.document_no || "");
     setTarih(ev.transport_date || new Date().toISOString().slice(0, 10));
-    setEditingTarih("");
     // Kayıtta unvan ve adres tek alanda satır sonuyla ayrılmış tutuluyor
     // (Alıcı ile AYNI desen). Eski kayıtlarda (adres alanı eklenmeden önce)
     // consignor sadece unvan içerir — bu durumda adres boş kalır, hatasız.
@@ -989,20 +943,8 @@ export default function TasimaEvraki({
                 ↻ Yeni no üret
               </button>
             )}
-            <input type="text" placeholder="GG.AA.YYYY" className="border p-2 rounded text-sm"
-              value={editingTarih || isoTarihiTurkceGoster(tarih)} 
-              onChange={(e) => setEditingTarih(e.target.value)}
-              onBlur={() => {
-                if (editingTarih) {
-                  const donusturulmus = turkceYaziyiIsoYaCevir(editingTarih);
-                  if (donusturulmus) {
-                    setTarih(donusturulmus);
-                    setEditingTarih("");
-                  }
-                  // Conversion başarısızsa editingTarih'i tut, tarih'i silme
-                }
-              }}
-              disabled={!canWrite} />
+            <input type="date" className="border p-2 rounded text-sm"
+              value={tarih} onChange={(e) => setTarih(e.target.value)} disabled={!canWrite} />
             <div className="md:col-span-1">
               <input className="border p-2 rounded text-sm w-full" placeholder="Gönderen firma unvanı"
                 value={gonderen} onChange={(e) => setGonderen(e.target.value)} disabled={!canWrite} />
