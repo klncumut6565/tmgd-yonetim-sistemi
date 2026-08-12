@@ -23,6 +23,7 @@ import { hataCevir } from "@/lib/hataCevir";
 import { surucuListesiExcelOlustur } from "@/lib/surucuListesiExcel";
 import { surucuListesiPdfOlustur, type LogoData, type SurucuBelgeEki } from "@/lib/surucuListesiPdf";
 import { pdfIlkSayfayiGorselYap } from "@/lib/pdfSayfaGorseli";
+import DateInput from "@/components/DateInput";
 
 type SurucuKaydi = {
   id: string;
@@ -601,50 +602,35 @@ export default function SurucuListesi({
                   </td>
 
                   <td className="p-1.5 border align-top">
-                    <input
-                      key={row.key + ":ise:" + row.ise_giris_tarihi}
-                      type="date"
-                      defaultValue={row.ise_giris_tarihi}
-                      onChange={(e) => {
-                        if (e.target.value) updateRow(row.key, { ise_giris_tarihi: e.target.value });
+                    <DateInput
+                      value={row.ise_giris_tarihi}
+                      onChange={(date) => {
+                        const guncel = { ...row, ise_giris_tarihi: date };
+                        updateRow(row.key, { ise_giris_tarihi: date });
+                        kaydet(guncel, idx + 1);
                       }}
-                      onBlur={(e) => {
-                        if (!e.target.value && row.ise_giris_tarihi) updateRow(row.key, { ise_giris_tarihi: "" });
-                        kaydet(row, idx + 1);
-                      }}
-                      className={HUCRE_INPUT}
                     />
                   </td>
 
                   <td className="p-1.5 border align-top">
-                    <input
-                      key={row.key + ":cikis:" + row.isten_cikis_tarihi}
-                      type="date"
-                      defaultValue={row.isten_cikis_tarihi}
-                      onChange={(e) => {
-                        if (e.target.value) updateRow(row.key, { isten_cikis_tarihi: e.target.value });
+                    <DateInput
+                      value={row.isten_cikis_tarihi}
+                      onChange={(date) => {
+                        const guncel = { ...row, isten_cikis_tarihi: date };
+                        updateRow(row.key, { isten_cikis_tarihi: date });
+                        kaydet(guncel, idx + 1);
                       }}
-                      onBlur={(e) => {
-                        if (!e.target.value && row.isten_cikis_tarihi) updateRow(row.key, { isten_cikis_tarihi: "" });
-                        kaydet(row, idx + 1);
-                      }}
-                      className={HUCRE_INPUT}
                     />
                   </td>
 
                   <td className="p-1.5 border align-top">
-                    <input
-                      key={row.key + ":sert:" + row.sertifika_gecerlilik_tarihi}
-                      type="date"
-                      defaultValue={row.sertifika_gecerlilik_tarihi}
-                      onChange={(e) => {
-                        if (e.target.value) updateRow(row.key, { sertifika_gecerlilik_tarihi: e.target.value });
+                    <DateInput
+                      value={row.sertifika_gecerlilik_tarihi}
+                      onChange={(date) => {
+                        const guncel = { ...row, sertifika_gecerlilik_tarihi: date };
+                        updateRow(row.key, { sertifika_gecerlilik_tarihi: date });
+                        kaydet(guncel, idx + 1);
                       }}
-                      onBlur={(e) => {
-                        if (!e.target.value && row.sertifika_gecerlilik_tarihi) updateRow(row.key, { sertifika_gecerlilik_tarihi: "" });
-                        kaydet(row, idx + 1);
-                      }}
-                      className={HUCRE_INPUT}
                     />
                   </td>
 

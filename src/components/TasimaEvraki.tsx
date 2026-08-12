@@ -32,6 +32,7 @@ import {
   LIBERATION_SANS_REGULAR_B64,
   LIBERATION_SANS_BOLD_B64,
 } from "@/lib/pdfFonts";
+import DateInput from "@/components/DateInput";
 
 // ── Tipler ────────────────────────────────────────────────────────────────
 /** ADR Tablo A satırı (adr_un_numbers tablosu) */
@@ -943,10 +944,7 @@ export default function TasimaEvraki({
                 ↻ Yeni no üret
               </button>
             )}
-            <input key={"tarih:" + tarih} type="date" className="border p-2 rounded text-sm"
-              defaultValue={tarih} 
-              onChange={(e) => { if (e.target.value) setTarih(e.target.value); }} 
-              disabled={!canWrite} />
+            <DateInput value={tarih} onChange={setTarih} disabled={!canWrite} />
             <div className="md:col-span-1">
               <input className="border p-2 rounded text-sm w-full" placeholder="Gönderen firma unvanı"
                 value={gonderen} onChange={(e) => setGonderen(e.target.value)} disabled={!canWrite} />

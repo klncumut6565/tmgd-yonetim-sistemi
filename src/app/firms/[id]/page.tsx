@@ -28,6 +28,7 @@ import GorevliListesi from "@/components/GorevliListesi";
 import SurucuListesi from "@/components/SurucuListesi";
 import AracEvraklari from "@/components/AracEvraklari";
 import BelgeOlusturForm from "@/components/BelgeOlusturForm";
+import DateInput from "@/components/DateInput";
 import FirmAuditTab from "@/components/audit/FirmAuditTab";
 import FirmNotesTab from "@/components/notes/FirmNotesTab";
 import {
@@ -1001,11 +1002,10 @@ function FirmDetailInner({
               <span className="text-sm text-gray-600">
                 Sözleşme / Başlangıç Tarihi
               </span>
-              <input
-                type="date"
-                className="border p-2 w-full rounded mt-1"
+              <DateInput
                 value={form.contract_start || ""}
-                onChange={set("contract_start")}
+                onChange={(date) => setForm((f) => ({ ...f, contract_start: date }))}
+                className="mt-1"
               />
             </label>
 
@@ -1212,18 +1212,10 @@ function FirmDetailInner({
                                    tarih gerçek bir visits kaydı oluşturur/günceller. */
                                 <div className="flex items-center gap-1 shrink-0 text-xs text-gray-400">
                                   <span title="Ziyaret Tarihi — Ziyaretler sekmesiyle bağlantılıdır">📅 Ziyaret Tarihi:</span>
-                                  <input
-                                    key={"visit:" + it.period + ":" + visitDate}
-                                    type="date"
-                                    defaultValue={visitDate}
+                                  <DateInput
+                                    value={visitDate}
                                     disabled={!canWrite}
-                                    onChange={(e) => {
-                                      if (e.target.value) updateVisitDate(it.period, e.target.value);
-                                    }}
-                                    onBlur={(e) => {
-                                      if (!e.target.value && visitDate) updateVisitDate(it.period, "");
-                                    }}
-                                    className="border rounded px-1 py-0.5 text-xs disabled:bg-gray-50 disabled:text-gray-400"
+                                    onChange={(date) => updateVisitDate(it.period, date)}
                                   />
                                 </div>
                               ) : it.code === "S1" ? (
@@ -1237,42 +1229,21 @@ function FirmDetailInner({
                                   <span title="Sözleşme Başlangıç Tarihi — ziyaret ve yıllık rapor takvimini belirler">
                                     📅 Başlangıç:
                                   </span>
-                                  <input
-                                    key={"contract:" + (firm?.contract_start ? String(firm.contract_start).slice(0, 10) : "")}
-                                    type="date"
-                                    defaultValue={firm?.contract_start ? String(firm.contract_start).slice(0, 10) : ""}
+                                  <DateInput
+                                    value={firm?.contract_start ? String(firm.contract_start).slice(0, 10) : ""}
                                     disabled={!canWrite}
-                                    onChange={(e) => {
-                                      if (e.target.value) updateContractStart(e.target.value);
-                                    }}
-                                    className="border rounded px-1 py-0.5 text-xs disabled:bg-gray-50 disabled:text-gray-400"
+                                    onChange={(date) => updateContractStart(date)}
                                   />
                                 </div>
                               ) : (
-                                /* Geçerlilik tarihi — isteğe bağlı.
-                                   
-                                   ÖNEMLİ: uncontrolled (defaultValue + key). Native date
-                                   input, tarih eksikken (örn. yıl tamamlanmamışken)
-                                   onChange'i BOŞ STRING ile tetikler. value= ile controlled
-                                   yapılırsa bu boş string state'e yazılıp input'a geri
-                                   basılıyor — tarayıcı bunu "tüm alanı temizle" olarak
-                                   yorumlayıp gün/ay segmentlerini de siliyordu. key={expiryDate}
-                                   sayesinde veri DIŞARIDAN değiştiğinde (örn. başka sekme/
-                                   supabase realtime) input yine de doğru şekilde yenileniyor. */
+                                /* Geçerlilik tarihi — isteğe bağlı. DateInput hibrit bileşeni:
+                                   hem GG.AA.YYYY yazılabilir hem 📅 ikonundan takvim açılır. */
                                 <div className="flex items-center gap-1 shrink-0 text-xs text-gray-400">
                                   <span title="Belge Geçerlilik Tarihi (isteğe bağlı)">📅 Geçerlilik:</span>
-                                  <input
-                                    key={itemKey + ":" + expiryDate}
-                                    type="date"
-                                    defaultValue={expiryDate}
+                                  <DateInput
+                                    value={expiryDate}
                                     disabled={!canWrite}
-                                    onChange={(e) => {
-                                      if (e.target.value) updateExpiry(it.code, it.period, e.target.value);
-                                    }}
-                                    onBlur={(e) => {
-                                      if (!e.target.value && expiryDate) updateExpiry(it.code, it.period, "");
-                                    }}
-                                    className="border rounded px-1 py-0.5 text-xs disabled:bg-gray-50 disabled:text-gray-400"
+                                    onChange={(date) => updateExpiry(it.code, it.period, date)}
                                   />
                                 </div>
                               )}

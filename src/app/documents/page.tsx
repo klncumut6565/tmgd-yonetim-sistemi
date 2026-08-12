@@ -11,6 +11,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase/client";
 import { useUser } from "@/hooks/useUser";
 import { hataCevir } from "@/lib/hataCevir";
+import DateInput from "@/components/DateInput";
 
 type Firm = { id: string; name: string };
 type DocType = { id: string; code: string; name: string };
@@ -433,15 +434,11 @@ export default function DocumentsPage() {
               <div className="grid grid-cols-2 gap-3">
                 <label className="block">
                   <span className="text-sm text-gray-600">Geçerlilik Başlangıcı</span>
-                  <input key={"validfrom:" + fValidFrom} type="date" className="border p-2 w-full rounded mt-1 text-sm"
-                    defaultValue={fValidFrom} 
-                    onChange={(e) => { if (e.target.value) setFValidFrom(e.target.value); }} />
+                  <DateInput value={fValidFrom} onChange={setFValidFrom} className="mt-1" />
                 </label>
                 <label className="block">
                   <span className="text-sm text-gray-600">Geçerlilik Bitiş *</span>
-                  <input key={"expiry:" + fExpiry} type="date" className="border p-2 w-full rounded mt-1 text-sm"
-                    defaultValue={fExpiry} 
-                    onChange={(e) => { if (e.target.value) setFExpiry(e.target.value); }} />
+                  <DateInput value={fExpiry} onChange={setFExpiry} className="mt-1" />
                 </label>
               </div>
 
