@@ -10,8 +10,10 @@
 // Supabase'den veri çekilir → jsPDF / xlsx ile dosya indirilir.
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { supabase } from "@/lib/supabase/client";
 import { hataCevir } from "@/lib/hataCevir";
+import { useUser } from "@/hooks/useUser";
 
 type Firm = { id: string; name: string; city: string | null; tax_number: string | null };
 
@@ -31,6 +33,9 @@ function fmt(d: string | null) {
 }
 
 export default function ReportsPage() {
+  const { profile, isSuperAdmin } = useUser();
+  const atikFirmalariErisim = isSuperAdmin || ["admin", "tmgd"].includes(profile?.role || "");
+
   const [firms, setFirms] = useState<Firm[]>([]);
   const [firmId, setFirmId] = useState("");
   const [loading, setLoading] = useState(false);
@@ -391,9 +396,26 @@ export default function ReportsPage() {
   return (
     <div className="p-8 max-w-4xl">
       <h1 className="text-3xl font-bold mb-2">Raporlar</h1>
-      <p className="text-gray-500 text-sm mb-8">
+      <p className="text-gray-500 text-sm mb-4">
         Raporlar tarayıcınızda oluşturulur ve otomatik olarak indirilir.
       </p>
+
+      {atikFirmalariErisim && (
+        <Link
+          href="/reports/atik-firmalari"
+          className="block border rounded-xl p-4 mb-8 bg-gray-50 hover:bg-gray-100 transition-colors"
+        >
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-semibold">🗑️ Atık Firmaları</p>
+              <p className="text-xs text-gray-500 mt-0.5">
+                Vergi numaraları ve TMFB (Tehlikeli Madde Faaliyet Belgesi) kütüphanesi — alfabetik sıralı
+              </p>
+            </div>
+            <span className="text-gray-300">→</span>
+          </div>
+        </Link>
+      )}
 
       {error && (
         <p className="mb-6 p-3 rounded border border-amber-200 bg-amber-50 text-amber-800 text-sm">
