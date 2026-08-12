@@ -670,13 +670,16 @@ export default function SurucuListesi({
                         const input = editingDates[row.key]?.ise_giris_tarihi;
                         if (input) {
                           const donusturulmus = turkceYaziyiIsoYaCevir(input);
-                          updateRow(row.key, { ise_giris_tarihi: donusturulmus });
-                          setEditingDates(prev => {
-                            const n = { ...prev };
-                            if (n[row.key]) delete n[row.key].ise_giris_tarihi;
-                            if (n[row.key] && Object.keys(n[row.key]).length === 0) delete n[row.key];
-                            return n;
-                          });
+                          if (donusturulmus) {
+                            updateRow(row.key, { ise_giris_tarihi: donusturulmus });
+                            setEditingDates(prev => {
+                              const n = { ...prev };
+                              if (n[row.key]) delete n[row.key].ise_giris_tarihi;
+                              if (n[row.key] && Object.keys(n[row.key]).length === 0) delete n[row.key];
+                              return n;
+                            });
+                          }
+                          // Conversion başarısızsa editingDates'ı tut, row'ı silme
                         }
                         kaydet(row, idx + 1);
                       }}
@@ -699,13 +702,16 @@ export default function SurucuListesi({
                         const input = editingDates[row.key]?.isten_cikis_tarihi;
                         if (input) {
                           const donusturulmus = turkceYaziyiIsoYaCevir(input);
-                          updateRow(row.key, { isten_cikis_tarihi: donusturulmus });
-                          setEditingDates(prev => {
-                            const n = { ...prev };
-                            if (n[row.key]) delete n[row.key].isten_cikis_tarihi;
-                            if (n[row.key] && Object.keys(n[row.key]).length === 0) delete n[row.key];
-                            return n;
-                          });
+                          if (donusturulmus) {
+                            updateRow(row.key, { isten_cikis_tarihi: donusturulmus });
+                            setEditingDates(prev => {
+                              const n = { ...prev };
+                              if (n[row.key]) delete n[row.key].isten_cikis_tarihi;
+                              if (n[row.key] && Object.keys(n[row.key]).length === 0) delete n[row.key];
+                              return n;
+                            });
+                          }
+                          // Conversion başarısızsa editingDates'ı tut, row'ı silme
                         }
                         kaydet(row, idx + 1);
                       }}
@@ -728,13 +734,16 @@ export default function SurucuListesi({
                         const input = editingDates[row.key]?.sertifika_gecerlilik_tarihi;
                         if (input) {
                           const donusturulmus = turkceYaziyiIsoYaCevir(input);
-                          updateRow(row.key, { sertifika_gecerlilik_tarihi: donusturulmus });
-                          setEditingDates(prev => {
-                            const n = { ...prev };
-                            if (n[row.key]) delete n[row.key].sertifika_gecerlilik_tarihi;
-                            if (n[row.key] && Object.keys(n[row.key]).length === 0) delete n[row.key];
-                            return n;
-                          });
+                          if (donusturulmus) {
+                            updateRow(row.key, { sertifika_gecerlilik_tarihi: donusturulmus });
+                            setEditingDates(prev => {
+                              const n = { ...prev };
+                              if (n[row.key]) delete n[row.key].sertifika_gecerlilik_tarihi;
+                              if (n[row.key] && Object.keys(n[row.key]).length === 0) delete n[row.key];
+                              return n;
+                            });
+                          }
+                          // Conversion başarısızsa editingDates'ı tut, row'ı silme
                         }
                         kaydet(row, idx + 1);
                       }}

@@ -487,8 +487,11 @@ export default function DocumentsPage() {
                     onBlur={() => {
                       if (editingValidFrom) {
                         const donusturulmus = turkceYaziyiIsoYaCevir(editingValidFrom);
-                        setFValidFrom(donusturulmus);
-                        setEditingValidFrom("");
+                        if (donusturulmus) {
+                          setFValidFrom(donusturulmus);
+                          setEditingValidFrom("");
+                        }
+                        // Conversion başarısızsa editingValidFrom'ı tut, fValidFrom'ı silme
                       }
                     }} />
                 </label>
@@ -500,8 +503,11 @@ export default function DocumentsPage() {
                     onBlur={() => {
                       if (editingExpiry) {
                         const donusturulmus = turkceYaziyiIsoYaCevir(editingExpiry);
-                        setFExpiry(donusturulmus);
-                        setEditingExpiry("");
+                        if (donusturulmus) {
+                          setFExpiry(donusturulmus);
+                          setEditingExpiry("");
+                        }
+                        // Conversion başarısızsa editingExpiry'ı tut, fExpiry'ı silme
                       }
                     }} />
                 </label>

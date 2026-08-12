@@ -995,8 +995,11 @@ export default function TasimaEvraki({
               onBlur={() => {
                 if (editingTarih) {
                   const donusturulmus = turkceYaziyiIsoYaCevir(editingTarih);
-                  setTarih(donusturulmus);
-                  setEditingTarih("");
+                  if (donusturulmus) {
+                    setTarih(donusturulmus);
+                    setEditingTarih("");
+                  }
+                  // Conversion başarısızsa editingTarih'i tut, tarih'i silme
                 }
               }}
               disabled={!canWrite} />
