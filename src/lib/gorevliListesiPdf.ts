@@ -214,7 +214,12 @@ export async function gorevliListesiPdfOlustur(
 
   autoTable(doc, {
     startY: 30,
-    margin: { left: M, right: M },
+    // margin.top ÖNEMLİ: autoTable kendi içinde devam sayfası eklediğinde
+    // (tablo bir sayfaya sığmayınca) her yeni sayfada bu üst boşluğu
+    // ayırır — yoksa devam sayfalarında tablo başlık satırı, üstteki
+    // baslikKutusuCiz() kutusuyla ÇAKIŞIR (didDrawPage o kutuyu tablo
+    // ÇİZİLDİKTEN SONRA çiziyor, üst üste biner).
+    margin: { top: 30, left: M, right: M },
     styles: { font: FONT, fontSize: 8.5, cellPadding: 2.5, valign: "middle" },
     headStyles: {
       font: FONT,
@@ -263,17 +268,36 @@ export async function gorevliListesiPdfOlustur(
   const sonY =
     (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable
       .finalY + 8;
-  const dipnotY = sonY > H - 30 ? H - 28 : sonY;
 
   doc.setFontSize(7.5);
   doc.setFont(FONT, "normal"); // "italic" stili gömülü değil (Türkçe karakterler bozulur), normal kullanılır
-  doc.setTextColor(90, 90, 90);
   const dipnotMetni =
     "Yukarıda Belirtilen Formda kişi/kişiler değişmesi halinde en geç 7 gün içerisinde yazılı olarak Tehlikeli Madde Güvenlik Danışmanına Haber verilmesi gerekmektedir.";
   const dipnotSatirlari = doc.splitTextToSize(dipnotMetni, W - 2 * M);
+  const dipnotYukseklik = dipnotSatirlari.length * 3.6;
+  const gerekliYukseklik = dipnotYukseklik + 8 + 8; // dipnot + boşluk + imza satırı
+
+  // ÖNEMLİ: Tablo sayfa sonuna çok yakın bittiyse (dipnot+imza için yer
+  // kalmadıysa), dipnotu tabloya sığdırmaya ZORLAMAK yerine (bu, metni
+  // tablonun son satırlarıyla ÇAKIŞTIRIRDI) yeni bir sayfa açılır.
+  // doc.addPage() argümansız çağrıldığında mevcut sayfa biçimini (yatay)
+  // korur.
+  let dipnotY: number;
+  if (sonY + gerekliYukseklik > H - 10) {
+    doc.addPage();
+    fontuKaydet(doc);
+    baslikKutusuCiz(doc, veri);
+    doc.setFontSize(7.5);
+    doc.setFont(FONT, "normal");
+    dipnotY = 32;
+  } else {
+    dipnotY = sonY;
+  }
+
+  doc.setTextColor(90, 90, 90);
   doc.text(dipnotSatirlari, M, dipnotY);
 
-  const imzaY = dipnotY + dipnotSatirlari.length * 3.6 + 8;
+  const imzaY = dipnotY + dipnotYukseklik + 8;
   doc.setTextColor(0, 0, 0);
   doc.setFontSize(9);
   doc.setFont(FONT, "bold");
