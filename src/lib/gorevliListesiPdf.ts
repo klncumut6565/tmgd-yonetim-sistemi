@@ -79,12 +79,28 @@ function logoKutusuHesapla(enBoyOrani: number, kutuBoyut: number) {
   return { w, h };
 }
 
+/**
+ * Kapak sayfasının kenarına ince bir çerçeve çizer — kullanıcının
+ * paylaştığı örnek kapak sayfasıyla (ARITEKS_Görevli_Listesi_Hk.pdf)
+ * aynı görünüm: sayfa kenarından ~6mm içeride, tüm sayfayı çevreleyen
+ * tek çizgili siyah çerçeve.
+ */
+function kapakCercevesiCiz(doc: JsPDFType) {
+  const kenar = 6;
+  doc.setDrawColor(0, 0, 0);
+  doc.setLineWidth(0.6);
+  doc.rect(kenar, kenar, W - 2 * kenar, H - 2 * kenar);
+  doc.setLineWidth(0.2); // sonraki çizimler için varsayılana döndür
+}
+
 async function kapakSayfasiCiz(
   doc: JsPDFType,
   veri: GorevliListesiPdfVerisi,
   autoTable: (doc: JsPDFType, opts: Record<string, unknown>) => void
 ) {
   sayfaYonunuAyarla(false);
+
+  kapakCercevesiCiz(doc);
 
   doc.setFillColor(...RENK_VURGU);
   doc.rect(0, 0, W, 4, "F");
@@ -175,23 +191,69 @@ async function kapakSayfasiCiz(
   }
 }
 
+/**
+ * Tablo sayfasının üst başlık kutusu — kullanıcının paylaştığı örnek
+ * belgeyle (ARITEKS_Görevli_Listesi_Hk.pdf, sayfa 2) AYNI şema:
+ *   Sol taraf (geniş)  : "GÖREVLİ LİSTESİ" başlığı + alt açıklama metni
+ *   Sağ taraf (dar)    : 4 satırlık bilgi paneli — Doküman No / Yayın
+ *                         Tarihi / Revizyon Tarihi / Sayı No
+ * Toplam kutu yüksekliği BASLIK_KUTUSU_YUKSEKLIK sabitiyle dışarıya
+ * açılır ki autoTable'ın startY/margin.top değerleri bununla tutarlı
+ * kalsın (aksi halde devam sayfalarında tablo başlığı bu kutuyla çakışır).
+ */
+const BASLIK_KUTUSU_YUKSEKLIK = 24;
+const BILGI_PANELI_GENISLIK = 55;
+
 function baslikKutusuCiz(doc: JsPDFType, veri: GorevliListesiPdfVerisi) {
-  const yukseklik = 16;
+  const kutuTop = 10;
+  const kutuGenislik = W - 2 * M;
+  const baslikGenislik = kutuGenislik - BILGI_PANELI_GENISLIK;
+  const satirYuksekligi = BASLIK_KUTUSU_YUKSEKLIK / 4;
+
   doc.setDrawColor(0, 0, 0);
   doc.setLineWidth(0.3);
-  doc.rect(M, 10, W - 2 * M, yukseklik);
-  doc.line(M + 90, 10, M + 90, 10 + yukseklik);
+  doc.rect(M, kutuTop, kutuGenislik, BASLIK_KUTUSU_YUKSEKLIK);
+  // Sol (başlık) / sağ (bilgi paneli) ayırıcı dikey çizgi
+  doc.line(M + baslikGenislik, kutuTop, M + baslikGenislik, kutuTop + BASLIK_KUTUSU_YUKSEKLIK);
+  // Bilgi panelindeki 4 satırı ayıran yatay çizgiler
+  for (let i = 1; i < 4; i++) {
+    const y = kutuTop + i * satirYuksekligi;
+    doc.line(M + baslikGenislik, y, M + kutuGenislik, y);
+  }
 
-  doc.setFontSize(11);
+  // Sol taraf: başlık + alt açıklama
+  doc.setFontSize(12);
   doc.setFont(FONT, "bold");
   doc.setTextColor(...RENK_VURGU);
-  doc.text("GÖREVLİ LİSTESİ", M + 4, 10 + yukseklik / 2 + 1.5);
+  doc.text("GÖREVLİ LİSTESİ", M + baslikGenislik / 2, kutuTop + 9, { align: "center" });
 
-  doc.setFontSize(8);
+  doc.setFontSize(6.5);
+  doc.setFont(FONT, "bold");
+  doc.setTextColor(0, 0, 0);
+  doc.text(
+    [
+      "TEHLİKELİ MADDELER İLE İLGİLİ İŞ VE İŞLEMLERDE GÖREV ALAN TÜM",
+      "PERSONELE AİT BİLGİLERİN YER ALDIĞI LİSTE",
+    ],
+    M + baslikGenislik / 2,
+    kutuTop + 15,
+    { align: "center" }
+  );
+
+  // Sağ taraf: bilgi paneli
+  doc.setFontSize(7.5);
   doc.setFont(FONT, "normal");
   doc.setTextColor(0, 0, 0);
-  doc.text(`Doküman No: TMGDK-G1`, M + 94, 10 + yukseklik / 2 - 2.5);
-  doc.text(`Düzenleme Tarihi: ${veri.bugun}`, M + 94, 10 + yukseklik / 2 + 4.5);
+  const bilgiX = M + baslikGenislik + 3;
+  const bilgiSatirlari = [
+    `Doküman No: TMGDK-G1`,
+    `Yayın Tarihi: ${veri.bugun}`,
+    `Revizyon Tarihi: ${veri.bugun}`,
+    `Sayı No: 1/1`,
+  ];
+  bilgiSatirlari.forEach((metin, i) => {
+    doc.text(metin, bilgiX, kutuTop + satirYuksekligi * i + satirYuksekligi / 2 + 1.5);
+  });
 }
 
 export async function gorevliListesiPdfOlustur(
@@ -213,13 +275,14 @@ export async function gorevliListesiPdfOlustur(
   baslikKutusuCiz(doc, veri);
 
   autoTable(doc, {
-    startY: 30,
+    startY: 38,
     // margin.top ÖNEMLİ: autoTable kendi içinde devam sayfası eklediğinde
     // (tablo bir sayfaya sığmayınca) her yeni sayfada bu üst boşluğu
     // ayırır — yoksa devam sayfalarında tablo başlık satırı, üstteki
     // baslikKutusuCiz() kutusuyla ÇAKIŞIR (didDrawPage o kutuyu tablo
-    // ÇİZİLDİKTEN SONRA çiziyor, üst üste biner).
-    margin: { top: 30, left: M, right: M },
+    // ÇİZİLDİKTEN SONRA çiziyor, üst üste biner). 38 = kutuTop(10) +
+    // BASLIK_KUTUSU_YUKSEKLIK(24) + 4mm boşluk.
+    margin: { top: 38, left: M, right: M },
     styles: { font: FONT, fontSize: 8.5, cellPadding: 2.5, valign: "middle" },
     headStyles: {
       font: FONT,
@@ -240,7 +303,7 @@ export async function gorevliListesiPdfOlustur(
     head: [
       [
         "Sıra No",
-        "Görev Başlığı",
+        "Tehlikeli Madde Görev Başlığı",
         "Yapılacak Görevler",
         "Bağlı Olduğu Birim",
         "Sorumlu Kişi/ler",
@@ -289,7 +352,7 @@ export async function gorevliListesiPdfOlustur(
     baslikKutusuCiz(doc, veri);
     doc.setFontSize(7.5);
     doc.setFont(FONT, "normal");
-    dipnotY = 32;
+    dipnotY = 38;
   } else {
     dipnotY = sonY;
   }
