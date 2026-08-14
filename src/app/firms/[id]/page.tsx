@@ -188,6 +188,9 @@ function FirmDetailInner({
   const [personelAltSekme, setPersonelAltSekme] = useState<"liste" | "gorevli">("liste");
   const [surucuAltSekme, setSurucuAltSekme] = useState<"liste" | "surucu_listesi">("liste");
   const [aracAltSekme, setAracAltSekme] = useState<"liste" | "arac_evraki">("liste");
+  // Mobilden Tara dönüşünde Araç Evrakı Oluştur'un hangi aracı seçili
+  // göstereceği (bkz. AracEvraklari 'preselectVehicleId' prop'u).
+  const [aracEvrakiPreselectId, setAracEvrakiPreselectId] = useState<string | undefined>(undefined);
   const [evrakPrefillUns, setEvrakPrefillUns] = useState<string[]>([]);
   const [evrakPrefillMiktar, setEvrakPrefillMiktar] = useState<number | undefined>(undefined);
 
@@ -242,6 +245,16 @@ function FirmDetailInner({
       const sayi = Number(evrakMiktarParam);
       if (Number.isFinite(sayi) && sayi > 0) setEvrakPrefillMiktar(sayi);
     }
+
+    // Mobilden Tara dönüşü: hangi alt sekmeye (ve — araç evrakı için —
+    // hangi araca) geri dönüleceğini belirtir. Bkz.
+    // /api/belge-tarama/baslat route.ts (returnTo üretimi).
+    const altParam = searchParams.get("alt");
+    if (altParam === "arac_evraki") setAracAltSekme("arac_evraki");
+    if (altParam === "surucu_listesi") setSurucuAltSekme("surucu_listesi");
+
+    const aracIdParam = searchParams.get("arac_id");
+    if (aracIdParam) setAracEvrakiPreselectId(aracIdParam);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
 
@@ -1621,7 +1634,7 @@ function FirmDetailInner({
             />
           )}
           {aracAltSekme === "arac_evraki" && firm && (
-            <AracEvraklari firmId={id} firmaAdi={firm.name} />
+            <AracEvraklari firmId={id} firmaAdi={firm.name} preselectVehicleId={aracEvrakiPreselectId} />
           )}
         </div>
       )}

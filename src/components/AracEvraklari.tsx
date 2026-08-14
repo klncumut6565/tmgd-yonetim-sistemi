@@ -20,6 +20,7 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase/client";
+import { authFetch } from "@/lib/supabase/authFetch";
 import { hataCevir } from "@/lib/hataCevir";
 import { pdfIlkSayfayiGorselYap } from "@/lib/pdfSayfaGorseli";
 import {
@@ -73,9 +74,12 @@ function bugununTarihi(): string {
 export default function AracEvraklari({
   firmId,
   firmaAdi,
+  preselectVehicleId,
 }: {
   firmId: string;
   firmaAdi: string;
+  /** Mobilden Tara dönüşünde önceden seçili gösterilecek araç ID'si. */
+  preselectVehicleId?: string;
 }) {
   const [araclar, setAraclar] = useState<Arac[]>([]);
   const [secilenAracId, setSecilenAracId] = useState<string>("");
@@ -113,7 +117,11 @@ export default function AracEvraklari({
         if (aracRes.error) throw aracRes.error;
         const liste = (aracRes.data as Arac[]) || [];
         setAraclar(liste);
-        if (liste.length > 0) setSecilenAracId(liste[0].id);
+        if (preselectVehicleId && liste.some((a) => a.id === preselectVehicleId)) {
+          setSecilenAracId(preselectVehicleId);
+        } else if (liste.length > 0) {
+          setSecilenAracId(liste[0].id);
+        }
 
         const firmVeri = firmRes.data as
           | (FirmOrtakBelgeler & { logo_url: string | null })
@@ -264,6 +272,50 @@ export default function AracEvraklari({
     }
   }
 
+  /**
+   * Ortam değişkeni NEXT_PUBLIC_TARAYICI_URL ayarlıysa mobil tarama
+   * butonu gösterilir — Belge Takip'teki "📷 Mobilden Tara" ile aynı
+   * mantık (bkz. firms/[id]/page.tsx).
+   */
+  const tarayiciYapilandirilmis = !!process.env.NEXT_PUBLIC_TARAYICI_URL;
+
+  /**
+   * Ortak firma belgesi (TMFB/K1) veya araca özel belge (Ek-3..Ek-10) için
+   * mobil tarama oturumu başlatır. Pencere ÖNCE (senkron) açılır — aradaki
+   * authFetch beklemesi yüzünden sonradan window.open çağırmak mobil
+   * Safari'de açılır pencere engelleyiciye takılabiliyordu.
+   */
+  async function mobildenTara(
+    hedefTipi: "arac_ortak" | "arac_ozel",
+    hedefVeri: Record<string, unknown>
+  ) {
+    const pencere = window.open("", "_blank");
+    if (!pencere) {
+      setError("Yeni sekme açılamadı — tarayıcının açılır pencere engelleyicisini kontrol et.");
+      return;
+    }
+
+    try {
+      const res = await authFetch("/api/belge-tarama/baslat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ firmId, hedefTipi, hedefVeri }),
+      });
+      const json = await res.json();
+
+      if (!res.ok || !json.url) {
+        pencere.close();
+        setError(json.error ?? "Tarama başlatılamadı.");
+        return;
+      }
+
+      pencere.location.href = json.url;
+    } catch (e) {
+      pencere.close();
+      setError("Tarama başlatılamadı: " + (e instanceof Error ? e.message : String(e)));
+    }
+  }
+
   async function belgeGoruntule(yol: string) {
     const { data } = await supabase.storage.from("firm-files").createSignedUrl(yol, 600);
     if (data?.signedUrl) window.open(data.signedUrl, "_blank");
@@ -385,12 +437,15 @@ export default function AracEvraklari({
     ad,
     onYukle,
     onSil,
+    onMobilTara,
   }: {
     baslik: string;
     yol: string | null;
     ad: string | null;
     onYukle: (file: File) => void;
     onSil: () => void;
+    /** Verilirse ve tarayici_ios yapılandırılmışsa "📷 Mobilden Tara" butonu gösterilir. */
+    onMobilTara?: () => void;
   }) {
     return (
       <div className="flex items-center justify-between py-2 px-3 border rounded-lg bg-white">
@@ -410,19 +465,31 @@ export default function AracEvraklari({
             </button>
           </div>
         ) : (
-          <label className="inline-flex items-center gap-1 text-xs text-blue-600 hover:underline cursor-pointer">
-            📎 Yükle
-            <input
-              type="file"
-              accept="image/*,.pdf"
-              className="hidden"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) onYukle(file);
-                e.target.value = "";
-              }}
-            />
-          </label>
+          <div className="flex items-center gap-2 text-xs">
+            <label className="inline-flex items-center gap-1 text-blue-600 hover:underline cursor-pointer">
+              📎 Yükle
+              <input
+                type="file"
+                accept="image/*,.pdf"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) onYukle(file);
+                  e.target.value = "";
+                }}
+              />
+            </label>
+            {onMobilTara && tarayiciYapilandirilmis && (
+              <button
+                type="button"
+                onClick={onMobilTara}
+                title="Telefon kamerasıyla tara — belge otomatik PDF olarak buraya eklenir"
+                className="text-gray-500 hover:underline"
+              >
+                📷 Mobilden Tara
+              </button>
+            )}
+          </div>
         )}
       </div>
     );
@@ -451,6 +518,7 @@ export default function AracEvraklari({
             ad={ortakBelgeler.tmfb_dosya_adi}
             onYukle={(f) => ortakBelgeYukle("tmfb", f)}
             onSil={() => ortakBelgeSil("tmfb")}
+            onMobilTara={() => mobildenTara("arac_ortak", { tur: "tmfb" })}
           />
           <BelgeSatiri
             baslik="Ek-2 — K1 Taşıma Yetki Belgesi"
@@ -458,6 +526,7 @@ export default function AracEvraklari({
             ad={ortakBelgeler.k1_dosya_adi}
             onYukle={(f) => ortakBelgeYukle("k1", f)}
             onSil={() => ortakBelgeSil("k1")}
+            onMobilTara={() => mobildenTara("arac_ortak", { tur: "k1" })}
           />
         </div>
       </div>
@@ -497,6 +566,7 @@ export default function AracEvraklari({
                 ad={(aracEvrak?.[`${slot.anahtar}_adi` as keyof AracEvrakKaydi] as string | null) ?? null}
                 onYukle={(f) => aracBelgeYukle(slot.anahtar, f)}
                 onSil={() => aracBelgeSil(slot.anahtar)}
+                onMobilTara={() => mobildenTara("arac_ozel", { vehicleId: secilenAracId, anahtar: slot.anahtar })}
               />
             ))}
           </div>

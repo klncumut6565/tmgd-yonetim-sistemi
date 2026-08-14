@@ -19,6 +19,7 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase/client";
+import { authFetch } from "@/lib/supabase/authFetch";
 import { hataCevir } from "@/lib/hataCevir";
 import { surucuListesiExcelOlustur } from "@/lib/surucuListesiExcel";
 import { surucuListesiPdfOlustur, type LogoData, type SurucuBelgeEki } from "@/lib/surucuListesiPdf";
@@ -325,6 +326,55 @@ export default function SurucuListesi({
   async function belgeGoruntule(yol: string) {
     const { data } = await supabase.storage.from("firm-files").createSignedUrl(yol, 600);
     if (data?.signedUrl) window.open(data.signedUrl, "_blank");
+  }
+
+  /**
+   * Ortam değişkeni NEXT_PUBLIC_TARAYICI_URL ayarlıysa mobil tarama
+   * butonu gösterilir — Belge Takip'teki "📷 Mobilden Tara" ile aynı
+   * mantık (bkz. firms/[id]/page.tsx).
+   */
+  const tarayiciYapilandirilmis = !!process.env.NEXT_PUBLIC_TARAYICI_URL;
+
+  /**
+   * Bir satırın SRC5/Ehliyet alanı için mobil tarama oturumu başlatır.
+   * Pencere ÖNCE (senkron) açılır — aradaki authFetch beklemesi yüzünden
+   * sonradan window.open çağırmak mobil Safari'de açılır pencere
+   * engelleyiciye takılabiliyordu.
+   */
+  async function mobildenTara(satir: SatirState, tur: BelgeTuru) {
+    if (!satir.id) {
+      setError("Dosya yüklemeden önce satırı kaydetmek için önce Adı Soyadı girin.");
+      return;
+    }
+    const pencere = window.open("", "_blank");
+    if (!pencere) {
+      setError("Yeni sekme açılamadı — tarayıcının açılır pencere engelleyicisini kontrol et.");
+      return;
+    }
+
+    try {
+      const res = await authFetch("/api/belge-tarama/baslat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          firmId,
+          hedefTipi: "surucu_belge",
+          hedefVeri: { satirId: satir.id, tur },
+        }),
+      });
+      const json = await res.json();
+
+      if (!res.ok || !json.url) {
+        pencere.close();
+        setError(json.error ?? "Tarama başlatılamadı.");
+        return;
+      }
+
+      pencere.location.href = json.url;
+    } catch (e) {
+      pencere.close();
+      setError("Tarama başlatılamadı: " + (e instanceof Error ? e.message : String(e)));
+    }
   }
 
   async function logoDataUrl(): Promise<LogoData> {
@@ -662,26 +712,38 @@ export default function SurucuListesi({
                             </button>
                           </div>
                         ) : (
-                          <label
-                            className={
-                              "inline-flex items-center gap-1 text-xs cursor-pointer " +
-                              (row.id ? "text-blue-600 hover:underline" : "text-gray-300 cursor-not-allowed")
-                            }
-                            title={row.id ? "Dosya yükle" : "Önce Adı Soyadı girip satırı kaydedin"}
-                          >
-                            📎 Yükle
-                            <input
-                              type="file"
-                              accept="image/*,.pdf"
-                              className="hidden"
-                              disabled={!row.id}
-                              onChange={(e) => {
-                                const file = e.target.files?.[0];
-                                if (file) belgeYukle(row, tur, file);
-                                e.target.value = "";
-                              }}
-                            />
-                          </label>
+                          <div className="flex flex-col items-start gap-0.5">
+                            <label
+                              className={
+                                "inline-flex items-center gap-1 text-xs cursor-pointer " +
+                                (row.id ? "text-blue-600 hover:underline" : "text-gray-300 cursor-not-allowed")
+                              }
+                              title={row.id ? "Dosya yükle" : "Önce Adı Soyadı girip satırı kaydedin"}
+                            >
+                              📎 Yükle
+                              <input
+                                type="file"
+                                accept="image/*,.pdf"
+                                className="hidden"
+                                disabled={!row.id}
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  if (file) belgeYukle(row, tur, file);
+                                  e.target.value = "";
+                                }}
+                              />
+                            </label>
+                            {row.id && tarayiciYapilandirilmis && (
+                              <button
+                                type="button"
+                                onClick={() => mobildenTara(row, tur)}
+                                title="Telefon kamerasıyla tara — belge otomatik PDF olarak buraya eklenir"
+                                className="text-[11px] text-gray-500 hover:underline"
+                              >
+                                📷 Tara
+                              </button>
+                            )}
+                          </div>
                         )}
                       </td>
                     );
