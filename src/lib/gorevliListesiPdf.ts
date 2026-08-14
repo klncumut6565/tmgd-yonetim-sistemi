@@ -156,8 +156,9 @@ async function kapakSayfasiCiz(
   doc.text("Sorumlu Kişi", W / 2 + 42, imzaY, { align: "center" });
   doc.setFont(FONT, "normal");
   doc.text(veri.hazirlayanAdi || "—", W / 2 - 42, imzaY + 6, { align: "center" });
-  doc.setDrawColor(180, 180, 180);
-  doc.line(W / 2 + 42 - 22, imzaY + 6, W / 2 + 42 + 22, imzaY + 6); // Sorumlu Kişi — boş imza çizgisi
+  // NOT: "Sorumlu Kişi" altına daha önce boş bir imza çizgisi çiziliyordu
+  // — kullanıcı talebiyle kaldırıldı, örnek kapak sayfasında böyle bir
+  // çizgi yok.
 
   doc.setFontSize(9.5);
   doc.setFont(FONT, "normal");
@@ -291,14 +292,17 @@ export async function gorevliListesiPdfOlustur(
       textColor: [255, 255, 255],
       halign: "center",
     },
+    // Sütun genişlikleri, kullanıcının paylaştığı örnek Excel'deki
+    // (TMFB_Faaliyetleri_Görevli_Listesi.xlsx) sütun genişlik ORANLARI
+    // korunarak sayfa kullanılabilir genişliğine (267mm) ölçeklendi.
     columnStyles: {
-      0: { cellWidth: 14, halign: "center" },
-      1: { cellWidth: 36 },
-      2: { cellWidth: 68 },
-      3: { cellWidth: 36 },
-      4: { cellWidth: 50 },
-      5: { cellWidth: 39 },
-      6: { cellWidth: 24, halign: "center" },
+      0: { cellWidth: 15.2, halign: "center" },
+      1: { cellWidth: 53.9 },
+      2: { cellWidth: 44.2 },
+      3: { cellWidth: 36.3 },
+      4: { cellWidth: 29.0 },
+      5: { cellWidth: 51.0 },
+      6: { cellWidth: 37.4, halign: "center" },
     },
     head: [
       [
