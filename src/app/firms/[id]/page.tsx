@@ -1664,7 +1664,7 @@ function FirmDetailInner({
       {tab === "employees" && (
         <div>
           <div className="flex gap-2 mb-4">
-            {(["liste", "gorevli"] as const).map((alt) => (
+            {(["gorevli", "liste"] as const).map((alt) => (
               <button
                 key={alt}
                 onClick={() => setPersonelAltSekme(alt)}
