@@ -9,9 +9,17 @@ import { LIBERATION_SANS_REGULAR_B64, LIBERATION_SANS_BOLD_B64 } from "./pdfFont
 
 const FONT = "LiberationSans";
 const RENK_VURGU: [number, number, number] = [30, 64, 175];
-const W = 210;
-const H = 297;
 const M = 15;
+
+// Sayfa ölçüleri sayfaya göre değişir (kapak + ek sayfaları DİKEY, tablo
+// sayfası YATAY) — bu yüzden sabit değil, module-level "let" ve bir
+// yardımcı fonksiyonla ayarlanır (gorevliListesiPdf.ts'teki AYNI teknik).
+let W = 210;
+let H = 297;
+function sayfaYonunuAyarla(yatay: boolean) {
+  W = yatay ? 297 : 210;
+  H = yatay ? 210 : 297;
+}
 
 export type SurucuListesiPdfSatiri = {
   sira_no: number;
@@ -75,11 +83,28 @@ function gorselEnBoyOraniOku(dataUrl: string): Promise<number> {
   });
 }
 
+/**
+ * Kapak sayfasının kenarına ince bir çerçeve çizer — Görevli Listesi
+ * (gorevliListesiPdf.ts) ile AYNI teknik, kullanıcı talebiyle eklendi.
+ */
+function kapakCercevesiCiz(doc: JsPDFType) {
+  const kenar = 6;
+  doc.setDrawColor(0, 0, 0);
+  doc.setLineWidth(0.6);
+  doc.rect(kenar, kenar, W - 2 * kenar, H - 2 * kenar);
+  doc.setLineWidth(0.2); // sonraki çizimler için varsayılana döndür
+}
+
 /** Bir sürücü belgesi ekini (SRC5/Ehliyet) ayrı bir sayfa olarak ekler.
  *  Görsel, içerik kutusuna ORANI KORUNARAK ve TAŞMADAN (contain) sığdırılır
  *  — bkz. belge posteri mekanizmasındaki AYNI dul/taşma düzeltmesi. */
 async function belgeEkiSayfasiEkle(doc: JsPDFType, ek: SurucuBelgeEki) {
-  doc.addPage();
+  // Bu sayfa, kendinden önceki tablo sayfası YATAY olsa bile her zaman
+  // DİKEY açılır — bu yüzden addPage() argümansız DEĞİL, açıkça
+  // "portrait" ile çağrılıyor. sayfaYonunuAyarla(false) ile W/H de bu
+  // fonksiyonun geri kalanında dikey ölçülere döner.
+  sayfaYonunuAyarla(false);
+  doc.addPage("a4", "portrait");
   fontuKaydet(doc);
 
   doc.setFontSize(12);
@@ -113,6 +138,8 @@ async function belgeEkiSayfasiEkle(doc: JsPDFType, ek: SurucuBelgeEki) {
 }
 
 function kapakSayfasiCiz(doc: JsPDFType, veri: SurucuListesiPdfVerisi) {
+  kapakCercevesiCiz(doc);
+
   doc.setFillColor(30, 64, 175);
   doc.rect(0, 0, W, 4, "F");
 
@@ -199,15 +226,22 @@ export async function surucuListesiPdfOlustur(veri: SurucuListesiPdfVerisi): Pro
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" }) as unknown as JsPDFType;
   fontuKaydet(doc);
 
+  // Sayfa 1 — kapak (DİKEY, çerçeveli)
+  sayfaYonunuAyarla(false);
   kapakSayfasiCiz(doc, veri);
 
-  doc.addPage();
+  // Sayfa 2 — başlık kutusu + tablo (YATAY — sütunlar rahat sığsın diye)
+  sayfaYonunuAyarla(true);
+  doc.addPage("a4", "landscape");
   fontuKaydet(doc);
   baslikKutusuCiz(doc, veri);
 
   autoTable(doc, {
     startY: 30,
-    margin: { left: M, right: M },
+    // margin.top ÖNEMLİ: autoTable devam sayfası eklediğinde bu üst
+    // boşluğu her yeni sayfada da ayırır — yoksa devam sayfalarında
+    // tablo başlığı baslikKutusuCiz() kutusuyla çakışır.
+    margin: { top: 30, left: M, right: M },
     styles: { font: FONT, fontSize: 8.5, cellPadding: 2, valign: "middle" },
     headStyles: {
       font: FONT,
@@ -216,14 +250,16 @@ export async function surucuListesiPdfOlustur(veri: SurucuListesiPdfVerisi): Pro
       textColor: [255, 255, 255],
       halign: "center",
     },
+    // Sütun genişlikleri, sayfa YATAYA döndüğü için kullanılabilir
+    // genişliğe (267mm) önceki dikey oranlar korunarak ölçeklendi.
     columnStyles: {
-      0: { cellWidth: 14, halign: "center" },
-      1: { cellWidth: 42 },
-      2: { cellWidth: 30 },
-      3: { cellWidth: 28, halign: "center" },
-      4: { cellWidth: 26, halign: "center" },
-      5: { cellWidth: 26, halign: "center" },
-      6: { cellWidth: 30, halign: "center" },
+      0: { cellWidth: 19.1, halign: "center" },
+      1: { cellWidth: 57.2 },
+      2: { cellWidth: 40.9 },
+      3: { cellWidth: 38.1, halign: "center" },
+      4: { cellWidth: 35.4, halign: "center" },
+      5: { cellWidth: 35.4, halign: "center" },
+      6: { cellWidth: 40.9, halign: "center" },
     },
     head: [
       ["Sıra No", "Adı Soyadı", "T.C. Kimlik No", "SRC5 Sertifikası (Var/Yok)", "İşe Giriş Tarihi", "İşten Çıkış Tarihi", "Sertifika Geçerlilik Tarihi"],
