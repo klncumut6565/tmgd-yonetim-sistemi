@@ -1629,7 +1629,7 @@ function FirmDetailInner({
       {tab === "drivers" && (
         <div>
           <div className="flex gap-2 mb-4">
-            {(["liste", "surucu_listesi"] as const).map((alt) => (
+            {(["surucu_listesi", "liste"] as const).map((alt) => (
               <button
                 key={alt}
                 onClick={() => setSurucuAltSekme(alt)}
