@@ -222,6 +222,19 @@ function baslikKutusuCiz(doc: JsPDFType, veri: GorevliListesiPdfVerisi) {
     doc.line(M + baslikGenislik, y, M + kutuGenislik, y);
   }
 
+  // Sol üst köşe — firma logosu (kapak sayfasındaki AYNI logo). Başlık
+  // ve alt açıklama metni ORTALANMIŞ olduğu için (bkz. aşağıdaki text
+  // çağrıları) küçük bir köşe logosu bunlarla çakışmaz — kaydırma
+  // gerekmez.
+  if (veri.logo) {
+    try {
+      const box = logoKutusuHesapla(veri.logo.enBoyOrani, BASLIK_KUTUSU_YUKSEKLIK - 4);
+      doc.addImage(veri.logo.data, veri.logo.fmt, M + 2, kutuTop + 2, box.w, box.h);
+    } catch {
+      /* logo eklenemezse başlık kutusu yine çizilsin */
+    }
+  }
+
   // Sol taraf: başlık + alt açıklama
   doc.setFontSize(12);
   doc.setFont(FONT, "bold");

@@ -193,21 +193,37 @@ function kapakSayfasiCiz(doc: JsPDFType, veri: SurucuListesiPdfVerisi) {
 
 function baslikKutusuCiz(doc: JsPDFType, veri: SurucuListesiPdfVerisi) {
   const yukseklik = 16;
+  const kutuTop = 10;
   doc.setDrawColor(0, 0, 0);
   doc.setLineWidth(0.3);
-  doc.rect(M, 10, W - 2 * M, yukseklik);
-  doc.line(M + 90, 10, M + 90, 10 + yukseklik);
+  doc.rect(M, kutuTop, W - 2 * M, yukseklik);
+  doc.line(M + 90, kutuTop, M + 90, kutuTop + yukseklik);
+
+  // Sol üst — firma logosu (kapak sayfasındaki AYNI logo). Sabit 12mm'lik
+  // bir alan ayrılır (logoKutusuHesapla oranı koruyarak bu alana sığdırır)
+  // — başlık metni bu alanın sağından başlar ki logo varsa/yoksa metin
+  // konumu tutarlı kalsın.
+  let baslikX = M + 4;
+  if (veri.logo) {
+    try {
+      const box = logoKutusuHesapla(veri.logo.enBoyOrani, yukseklik - 4);
+      doc.addImage(veri.logo.data, veri.logo.fmt, M + 2, kutuTop + 2, box.w, box.h);
+      baslikX = M + 2 + (yukseklik - 4) + 4;
+    } catch {
+      /* logo eklenemezse başlık normal konumunda kalır */
+    }
+  }
 
   doc.setFontSize(11);
   doc.setFont(FONT, "bold");
   doc.setTextColor(...RENK_VURGU);
-  doc.text("ARAÇ SÜRÜCÜ LİSTESİ", M + 4, 10 + yukseklik / 2 + 1.5);
+  doc.text("ARAÇ SÜRÜCÜ LİSTESİ", baslikX, kutuTop + yukseklik / 2 + 1.5);
 
   doc.setFontSize(8);
   doc.setFont(FONT, "normal");
   doc.setTextColor(0, 0, 0);
-  doc.text("Doküman No: TMGDK-L3", M + 94, 10 + yukseklik / 2 - 2.5);
-  doc.text(`Düzenleme Tarihi: ${veri.bugun}`, M + 94, 10 + yukseklik / 2 + 4.5);
+  doc.text("Doküman No: TMGDK-L3", M + 94, kutuTop + yukseklik / 2 - 2.5);
+  doc.text(`Düzenleme Tarihi: ${veri.bugun}`, M + 94, kutuTop + yukseklik / 2 + 4.5);
 }
 
 export async function surucuListesiPdfOlustur(veri: SurucuListesiPdfVerisi): Promise<Blob> {
