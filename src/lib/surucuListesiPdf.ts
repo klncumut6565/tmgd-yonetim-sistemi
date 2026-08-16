@@ -189,15 +189,6 @@ function kapakSayfasiCiz(doc: JsPDFType, veri: SurucuListesiPdfVerisi) {
   doc.text("Düzenleme Tarihi", W / 2, 156, { align: "center" });
   doc.setFont(FONT, "normal");
   doc.text(veri.bugun, W / 2, 162, { align: "center" });
-
-  doc.setFontSize(8);
-  doc.setTextColor(140, 140, 140);
-  doc.text(
-    `${veri.firmaAdi} · TMGDK-L3 · TMGD Yönetim Sistemi tarafından ${veri.bugun} tarihinde oluşturuldu`,
-    W / 2,
-    285,
-    { align: "center" }
-  );
 }
 
 function baslikKutusuCiz(doc: JsPDFType, veri: SurucuListesiPdfVerisi) {
