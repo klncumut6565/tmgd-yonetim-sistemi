@@ -145,51 +145,131 @@ async function belgeEkiSayfasiEkle(doc: JsPDFType, ek: SurucuBelgeEki) {
   }
 }
 
+/**
+ * Belge Oluştur kapak sayfasındaki üst başlık kutusuyla (BelgeOlusturForm.
+ * tsx → baslikTablosuCiz) AYNI 3 sütunlu şema: sol logo / orta başlık+alt
+ * başlık / sağ Doküman No-Yayın Tarihi-Revizyon Tarihi-Sayfa No paneli.
+ * gorevliListesiPdf.ts'teki AYNI teknik.
+ */
+function kapakBaslikYuksekligiHesapla(
+  doc: JsPDFType,
+  altBaslik: string,
+  ortaGenislik: number
+): { yukseklik: number; lines: string[] } {
+  doc.setFontSize(7);
+  doc.setFont(FONT, "bold");
+  const lines: string[] = doc.splitTextToSize(altBaslik, ortaGenislik);
+  const taban = 26;
+  const altBlok = 9 + lines.length * 3.8 + 4;
+  return { yukseklik: Math.max(taban, altBlok), lines };
+}
+
+function kapakBaslikTablosuCiz(
+  doc: JsPDFType,
+  veri: SurucuListesiPdfVerisi,
+  baslik: string,
+  altBaslikLines: string[],
+  dokumanNo: string,
+  yukseklik: number
+) {
+  const solKenar = 6; // kapakCercevesiCiz çerçevesiyle bitişik
+  const kutuGenislik = W - 2 * solKenar;
+  const ustY = solKenar;
+  const solGenislik = 38;
+  const sagGenislik = 45;
+
+  doc.setDrawColor(0, 0, 0);
+  doc.setLineWidth(0.3);
+  doc.rect(solKenar, ustY, kutuGenislik, yukseklik);
+  doc.line(solKenar + solGenislik, ustY, solKenar + solGenislik, ustY + yukseklik);
+  doc.line(W - solKenar - sagGenislik, ustY, W - solKenar - sagGenislik, ustY + yukseklik);
+
+  const ortaAyirici = ustY + yukseklik / 2;
+  doc.line(solKenar + solGenislik, ortaAyirici, W - solKenar - sagGenislik, ortaAyirici);
+
+  const sagSatirY = yukseklik / 4;
+  for (let i = 1; i < 4; i++) {
+    doc.line(W - solKenar - sagGenislik, ustY + sagSatirY * i, W - solKenar, ustY + sagSatirY * i);
+  }
+
+  // Sol: firma logosu
+  if (veri.logo) {
+    try {
+      const kenar = 2.5;
+      const alanG = solGenislik - 2 * kenar;
+      const alanY = Math.min(yukseklik - 2 * kenar, 22);
+      const box = logoKutusuHesapla(veri.logo.enBoyOrani, Math.min(alanG, alanY));
+      doc.addImage(
+        veri.logo.data,
+        veri.logo.fmt,
+        solKenar + kenar + (alanG - box.w) / 2,
+        ustY + kenar + (alanY - box.h) / 2,
+        box.w,
+        box.h
+      );
+    } catch {
+      /* logo eklenemezse kutu yine çizilsin */
+    }
+  }
+
+  // Orta: üst yarı başlık, alt yarı alt başlık
+  const ortaX = solKenar + solGenislik + (kutuGenislik - solGenislik - sagGenislik) / 2;
+  doc.setFontSize(12);
+  doc.setFont(FONT, "bold");
+  doc.setTextColor(...RENK_VURGU);
+  doc.text(baslik, ortaX, ustY + yukseklik / 4 + 2, { align: "center" });
+
+  doc.setFontSize(7);
+  doc.setFont(FONT, "bold");
+  doc.setTextColor(0, 0, 0);
+  const altBlok = altBaslikLines.length * 3.8;
+  const altY = ortaAyirici + yukseklik / 4 - altBlok / 2 + 3;
+  doc.text(altBaslikLines, ortaX, altY, { align: "center" });
+
+  // Sağ: doküman no / tarihler / sayfa no
+  doc.setFontSize(7);
+  doc.setFont(FONT, "normal");
+  doc.setTextColor(0, 0, 0);
+  const sagX = W - solKenar - sagGenislik + 2;
+  const sagMetinY = (i: number) => ustY + sagSatirY * i + sagSatirY / 2 + 1.2;
+  doc.text(`Doküman No: ${dokumanNo}`, sagX, sagMetinY(0));
+  doc.text(`Yayın Tarihi: ${veri.bugun}`, sagX, sagMetinY(1));
+  doc.text(`Revizyon Tarihi: ${veri.bugun}`, sagX, sagMetinY(2));
+  doc.text("Sayfa No: Kapak Sayfası", sagX, sagMetinY(3));
+
+  return ustY + yukseklik;
+}
+
 function kapakSayfasiCiz(doc: JsPDFType, veri: SurucuListesiPdfVerisi) {
   kapakCercevesiCiz(doc);
 
-  doc.setFillColor(30, 64, 175);
-  doc.rect(0, 0, W, 4, "F");
-
-  if (veri.logo) {
-    try {
-      const box = logoKutusuHesapla(veri.logo.enBoyOrani, 26);
-      doc.addImage(veri.logo.data, veri.logo.fmt, M, 16, box.w, box.h);
-    } catch {
-      /* logo eklenemezse kapak yine üretilsin */
-    }
-  }
+  const solGenislik = 38;
+  const sagGenislik = 45;
+  const ortaGenislik = W - 2 * 6 - solGenislik - sagGenislik;
+  const altBaslikMetni = "Taşımada Görev Alan Sürücülere İlişkin Bilgiler";
+  const { yukseklik: baslikYukseklik, lines: altBaslikLines } = kapakBaslikYuksekligiHesapla(
+    doc,
+    altBaslikMetni,
+    ortaGenislik
+  );
+  const kutuAlti = kapakBaslikTablosuCiz(
+    doc,
+    veri,
+    "ARAÇ SÜRÜCÜ LİSTESİ",
+    altBaslikLines,
+    "TMGDK-L3",
+    baslikYukseklik
+  );
 
   doc.setFontSize(18);
   doc.setFont(FONT, "bold");
   doc.setTextColor(0, 0, 0);
-  doc.text(veri.firmaAdi, W / 2, 70, { align: "center", maxWidth: W - 2 * M });
-
-  doc.setFontSize(9.5);
-  doc.setFont(FONT, "normal");
-  doc.setTextColor(90, 90, 90);
-  doc.text("Doküman No: TMGDK-L3", W / 2, 79, { align: "center" });
-
-  doc.setDrawColor(200, 200, 200);
-  doc.line(W / 2 - 40, 86, W / 2 + 40, 86);
-
-  doc.setFontSize(15);
-  doc.setFont(FONT, "bold");
-  doc.setTextColor(...RENK_VURGU);
-  doc.text("ARAÇ SÜRÜCÜ LİSTESİ", W / 2, 100, { align: "center" });
-
-  doc.setFontSize(10);
-  doc.setFont(FONT, "normal");
-  doc.setTextColor(70, 70, 70);
-  doc.text("Taşımada Görev Alan Sürücülere İlişkin Bilgiler", W / 2, 108, {
-    align: "center",
-    maxWidth: W - 2 * M,
-  });
+  doc.text(veri.firmaAdi, W / 2, kutuAlti + 25, { align: "center", maxWidth: W - 2 * M });
 
   // Hazırlayan (TMGD) / Sorumlu Kişi — Görevli Listesi kapak sayfasıyla
   // (gorevliListesiPdf.ts) AYNI iki sütunlu imza alanı. "Sorumlu Kişi",
   // onaylayanAdi (firms.approver_name / tesis sorumlusu) ile doldurulur.
-  const imzaY = 140;
+  const imzaY = kutuAlti + 65;
   doc.setFontSize(9.5);
   doc.setFont(FONT, "bold");
   doc.setTextColor(0, 0, 0);

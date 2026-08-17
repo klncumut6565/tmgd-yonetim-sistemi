@@ -95,6 +95,101 @@ function kapakCercevesiCiz(doc: JsPDFType) {
   doc.setLineWidth(0.2); // sonraki çizimler için varsayılana döndür
 }
 
+/**
+ * Belge Oluştur kapak sayfasındaki üst başlık kutusuyla (BelgeOlusturForm.
+ * tsx → baslikTablosuCiz) AYNI 3 sütunlu şema: sol logo / orta başlık+alt
+ * başlık / sağ Doküman No-Yayın Tarihi-Revizyon Tarihi-Sayfa No paneli.
+ * Yükseklik, alt başlık kaç satıra sarıyorsa ona göre dinamik büyür.
+ */
+function kapakBaslikYuksekligiHesapla(
+  doc: JsPDFType,
+  altBaslik: string,
+  ortaGenislik: number
+): { yukseklik: number; lines: string[] } {
+  doc.setFontSize(6.5);
+  doc.setFont(FONT, "bold");
+  const lines: string[] = doc.splitTextToSize(altBaslik, ortaGenislik);
+  const taban = 26;
+  const altBlok = 9 + lines.length * 3.6 + 4;
+  return { yukseklik: Math.max(taban, altBlok), lines };
+}
+
+function kapakBaslikTablosuCiz(
+  doc: JsPDFType,
+  veri: GorevliListesiPdfVerisi,
+  baslik: string,
+  altBaslikLines: string[],
+  dokumanNo: string,
+  yukseklik: number
+) {
+  const solKenar = 6; // kapakCercevesiCiz çerçevesiyle bitişik
+  const kutuGenislik = W - 2 * solKenar;
+  const ustY = solKenar;
+  const solGenislik = 38;
+  const sagGenislik = 45;
+
+  doc.setDrawColor(0, 0, 0);
+  doc.setLineWidth(0.3);
+  doc.rect(solKenar, ustY, kutuGenislik, yukseklik);
+  doc.line(solKenar + solGenislik, ustY, solKenar + solGenislik, ustY + yukseklik);
+  doc.line(W - solKenar - sagGenislik, ustY, W - solKenar - sagGenislik, ustY + yukseklik);
+
+  const ortaAyirici = ustY + yukseklik / 2;
+  doc.line(solKenar + solGenislik, ortaAyirici, W - solKenar - sagGenislik, ortaAyirici);
+
+  const sagSatirY = yukseklik / 4;
+  for (let i = 1; i < 4; i++) {
+    doc.line(W - solKenar - sagGenislik, ustY + sagSatirY * i, W - solKenar, ustY + sagSatirY * i);
+  }
+
+  // Sol: firma logosu
+  if (veri.logo) {
+    try {
+      const kenar = 2.5;
+      const alanG = solGenislik - 2 * kenar;
+      const alanY = Math.min(yukseklik - 2 * kenar, 22);
+      const box = logoKutusuHesapla(veri.logo.enBoyOrani, Math.min(alanG, alanY));
+      doc.addImage(
+        veri.logo.data,
+        veri.logo.fmt,
+        solKenar + kenar + (alanG - box.w) / 2,
+        ustY + kenar + (alanY - box.h) / 2,
+        box.w,
+        box.h
+      );
+    } catch {
+      /* logo eklenemezse kutu yine çizilsin */
+    }
+  }
+
+  // Orta: üst yarı başlık, alt yarı alt başlık
+  const ortaX = solKenar + solGenislik + (kutuGenislik - solGenislik - sagGenislik) / 2;
+  doc.setFontSize(11);
+  doc.setFont(FONT, "bold");
+  doc.setTextColor(...RENK_VURGU);
+  doc.text(baslik, ortaX, ustY + yukseklik / 4 + 2, { align: "center" });
+
+  doc.setFontSize(6.5);
+  doc.setFont(FONT, "bold");
+  doc.setTextColor(0, 0, 0);
+  const altBlok = altBaslikLines.length * 3.6;
+  const altY = ortaAyirici + yukseklik / 4 - altBlok / 2 + 3;
+  doc.text(altBaslikLines, ortaX, altY, { align: "center" });
+
+  // Sağ: doküman no / tarihler / sayfa no
+  doc.setFontSize(7);
+  doc.setFont(FONT, "normal");
+  doc.setTextColor(0, 0, 0);
+  const sagX = W - solKenar - sagGenislik + 2;
+  const sagMetinY = (i: number) => ustY + sagSatirY * i + sagSatirY / 2 + 1.2;
+  doc.text(`Doküman No: ${dokumanNo}`, sagX, sagMetinY(0));
+  doc.text(`Yayın Tarihi: ${veri.bugun}`, sagX, sagMetinY(1));
+  doc.text(`Revizyon Tarihi: ${veri.bugun}`, sagX, sagMetinY(2));
+  doc.text("Sayfa No: Kapak Sayfası", sagX, sagMetinY(3));
+
+  return ustY + yukseklik;
+}
+
 async function kapakSayfasiCiz(
   doc: JsPDFType,
   veri: GorevliListesiPdfVerisi,
@@ -104,27 +199,34 @@ async function kapakSayfasiCiz(
 
   kapakCercevesiCiz(doc);
 
-  doc.setFillColor(...RENK_VURGU);
-  doc.rect(0, 0, W, 4, "F");
-
-  if (veri.logo) {
-    try {
-      const box = logoKutusuHesapla(veri.logo.enBoyOrani, 24);
-      doc.addImage(veri.logo.data, veri.logo.fmt, M, 14, box.w, box.h);
-    } catch {
-      /* logo eklenemezse kapak yine üretilsin */
-    }
-  }
+  const solGenislik = 38;
+  const sagGenislik = 45;
+  const ortaGenislik = W - 2 * 6 - solGenislik - sagGenislik;
+  const altBaslikMetni =
+    "Tehlikeli Maddeler İle İlgili İş Ve İşlemlerde Görev Alan Tüm Personele Ait Bilgilerin Yer Aldığı Liste";
+  const { yukseklik: baslikYukseklik, lines: altBaslikLines } = kapakBaslikYuksekligiHesapla(
+    doc,
+    altBaslikMetni,
+    ortaGenislik
+  );
+  const kutuAlti = kapakBaslikTablosuCiz(
+    doc,
+    veri,
+    "GÖREVLİ PERSONEL LİSTESİ",
+    altBaslikLines,
+    "TMGDK-G1",
+    baslikYukseklik
+  );
 
   doc.setFontSize(15);
   doc.setFont(FONT, "bold");
   doc.setTextColor(0, 0, 0);
-  doc.text(veri.firmaAdi, W / 2, 58, { align: "center", maxWidth: W - 2 * M });
+  doc.text(veri.firmaAdi, W / 2, kutuAlti + 20, { align: "center", maxWidth: W - 2 * M });
 
   // Doküman kontrol tablosu — örnek kapak sayfasıyla (TM_Görevli_Listesi_
   // Kapak_Sayfası_Örnek_.docx) birebir aynı 4 satır.
   autoTable(doc, {
-    startY: 75,
+    startY: kutuAlti + 30,
     margin: { left: M, right: M },
     theme: "grid",
     styles: { font: FONT, fontSize: 9, cellPadding: 3, valign: "middle", lineColor: [80, 80, 80] },
@@ -192,6 +294,118 @@ async function kapakSayfasiCiz(
   } catch {
     /* logo eklenemezse belge yine üretilsin */
   }
+}
+
+/**
+ * Sayfa 2 — kullanıcının paylaştığı örnek belgenin (ADR_1_3_Gorevli_
+ * Listesi.docx) İLK SAYFASI ile AYNEN aynı içerik: başlık, alt başlık,
+ * "1. Taraf Tanımları" bölümü ve tanımlar tablosu. Belgenin ikinci
+ * bölümü (doldurulacak boş ADR 1.3 Eğitimi listesi) DAHİL EDİLMEDİ —
+ * onun işlevini zaten uygulamanın kendi ürettiği sayfa 3'teki (yatay)
+ * tablo görüyor.
+ */
+function tanimlarSayfasiCiz(
+  doc: JsPDFType,
+  autoTable: (doc: JsPDFType, opts: Record<string, unknown>) => void
+) {
+  sayfaYonunuAyarla(false);
+  doc.addPage("a4", "portrait");
+  fontuKaydet(doc);
+
+  doc.setFontSize(12);
+  doc.setFont(FONT, "bold");
+  doc.setTextColor(...RENK_VURGU);
+  const baslikSatirlari = doc.splitTextToSize(
+    "TEHLİKELİ MADDELERİN KARAYOLUYLA TAŞINMASI HAKKINDA YÖNETMELİK",
+    W - 2 * M
+  );
+  doc.text(baslikSatirlari, W / 2, 18, { align: "center" });
+
+  doc.setFontSize(10);
+  doc.setFont(FONT, "normal");
+  doc.setTextColor(0, 0, 0);
+  let y = 18 + baslikSatirlari.length * 5.5 + 3;
+  const altBaslikSatirlari = doc.splitTextToSize(
+    "Kapsamındaki Tarafların Tanımları ve ADR 1.3 Eğitimi Görevli Listesi",
+    W - 2 * M
+  );
+  doc.text(altBaslikSatirlari, W / 2, y, { align: "center" });
+  y += altBaslikSatirlari.length * 5 + 8;
+
+  doc.setFontSize(10.5);
+  doc.setFont(FONT, "bold");
+  doc.setTextColor(...RENK_VURGU);
+  doc.text("1. Taraf Tanımları", M, y);
+  y += 6;
+
+  doc.setFontSize(8.5);
+  doc.setFont(FONT, "normal");
+  doc.setTextColor(0, 0, 0);
+  const girisSatirlari = doc.splitTextToSize(
+    "Aşağıdaki tabloda, Tehlikeli Maddelerin Karayoluyla Taşınması Hakkında Yönetmelik kapsamında yer alan başlıca tarafların tanımlarına yer verilmiştir.",
+    W - 2 * M
+  );
+  doc.text(girisSatirlari, M, y);
+  y += girisSatirlari.length * 4 + 5;
+
+  autoTable(doc, {
+    startY: y,
+    margin: { left: M, right: M },
+    theme: "grid",
+    styles: { font: FONT, fontSize: 7.8, cellPadding: 2.2, valign: "top", lineColor: [150, 150, 150] },
+    headStyles: { font: FONT, fontStyle: "bold", fillColor: RENK_VURGU, textColor: [255, 255, 255] },
+    columnStyles: {
+      0: { cellWidth: 48, fontStyle: "bold" },
+      1: { cellWidth: W - 2 * M - 48 },
+    },
+    head: [["Taraf", "Tanım"]],
+    body: [
+      [
+        "Gönderen (Consignor)",
+        "Kendi adına veya bir üçüncü şahıs adına tehlikeli maddeleri gönderen işletme; taşıma sözleşmesi mevcutsa sözleşmede gönderen olarak belirtilen taraf, sözleşme yoksa taşımanın başlangıcında tehlikeli maddeleri taşımacıya teslim eden gerçek veya tüzel kişi.",
+      ],
+      [
+        "Taşımacı (Carrier)",
+        "Taşıma işlemini bir taşıma sözleşmesi ile veya sözleşme olmaksızın gerçekleştiren işletme.",
+      ],
+      [
+        "Alıcı (Consignee)",
+        "Taşıma sözleşmesinde belirtilen alıcı; alıcı, taşıma sözleşmesi hükümlerine göre üçüncü bir tarafı belirlemişse, bu üçüncü taraf ADR anlamında alıcı sayılır.",
+      ],
+      [
+        "Dolduran (Filler)",
+        "Tehlikeli maddeleri bir tanka (tank aracına, portatif tanka, tank-konteynerine veya çok elemanlı gaz konteynerine/MEGC'ye), bir batarya araca ya da konteynere yükleyen; ayrıca tehlikeli maddeleri ambalajlara, büyük ambalajlara veya IBC'lere dolduran işletme.",
+      ],
+      [
+        "Yükleyen (Loader)",
+        "Ambalajlanmış tehlikeli maddeleri, küçük konteynerleri veya taşınabilir tankları bir araca ya da konteynere yükleyen; konteynerleri, çok elemanlı gaz konteynerlerini (MEGC), tank-konteynerlerini veya portatif tankları araca yükleyen işletme.",
+      ],
+      [
+        "Boşaltan (Unloader)",
+        "Konteyneri araçtan indiren; ambalajlanmış tehlikeli maddeleri araçtan veya konteynerden boşaltan; tehlikeli maddeleri bir tanktan (tank aracından, portatif tanktan, tank-konteynerinden veya MEGC'den) ya da bir batarya araçtan/konteynerden boşaltan işletme.",
+      ],
+      [
+        "Paketleyen (Packer)",
+        "Tehlikeli maddeleri ambalajlara, büyük ambalajlara veya IBC'lere yerleştiren ve gerektiğinde aracın ya da konteynerin taşımaya hazırlanmasını sağlayan işletme.",
+      ],
+      [
+        "Tank-konteyner/Portatif Tank İşletmecisi",
+        "Adına bir tank-konteyner veya portatif tank işletilen işletme.",
+      ],
+      [
+        "Araç İşletmecisi",
+        "Tehlikeli madde taşımasında kullanılan aracın işletiminden sorumlu, adına araç ruhsatlandırılmış olan işletme.",
+      ],
+      [
+        "Ambalajlayan",
+        "Ambalajları, tehlikeli maddelerin taşınmasına uygun olacak şekilde hazırlayan ve/veya dolduran işletme.",
+      ],
+      [
+        "ADR Güvenlik Danışmanı",
+        "İşletme yönetiminin sorumluluğu altında, uygun araç ve yöntemlerle, faaliyetlerin ilgili gereklilikler çerçevesinde ve mümkün olan en güvenli şekilde yürütülmesine yardımcı olmak amacıyla görevlendirilen, bakanlıkça yetkilendirilmiş kişi.",
+      ],
+    ],
+  });
 }
 
 /**
@@ -326,7 +540,11 @@ export async function gorevliListesiPdfOlustur(
   // Sayfa 1 — kapak (dikey)
   await kapakSayfasiCiz(doc, veri, autoTable);
 
-  // Sayfa 2 — başlık kutusu + tablo (YATAY — uzun metinli sütunlar rahat sığsın diye)
+  // Sayfa 2 — kullanıcının paylaştığı örnek belgenin ilk sayfası (Taraf
+  // Tanımları), aynen eklenir (dikey).
+  tanimlarSayfasiCiz(doc, autoTable);
+
+  // Sayfa 3 — başlık kutusu + tablo (YATAY — uzun metinli sütunlar rahat sığsın diye)
   sayfaYonunuAyarla(true);
   doc.addPage("a4", "landscape");
   fontuKaydet(doc);
