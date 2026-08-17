@@ -96,7 +96,23 @@ async function statikGorselGetir(yol: string): Promise<string | null> {
   }
 }
 
+/**
+ * Kapak sayfasının kenarına ince bir çerçeve çizer — Görevli Listesi ve
+ * Sürücü Listesi kapak sayfalarıyla (gorevliListesiPdf.ts,
+ * surucuListesiPdf.ts) AYNI teknik. Yalnızca kapak sayfasında kullanılır,
+ * Ek sayfalarına uygulanmaz.
+ */
+function kapakCercevesiCiz(doc: JsPDFType) {
+  const kenar = 6;
+  doc.setDrawColor(0, 0, 0);
+  doc.setLineWidth(0.6);
+  doc.rect(kenar, kenar, W - 2 * kenar, H - 2 * kenar);
+  doc.setLineWidth(0.2); // sonraki çizimler için varsayılana döndür
+}
+
 function kapakSayfasiCiz(doc: JsPDFType, veri: AracEvraklariPdfVerisi, ekBasliklari: string[]) {
+  kapakCercevesiCiz(doc);
+
   doc.setFillColor(...RENK_VURGU);
   doc.rect(0, 0, W, 4, "F");
 
