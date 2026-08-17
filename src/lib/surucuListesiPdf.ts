@@ -12,6 +12,7 @@
 
 import type { jsPDF as JsPDFType } from "jspdf";
 import { LIBERATION_SANS_REGULAR_B64, LIBERATION_SANS_BOLD_B64 } from "./pdfFonts";
+import { SIAM_LOGO_B64, SIAM_LOGO_EN_BOY, SIAM_QR_B64 } from "./kapakVarliklari";
 
 const FONT = "LiberationSans";
 const RENK_VURGU: [number, number, number] = [30, 64, 175];
@@ -185,17 +186,49 @@ function kapakSayfasiCiz(doc: JsPDFType, veri: SurucuListesiPdfVerisi) {
     maxWidth: W - 2 * M,
   });
 
-  doc.setTextColor(0, 0, 0);
+  // Hazırlayan (TMGD) / Sorumlu Kişi — Görevli Listesi kapak sayfasıyla
+  // (gorevliListesiPdf.ts) AYNI iki sütunlu imza alanı. "Sorumlu Kişi",
+  // onaylayanAdi (firms.approver_name / tesis sorumlusu) ile doldurulur.
+  const imzaY = 140;
   doc.setFontSize(9.5);
   doc.setFont(FONT, "bold");
-  doc.text("Formu Düzenleyen Kişi", W / 2, 140, { align: "center" });
+  doc.setTextColor(0, 0, 0);
+  doc.text("Hazırlayan (TMGD)", W / 2 - 42, imzaY, { align: "center" });
+  doc.text("Sorumlu Kişi", W / 2 + 42, imzaY, { align: "center" });
   doc.setFont(FONT, "normal");
-  doc.text(veri.hazirlayanAdi || "—", W / 2, 146, { align: "center" });
+  doc.text(veri.hazirlayanAdi || "—", W / 2 - 42, imzaY + 6, { align: "center" });
+  doc.text(veri.onaylayanAdi || "—", W / 2 + 42, imzaY + 6, { align: "center" });
 
-  doc.setFont(FONT, "bold");
-  doc.text("Düzenleme Tarihi", W / 2, 156, { align: "center" });
+  doc.setFontSize(9.5);
   doc.setFont(FONT, "normal");
-  doc.text(veri.bugun, W / 2, 162, { align: "center" });
+  doc.setTextColor(90, 90, 90);
+  doc.text("Doküman No: TMGDK-L3", W / 2, H - 34, { align: "center" });
+  doc.text(`Düzenleme Tarihi: ${veri.bugun}`, W / 2, H - 28, { align: "center" });
+
+  // Sağ alt köşe: SİAM TMGDK kurumsal logosu + karekod — diğer TÜM
+  // belgelerin kapağıyla (Görevli Listesi, Belge Oluştur) AYNI yerleşim.
+  const qrBoyut = 22;
+  const qrX = W - M - qrBoyut;
+  const qrY = H - qrBoyut - 12;
+  try {
+    doc.addImage(SIAM_QR_B64, "PNG", qrX, qrY, qrBoyut, qrBoyut);
+  } catch {
+    /* karekod eklenemezse belge yine üretilsin */
+  }
+  const logoYukseklik = 11;
+  const logoGenislik = logoYukseklik * SIAM_LOGO_EN_BOY;
+  try {
+    doc.addImage(
+      SIAM_LOGO_B64,
+      "JPEG",
+      qrX - logoGenislik - 4,
+      qrY + (qrBoyut - logoYukseklik) / 2,
+      logoGenislik,
+      logoYukseklik
+    );
+  } catch {
+    /* logo eklenemezse belge yine üretilsin */
+  }
 }
 
 /**
