@@ -101,7 +101,10 @@ export async function POST(req: NextRequest) {
 
   try {
     if (hedefTipi === 'arac_ortak') {
-      // AracEvraklari.tsx → ortakBelgeYukle ile AYNI yol deseni.
+      // AracEvraklari.tsx → ortakBelgeYukle ile AYNI yol deseni ve AYNI
+      // tablo (firm_arac_evrak_dosyalari, migration 050 — çoklu dosya
+      // desteği). INSERT edilir, ÜZERİNE YAZILMAZ — mobilden taranan
+      // belge de mevcut dosyaların yanına eklenir.
       const tur = String(hedefVeri.tur)
       if (tur !== 'tmfb' && tur !== 'k1') {
         return corsJson({ error: 'Geçersiz hedef: tur.' }, 400)
@@ -115,17 +118,21 @@ export async function POST(req: NextRequest) {
         return corsJson({ error: 'Dosya kaydedilemedi: ' + yuklemeHata.message }, 500)
       }
 
-      const guncelleme =
-        tur === 'tmfb'
-          ? { tmfb_dosya_yolu: yol, tmfb_dosya_adi: guvenliAd }
-          : { k1_dosya_yolu: yol, k1_dosya_adi: guvenliAd }
-      const { error: dbHata } = await supabase.from('firms').update(guncelleme).eq('id', oturum.firm_id)
+      const { error: dbHata } = await supabase.from('firm_arac_evrak_dosyalari').insert({
+        firm_id: oturum.firm_id,
+        vehicle_id: null,
+        belge_turu: tur,
+        file_path: yol,
+        file_name: guvenliAd,
+      })
       if (dbHata) {
         await supabase.storage.from('firm-files').remove([yol])
         return corsJson({ error: 'Belge kaydı oluşturulamadı: ' + dbHata.message }, 500)
       }
     } else if (hedefTipi === 'arac_ozel') {
-      // AracEvraklari.tsx → aracBelgeYukle ile AYNI yol deseni.
+      // AracEvraklari.tsx → aracBelgeYukle ile AYNI yol deseni ve AYNI
+      // tablo (firm_arac_evrak_dosyalari, migration 050). INSERT edilir,
+      // ÜZERİNE YAZILMAZ.
       const vehicleId = String(hedefVeri.vehicleId ?? '')
       const anahtar = String(hedefVeri.anahtar ?? '')
       if (!vehicleId || !anahtar) {
@@ -140,18 +147,13 @@ export async function POST(req: NextRequest) {
         return corsJson({ error: 'Dosya kaydedilemedi: ' + yuklemeHata.message }, 500)
       }
 
-      const govde = { [`${anahtar}_yolu`]: yol, [`${anahtar}_adi`]: guvenliAd }
-      const { data: mevcut } = await supabase
-        .from('firm_arac_evraklari')
-        .select('id')
-        .eq('vehicle_id', vehicleId)
-        .maybeSingle()
-
-      const { error: dbHata } = mevcut
-        ? await supabase.from('firm_arac_evraklari').update(govde).eq('id', mevcut.id)
-        : await supabase
-            .from('firm_arac_evraklari')
-            .insert({ firm_id: oturum.firm_id, vehicle_id: vehicleId, ...govde })
+      const { error: dbHata } = await supabase.from('firm_arac_evrak_dosyalari').insert({
+        firm_id: oturum.firm_id,
+        vehicle_id: vehicleId,
+        belge_turu: anahtar,
+        file_path: yol,
+        file_name: guvenliAd,
+      })
 
       if (dbHata) {
         await supabase.storage.from('firm-files').remove([yol])

@@ -29,11 +29,12 @@ const M = 15;
 export type LogoData = { data: string; fmt: "PNG" | "JPEG"; enBoyOrani: number } | null;
 
 /** Bir Ek'e ait, hazır (fetch edilmiş, gerekiyorsa PDF->görsel çevrilmiş)
- *  belge — dataUrl null ise "belge yüklenmemiştir" sayfası basılır. */
+ *  belge(ler) — dataUrls boşsa "belge yüklenmemiştir" sayfası basılır,
+ *  birden fazla dosya varsa hepsi sırayla ayrı sayfa olarak eklenir. */
 export type AracEvrakBelgesi = {
   ekNo: number;
   baslik: string;
-  dataUrl: string | null;
+  dataUrls: string[];
 };
 
 export type AracEvraklariPdfVerisi = {
@@ -269,24 +270,33 @@ export async function aracEvraklariPdfOlustur(veri: AracEvraklariPdfVerisi): Pro
   kapakSayfasiCiz(doc, veri, ekBasliklari);
 
   for (const belge of veri.belgeler.filter((b) => b.ekNo < 6).sort((a, b) => a.ekNo - b.ekNo)) {
-    if (belge.dataUrl) await gorselliEkSayfasiEkle(doc, belge.ekNo, belge.baslik, belge.dataUrl);
-    else bosEkSayfasiEkle(doc, belge.ekNo, belge.baslik);
+    if (belge.dataUrls.length > 0) {
+      for (const dataUrl of belge.dataUrls) await gorselliEkSayfasiEkle(doc, belge.ekNo, belge.baslik, dataUrl);
+    } else {
+      bosEkSayfasiEkle(doc, belge.ekNo, belge.baslik);
+    }
   }
 
   await yaziliTalimatEkleriEkle(doc, 6);
 
   const ek7 = veri.belgeler.find((b) => b.ekNo === 7);
   if (ek7) {
-    if (ek7.dataUrl) await gorselliEkSayfasiEkle(doc, 7, ek7.baslik, ek7.dataUrl);
-    else bosEkSayfasiEkle(doc, 7, ek7.baslik);
+    if (ek7.dataUrls.length > 0) {
+      for (const dataUrl of ek7.dataUrls) await gorselliEkSayfasiEkle(doc, 7, ek7.baslik, dataUrl);
+    } else {
+      bosEkSayfasiEkle(doc, 7, ek7.baslik);
+    }
   }
 
   const adrCantaGorsel = await statikGorselGetir(ADR_CANTA_ICERIGI_GORSELI);
   if (adrCantaGorsel) await gorselliEkSayfasiEkle(doc, 8, "ADR ÇANTASI İÇERİĞİ", adrCantaGorsel);
 
   for (const belge of veri.belgeler.filter((b) => b.ekNo > 8).sort((a, b) => a.ekNo - b.ekNo)) {
-    if (belge.dataUrl) await gorselliEkSayfasiEkle(doc, belge.ekNo, belge.baslik, belge.dataUrl);
-    else bosEkSayfasiEkle(doc, belge.ekNo, belge.baslik);
+    if (belge.dataUrls.length > 0) {
+      for (const dataUrl of belge.dataUrls) await gorselliEkSayfasiEkle(doc, belge.ekNo, belge.baslik, dataUrl);
+    } else {
+      bosEkSayfasiEkle(doc, belge.ekNo, belge.baslik);
+    }
   }
 
   return doc.output("blob");
