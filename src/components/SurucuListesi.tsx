@@ -34,6 +34,7 @@ type SurucuKaydi = {
   tc_kimlik_no: string | null;
   src5_sertifikasi: string | null;
   ise_giris_tarihi: string | null;
+  sertifika_numarasi: string | null;
   isten_cikis_tarihi: string | null;
   sertifika_gecerlilik_tarihi: string | null;
   src5_dosya_yolu: string | null;
@@ -51,6 +52,7 @@ type SatirState = {
   tc_kimlik_no: string;
   src5_sertifikasi: string;
   ise_giris_tarihi: string;
+  sertifika_numarasi: string;
   isten_cikis_tarihi: string;
   sertifika_gecerlilik_tarihi: string;
   src5_dosya_yolu: string | null;
@@ -70,6 +72,7 @@ function bosSatir(): SatirState {
     tc_kimlik_no: "",
     src5_sertifikasi: SRC5_SECENEKLERI[0],
     ise_giris_tarihi: "",
+    sertifika_numarasi: "",
     isten_cikis_tarihi: "",
     sertifika_gecerlilik_tarihi: "",
     src5_dosya_yolu: null,
@@ -88,6 +91,7 @@ function kayittanSatir(k: SurucuKaydi): SatirState {
     tc_kimlik_no: k.tc_kimlik_no || "",
     src5_sertifikasi: k.src5_sertifikasi || SRC5_SECENEKLERI[0],
     ise_giris_tarihi: k.ise_giris_tarihi || "",
+    sertifika_numarasi: k.sertifika_numarasi || "",
     isten_cikis_tarihi: k.isten_cikis_tarihi || "",
     sertifika_gecerlilik_tarihi: k.sertifika_gecerlilik_tarihi || "",
     src5_dosya_yolu: k.src5_dosya_yolu || null,
@@ -134,6 +138,7 @@ export default function SurucuListesi({
   const [busy, setBusy] = useState(false);
 
   const [hazirlayanAdi, setHazirlayanAdi] = useState("");
+  const [onaylayanAdi, setOnaylayanAdi] = useState("");
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
 
   useEffect(() => {
@@ -148,13 +153,15 @@ export default function SurucuListesi({
             .select("*")
             .eq("firm_id", firmId)
             .order("sira_no"),
-          supabase.from("firms").select("logo_url").eq("id", firmId).single(),
+          supabase.from("firms").select("logo_url, approver_name").eq("id", firmId).single(),
         ]);
         if (iptal) return;
         if (kayitRes.error) throw kayitRes.error;
         const yuklenen = ((kayitRes.data as SurucuKaydi[]) || []).map(kayittanSatir);
         setRows(ensureTrailingBlank(yuklenen));
-        setLogoUrl((firmRes.data as { logo_url: string | null } | null)?.logo_url ?? null);
+        const firmVeri = firmRes.data as { logo_url: string | null; approver_name: string | null } | null;
+        setLogoUrl(firmVeri?.logo_url ?? null);
+        setOnaylayanAdi(firmVeri?.approver_name ?? "");
 
         const { data: tmgdAdi } = await supabase.rpc("get_firm_tmgd_name", {
           p_firm_id: firmId,
@@ -190,6 +197,7 @@ export default function SurucuListesi({
         tc_kimlik_no: satir.tc_kimlik_no.trim() || null,
         src5_sertifikasi: satir.src5_sertifikasi || null,
         ise_giris_tarihi: satir.ise_giris_tarihi || null,
+        sertifika_numarasi: satir.sertifika_numarasi.trim() || null,
         isten_cikis_tarihi: satir.isten_cikis_tarihi || null,
         sertifika_gecerlilik_tarihi: satir.sertifika_gecerlilik_tarihi || null,
       };
@@ -414,6 +422,7 @@ export default function SurucuListesi({
       tc_kimlik_no: r.tc_kimlik_no,
       src5_sertifikasi: r.src5_sertifikasi,
       ise_giris_tarihi: trTarih(r.ise_giris_tarihi),
+      sertifika_numarasi: r.sertifika_numarasi,
       isten_cikis_tarihi: trTarih(r.isten_cikis_tarihi),
       sertifika_gecerlilik_tarihi: trTarih(r.sertifika_gecerlilik_tarihi),
     }));
@@ -426,6 +435,7 @@ export default function SurucuListesi({
       const buf = await surucuListesiExcelOlustur({
         firmaAdi,
         hazirlayanAdi,
+        onaylayanAdi,
         bugun: bugununTarihi(),
         satirlar: satirlariHazirla(),
       });
@@ -499,6 +509,7 @@ export default function SurucuListesi({
       const blob = await surucuListesiPdfOlustur({
         firmaAdi,
         hazirlayanAdi,
+        onaylayanAdi,
         bugun: bugununTarihi(),
         satirlar: satirlariHazirla(),
         logo,
@@ -573,6 +584,7 @@ export default function SurucuListesi({
               <th className="p-2 border text-left w-32">T.C. Kimlik No</th>
               <th className="p-2 border text-left w-36">SRC5 Sertifikası</th>
               <th className="p-2 border text-left w-32">İşe Giriş Tarihi</th>
+              <th className="p-2 border text-left w-32">Sertifika Numarası</th>
               <th className="p-2 border text-left w-32">İşten Çıkış Tarihi</th>
               <th className="p-2 border text-left w-36">Sertifika Geçerlilik Tarihi</th>
               <th className="p-2 border text-left w-32">SRC5 Belgesi</th>
@@ -659,6 +671,17 @@ export default function SurucuListesi({
                         updateRow(row.key, { ise_giris_tarihi: date });
                         kaydet(guncel, idx + 1);
                       }}
+                    />
+                  </td>
+
+                  <td className="p-1.5 border align-top">
+                    <input
+                      type="text"
+                      value={row.sertifika_numarasi}
+                      onChange={(e) => updateRow(row.key, { sertifika_numarasi: e.target.value })}
+                      onBlur={() => kaydet(row, idx + 1)}
+                      placeholder="Sertifika No"
+                      className={HUCRE_INPUT}
                     />
                   </td>
 
