@@ -54,7 +54,7 @@ const ARAC_BELGE_SLOTLARI = [
   { anahtar: "arac_ruhsat", ekNo: 5, baslik: "Araç Ruhsatı" },
   { anahtar: "sigorta_kasko", ekNo: 7, baslik: "Araç Sigorta -KASKO-Tehlikeli Madde Mali Sorumluluk Sigortası(TMMS)" },
   { anahtar: "src5_belgesi", ekNo: 9, baslik: "SRC5 Belgeli Şoför Sertifikası" },
-  { anahtar: "tasima_evraklari", ekNo: 10, baslik: "Taşıma Evrakları" },
+  { anahtar: "tasima_evraklari", ekNo: 10, baslik: "Karayolu İle Atık Taşıma Aracı Uygunluk Belgesi" },
 ] as const;
 type AracBelgeAnahtari = (typeof ARAC_BELGE_SLOTLARI)[number]["anahtar"];
 

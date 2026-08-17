@@ -283,10 +283,17 @@ export async function aracEvraklariPdfOlustur(veri: AracEvraklariPdfVerisi): Pro
 
   // Ek sırası sabit: 1-2 firma ortak, 3-5 araca özel, 6 yazılı talimat
   // (jenerik), 7 araca özel, 8 ADR çanta (jenerik), 9-10 araca özel.
+  //
+  // ÖZEL DURUM — Ek-10 (Karayolu İle Atık Taşıma Aracı Uygunluk Belgesi):
+  // bu belge yüklenmemişse (dataUrls boşsa) hem kapak sayfasındaki
+  // "Doküman İçeriği" listesinden hem de PDF içeriğinden TAMAMEN
+  // ÇIKARILIR — diğer Ek'lerin aksine "belge yüklenmemiştir" boş sayfası
+  // dahi eklenmez.
   const ekBasliklari = veri.belgeler
     .slice()
     .sort((a, b) => a.ekNo - b.ekNo)
     .reduce<string[]>((acc, b) => {
+      if (b.ekNo === 10 && b.dataUrls.length === 0) return acc;
       acc[b.ekNo - 1] = b.baslik;
       return acc;
     }, []);
@@ -320,7 +327,9 @@ export async function aracEvraklariPdfOlustur(veri: AracEvraklariPdfVerisi): Pro
   for (const belge of veri.belgeler.filter((b) => b.ekNo > 8).sort((a, b) => a.ekNo - b.ekNo)) {
     if (belge.dataUrls.length > 0) {
       for (const dataUrl of belge.dataUrls) await gorselliEkSayfasiEkle(doc, belge.ekNo, belge.baslik, dataUrl);
-    } else {
+    } else if (belge.ekNo !== 10) {
+      // Ek-10 istisnası: belge yoksa "belge yüklenmemiştir" sayfası bile
+      // eklenmez (bkz. yukarıdaki ekBasliklari açıklaması).
       bosEkSayfasiEkle(doc, belge.ekNo, belge.baslik);
     }
   }
