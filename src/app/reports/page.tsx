@@ -395,27 +395,24 @@ export default function ReportsPage() {
 
   return (
     <div className="p-8 max-w-4xl">
+      {atikFirmalariErisim && (
+        <div className="flex gap-2 mb-4">
+          <span className="px-3 py-1.5 rounded-lg text-sm border bg-blue-600 text-white border-blue-600">
+            📊 Raporlar
+          </span>
+          <Link
+            href="/reports/atik-firmalari"
+            className="px-3 py-1.5 rounded-lg text-sm border bg-white hover:bg-gray-50"
+          >
+            🗑️ Atık Firmaları
+          </Link>
+        </div>
+      )}
+
       <h1 className="text-3xl font-bold mb-2">Raporlar</h1>
       <p className="text-gray-500 text-sm mb-4">
         Raporlar tarayıcınızda oluşturulur ve otomatik olarak indirilir.
       </p>
-
-      {atikFirmalariErisim && (
-        <Link
-          href="/reports/atik-firmalari"
-          className="block border rounded-xl p-4 mb-8 bg-gray-50 hover:bg-gray-100 transition-colors"
-        >
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-semibold">🗑️ Atık Firmaları</p>
-              <p className="text-xs text-gray-500 mt-0.5">
-                Vergi numaraları ve TMFB (Tehlikeli Madde Faaliyet Belgesi) kütüphanesi — alfabetik sıralı
-              </p>
-            </div>
-            <span className="text-gray-300">→</span>
-          </div>
-        </Link>
-      )}
 
       {error && (
         <p className="mb-6 p-3 rounded border border-amber-200 bg-amber-50 text-amber-800 text-sm">

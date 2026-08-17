@@ -196,7 +196,17 @@ export default function AtikFirmalariPage() {
 
   return (
     <div className="p-8">
-      <Link href="/reports" className="text-sm text-blue-600 hover:underline">← Raporlar</Link>
+      <div className="flex gap-2 mb-4">
+        <Link
+          href="/reports"
+          className="px-3 py-1.5 rounded-lg text-sm border bg-white hover:bg-gray-50"
+        >
+          📊 Raporlar
+        </Link>
+        <span className="px-3 py-1.5 rounded-lg text-sm border bg-blue-600 text-white border-blue-600">
+          🗑️ Atık Firmaları
+        </span>
+      </div>
 
       <div className="flex items-center justify-between mb-2 mt-2">
         <div>
