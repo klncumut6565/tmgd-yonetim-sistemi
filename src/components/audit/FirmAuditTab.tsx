@@ -36,6 +36,17 @@ const TABLE_TR: Record<string, string> = {
   visits: "Ziyaret",
   notifications: "Bildirim",
   user_roles: "Rol",
+  firm_belgeleri: "Belge Takip",
+  firm_belge_dosyalari: "Belge Takip Dosyası",
+  firm_arac_evraklari: "Araç Evrakı",
+  firm_surucu_listesi: "Sürücü Listesi",
+  firm_gorevli_listesi: "Görevli Listesi",
+  firm_chemicals: "Kimyasal Envanter",
+  firm_consignees: "Alıcı Firma",
+  firm_notes: "Firma Notu",
+  transport_documents: "Taşıma Evrakı",
+  transport_document_items: "Taşıma Evrakı Kalemi",
+  kayit_dosyalari: "Kayıt Dosyası",
 };
 
 const ACTION_TR: Record<string, string> = {
