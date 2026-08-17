@@ -404,7 +404,7 @@ export default function ReportsPage() {
             href="/reports/atik-firmalari"
             className="px-3 py-1.5 rounded-lg text-sm border bg-white hover:bg-gray-50"
           >
-            🗑️ Atık Firmaları
+            🗑️ Atık/Taşımacı Firmaları
           </Link>
         </div>
       )}

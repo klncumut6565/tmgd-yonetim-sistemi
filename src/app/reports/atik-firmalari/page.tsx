@@ -21,6 +21,8 @@ type AtikFirmasi = {
   id: string;
   firma_adi: string;
   vergi_no: string | null;
+  tmfb_numarasi: string | null;
+  tmfb_gecerlilik_tarihi: string | null;
   aciklama: string | null;
   file_path: string;
   file_name: string;
@@ -38,6 +40,13 @@ function boyutYaz(b: number | null): string {
   return `${(b / 1024 / 1024).toFixed(1)} MB`;
 }
 
+function tarihYaz(iso: string | null): string {
+  if (!iso) return "—";
+  const m = iso.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return iso;
+  return `${m[3]}.${m[2]}.${m[1]}`;
+}
+
 export default function AtikFirmalariPage() {
   const { profile, isSuperAdmin, loading: userLoading } = useUser();
   const yetkili = isSuperAdmin || ERISEBILEN_ROLLER.includes(profile?.role || "");
@@ -53,11 +62,17 @@ export default function AtikFirmalariPage() {
   const [formAcik, setFormAcik] = useState(false);
   const [firmaAdi, setFirmaAdi] = useState("");
   const [vergiNo, setVergiNo] = useState("");
+  const [tmfbNo, setTmfbNo] = useState("");
+  const [tmfbGecerlilik, setTmfbGecerlilik] = useState("");
   const [aciklama, setAciklama] = useState("");
   const [dosya, setDosya] = useState<File | null>(null);
   const [yukleniyor, setYukleniyor] = useState(false);
   const [mesaj, setMesaj] = useState("");
   const dosyaRef = useRef<HTMLInputElement>(null);
+
+  // Firma bilgi paneli — firma adına tıklanınca açılır (TMFB belgesini
+  // AÇMAZ; belge yalnızca kendi ayrı bağlantısına tıklanınca açılır).
+  const [detay, setDetay] = useState<AtikFirmasi | null>(null);
 
   const yukle = useCallback(async () => {
     setLoading(true);
@@ -74,7 +89,7 @@ export default function AtikFirmalariPage() {
     if (err) {
       setError(
         /does not exist|not find the table/i.test(err.message)
-          ? "Atık Firmaları tablosu bulunamadı — veritabanı güncellemesi (046_atik_firmalari_tmfb.sql) çalıştırılmalı."
+          ? "Atık/Taşımacı Firmaları tablosu bulunamadı — veritabanı güncellemesi (046_atik_firmalari_tmfb.sql) çalıştırılmalı."
           : "Yüklenemedi: " + hataCevir(err)
       );
       setKayitlar([]);
@@ -130,6 +145,8 @@ export default function AtikFirmalariPage() {
     const { error: insErr } = await supabase.from("atik_firmalari").insert({
       firma_adi: firmaAdi.trim(),
       vergi_no: vergiNo.trim() || null,
+      tmfb_numarasi: tmfbNo.trim() || null,
+      tmfb_gecerlilik_tarihi: tmfbGecerlilik || null,
       aciklama: aciklama.trim() || null,
       file_path: yol,
       file_name: dosya.name,
@@ -147,8 +164,8 @@ export default function AtikFirmalariPage() {
       return;
     }
 
-    setMesaj("✓ Atık firması eklendi.");
-    setFirmaAdi(""); setVergiNo(""); setAciklama(""); setDosya(null);
+    setMesaj("✓ Atık/Taşımacı firması eklendi.");
+    setFirmaAdi(""); setVergiNo(""); setTmfbNo(""); setTmfbGecerlilik(""); setAciklama(""); setDosya(null);
     if (dosyaRef.current) dosyaRef.current.value = "";
     setFormAcik(false);
     yukle();
@@ -204,13 +221,13 @@ export default function AtikFirmalariPage() {
           📊 Raporlar
         </Link>
         <span className="px-3 py-1.5 rounded-lg text-sm border bg-blue-600 text-white border-blue-600">
-          🗑️ Atık Firmaları
+          🗑️ Atık/Taşımacı Firmaları
         </span>
       </div>
 
       <div className="flex items-center justify-between mb-2 mt-2">
         <div>
-          <h1 className="text-3xl font-bold">Atık Firmaları</h1>
+          <h1 className="text-3xl font-bold">Atık/Taşımacı Firmaları</h1>
           <p className="text-sm text-gray-500 mt-1">
             Vergi numaraları ve Tehlikeli Madde Faaliyet Belgeleri (TMFB) — firma adına göre alfabetik.
           </p>
@@ -220,7 +237,7 @@ export default function AtikFirmalariPage() {
             onClick={() => { setFormAcik(true); setMesaj(""); }}
             className="px-4 py-2 bg-black text-white rounded text-sm whitespace-nowrap"
           >
-            + Atık Firması Ekle
+            + Atık/Taşımacı Firması Ekle
           </button>
         )}
       </div>
@@ -232,7 +249,7 @@ export default function AtikFirmalariPage() {
       {/* Yükleme formu */}
       {formAcik && (
         <div className="border rounded-xl p-4 my-4 bg-gray-50">
-          <h2 className="font-semibold text-sm mb-3">Yeni Atık Firması</h2>
+          <h2 className="font-semibold text-sm mb-3">Yeni Atık/Taşımacı Firması</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <label className="block">
               <span className="text-xs text-gray-600">Firma Adı *</span>
@@ -252,7 +269,25 @@ export default function AtikFirmalariPage() {
                 onChange={(e) => setVergiNo(e.target.value)}
               />
             </label>
-            <label className="block md:col-span-2">
+            <label className="block">
+              <span className="text-xs text-gray-600">TMFB Numarası</span>
+              <input
+                className="border p-2 w-full rounded mt-1 text-sm"
+                placeholder="Belge numarası"
+                value={tmfbNo}
+                onChange={(e) => setTmfbNo(e.target.value)}
+              />
+            </label>
+            <label className="block">
+              <span className="text-xs text-gray-600">TMFB Geçerlilik Tarihi</span>
+              <input
+                type="date"
+                className="border p-2 w-full rounded mt-1 text-sm"
+                value={tmfbGecerlilik}
+                onChange={(e) => setTmfbGecerlilik(e.target.value)}
+              />
+            </label>
+            <label className="block">
               <span className="text-xs text-gray-600">TMFB Dosyası * (en fazla 25 MB)</span>
               <input
                 ref={dosyaRef}
@@ -308,7 +343,7 @@ export default function AtikFirmalariPage() {
       {!loading && gosterilen.length === 0 && !error && (
         <div className="border rounded-xl p-8 text-center text-gray-400">
           {kayitlar.length === 0
-            ? "Henüz atık firması eklenmemiş."
+            ? "Henüz atık/taşımacı firması eklenmemiş."
             : "Aramanla eşleşen kayıt yok."}
         </div>
       )}
@@ -318,27 +353,29 @@ export default function AtikFirmalariPage() {
         <div className="border rounded-xl divide-y overflow-hidden">
           {gosterilen.map((k) => (
             <div key={k.id} className="flex items-center gap-3 p-3 hover:bg-gray-50">
-              <button
-                onClick={() => belgeAc(k)}
-                className="flex-1 text-left"
-                title="TMFB'yi yeni sekmede aç"
-              >
-                <p className="text-sm font-medium text-blue-700 hover:underline">
+              <div className="flex-1 min-w-0">
+                <button
+                  onClick={() => setDetay(k)}
+                  className="text-sm font-medium text-gray-900 hover:underline text-left"
+                  title="Firma bilgilerini göster"
+                >
                   {k.firma_adi}
-                </p>
+                </button>
                 <p className="text-xs text-gray-500 mt-0.5">
-                  {[
-                    k.vergi_no ? `VN: ${k.vergi_no}` : null,
-                    k.file_name,
-                    boyutYaz(k.file_size),
-                  ]
-                    .filter(Boolean)
-                    .join(" · ")}
+                  {k.vergi_no ? `VN: ${k.vergi_no} · ` : ""}
+                  <button
+                    onClick={() => belgeAc(k)}
+                    className="text-blue-600 hover:underline"
+                    title="TMFB'yi yeni sekmede aç"
+                  >
+                    📄 {k.file_name}
+                  </button>
+                  {boyutYaz(k.file_size) && ` · ${boyutYaz(k.file_size)}`}
                 </p>
                 {k.aciklama && (
                   <p className="text-xs text-gray-400 mt-0.5">{k.aciklama}</p>
                 )}
-              </button>
+              </div>
               {canWrite && (
                 <button
                   onClick={() => sil(k)}
@@ -349,6 +386,54 @@ export default function AtikFirmalariPage() {
               )}
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Firma bilgi paneli — firma adına tıklanınca açılır */}
+      {detay && (
+        <div
+          className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4"
+          onClick={() => setDetay(null)}
+        >
+          <div
+            className="bg-white rounded-xl shadow-xl max-w-md w-full p-5"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-semibold text-base">Firma Bilgileri</h2>
+              <button onClick={() => setDetay(null)} className="text-gray-400 hover:text-gray-600">✕</button>
+            </div>
+            <dl className="space-y-3 text-sm">
+              <div>
+                <dt className="text-xs text-gray-500">İşletme Unvanı</dt>
+                <dd className="font-medium">{detay.firma_adi}</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-gray-500">Vergi Numarası</dt>
+                <dd>{detay.vergi_no || "—"}</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-gray-500">TMFB Numarası</dt>
+                <dd>{detay.tmfb_numarasi || "—"}</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-gray-500">TMFB Geçerlilik Tarihi</dt>
+                <dd>{tarihYaz(detay.tmfb_gecerlilik_tarihi)}</dd>
+              </div>
+              {detay.aciklama && (
+                <div>
+                  <dt className="text-xs text-gray-500">Açıklama</dt>
+                  <dd>{detay.aciklama}</dd>
+                </div>
+              )}
+            </dl>
+            <button
+              onClick={() => belgeAc(detay)}
+              className="mt-5 w-full px-4 py-2 bg-black text-white rounded text-sm"
+            >
+              📄 TMFB Belgesini Aç
+            </button>
+          </div>
         </div>
       )}
     </div>
