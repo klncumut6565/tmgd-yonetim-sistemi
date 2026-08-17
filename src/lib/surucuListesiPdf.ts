@@ -320,12 +320,6 @@ function imzaBlokuCiz(doc: JsPDFType, veri: SurucuListesiPdfVerisi, y: number) {
   ];
   const isimliUnvanlar = [altBasliklar[0], altBasliklar[1], "Tesis Sorumlusu"];
 
-  doc.setDrawColor(0, 0, 0);
-  doc.setLineWidth(0.3);
-  doc.rect(M, y, W - 2 * M, yukseklik);
-  doc.line(M + kolonGenislik, y, M + kolonGenislik, y + yukseklik);
-  doc.line(M + kolonGenislik * 2, y, M + kolonGenislik * 2, y + yukseklik);
-
   basliklar.forEach((b, i) => {
     const x = M + kolonGenislik * i + kolonGenislik / 2;
     const isim = isimler[i];
