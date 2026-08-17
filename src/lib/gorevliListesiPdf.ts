@@ -55,6 +55,8 @@ export type LogoData = {
 export type GorevliListesiPdfVerisi = {
   firmaAdi: string;
   hazirlayanAdi: string;
+  /** Onaylayan (tesis sorumlusu) — firms.approver_name. */
+  onaylayanAdi: string;
   bugun: string; // gg.aa.yyyy
   satirlar: GorevliListesiPdfSatiri[];
   logo?: LogoData;
@@ -270,6 +272,48 @@ function baslikKutusuCiz(doc: JsPDFType, veri: GorevliListesiPdfVerisi) {
   });
 }
 
+/**
+ * HAZIRLAYAN / KONTROL EDEN / ONAYLAYAN üç sütunlu imza bloğu —
+ * surucuListesiPdf.ts'teki (imzaBlokuCiz) AYNI çerçevesiz desen.
+ * "KONTROL EDEN" her zaman sabit TMGD Koordinatörü'dür (BelgeOlusturForm.
+ * tsx'teki kurumsal desenle tutarlı).
+ */
+function imzaBlokuCiz(doc: JsPDFType, veri: GorevliListesiPdfVerisi, y: number) {
+  const kolonGenislik = (W - 2 * M) / 3;
+
+  const isimler = [veri.hazirlayanAdi.trim(), "YAKUP ATAŞ", veri.onaylayanAdi.trim()];
+  const basliklar = ["HAZIRLAYAN", "KONTROL EDEN", "ONAYLAYAN"];
+  const altBasliklar = [
+    "Tehlikeli Madde Güvenlik Danışmanı",
+    "Tehlikeli Madde Güvenlik Danışmanı Koordinatörü",
+    "Sorumlu Kişi",
+  ];
+  const isimliUnvanlar = [altBasliklar[0], altBasliklar[1], "Tesis Sorumlusu"];
+
+  basliklar.forEach((b, i) => {
+    const x = M + kolonGenislik * i + kolonGenislik / 2;
+    const isim = isimler[i];
+
+    doc.setFontSize(7.5);
+    doc.setFont(FONT, "bold");
+    doc.setTextColor(0, 0, 0);
+    doc.text(b, x, y + 5, { align: "center" });
+
+    if (isim) {
+      doc.setFontSize(7.5);
+      doc.setFont(FONT, "bold");
+      doc.text(isim.toLocaleUpperCase("tr-TR"), x, y + 10.5, { align: "center", maxWidth: kolonGenislik - 4 });
+      doc.setFontSize(6);
+      doc.setFont(FONT, "normal");
+      doc.text(isimliUnvanlar[i], x, y + 14.3, { align: "center", maxWidth: kolonGenislik - 4 });
+    } else {
+      doc.setFontSize(6.5);
+      doc.setFont(FONT, "normal");
+      doc.text(altBasliklar[i], x, y + 10.5, { align: "center", maxWidth: kolonGenislik - 4 });
+    }
+  });
+}
+
 export async function gorevliListesiPdfOlustur(
   veri: GorevliListesiPdfVerisi
 ): Promise<Blob> {
@@ -355,7 +399,7 @@ export async function gorevliListesiPdfOlustur(
     "Yukarıda Belirtilen Formda kişi/kişiler değişmesi halinde en geç 7 gün içerisinde yazılı olarak Tehlikeli Madde Güvenlik Danışmanına Haber verilmesi gerekmektedir.";
   const dipnotSatirlari = doc.splitTextToSize(dipnotMetni, W - 2 * M);
   const dipnotYukseklik = dipnotSatirlari.length * 3.6;
-  const gerekliYukseklik = dipnotYukseklik + 8 + 8; // dipnot + boşluk + imza satırı
+  const gerekliYukseklik = dipnotYukseklik + 8 + 20; // dipnot + boşluk + 3 satırlı imza bloğu
 
   // ÖNEMLİ: Tablo sayfa sonuna çok yakın bittiyse (dipnot+imza için yer
   // kalmadıysa), dipnotu tabloya sığdırmaya ZORLAMAK yerine (bu, metni
@@ -378,15 +422,7 @@ export async function gorevliListesiPdfOlustur(
   doc.text(dipnotSatirlari, M, dipnotY);
 
   const imzaY = dipnotY + dipnotYukseklik + 8;
-  doc.setTextColor(0, 0, 0);
-  doc.setFontSize(9);
-  doc.setFont(FONT, "bold");
-  doc.text("TMGD:", M, imzaY);
-  doc.setFont(FONT, "normal");
-  doc.text(veri.hazirlayanAdi || "—", M + 16, imzaY);
-
-  doc.setFont(FONT, "bold");
-  doc.text("Sorumlu Kişi:", W - M - 45, imzaY);
+  imzaBlokuCiz(doc, veri, imzaY);
 
   return doc.output("blob");
 }

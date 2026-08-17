@@ -177,6 +177,7 @@ export default function GorevliListesi({
   const [busy, setBusy] = useState(false);
 
   const [hazirlayanAdi, setHazirlayanAdi] = useState("");
+  const [onaylayanAdi, setOnaylayanAdi] = useState("");
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
 
   useEffect(() => {
@@ -191,13 +192,15 @@ export default function GorevliListesi({
             .select("*")
             .eq("firm_id", firmId)
             .order("sira_no"),
-          supabase.from("firms").select("logo_url").eq("id", firmId).single(),
+          supabase.from("firms").select("logo_url, approver_name").eq("id", firmId).single(),
         ]);
         if (iptal) return;
         if (kayitRes.error) throw kayitRes.error;
         const yuklenen = ((kayitRes.data as GorevliKaydi[]) || []).map(kayittanSatir);
         setRows(ensureTrailingBlank(yuklenen));
-        setLogoUrl((firmRes.data as { logo_url: string | null } | null)?.logo_url ?? null);
+        const firmVeri = firmRes.data as { logo_url: string | null; approver_name: string | null } | null;
+        setLogoUrl(firmVeri?.logo_url ?? null);
+        setOnaylayanAdi(firmVeri?.approver_name ?? "");
 
         const { data: tmgdAdi } = await supabase.rpc("get_firm_tmgd_name", {
           p_firm_id: firmId,
@@ -372,6 +375,7 @@ export default function GorevliListesi({
       const blob = await gorevliListesiPdfOlustur({
         firmaAdi,
         hazirlayanAdi,
+        onaylayanAdi,
         bugun: bugununTarihi(),
         satirlar: satirlariHazirla(),
         logo,
