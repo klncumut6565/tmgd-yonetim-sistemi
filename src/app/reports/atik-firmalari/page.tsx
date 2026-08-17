@@ -58,8 +58,10 @@ export default function AtikFirmalariPage() {
   const [error, setError] = useState("");
   const [arama, setArama] = useState("");
 
-  // Yükleme formu
+  // Yükleme formu (aynı form hem "yeni ekle" hem "düzenle" için kullanılır —
+  // duzenlenenId doluysa güncelleme modundayız).
   const [formAcik, setFormAcik] = useState(false);
+  const [duzenlenenId, setDuzenlenenId] = useState<string | null>(null);
   const [firmaAdi, setFirmaAdi] = useState("");
   const [vergiNo, setVergiNo] = useState("");
   const [tmfbNo, setTmfbNo] = useState("");
@@ -121,37 +123,109 @@ export default function AtikFirmalariPage() {
     else window.open(data.signedUrl, "_blank");
   }
 
+  /** Var olan bir kaydı düzenlemek için formu doldurup açar. */
+  function duzenle(k: AtikFirmasi) {
+    setDuzenlenenId(k.id);
+    setFirmaAdi(k.firma_adi);
+    setVergiNo(k.vergi_no || "");
+    setTmfbNo(k.tmfb_numarasi || "");
+    setTmfbGecerlilik(k.tmfb_gecerlilik_tarihi ? k.tmfb_gecerlilik_tarihi.slice(0, 10) : "");
+    setAciklama(k.aciklama || "");
+    setDosya(null);
+    if (dosyaRef.current) dosyaRef.current.value = "";
+    setMesaj("");
+    setFormAcik(true);
+  }
+
+  function formuKapat() {
+    setFormAcik(false);
+    setDuzenlenenId(null);
+    setFirmaAdi(""); setVergiNo(""); setTmfbNo(""); setTmfbGecerlilik(""); setAciklama(""); setDosya(null);
+    if (dosyaRef.current) dosyaRef.current.value = "";
+    setMesaj("");
+  }
+
   async function kaydet() {
     if (!firmaAdi.trim()) { setMesaj("Firma adı zorunlu."); return; }
-    if (!dosya) { setMesaj("TMFB dosyası seç."); return; }
-    if (dosya.size > 25 * 1024 * 1024) { setMesaj("Dosya 25 MB'tan büyük olamaz."); return; }
+    // Yeni eklerken dosya zorunlu; düzenlerken mevcut dosya korunuyorsa
+    // (yeni dosya seçilmediyse) zorunlu değil.
+    if (!duzenlenenId && !dosya) { setMesaj("TMFB dosyası seç."); return; }
+    if (dosya && dosya.size > 25 * 1024 * 1024) { setMesaj("Dosya 25 MB'tan büyük olamaz."); return; }
 
     setYukleniyor(true);
     setMesaj("");
 
-    const uzanti = dosya.name.split(".").pop() || "pdf";
-    const yol = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${uzanti}`;
+    // Yeni bir dosya seçildiyse yükle (hem ekleme hem düzenleme için);
+    // düzenlemede dosya seçilmediyse mevcut file_path/file_name korunur.
+    let yeniYol: string | null = null;
+    let yeniAd: string | null = null;
+    let yeniBoyut: number | null = null;
+    let yeniMime: string | null = null;
 
-    const { error: upErr } = await supabase.storage
-      .from("atik-firmalari-tmfb")
-      .upload(yol, dosya, { contentType: dosya.type || undefined });
+    if (dosya) {
+      const uzanti = dosya.name.split(".").pop() || "pdf";
+      yeniYol = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${uzanti}`;
+      const { error: upErr } = await supabase.storage
+        .from("atik-firmalari-tmfb")
+        .upload(yeniYol, dosya, { contentType: dosya.type || undefined });
+      if (upErr) {
+        setYukleniyor(false);
+        setMesaj("Dosya yüklenemedi: " + upErr.message);
+        return;
+      }
+      yeniAd = dosya.name;
+      yeniBoyut = dosya.size;
+      yeniMime = dosya.type || null;
+    }
 
-    if (upErr) {
+    if (duzenlenenId) {
+      // ---- GÜNCELLEME ----
+      const eskiKayit = kayitlar.find((k) => k.id === duzenlenenId);
+      const govde: Record<string, unknown> = {
+        firma_adi: firmaAdi.trim(),
+        vergi_no: vergiNo.trim() || null,
+        tmfb_numarasi: tmfbNo.trim() || null,
+        tmfb_gecerlilik_tarihi: tmfbGecerlilik || null,
+        aciklama: aciklama.trim() || null,
+      };
+      if (yeniYol) {
+        govde.file_path = yeniYol;
+        govde.file_name = yeniAd;
+        govde.file_size = yeniBoyut;
+        govde.mime_type = yeniMime;
+      }
+
+      const { error: updErr } = await supabase.from("atik_firmalari").update(govde).eq("id", duzenlenenId);
       setYukleniyor(false);
-      setMesaj("Dosya yüklenemedi: " + upErr.message);
+
+      if (updErr) {
+        if (yeniYol) await supabase.storage.from("atik-firmalari-tmfb").remove([yeniYol]);
+        setMesaj("Güncellenemedi: " + hataCevir(updErr));
+        return;
+      }
+
+      // Dosya değiştirildiyse eski dosyayı depodan temizle.
+      if (yeniYol && eskiKayit?.file_path) {
+        await supabase.storage.from("atik-firmalari-tmfb").remove([eskiKayit.file_path]);
+      }
+
+      setMesaj("✓ Atık/Taşımacı firması güncellendi.");
+      formuKapat();
+      yukle();
       return;
     }
 
+    // ---- YENİ EKLEME ----
     const { error: insErr } = await supabase.from("atik_firmalari").insert({
       firma_adi: firmaAdi.trim(),
       vergi_no: vergiNo.trim() || null,
       tmfb_numarasi: tmfbNo.trim() || null,
       tmfb_gecerlilik_tarihi: tmfbGecerlilik || null,
       aciklama: aciklama.trim() || null,
-      file_path: yol,
-      file_name: dosya.name,
-      file_size: dosya.size,
-      mime_type: dosya.type || null,
+      file_path: yeniYol,
+      file_name: yeniAd,
+      file_size: yeniBoyut,
+      mime_type: yeniMime,
       yukleyen: profile?.id ?? null,
     });
 
@@ -159,15 +233,13 @@ export default function AtikFirmalariPage() {
 
     if (insErr) {
       // Kayıt başarısızsa yüklenen dosyayı geri al — yetim dosya kalmasın
-      await supabase.storage.from("atik-firmalari-tmfb").remove([yol]);
+      if (yeniYol) await supabase.storage.from("atik-firmalari-tmfb").remove([yeniYol]);
       setMesaj("Kaydedilemedi: " + hataCevir(insErr));
       return;
     }
 
     setMesaj("✓ Atık/Taşımacı firması eklendi.");
-    setFirmaAdi(""); setVergiNo(""); setTmfbNo(""); setTmfbGecerlilik(""); setAciklama(""); setDosya(null);
-    if (dosyaRef.current) dosyaRef.current.value = "";
-    setFormAcik(false);
+    formuKapat();
     yukle();
   }
 
@@ -234,7 +306,7 @@ export default function AtikFirmalariPage() {
         </div>
         {!formAcik && (
           <button
-            onClick={() => { setFormAcik(true); setMesaj(""); }}
+            onClick={() => { setFormAcik(true); setDuzenlenenId(null); setMesaj(""); }}
             className="px-4 py-2 bg-black text-white rounded text-sm whitespace-nowrap"
           >
             + Atık/Taşımacı Firması Ekle
@@ -249,7 +321,9 @@ export default function AtikFirmalariPage() {
       {/* Yükleme formu */}
       {formAcik && (
         <div className="border rounded-xl p-4 my-4 bg-gray-50">
-          <h2 className="font-semibold text-sm mb-3">Yeni Atık/Taşımacı Firması</h2>
+          <h2 className="font-semibold text-sm mb-3">
+            {duzenlenenId ? "Atık/Taşımacı Firmasını Düzenle" : "Yeni Atık/Taşımacı Firması"}
+          </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <label className="block">
               <span className="text-xs text-gray-600">Firma Adı *</span>
@@ -288,7 +362,9 @@ export default function AtikFirmalariPage() {
               />
             </label>
             <label className="block">
-              <span className="text-xs text-gray-600">TMFB Dosyası * (en fazla 25 MB)</span>
+              <span className="text-xs text-gray-600">
+                TMFB Dosyası {duzenlenenId ? "(değiştirmek için seç, boş bırakırsan mevcut dosya kalır)" : "* (en fazla 25 MB)"}
+              </span>
               <input
                 ref={dosyaRef}
                 type="file"
@@ -316,10 +392,10 @@ export default function AtikFirmalariPage() {
               disabled={yukleniyor}
               className="px-4 py-2 bg-black text-white rounded text-sm disabled:opacity-50"
             >
-              {yukleniyor ? "Yükleniyor..." : "Kaydet"}
+              {yukleniyor ? "Kaydediliyor..." : duzenlenenId ? "Güncelle" : "Kaydet"}
             </button>
             <button
-              onClick={() => { setFormAcik(false); setMesaj(""); }}
+              onClick={formuKapat}
               className="px-4 py-2 border rounded text-sm"
             >
               Vazgeç
@@ -377,12 +453,20 @@ export default function AtikFirmalariPage() {
                 )}
               </div>
               {canWrite && (
-                <button
-                  onClick={() => sil(k)}
-                  className="text-xs px-2 py-1 border rounded text-red-600 hover:bg-red-50 shrink-0"
-                >
-                  Sil
-                </button>
+                <div className="flex items-center gap-1 shrink-0">
+                  <button
+                    onClick={() => duzenle(k)}
+                    className="text-xs px-2 py-1 border rounded text-blue-600 hover:bg-blue-50"
+                  >
+                    Düzenle
+                  </button>
+                  <button
+                    onClick={() => sil(k)}
+                    className="text-xs px-2 py-1 border rounded text-red-600 hover:bg-red-50"
+                  >
+                    Sil
+                  </button>
+                </div>
               )}
             </div>
           ))}
@@ -427,12 +511,22 @@ export default function AtikFirmalariPage() {
                 </div>
               )}
             </dl>
-            <button
-              onClick={() => belgeAc(detay)}
-              className="mt-5 w-full px-4 py-2 bg-black text-white rounded text-sm"
-            >
-              📄 TMFB Belgesini Aç
-            </button>
+            <div className="flex gap-2 mt-5">
+              <button
+                onClick={() => belgeAc(detay)}
+                className="flex-1 px-4 py-2 bg-black text-white rounded text-sm"
+              >
+                📄 TMFB Belgesini Aç
+              </button>
+              {canWrite && (
+                <button
+                  onClick={() => { duzenle(detay); setDetay(null); }}
+                  className="px-4 py-2 border rounded text-sm text-blue-600 hover:bg-blue-50"
+                >
+                  Düzenle
+                </button>
+              )}
+            </div>
           </div>
         </div>
       )}
