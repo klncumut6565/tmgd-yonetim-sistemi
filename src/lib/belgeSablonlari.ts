@@ -38,6 +38,72 @@ export type BelgeSablonu = {
   posterYolu?: string;
 };
 
+// K3 (Gönderen Kontrol Dökümanı) ve K4 (Yükleyen Kontrol Dökümanı), kullanıcının
+// paylaştığı örnek belgeye (Gönderen_Kontrol_Dökümanı_K3.docx) göre AYNI ortak
+// içeriğe sahiptir — tek kaynaktan (bu sabit) türetilir, ikisi de birebir aynı
+// blokları kullanır. Çerçeve (KONTROL DÖKÜMANI üst başlık kutusu) ve imza
+// alanları (Gönderen/Kaşe İmza, Taşıyıcı-Şoför Adı Soyadı/İmza) kasıtlı olarak
+// DAHİL EDİLMEDİ — bunlar uygulamanın kendi kapak/imza sistemi tarafından
+// karşılanıyor.
+const GONDEREN_YUKLEME_KONTROL_BLOCKS: TemplateBlock[] = [
+  { type: "paragraph", text: "Onay kısmına yazılan; i harfi ilgili değil anlamına gelir, ✓ işareti mevcut/kontrolü yapıldığı anlamına gelir, X işareti mevcut değil/kontrolü yapılmadığı anlamına gelir." },
+  { type: "subheading", text: "Levha ve İşaret Kontrolleri" },
+  { type: "table",
+    headers: ["No", "Açıklama", "Evet", "Hayır", "İlgili Değil"],
+    colWidths: [0.4, 4.4, 0.6, 0.6, 0.9],
+    rows: [
+      ["1", "Ambalajlı taşıma için aracın önünde arkasında boş turuncu plaka mevcut mu?", "☐", "☐", "☐"],
+      ["2", "Tank ve dökme taşıma için aracın önünde arkasında yazılı turuncu plaka ve her iki yanında arkasında tehlike ikaz işareti mevcut mu?", "☐", "☐", "☐"],
+      ["3", "Konteyner ile yük taşınması durumunda konteynerin dört tarafında tehlike ikaz işareti ve UN numarası mevcut mu?", "☐", "☐", "☐"],
+    ],
+  },
+  { type: "subheading", text: "Sevkiyat Bilgileri" },
+  { type: "bullet", items: [
+    "Tarih: ……………………………",
+    "Gönderici Firma Unvanı: ……………………………",
+    "Taşıyıcı Firma Unvanı: ……………………………",
+    "Araç Plaka No: ……………………………",
+    "Araç Türü:  ☐ Kamyon   ☐ Tank   ☐ Diğer (……………………………)",
+  ]},
+  { type: "subheading", text: "Gönderen-Paketleyen Kontrolleri" },
+  { type: "table",
+    headers: ["Sıra No", "Araçta Bulunması Gereken Evraklar", "Onay"],
+    colWidths: [0.5, 4.5, 0.8],
+    rows: [
+      ["1", "Tehlikeli Madde Faaliyet Belgesi (Taşımacı konulu olarak) mevcut mu?", ""],
+      ["2", "Taşıma Evrağı mevcut mu?", ""],
+      ["3", "Yazılı Talimat mevcut mu?", ""],
+      ["4", "Taşıma Yetki Belgesi (K1-K2-TİO v.b.) mevcut mu?", ""],
+      ["5", "Basınçlı kap olması halinde muayene ve test mevcut mu?", ""],
+      ["6", "Ambalajlarda uygun etiket ve işaretleme mevcut mu?", ""],
+      ["7", "Uygun sertifikalı ambalajlar (UN sertifikalı) kullanıldı mı?", ""],
+      ["8", "Tank ve patlayıcı madde taşımasına uygun ADR/Taşıt uygunluk belgesi mevcut mu?", ""],
+      ["9", "Tankların test ve muayeneleri mevcut mu?", ""],
+    ],
+  },
+  { type: "subheading", text: "Yükleyen Kontrolleri" },
+  { type: "table",
+    headers: ["Sıra No", "Araçta Bulunması Gereken Evraklar", "Onay"],
+    colWidths: [0.5, 4.5, 0.8],
+    rows: [
+      ["1", "Birlikte yükleme, karışık yükleme kurallarına uygun mu? (ADR 7.5)", ""],
+      ["2", "Yüklenecek mallarda hasar, sızdırma kontrolü yapıldı mı?", ""],
+      ["3", "Araç levha kontrolü yapıldı mı?", ""],
+      ["4", "Yükleme sırasında çevrede güvenlik önlemleri alındı mı?", ""],
+      ["5", "Araçta bulunması gereken donanım, teçhizat, yangın tüpü mevcut mu?", ""],
+      ["6", "SRC5 belgeli şoför mevcut mu?", ""],
+    ],
+  },
+  { type: "subheading", text: "Tehlikeli Maddelerin Gönderimi, Paketlemesi ve Yüklemesi Sırasında Uyulması Gereken Talimatlar" },
+  { type: "numbered", items: [
+    "ADR Bölüm 5.4.1'de belirtilen mahiyette taşıma evrakı eksiksiz hazırlanır ve taşımacıya verilir.",
+    "Tehlikeli Madde faaliyet belgesi ve diğer araçta bulunması gereken evraklar kontrol edilir.",
+    "Araçta ve ambalajlarda bulunması gereken levha, etiketler ve işaretlemelerin uygunluğu sağlanır.",
+    "Paketleme ADR 4.1 paketleme talimatına uygun olarak yapılır.",
+    "Yükleme öncesi araçta sızıntı varsa yükleme yapılmaz. Hasarlı, tahrip olmuş ambalajlar araca yüklenmez.",
+  ]},
+];
+
 export const BELGE_SABLONLARI: Record<string, BelgeSablonu> = {
   // ============================= P1 — ALICI PROSEDÜRÜ =============================
   P1: {
@@ -1419,46 +1485,8 @@ export const BELGE_SABLONLARI: Record<string, BelgeSablonu> = {
   // ==================== K3 — SEVKİYAT UYGUNLUK KONTROL FORMU (GÖNDEREN) ====================
   K3: {
     docType: "KONTROL FORMU",
-    yayinTarihi: "01.11.2025",
-    blocks: [
-      { type: "subheading", text: "Levha ve İşaret Kontrolleri (Evet / Hayır / İlgili Değil)" },
-      { type: "bullet", items: [
-        "Ambalajlı Taşıma için Aracın önünde/arkasında boş turuncu plaka mevcut mu?",
-        "Tank ve Dökme Taşıma için Aracın önünde/arkasında yazılı turuncu plaka ve her iki yanında tehlike ikaz işareti mevcut mu?",
-        "Konteyner ile yük taşınması durumunda konteynerin dört tarafında tehlike ikaz işareti ve UN numarası mevcut mu?",
-      ]},
-      { type: "subheading", text: "Sevkiyat Bilgileri" },
-      { type: "bullet", items: ["Tarih: ……………", "Gönderici Firma Unvanı: ……………", "Taşıyıcı Firma Unvanı: ……………", "Araç Plaka No: ……………", "Araç Türü: Kamyon / Tank / Diğer"] },
-      { type: "subheading", text: "Gönderen-Paketleyen Kontrolleri" },
-      { type: "numbered", items: [
-        "Tehlikeli Madde Faaliyet Belgesi (Taşımacı konulu olarak) mevcut mu?",
-        "Taşıma Evrağı mevcut mu?",
-        "Yazılı Talimat mevcut mu?",
-        "Taşıma Yetki Belgesi (K1-K2-TİO vb.) mevcut mu?",
-        "Basınçlı kap olması halinde muayene ve test mevcut mu?",
-        "Ambalajlarda uygun etiket ve işaretleme var mı?",
-        "Uygun sertifikalı ambalajlar (UN sertifikalı) kullanıldı mı?",
-        "Tank ve patlayıcı madde taşımasına uygun ADR/Taşıt uygunluk belgesi mevcut mu?",
-        "Tankların test ve muayeneleri mevcut mu?",
-      ]},
-      { type: "subheading", text: "Yükleyen Kontrolleri" },
-      { type: "numbered", items: [
-        "Birlikte yükleme, karışık yükleme kurallarına uygun mu? (ADR 7.5)",
-        "Yüklenecek mallarda hasar, sızdırma kontrolü yapıldı mı?",
-        "Araç levha kontrolü yapıldı mı?",
-        "Yükleme sırasında çevrede güvenlik önlemleri alındı mı?",
-        "Araçta bulunması gereken donanım, teçhizat, yangın tüpü mevcut mu?",
-        "SRC5 belgeli şoför mevcut mu?",
-      ]},
-      { type: "subheading", text: "Uyulması Gereken Talimatlar" },
-      { type: "numbered", items: [
-        "ADR Bölüm 5.4.1'de belirtilen mahiyette taşıma evrakı eksiksiz hazırlanır ve taşımacıya verilir.",
-        "Tehlikeli Madde faaliyet belgesi ve diğer araçta bulunması gereken evraklar kontrol edilir.",
-        "Araçta ve ambalajlarda bulunması gereken levha, etiketler ve işaretlemelerin uygunluğu sağlanır.",
-        "Paketleme ADR 4.1 paketleme talimatına uygun olarak yapılır.",
-        "Yükleme öncesi araçta sızıntı varsa yükleme yapılmaz; hasarlı, tahrip olmuş ambalajlar araca yüklenmez.",
-      ]},
-    ],
+    yayinTarihi: "01.01.2024",
+    blocks: GONDEREN_YUKLEME_KONTROL_BLOCKS,
   },
 
   // ============================= L2 — ARAÇ / TAŞIMACI LİSTESİ VE TAŞIMA EVRAKI KAYITLARI =============================
@@ -2143,24 +2171,8 @@ export const BELGE_SABLONLARI: Record<string, BelgeSablonu> = {
 
   K4: {
     docType: "KONTROL FORMU",
-    yayinTarihi: "01.11.2025",
-    blocks: [
-      { type: "subheading", text: "Sevkiyat Bilgileri" },
-      { type: "bullet", items: ["Tarih: ……………", "Araç Plaka No: ……………", "Yükleyen İşletme Unvanı: ……………", "Taşıma Türü: Ambalajlı / Dökme / Tank"] },
-      { type: "subheading", text: "Kontrol Alanları (Evet / Hayır)" },
-      { type: "bullet", items: [
-        "Birlikte yükleme, karışık yükleme kurallarına (ADR 7.5) uygun mu?",
-        "Yüklenecek mallarda hasar, sızdırma kontrolü yapıldı mı?",
-        "Araç levha/etiket kontrolü yapıldı mı?",
-        "Yükleme sırasında çevrede güvenlik önlemleri alındı mı?",
-        "Yükler kayma/devrilmeye karşı sabitlendi mi?",
-        "Araçta bulunması gereken donanım, teçhizat, yangın tüpü mevcut mu?",
-        "Taşıma evrakı ve etiketleme eksiksiz mi?",
-        "SRC5 belgeli şoför mevcut mu?",
-      ]},
-      { type: "subheading", text: "Kontrolü Yapan" },
-      { type: "bullet", items: ["Adı: ……………", "İmzası: ……………", "Tarih: ……………"] },
-    ],
+    yayinTarihi: "01.01.2024",
+    blocks: GONDEREN_YUKLEME_KONTROL_BLOCKS,
   },
 
   // ═══════════════════════════ PAKETLEYEN (P6, T9-T12, K6) ═══════════════════════════
