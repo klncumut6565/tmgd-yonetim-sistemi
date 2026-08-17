@@ -868,13 +868,7 @@ function renderBasitBelge(
   doc.setDrawColor(220, 220, 220);
   doc.rect(15, y, W - 30, Math.max(40, 240 - y));
 
-  doc.setFontSize(8);
-  doc.setTextColor(120, 120, 120);
-  doc.text(
-    `${firm.name} · TMGDK-${item.code} · TMGD Yönetim Sistemi tarafından ${bugun} tarihinde oluşturuldu`,
-    15,
-    290
-  );
+
 }
 
 // ---------------------------------------------------------------------

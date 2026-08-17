@@ -145,14 +145,7 @@ function kapakSayfasiCiz(doc: JsPDFType, veri: AracEvraklariPdfVerisi, ekBaslikl
     y += 6.5;
   });
 
-  doc.setFontSize(8);
-  doc.setTextColor(140, 140, 140);
-  doc.text(
-    `${veri.firmaAdi} · TMGD Yönetim Sistemi tarafından ${veri.bugun} tarihinde oluşturuldu`,
-    W / 2,
-    H - 12,
-    { align: "center" }
-  );
+
 }
 
 /** Bir Ek sayfasını (başlık) çizer, altına içerik eklenecek boşluk bırakır. */
