@@ -1616,7 +1616,6 @@ async function renderYapilandirilmisBelge(
 
   sayfalar.forEach((sayfaSatirlari, idx) => {
     doc.addPage(); // kapak 1. sayfa olduğundan içerik her zaman yeni sayfada
-    cerceveCiz(doc);
 
     baslikTablosuCiz(doc, firmAdi, code, belgeAdi, sablon, logo, bugun, idx + 1, toplamSayfa, baslikYukseklik, adLines);
     altTabloCiz(doc, hazirlayanAdi, onaylayanAdi);
@@ -1670,7 +1669,6 @@ async function renderYapilandirilmisBelge(
   // sığdırılır.
   if (posterVeri) {
     doc.addPage();
-    cerceveCiz(doc);
     baslikTablosuCiz(doc, firmAdi, code, belgeAdi, sablon, logo, bugun, toplamSayfa, toplamSayfa, baslikYukseklik, adLines);
     altTabloCiz(doc, hazirlayanAdi, onaylayanAdi);
 

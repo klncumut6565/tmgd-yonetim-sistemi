@@ -189,10 +189,6 @@ async function gorselliEkSayfasiEkle(doc: JsPDFType, ekNo: number, baslik: strin
 
 function bosEkSayfasiEkle(doc: JsPDFType, ekNo: number, baslik: string) {
   ekSayfaBasligiCiz(doc, ekNo, baslik);
-  doc.setFontSize(10);
-  doc.setFont(FONT, "normal");
-  doc.setTextColor(160, 160, 160);
-  doc.text("Bu belge henüz sisteme yüklenmemiştir.", W / 2, 60, { align: "center" });
 }
 
 /** Ek-6 Yazılı Talimat: metin sayfası (gerçek yazı, görsel değil) + 3
