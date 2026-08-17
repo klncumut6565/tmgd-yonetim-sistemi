@@ -47,6 +47,25 @@ function tarihYaz(iso: string | null): string {
   return `${m[3]}.${m[2]}.${m[1]}`;
 }
 
+/** Belge Takip ekranındaki (firms/[id]/page.tsx expiryBadge) AYNI
+ *  "kalan gün" rozeti mantığı. */
+function gecerlilikRozeti(iso: string | null): { label: string; className: string } | null {
+  if (!iso) return null;
+  const days = Math.round(
+    (new Date(iso).getTime() - new Date(new Date().toDateString()).getTime()) / 86400000
+  );
+  const label = days < 0 ? `${Math.abs(days)} gün geçti` : days === 0 ? "Bugün doluyor" : `${days} gün kaldı`;
+  const className =
+    days < 0
+      ? "bg-gray-700 text-gray-100"
+      : days <= 7
+        ? "bg-red-100 text-red-700"
+        : days <= 30
+          ? "bg-amber-100 text-amber-800"
+          : "bg-green-50 text-green-700";
+  return { label, className };
+}
+
 export default function AtikFirmalariPage() {
   const { profile, isSuperAdmin, loading: userLoading } = useUser();
   const yetkili = isSuperAdmin || ERISEBILEN_ROLLER.includes(profile?.role || "");
@@ -430,13 +449,23 @@ export default function AtikFirmalariPage() {
           {gosterilen.map((k) => (
             <div key={k.id} className="flex items-center gap-3 p-3 hover:bg-gray-50">
               <div className="flex-1 min-w-0">
-                <button
-                  onClick={() => setDetay(k)}
-                  className="text-sm font-medium text-gray-900 hover:underline text-left"
-                  title="Firma bilgilerini göster"
-                >
-                  {k.firma_adi}
-                </button>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <button
+                    onClick={() => setDetay(k)}
+                    className="text-sm font-medium text-gray-900 hover:underline text-left"
+                    title="Firma bilgilerini göster"
+                  >
+                    {k.firma_adi}
+                  </button>
+                  {(() => {
+                    const rozet = gecerlilikRozeti(k.tmfb_gecerlilik_tarihi);
+                    return rozet ? (
+                      <span className={`text-xs px-2 py-0.5 rounded-full shrink-0 ${rozet.className}`}>
+                        {rozet.label}
+                      </span>
+                    ) : null;
+                  })()}
+                </div>
                 <p className="text-xs text-gray-500 mt-0.5">
                   {k.vergi_no ? `VN: ${k.vergi_no} · ` : ""}
                   <button
@@ -502,7 +531,17 @@ export default function AtikFirmalariPage() {
               </div>
               <div>
                 <dt className="text-xs text-gray-500">TMFB Geçerlilik Tarihi</dt>
-                <dd>{tarihYaz(detay.tmfb_gecerlilik_tarihi)}</dd>
+                <dd className="flex items-center gap-2 flex-wrap">
+                  <span>{tarihYaz(detay.tmfb_gecerlilik_tarihi)}</span>
+                  {(() => {
+                    const rozet = gecerlilikRozeti(detay.tmfb_gecerlilik_tarihi);
+                    return rozet ? (
+                      <span className={`text-xs px-2 py-0.5 rounded-full ${rozet.className}`}>
+                        {rozet.label}
+                      </span>
+                    ) : null;
+                  })()}
+                </dd>
               </div>
               {detay.aciklama && (
                 <div>
