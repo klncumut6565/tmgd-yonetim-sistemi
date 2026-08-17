@@ -164,10 +164,21 @@ function kapakSayfasiCiz(doc: JsPDFType, veri: AracEvraklariPdfVerisi, ekBaslikl
 
 }
 
-/** Bir Ek sayfasını (başlık) çizer, altına içerik eklenecek boşluk bırakır. */
-function ekSayfaBasligiCiz(doc: JsPDFType, ekNo: number, baslik: string) {
+/** Bir Ek sayfasını (başlık) çizer, altına içerik eklenecek boşluk bırakır.
+ *  logo verilirse sol üst köşeye küçük firma logosu eklenir (yalnızca
+ *  bunu isteyen çağrılar için — kapakSayfasiCiz ile AYNI hesaplama). */
+function ekSayfaBasligiCiz(doc: JsPDFType, ekNo: number, baslik: string, logo?: LogoData) {
   doc.addPage();
   fontuKaydet(doc);
+
+  if (logo) {
+    try {
+      const box = logoKutusuHesapla(logo.enBoyOrani, 14);
+      doc.addImage(logo.data, logo.fmt, M, 10, box.w, box.h);
+    } catch {
+      /* logo eklenemezse sayfa yine üretilsin */
+    }
+  }
 
   doc.setFontSize(12);
   doc.setFont(FONT, "bold");
@@ -179,8 +190,8 @@ function ekSayfaBasligiCiz(doc: JsPDFType, ekNo: number, baslik: string) {
   return { kutuUst: 28 };
 }
 
-async function gorselliEkSayfasiEkle(doc: JsPDFType, ekNo: number, baslik: string, dataUrl: string) {
-  const { kutuUst } = ekSayfaBasligiCiz(doc, ekNo, baslik);
+async function gorselliEkSayfasiEkle(doc: JsPDFType, ekNo: number, baslik: string, dataUrl: string, logo?: LogoData) {
+  const { kutuUst } = ekSayfaBasligiCiz(doc, ekNo, baslik, logo);
   const kutuG = W - 2 * M;
   const kutuY = H - kutuUst - 15;
 
@@ -208,10 +219,20 @@ function bosEkSayfasiEkle(doc: JsPDFType, ekNo: number, baslik: string) {
 }
 
 /** Ek-6 Yazılı Talimat: metin sayfası (gerçek yazı, görsel değil) + 3
- *  tablo görseli. */
-async function yaziliTalimatEkleriEkle(doc: JsPDFType, ekNo: number) {
+ *  tablo görseli. logo verilirse ilk sayfanın sol üst köşesine firma
+ *  logosu eklenir. */
+async function yaziliTalimatEkleriEkle(doc: JsPDFType, ekNo: number, logo?: LogoData) {
   doc.addPage();
   fontuKaydet(doc);
+
+  if (logo) {
+    try {
+      const box = logoKutusuHesapla(logo.enBoyOrani, 14);
+      doc.addImage(logo.data, logo.fmt, M, 10, box.w, box.h);
+    } catch {
+      /* logo eklenemezse sayfa yine üretilsin */
+    }
+  }
 
   doc.setFontSize(12);
   doc.setFont(FONT, "bold");
@@ -282,7 +303,7 @@ export async function aracEvraklariPdfOlustur(veri: AracEvraklariPdfVerisi): Pro
     }
   }
 
-  await yaziliTalimatEkleriEkle(doc, 6);
+  await yaziliTalimatEkleriEkle(doc, 6, veri.logo);
 
   const ek7 = veri.belgeler.find((b) => b.ekNo === 7);
   if (ek7) {
@@ -294,7 +315,7 @@ export async function aracEvraklariPdfOlustur(veri: AracEvraklariPdfVerisi): Pro
   }
 
   const adrCantaGorsel = await statikGorselGetir(ADR_CANTA_ICERIGI_GORSELI);
-  if (adrCantaGorsel) await gorselliEkSayfasiEkle(doc, 8, "ADR ÇANTASI İÇERİĞİ", adrCantaGorsel);
+  if (adrCantaGorsel) await gorselliEkSayfasiEkle(doc, 8, "ADR ÇANTASI İÇERİĞİ", adrCantaGorsel, veri.logo);
 
   for (const belge of veri.belgeler.filter((b) => b.ekNo > 8).sort((a, b) => a.ekNo - b.ekNo)) {
     if (belge.dataUrls.length > 0) {

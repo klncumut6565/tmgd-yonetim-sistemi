@@ -52,7 +52,7 @@ const ARAC_BELGE_SLOTLARI = [
   { anahtar: "tasit_karti", ekNo: 3, baslik: "Taşıt Kartı" },
   { anahtar: "arac_muayene", ekNo: 4, baslik: "Araç Muayenesi" },
   { anahtar: "arac_ruhsat", ekNo: 5, baslik: "Araç Ruhsatı" },
-  { anahtar: "sigorta_kasko", ekNo: 7, baslik: "Araç Sigorta-Kasko" },
+  { anahtar: "sigorta_kasko", ekNo: 7, baslik: "Araç Sigorta -KASKO-Tehlikeli Madde Mali Sorumluluk Sigortası(TMMS)" },
   { anahtar: "src5_belgesi", ekNo: 9, baslik: "SRC5 Belgeli Şoför Sertifikası" },
   { anahtar: "tasima_evraklari", ekNo: 10, baslik: "Taşıma Evrakları" },
 ] as const;
