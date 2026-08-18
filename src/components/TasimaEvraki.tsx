@@ -909,19 +909,27 @@ export default function TasimaEvraki({
 
   if (hata) {
     return (
-      <p className="text-sm text-red-600 border border-red-200 bg-red-50 rounded p-3">
+      <p className="text-sm text-red-600 border border-red-200 bg-red-50 rounded-lg p-3">
         {hata}
       </p>
     );
   }
 
+  // ── Ortak stil sabitleri ─────────────────────────────────────────────
+  const ETIKET = "block text-[11px] font-semibold uppercase tracking-wide text-gray-500 mb-1";
+  const GIRIS =
+    "border border-gray-300 rounded-lg px-3 py-2 text-sm w-full outline-none transition-colors " +
+    "focus:border-blue-500 focus:ring-1 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-400";
+
   return (
-    <div className="lg:flex lg:gap-6 lg:items-start">
+    <div className="lg:flex lg:gap-5 lg:items-start">
       {/* SOL: editör */}
-      <div className="flex-1 min-w-0">
-        <div className="border rounded-xl p-4 mb-4">
-          <div className="flex items-center justify-between mb-3">
-            <h4 className="font-semibold">
+      <div className="flex-1 min-w-0 space-y-4">
+
+        {/* ── EVRAK BİLGİLERİ ───────────────────────────────────────── */}
+        <section className="border border-gray-200 rounded-xl bg-white overflow-hidden">
+          <div className="flex items-center justify-between px-4 py-3 border-b bg-gray-50">
+            <h4 className="font-semibold text-sm">
               {evrakId ? "Evrakı Düzenle" : "Yeni Taşıma Evrakı"}
             </h4>
             {evrakId && (
@@ -931,31 +939,49 @@ export default function TasimaEvraki({
             )}
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mb-2">
-            <input className="border p-2 rounded text-sm" placeholder="Evrak No *"
-              value={evrakNo} onChange={(e) => setEvrakNo(e.target.value)} disabled={!canWrite} />
-            {canWrite && (
-              <button
-                type="button"
-                onClick={() => setEvrakNo(evrakNoUret())}
-                title="Yeni evrak numarası üret"
-                className="text-xs text-blue-600 hover:underline -mt-1"
-              >
-                ↻ Yeni no üret
-              </button>
-            )}
-            <DateInput value={tarih} onChange={setTarih} disabled={!canWrite} />
-            <div className="md:col-span-1">
-              <input className="border p-2 rounded text-sm w-full" placeholder="Gönderen firma unvanı"
+          <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div>
+              <label className={ETIKET}>Evrak No *</label>
+              <div className="flex items-center gap-2">
+                <input
+                  className={GIRIS}
+                  value={evrakNo}
+                  onChange={(e) => setEvrakNo(e.target.value)}
+                  disabled={!canWrite}
+                />
+                {canWrite && (
+                  <button
+                    type="button"
+                    onClick={() => setEvrakNo(evrakNoUret())}
+                    title="Yeni evrak numarası üret"
+                    className="shrink-0 text-gray-400 hover:text-blue-600 border border-gray-300 rounded-lg p-2 hover:border-blue-400 transition-colors"
+                  >
+                    ↻
+                  </button>
+                )}
+              </div>
+              <p className="text-[11px] text-gray-400 mt-1">Otomatik üretilir, gerekirse elle değiştirilebilir.</p>
+            </div>
+
+            <div>
+              <label className={ETIKET}>Taşıma Tarihi</label>
+              <DateInput value={tarih} onChange={setTarih} disabled={!canWrite} />
+            </div>
+
+            <div>
+              <label className={ETIKET}>Gönderen firma unvanı</label>
+              <input className={GIRIS} placeholder="Firma unvanı"
                 value={gonderen} onChange={(e) => setGonderen(e.target.value)} disabled={!canWrite} />
-              <textarea className="border p-2 rounded text-sm w-full mt-1" rows={2}
+              <textarea className={GIRIS + " mt-1.5"} rows={2}
                 placeholder="Gönderen adresi"
                 value={gonderenAdres} onChange={(e) => setGonderenAdres(e.target.value)} disabled={!canWrite} />
             </div>
-            <div className="md:col-span-1">
+
+            <div>
+              <label className={ETIKET}>Alıcı firma unvanı</label>
               {aliciListesi.length > 0 && (
                 <select
-                  className="border p-2 rounded text-sm w-full mb-1"
+                  className={GIRIS + " mb-1.5"}
                   value=""
                   onChange={(e) => {
                     const sec = aliciListesi.find((a) => a.id === e.target.value);
@@ -972,53 +998,74 @@ export default function TasimaEvraki({
                   ))}
                 </select>
               )}
-              <input className="border p-2 rounded text-sm w-full" placeholder="Alıcı firma unvanı"
+              <input className={GIRIS} placeholder="Firma unvanı"
                 value={alici} onChange={(e) => setAlici(e.target.value)} disabled={!canWrite} />
-              <textarea className="border p-2 rounded text-sm w-full mt-1" rows={2}
+              <textarea className={GIRIS + " mt-1.5"} rows={2}
                 placeholder="Alıcı adresi"
                 value={aliciAdres} onChange={(e) => setAliciAdres(e.target.value)} disabled={!canWrite} />
               {canWrite && alici.trim() && (
                 <button
                   onClick={aliciyiRehbereKaydet}
                   disabled={aliciKaydediliyor}
-                  className="text-xs text-blue-600 hover:underline mt-1 disabled:opacity-50"
+                  className="text-xs text-blue-600 hover:underline mt-1.5 disabled:opacity-50"
                 >
                   {aliciKaydediliyor ? "Kaydediliyor..." : "💾 Bu alıcıyı rehbere kaydet"}
                 </button>
               )}
             </div>
-            <input className="border p-2 rounded text-sm" placeholder="Taşıyıcı firma"
-              value={tasiyici} onChange={(e) => setTasiyici(e.target.value)} disabled={!canWrite} />
-            <select className="border p-2 rounded text-sm" value={surucuId}
-              onChange={(e) => setSurucuId(e.target.value)} disabled={!canWrite}>
-              <option value="">Sürücü seç (opsiyonel)</option>
-              {suruculer.map((s) => (
-                <option key={s.id} value={s.id}>{s.first_name} {s.last_name}</option>
-              ))}
-            </select>
-            <select className="border p-2 rounded text-sm" value={aracId}
-              onChange={(e) => setAracId(e.target.value)} disabled={!canWrite}>
-              <option value="">Araç seç (opsiyonel)</option>
-              {araclar.map((a) => (
-                <option key={a.id} value={a.id}>{a.plate_number}{a.brand ? ` · ${a.brand}` : ""}</option>
-              ))}
-            </select>
-            <input className="border p-2 rounded text-sm" placeholder="Notlar"
-              value={notlar} onChange={(e) => setNotlar(e.target.value)} disabled={!canWrite} />
+
+            <div>
+              <label className={ETIKET}>Taşıyıcı firma</label>
+              <input className={GIRIS} placeholder="Taşıyıcı firma unvanı"
+                value={tasiyici} onChange={(e) => setTasiyici(e.target.value)} disabled={!canWrite} />
+            </div>
+
+            <div>
+              <label className={ETIKET}>Notlar</label>
+              <input className={GIRIS} placeholder="İsteğe bağlı not"
+                value={notlar} onChange={(e) => setNotlar(e.target.value)} disabled={!canWrite} />
+            </div>
+
+            <div>
+              <label className={ETIKET}>Sürücü</label>
+              <select className={GIRIS} value={surucuId}
+                onChange={(e) => setSurucuId(e.target.value)} disabled={!canWrite}>
+                <option value="">Seçilmedi (opsiyonel)</option>
+                {suruculer.map((s) => (
+                  <option key={s.id} value={s.id}>{s.first_name} {s.last_name}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className={ETIKET}>Araç</label>
+              <select className={GIRIS} value={aracId}
+                onChange={(e) => setAracId(e.target.value)} disabled={!canWrite}>
+                <option value="">Seçilmedi (opsiyonel)</option>
+                {araclar.map((a) => (
+                  <option key={a.id} value={a.id}>{a.plate_number}{a.brand ? ` · ${a.brand}` : ""}</option>
+                ))}
+              </select>
+            </div>
           </div>
+        </section>
 
-          {/* Ürün ekleme — YALNIZCA envanterden */}
-          {canWrite && (
-            <div className="border rounded-lg p-3 bg-gray-50 mb-3">
-              <p className="text-xs text-gray-500 mb-2">
-                Ürünü firmanın Kimyasal Envanterinden seç ya da ADR Tablo A&apos;da ara.
+        {/* ── ÜRÜN EKLE ─────────────────────────────────────────────── */}
+        {canWrite && (
+          <section className="border border-gray-200 rounded-xl bg-white overflow-hidden">
+            <div className="px-4 py-3 border-b bg-gray-50">
+              <h4 className="font-semibold text-sm">Ürün Ekle</h4>
+              <p className="text-xs text-gray-500 mt-0.5">
+                Firmanın Kimyasal Envanterinden seç ya da ADR Tablo A&apos;da ara.
               </p>
+            </div>
 
-              {/* ADR Tablo A araması — envanterde olmayan maddeler için */}
-              <div className="mb-2">
+            <div className="p-4">
+              <div className="mb-3">
+                <label className={ETIKET}>Ürün ara</label>
                 <input
-                  className="border p-2 rounded text-sm w-full"
-                  placeholder="🔍 Ürün ara — ticari ad, madde adı veya UN numarası..."
+                  className={GIRIS}
+                  placeholder="🔍 Ticari ad, madde adı veya UN numarası..."
                   value={tabloAArama}
                   onChange={(e) => {
                     setTabloAArama(e.target.value);
@@ -1029,8 +1076,8 @@ export default function TasimaEvraki({
                 {/* Firma envanteri sonuçları — üstte, çünkü kullanıcının kendi
                     ürünleri daha muhtemel bir eşleşmedir */}
                 {envanterSonuclar.length > 0 && (
-                  <div className="border rounded mt-1 bg-white overflow-hidden">
-                    <div className="px-2 py-1 bg-green-50 text-[11px] font-semibold text-green-800 border-b">
+                  <div className="border rounded-lg mt-1.5 bg-white overflow-hidden shadow-sm">
+                    <div className="px-2.5 py-1.5 bg-green-50 text-[11px] font-semibold text-green-800 border-b">
                       📦 Firma Envanteri ({envanterSonuclar.length})
                     </div>
                     <div className="max-h-40 overflow-y-auto">
@@ -1045,7 +1092,7 @@ export default function TasimaEvraki({
                               `${e.trade_name || e.proper_shipping_name} (UN ${e.un_number})`
                             );
                           }}
-                          className="block w-full text-left px-2 py-1.5 text-xs hover:bg-green-50 border-b last:border-b-0"
+                          className="block w-full text-left px-2.5 py-1.5 text-xs hover:bg-green-50 border-b last:border-b-0"
                         >
                           <span className="font-mono font-semibold">UN {e.un_number}</span>{" "}
                           {e.trade_name ? (
@@ -1062,20 +1109,20 @@ export default function TasimaEvraki({
                   </div>
                 )}
 
-                {tabloAAraniyor && <p className="text-xs text-gray-400 mt-1">Aranıyor...</p>}
+                {tabloAAraniyor && <p className="text-xs text-gray-400 mt-1.5">Aranıyor...</p>}
                 {!tabloAAraniyor &&
                   tabloAArama.trim().length >= 2 &&
                   tabloASonuclar.length === 0 &&
                   envanterSonuclar.length === 0 &&
                   !seciliKimyasal &&
                   !seciliTabloA && (
-                    <p className="text-xs text-gray-400 mt-1">
+                    <p className="text-xs text-gray-400 mt-1.5">
                       Ne envanterde ne Tablo A&apos;da eşleşme bulunamadı.
                     </p>
                   )}
                 {tabloASonuclar.length > 0 && (
-                  <div className="border rounded mt-1 bg-white overflow-hidden">
-                    <div className="px-2 py-1 bg-blue-50 text-[11px] font-semibold text-blue-800 border-b">
+                  <div className="border rounded-lg mt-1.5 bg-white overflow-hidden shadow-sm">
+                    <div className="px-2.5 py-1.5 bg-blue-50 text-[11px] font-semibold text-blue-800 border-b">
                       📖 ADR Tablo A ({tabloASonuclar.length})
                     </div>
                     <div className="max-h-40 overflow-y-auto">
@@ -1088,7 +1135,7 @@ export default function TasimaEvraki({
                           setTabloASonuclar([]);
                           setTabloAArama(`UN ${r.un_number} — ${r.proper_shipping_name}`);
                         }}
-                        className="block w-full text-left px-2 py-1.5 text-xs hover:bg-blue-50 border-b last:border-b-0"
+                        className="block w-full text-left px-2.5 py-1.5 text-xs hover:bg-blue-50 border-b last:border-b-0"
                       >
                         <span className="font-mono font-semibold">UN {r.un_number}</span>{" "}
                         {r.proper_shipping_name}
@@ -1102,7 +1149,7 @@ export default function TasimaEvraki({
                   </div>
                 )}
                 {seciliKimyasal && (
-                  <p className="text-xs text-green-700 bg-green-50 border border-green-200 rounded p-1.5 mt-1">
+                  <p className="text-xs text-green-700 bg-green-50 border border-green-200 rounded-lg p-2 mt-1.5">
                     ✓ Envanterden seçildi
                     <button
                       onClick={() => { setSeciliKimyasal(""); setTabloAArama(""); }}
@@ -1113,7 +1160,7 @@ export default function TasimaEvraki({
                   </p>
                 )}
                 {seciliTabloA && (
-                  <p className="text-xs text-blue-700 bg-blue-50 border border-blue-200 rounded p-1.5 mt-1">
+                  <p className="text-xs text-blue-700 bg-blue-50 border border-blue-200 rounded-lg p-2 mt-1.5">
                     ✓ Tablo A&apos;dan seçildi: UN {seciliTabloA.un_number} — {seciliTabloA.proper_shipping_name}
                     <button
                       onClick={() => { setSeciliTabloA(null); setTabloAArama(""); }}
@@ -1125,88 +1172,116 @@ export default function TasimaEvraki({
                 )}
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-6 gap-2 items-center">
-                <select className="border p-2 rounded text-sm md:col-span-2"
-                  value={seciliKimyasal}
-                  onChange={(e) => {
-                    setSeciliKimyasal(e.target.value);
-                    if (e.target.value) { setSeciliTabloA(null); setTabloAArama(""); }
-                  }}>
-                  <option value="">
-                    {envanter.length === 0 ? "Envanter boş — Tablo A'dan ara" : "Envanterden seç..."}
-                  </option>
-                  {envanter.map((e) => (
-                    <option key={e.id} value={e.id}>
-                      UN {e.un_number} — {(e.trade_name || e.proper_shipping_name).slice(0, 48)}
+              {/* Etiketli, ferah bir ızgara — küçük ekranlarda 2 sütuna
+                  düşer, tek sıraya sıkıştırmaz (bkz. tasarım notu üstte). */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+                <div className="col-span-2 lg:col-span-2">
+                  <label className={ETIKET}>Envanterden Seç</label>
+                  <select className={GIRIS}
+                    value={seciliKimyasal}
+                    onChange={(e) => {
+                      setSeciliKimyasal(e.target.value);
+                      if (e.target.value) { setSeciliTabloA(null); setTabloAArama(""); }
+                    }}>
+                    <option value="" disabled={envanter.length === 0}>
+                      {envanter.length === 0 ? "Envanter boş — yukarıdan Tablo A'da ara" : "Seçiniz..."}
                     </option>
-                  ))}
-                </select>
-                <select className="border p-2 rounded text-sm"
-                  value={ambalajTuru} onChange={(e) => setAmbalajTuru(e.target.value)}>
-                  <option value="">Ambalaj türü...</option>
-                  {AMBALAJ_TURLERI.map((a) => (
-                    <option key={a} value={a}>{a}</option>
-                  ))}
-                </select>
-                <input className="border p-2 rounded text-sm" type="number" min="1" placeholder="Adet"
-                  value={ambalajAdet} onChange={(e) => setAmbalajAdet(e.target.value)} />
-                <input className="border p-2 rounded text-sm" type="number" min="0" step="any"
-                  placeholder="Net miktar *" value={miktar} onChange={(e) => setMiktar(e.target.value)} />
-                <select className="border p-2 rounded text-sm" value={birim}
-                  onChange={(e) => setBirim(e.target.value)}>
-                  <option value="kg">kg</option><option value="lt">lt</option><option value="adet">adet</option>
-                </select>
+                    {envanter.map((e) => (
+                      <option key={e.id} value={e.id}>
+                        UN {e.un_number} — {(e.trade_name || e.proper_shipping_name).slice(0, 48)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className={ETIKET}>Ambalaj Türü</label>
+                  <select className={GIRIS}
+                    value={ambalajTuru} onChange={(e) => setAmbalajTuru(e.target.value)}>
+                    <option value="" disabled>Seçiniz...</option>
+                    {AMBALAJ_TURLERI.map((a) => (
+                      <option key={a} value={a}>{a}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className={ETIKET}>Adet</label>
+                  <input className={GIRIS} type="number" min="1" placeholder="1"
+                    value={ambalajAdet} onChange={(e) => setAmbalajAdet(e.target.value)} />
+                </div>
+
+                <div>
+                  <label className={ETIKET}>Net Miktar *</label>
+                  <input className={GIRIS} type="number" min="0" step="any"
+                    placeholder="0" value={miktar} onChange={(e) => setMiktar(e.target.value)} />
+                </div>
+
+                <div>
+                  <label className={ETIKET}>Birim</label>
+                  <select className={GIRIS} value={birim}
+                    onChange={(e) => setBirim(e.target.value)}>
+                    <option value="kg">kg</option><option value="lt">lt</option><option value="adet">adet</option>
+                  </select>
+                </div>
               </div>
+
               {ambalajTuru === "Diğer" && (
-                <input className="border p-2 rounded text-sm w-full mt-2"
+                <input className={GIRIS + " mt-3"}
                   placeholder="Ambalaj türünü yaz..."
                   value={ambalajDiger} onChange={(e) => setAmbalajDiger(e.target.value)} />
               )}
-              <div className="flex items-center gap-4 mt-2">
-                <label className="text-xs flex items-center gap-1">
+
+              <div className="flex flex-wrap items-center gap-x-5 gap-y-2 mt-3 pt-3 border-t">
+                <label className="text-xs flex items-center gap-1.5 text-gray-700" title="Sınırlı Miktar (Limited Quantity) — ADR Bölüm 3.4 kapsamında azaltılmış kurallarla taşınabilen küçük paketleme.">
                   <input type="checkbox" checked={lq} onChange={(e) => setLq(e.target.checked)} />
-                  LQ (Sınırlı Miktar)
+                  LQ <span className="text-gray-400">— Sınırlı Miktar ⓘ</span>
                 </label>
-                <label className="text-xs flex items-center gap-1">
+                <label className="text-xs flex items-center gap-1.5 text-gray-700" title="İstisnai Miktar (Excepted Quantity) — ADR Bölüm 3.5 kapsamında ADR kurallarından muaf, çok küçük miktarlı paketleme.">
                   <input type="checkbox" checked={eq} onChange={(e) => setEq(e.target.checked)} />
-                  EQ (İstisnai Miktar)
+                  EQ <span className="text-gray-400">— İstisnai Miktar ⓘ</span>
                 </label>
                 <button onClick={kalemEkle} disabled={!seciliKimyasal && !seciliTabloA}
-                  className="ml-auto px-3 py-1.5 rounded bg-blue-600 text-white text-xs hover:bg-blue-700 disabled:opacity-40">
-                  Ürünü ekle
+                  className="ml-auto px-4 py-2 rounded-lg bg-blue-600 text-white text-xs font-medium hover:bg-blue-700 disabled:bg-gray-200 disabled:text-gray-400 transition-colors">
+                  + Ürünü Ekle
                 </button>
               </div>
             </div>
-          )}
+          </section>
+        )}
 
-          {/* Kalem listesi */}
-          {kalemler.length > 0 && (
-            <table className="w-full text-xs border rounded overflow-hidden mb-3">
-              <thead className="bg-gray-100 text-left">
+        {/* ── ÜRÜN LİSTESİ ──────────────────────────────────────────── */}
+        {kalemler.length > 0 && (
+          <section className="border border-gray-200 rounded-xl bg-white overflow-hidden">
+            <div className="px-4 py-3 border-b bg-gray-50">
+              <h4 className="font-semibold text-sm">Evraktaki Ürünler ({kalemler.length})</h4>
+            </div>
+            <table className="w-full text-xs">
+              <thead className="bg-gray-50 text-left text-gray-500">
                 <tr>
-                  <th className="p-1.5">UN</th><th className="p-1.5">Ad</th>
-                  <th className="p-1.5 text-center">Sınıf/PG</th>
-                  <th className="p-1.5 text-center">Kat.</th>
-                  <th className="p-1.5">Ambalaj</th>
-                  <th className="p-1.5 text-right">Miktar</th>
-                  {canWrite && <th className="p-1.5"></th>}
+                  <th className="p-2.5 font-medium">UN</th><th className="p-2.5 font-medium">Ad</th>
+                  <th className="p-2.5 font-medium text-center">Sınıf/PG</th>
+                  <th className="p-2.5 font-medium text-center">Kat.</th>
+                  <th className="p-2.5 font-medium">Ambalaj</th>
+                  <th className="p-2.5 font-medium text-right">Miktar</th>
+                  {canWrite && <th className="p-2.5"></th>}
                 </tr>
               </thead>
               <tbody>
                 {kalemler.map((k, i) => (
-                  <tr key={i} className="border-t">
-                    <td className="p-1.5 font-semibold whitespace-nowrap">UN {k.un_number}</td>
-                    <td className="p-1.5">
+                  <tr key={i} className="border-t hover:bg-gray-50">
+                    <td className="p-2.5 font-semibold whitespace-nowrap">UN {k.un_number}</td>
+                    <td className="p-2.5">
                       {k.proper_shipping_name}
                       {k.is_lq && <span className="ml-1 text-green-700 border border-green-700 rounded px-1">LQ</span>}
                       {k.is_eq && <span className="ml-1 text-blue-800 border border-blue-800 rounded px-1">EQ</span>}
                     </td>
-                    <td className="p-1.5 text-center">{k.adr_class || "—"}/{k.packing_group || "—"}</td>
-                    <td className="p-1.5 text-center">{k.transport_category || "?"}</td>
-                    <td className="p-1.5">{k.packaging_count}× {k.packaging_type || "—"}</td>
-                    <td className="p-1.5 text-right whitespace-nowrap">{k.quantity} {k.unit}</td>
+                    <td className="p-2.5 text-center">{k.adr_class || "—"}/{k.packing_group || "—"}</td>
+                    <td className="p-2.5 text-center">{k.transport_category || "?"}</td>
+                    <td className="p-2.5">{k.packaging_count}× {k.packaging_type || "—"}</td>
+                    <td className="p-2.5 text-right whitespace-nowrap">{k.quantity} {k.unit}</td>
                     {canWrite && (
-                      <td className="p-1.5 text-right">
+                      <td className="p-2.5 text-right">
                         <button onClick={() => setKalemler((p) => p.filter((_, j) => j !== i))}
                           className="text-gray-400 hover:text-red-500">✕</button>
                       </td>
@@ -1215,57 +1290,74 @@ export default function TasimaEvraki({
                 ))}
               </tbody>
             </table>
-          )}
+          </section>
+        )}
 
-          <div className="flex gap-2">
+        {/* ── KAYDET / PDF ──────────────────────────────────────────── */}
+        <section className="border border-gray-200 rounded-xl bg-white p-4">
+          <div className="flex flex-wrap items-center gap-2">
             {canWrite && (
               <button onClick={kaydet}
-                className="px-4 py-2 rounded bg-blue-600 text-white text-sm hover:bg-blue-700">
+                className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition-colors">
                 💾 Kaydet
               </button>
             )}
             <button onClick={pdfIndir} disabled={kalemler.length === 0}
-              className="px-4 py-2 rounded border text-sm hover:bg-gray-50 disabled:opacity-40">
-              📄 PDF indir ({kalemler.length} ürün)
+              title={kalemler.length === 0 ? "PDF indirmek için önce en az bir ürün ekleyin" : "Evrakı PDF olarak indir"}
+              className="px-4 py-2 rounded-lg border text-sm font-medium hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-white transition-colors">
+              📄 PDF İndir {kalemler.length > 0 ? `(${kalemler.length} ürün)` : ""}
             </button>
+            <p className="text-[11px] text-gray-400 ml-auto">* zorunlu alan</p>
           </div>
-          {mesaj && <p className="text-sm mt-2">{mesaj}</p>}
-        </div>
-
-        {/* Kayıtlı evraklar */}
-        <div className="border rounded-xl p-4">
-          <h4 className="font-semibold mb-2">Kayıtlı Evraklar</h4>
-          {evraklar.length === 0 ? (
-            <p className="text-sm text-gray-400">Henüz kayıtlı evrak yok.</p>
-          ) : (
-            <ul className="divide-y">
-              {evraklar.map((e) => (
-                <li key={e.id} className="py-2 flex items-center gap-3 text-sm">
-                  <button onClick={() => evrakAc(e.id)}
-                    className="font-semibold text-blue-700 hover:underline">
-                    {e.document_no}
-                  </button>
-                  <span className="text-gray-400 text-xs">{e.transport_date || ""}</span>
-                  <span className="text-xs text-gray-500">
-                    {e.total_points != null ? `${Number(e.total_points).toFixed(0)} puan` : "muafiyetsiz"}
-                    {e.tunnel_restriction_code ? ` · Tünel ${e.tunnel_restriction_code}` : ""}
-                  </span>
-                  {canWrite && (
-                    <button onClick={() => evrakSil(e.id)}
-                      className="ml-auto text-gray-400 hover:text-red-500 text-xs">✕</button>
-                  )}
-                </li>
-              ))}
-            </ul>
+          {kalemler.length === 0 && (
+            <p className="text-[11px] text-gray-400 mt-2">PDF indirmek için yukarıdan en az bir ürün ekle.</p>
           )}
-        </div>
+          {mesaj && <p className="text-sm mt-2 text-gray-700">{mesaj}</p>}
+        </section>
+
+        {/* ── KAYITLI EVRAKLAR ──────────────────────────────────────── */}
+        <section className="border border-gray-200 rounded-xl bg-white overflow-hidden">
+          <div className="px-4 py-3 border-b bg-gray-50">
+            <h4 className="font-semibold text-sm">Kayıtlı Evraklar</h4>
+          </div>
+          <div className="p-4">
+            {evraklar.length === 0 ? (
+              <p className="text-sm text-gray-400">Henüz kayıtlı evrak yok.</p>
+            ) : (
+              <ul className="divide-y">
+                {evraklar.map((e) => (
+                  <li key={e.id} className="py-2 flex items-center gap-3 text-sm">
+                    <button onClick={() => evrakAc(e.id)}
+                      className="font-semibold text-blue-700 hover:underline">
+                      {e.document_no}
+                    </button>
+                    <span className="text-gray-400 text-xs">{e.transport_date || ""}</span>
+                    <span className="text-xs text-gray-500">
+                      {e.total_points != null ? `${Number(e.total_points).toFixed(0)} puan` : "muafiyetsiz"}
+                      {e.tunnel_restriction_code ? ` · Tünel ${e.tunnel_restriction_code}` : ""}
+                    </span>
+                    {canWrite && (
+                      <button onClick={() => evrakSil(e.id)}
+                        className="ml-auto text-gray-400 hover:text-red-500 text-xs">✕</button>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </section>
       </div>
 
-      {/* SAĞ: canlı ADR paneli */}
+      {/* SAĞ: canlı ADR paneli — soldaki forma bitişik, aynı vurgu
+          rengiyle bağlanan bir "sonuç paneli" olarak tasarlandı (üstteki
+          mavi şerit, forma ait olduğunu görsel olarak gösterir). */}
       <aside className="lg:w-[300px] shrink-0 mt-4 lg:mt-0 lg:sticky lg:top-4">
-        <div className="border rounded-xl p-4 bg-white">
-          <h4 className="font-bold mb-1">🛡️ ADR Kontrol</h4>
-          <p className="text-xs text-gray-400 mb-3">Canlı hesap — her değişiklikte güncellenir</p>
+        <div className="border border-gray-200 rounded-xl bg-white overflow-hidden">
+          <div className="px-4 py-3 border-b bg-blue-600">
+            <h4 className="font-bold text-sm text-white flex items-center gap-1.5">🛡️ ADR Kontrol</h4>
+            <p className="text-[11px] text-blue-100 mt-0.5">Canlı hesap — her değişiklikte güncellenir</p>
+          </div>
+          <div className="p-4">
           {kalemler.length === 0 ? (
             <p className="text-sm text-gray-400">Ürün eklendikçe 1.1.3.6 puanı ve tünel kısıtı burada hesaplanır.</p>
           ) : (
@@ -1466,6 +1558,7 @@ export default function TasimaEvraki({
               )}
             </div>
           )}
+          </div>
         </div>
       </aside>
     </div>

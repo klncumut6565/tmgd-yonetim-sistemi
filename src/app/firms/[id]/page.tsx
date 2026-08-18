@@ -848,7 +848,8 @@ function FirmDetailInner({
         <span className="text-gray-700">{display(firm.status)}</span>
       </p>
       {(firm.activities || []).length > 0 && (
-        <div className="flex flex-wrap gap-1 mb-4">
+        <div className="flex flex-wrap items-center gap-1 mb-4">
+          <span className="text-xs text-gray-400 mr-1">Faaliyet Rolleri:</span>
           {(firm.activities || []).map((a) => (
             <span key={a} className="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded">
               {ACTIVITY_LABELS[a] || a}
@@ -1729,7 +1730,7 @@ function FirmDetailInner({
           ürün kaynağı olacak (arama yalnızca bu listeden yapılır). */}
       {tab === "adr_transport" && (
         <div>
-          <h2 className="text-lg font-bold mb-1">🚚 Taşıma Evrakı</h2>
+          <h2 className="text-lg font-bold mb-1">🚚 Taşıma & Kimyasal Yönetimi</h2>
           <p className="text-sm text-gray-500 mb-3">
             Taşıma evrakları bu firmanın kendi Kimyasal Envanterinden beslenir;
             ADR bilgileri ortak Tablo A&apos;dan (2.939 kayıt) otomatik gelir.
