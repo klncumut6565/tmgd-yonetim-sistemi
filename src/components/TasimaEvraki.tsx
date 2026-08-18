@@ -382,7 +382,7 @@ async function evrakPdfUret(args: {
   // Alt bilgi
   doc.setFontSize(6.5); doc.setTextColor(130, 130, 130);
   doc.text(
-    `${args.firmaAdi} — ADR Taşıma Evrakı · Bu belge TMGD Yönetim Sistemi ile üretilmiştir.`,
+    "Bu belge ADR Yönetmeliği Madde 5.4.1 kapsamında düzenlenmiştir.",
     W / 2, 290, { align: "center" }
   );
   return doc;
