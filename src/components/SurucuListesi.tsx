@@ -489,22 +489,64 @@ export default function SurucuListesi({
     }
   }
 
+  /** Sürücülerin SRC5/Ehliyet dosyalarını PDF eki olarak hazırlar — hem
+   *  indirme hem önizleme AYNI bu fonksiyonu kullanır. */
+  async function eklerHazirla(): Promise<SurucuBelgeEki[]> {
+    const ekIstekleri: Promise<SurucuBelgeEki | null>[] = [];
+    for (const r of kayitliSatirlar) {
+      if (r.src5_dosya_yolu) {
+        ekIstekleri.push(belgeEkiHazirla(r.src5_dosya_yolu, r.ad_soyad, "SRC5 Sertifikası"));
+      }
+      if (r.ehliyet_dosya_yolu) {
+        ekIstekleri.push(belgeEkiHazirla(r.ehliyet_dosya_yolu, r.ad_soyad, "Ehliyet"));
+      }
+    }
+    return (await Promise.all(ekIstekleri)).filter((e): e is SurucuBelgeEki => e !== null);
+  }
+
+  /**
+   * PDF'i indirmeden, tarayıcının kendi PDF görüntüleyicisiyle YENİ
+   * SEKMEDE açar — "önizleme". Pencere ÖNCE (senkron) açılır, PDF
+   * üretimi (async) bittiğinde blob URL'i o pencereye yüklenir; bu
+   * sıra, mobil Safari'nin açılır pencere engelleyicisine takılmayı
+   * önler (TasimaEvraki.tsx'teki AYNI teknik).
+   */
+  async function pdfOnizle() {
+    const pencere = window.open("", "_blank");
+    if (!pencere) {
+      setError("Yeni sekme açılamadı — tarayıcının açılır pencere engelleyicisini kontrol et.");
+      return;
+    }
+    setBusy(true);
+    setError("");
+    try {
+      const logo = await logoDataUrl();
+      const ekler = await eklerHazirla();
+      const blob = await surucuListesiPdfOlustur({
+        firmaAdi,
+        hazirlayanAdi,
+        onaylayanAdi,
+        bugun: bugununTarihi(),
+        satirlar: satirlariHazirla(),
+        logo,
+        ekler,
+      });
+      const url = URL.createObjectURL(blob);
+      pencere.location.href = url;
+    } catch (e) {
+      pencere.close();
+      setError(hataCevir(e as { message?: string }));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function pdfIndir() {
     setBusy(true);
     setError("");
     try {
       const logo = await logoDataUrl();
-
-      const ekIstekleri: Promise<SurucuBelgeEki | null>[] = [];
-      for (const r of kayitliSatirlar) {
-        if (r.src5_dosya_yolu) {
-          ekIstekleri.push(belgeEkiHazirla(r.src5_dosya_yolu, r.ad_soyad, "SRC5 Sertifikası"));
-        }
-        if (r.ehliyet_dosya_yolu) {
-          ekIstekleri.push(belgeEkiHazirla(r.ehliyet_dosya_yolu, r.ad_soyad, "Ehliyet"));
-        }
-      }
-      const ekler = (await Promise.all(ekIstekleri)).filter((e): e is SurucuBelgeEki => e !== null);
+      const ekler = await eklerHazirla();
 
       const blob = await surucuListesiPdfOlustur({
         firmaAdi,
@@ -557,6 +599,14 @@ export default function SurucuListesi({
             className="px-3 py-1.5 rounded-lg text-sm border bg-white hover:bg-gray-50 disabled:opacity-50"
           >
             📊 Excel İndir
+          </button>
+          <button
+            onClick={pdfOnizle}
+            disabled={busy || kayitliSatirlar.length === 0}
+            title="PDF'i yeni sekmede önizle"
+            className="px-3 py-1.5 rounded-lg text-sm border bg-white hover:bg-gray-50 disabled:opacity-50"
+          >
+            👁️ Önizle
           </button>
           <button
             onClick={pdfIndir}

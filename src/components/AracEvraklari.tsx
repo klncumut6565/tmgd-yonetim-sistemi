@@ -372,6 +372,75 @@ export default function AracEvraklari({
     }
   }
 
+  /** Ek-1..Ek-10 belge listesini (her türe ait tüm dosyaların dataUrl'leri
+   *  dahil) hazırlar — hem indirme hem önizleme AYNI bu fonksiyonu kullanır. */
+  async function belgelerHazirla(): Promise<AracEvrakBelgesi[]> {
+    const belgeler: AracEvrakBelgesi[] = [];
+
+    for (const ortak of ORTAK_BELGE_TURLERI) {
+      const dosyalar = ortakDosyalar[ortak.anahtar];
+      const dataUrls: string[] = [];
+      for (const d of dosyalar) {
+        const url = await belgeDataUrlHazirla(d.file_path);
+        if (url) dataUrls.push(url);
+      }
+      belgeler.push({ ekNo: ortak.ekNo, baslik: ortak.baslik, dataUrls });
+    }
+
+    for (const slot of ARAC_BELGE_SLOTLARI) {
+      const dosyalar = aracDosyalar[slot.anahtar];
+      const dataUrls: string[] = [];
+      for (const d of dosyalar) {
+        const url = await belgeDataUrlHazirla(d.file_path);
+        if (url) dataUrls.push(url);
+      }
+      belgeler.push({ ekNo: slot.ekNo, baslik: slot.baslik, dataUrls });
+    }
+
+    return belgeler;
+  }
+
+  /**
+   * PDF'i indirmeden, tarayıcının kendi PDF görüntüleyicisiyle YENİ
+   * SEKMEDE açar — "önizleme". Pencere ÖNCE (senkron) açılır, PDF
+   * üretimi (async) bittiğinde blob URL'i o pencereye yüklenir; bu
+   * sıra, mobil Safari'nin açılır pencere engelleyicisine takılmayı
+   * önler (TasimaEvraki.tsx'teki AYNI teknik).
+   */
+  async function pdfOnizle() {
+    const secilenArac = araclar.find((a) => a.id === secilenAracId);
+    if (!secilenArac) {
+      setError("Önce bir araç seçin.");
+      return;
+    }
+    const pencere = window.open("", "_blank");
+    if (!pencere) {
+      setError("Yeni sekme açılamadı — tarayıcının açılır pencere engelleyicisini kontrol et.");
+      return;
+    }
+    setBusy(true);
+    setError("");
+    try {
+      const logo = await logoDataUrl();
+      const belgeler = await belgelerHazirla();
+      const blob = await aracEvraklariPdfOlustur({
+        firmaAdi,
+        plaka: secilenArac.plate_number,
+        hazirlayanAdi,
+        bugun: bugununTarihi(),
+        logo,
+        belgeler,
+      });
+      const url = URL.createObjectURL(blob);
+      pencere.location.href = url;
+    } catch (e) {
+      pencere.close();
+      setError(hataCevir(e as { message?: string }));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function pdfOlustur() {
     const secilenArac = araclar.find((a) => a.id === secilenAracId);
     if (!secilenArac) {
@@ -382,28 +451,7 @@ export default function AracEvraklari({
     setError("");
     try {
       const logo = await logoDataUrl();
-
-      const belgeler: AracEvrakBelgesi[] = [];
-
-      for (const ortak of ORTAK_BELGE_TURLERI) {
-        const dosyalar = ortakDosyalar[ortak.anahtar];
-        const dataUrls: string[] = [];
-        for (const d of dosyalar) {
-          const url = await belgeDataUrlHazirla(d.file_path);
-          if (url) dataUrls.push(url);
-        }
-        belgeler.push({ ekNo: ortak.ekNo, baslik: ortak.baslik, dataUrls });
-      }
-
-      for (const slot of ARAC_BELGE_SLOTLARI) {
-        const dosyalar = aracDosyalar[slot.anahtar];
-        const dataUrls: string[] = [];
-        for (const d of dosyalar) {
-          const url = await belgeDataUrlHazirla(d.file_path);
-          if (url) dataUrls.push(url);
-        }
-        belgeler.push({ ekNo: slot.ekNo, baslik: slot.baslik, dataUrls });
-      }
+      const belgeler = await belgelerHazirla();
 
       const blob = await aracEvraklariPdfOlustur({
         firmaAdi,
@@ -587,13 +635,23 @@ export default function AracEvraklari({
         </div>
       )}
 
-      <button
-        onClick={pdfOlustur}
-        disabled={busy || !secilenAracId}
-        className="px-4 py-2 rounded-lg text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
-      >
-        {busy ? "Hazırlanıyor…" : "📄 Araç Evrakı PDF'i Oluştur ve İndir"}
-      </button>
+      <div className="flex gap-2">
+        <button
+          onClick={pdfOnizle}
+          disabled={busy || !secilenAracId}
+          title="PDF'i yeni sekmede önizle"
+          className="px-4 py-2 rounded-lg text-sm font-medium border hover:bg-gray-50 disabled:opacity-50"
+        >
+          👁️ Önizle
+        </button>
+        <button
+          onClick={pdfOlustur}
+          disabled={busy || !secilenAracId}
+          className="px-4 py-2 rounded-lg text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
+        >
+          {busy ? "Hazırlanıyor…" : "📄 Araç Evrakı PDF'i Oluştur ve İndir"}
+        </button>
+      </div>
     </div>
   );
 }

@@ -367,6 +367,41 @@ export default function GorevliListesi({
     }
   }
 
+  /**
+   * PDF'i indirmeden, tarayıcının kendi PDF görüntüleyicisiyle YENİ
+   * SEKMEDE açar — "önizleme". Pencere ÖNCE (senkron) açılır, PDF
+   * üretimi (async) bittiğinde blob URL'i o pencereye yüklenir; bu
+   * sıra, mobil Safari'nin açılır pencere engelleyicisine takılmayı
+   * önler (TasimaEvraki.tsx'teki AYNI teknik).
+   */
+  async function pdfOnizle() {
+    const pencere = window.open("", "_blank");
+    if (!pencere) {
+      setError("Yeni sekme açılamadı — tarayıcının açılır pencere engelleyicisini kontrol et.");
+      return;
+    }
+    setBusy(true);
+    setError("");
+    try {
+      const logo = await logoDataUrl();
+      const blob = await gorevliListesiPdfOlustur({
+        firmaAdi,
+        hazirlayanAdi,
+        onaylayanAdi,
+        bugun: bugununTarihi(),
+        satirlar: satirlariHazirla(),
+        logo,
+      });
+      const url = URL.createObjectURL(blob);
+      pencere.location.href = url;
+    } catch (e) {
+      pencere.close();
+      setError(hataCevir(e as { message?: string }));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function pdfIndir() {
     setBusy(true);
     setError("");
@@ -418,6 +453,14 @@ export default function GorevliListesi({
             className="px-3 py-1.5 rounded-lg text-sm border bg-white hover:bg-gray-50 disabled:opacity-50"
           >
             📊 Excel İndir
+          </button>
+          <button
+            onClick={pdfOnizle}
+            disabled={busy || kayitliSatirlar.length === 0}
+            title="PDF'i yeni sekmede önizle"
+            className="px-3 py-1.5 rounded-lg text-sm border bg-white hover:bg-gray-50 disabled:opacity-50"
+          >
+            👁️ Önizle
           </button>
           <button
             onClick={pdfIndir}
