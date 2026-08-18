@@ -413,6 +413,11 @@ export default function TasimaEvraki({
   const [aracManuel, setAracManuel] = useState("");
   const [notlar, setNotlar] = useState("");
   const [kalemler, setKalemler] = useState<Kalem[]>([]);
+  // Ürün listesinde satır bazında inline düzenleme — hangi satırın
+  // (index) düzenleme modunda olduğunu tutar. Ürünün ADR künyesi
+  // (UN/ad/sınıf/kategori) değişmez, yalnızca ambalaj/miktar/LQ-EQ
+  // düzenlenebilir (o bilgiler zaten Tablo A'dan/envanterden sabit gelir).
+  const [duzenlenenIndex, setDuzenlenenIndex] = useState<number | null>(null);
 
   // Yeni kalem formu
   const [seciliKimyasal, setSeciliKimyasal] = useState("");
@@ -1352,30 +1357,117 @@ export default function TasimaEvraki({
                   <th className="p-2.5 font-medium text-center">Kat.</th>
                   <th className="p-2.5 font-medium">Ambalaj</th>
                   <th className="p-2.5 font-medium text-right">Miktar</th>
-                  {canWrite && <th className="p-2.5"></th>}
+                  {canWrite && <th className="p-2.5 text-right">İşlem</th>}
                 </tr>
               </thead>
               <tbody>
-                {kalemler.map((k, i) => (
-                  <tr key={i} className="border-t hover:bg-gray-50">
-                    <td className="p-2.5 font-semibold whitespace-nowrap">UN {k.un_number}</td>
-                    <td className="p-2.5">
-                      {k.proper_shipping_name}
-                      {k.is_lq && <span className="ml-1 text-green-700 border border-green-700 rounded px-1">LQ</span>}
-                      {k.is_eq && <span className="ml-1 text-blue-800 border border-blue-800 rounded px-1">EQ</span>}
-                    </td>
-                    <td className="p-2.5 text-center">{k.adr_class || "—"}/{k.packing_group || "—"}</td>
-                    <td className="p-2.5 text-center">{k.transport_category || "?"}</td>
-                    <td className="p-2.5">{k.packaging_count}× {k.packaging_type || "—"}</td>
-                    <td className="p-2.5 text-right whitespace-nowrap">{k.quantity} {k.unit}</td>
-                    {canWrite && (
-                      <td className="p-2.5 text-right">
-                        <button onClick={() => setKalemler((p) => p.filter((_, j) => j !== i))}
-                          className="text-gray-400 hover:text-red-500">✕</button>
+                {kalemler.map((k, i) =>
+                  duzenlenenIndex === i ? (
+                    <tr key={i} className="border-t bg-blue-50/50">
+                      <td className="p-2.5 font-semibold whitespace-nowrap align-top pt-3">UN {k.un_number}</td>
+                      <td className="p-2.5 align-top pt-3">
+                        {k.proper_shipping_name}
+                        <p className="text-[10px] text-gray-400 mt-1">Ürünün kendisi değiştirilemez — bunun için satırı silip yeniden ekle.</p>
                       </td>
-                    )}
-                  </tr>
-                ))}
+                      <td className="p-2.5 text-center align-top pt-3">{k.adr_class || "—"}/{k.packing_group || "—"}</td>
+                      <td className="p-2.5 text-center align-top pt-3">{k.transport_category || "?"}</td>
+                      <td className="p-2.5 align-top" colSpan={2}>
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                          <select
+                            className="border border-gray-300 rounded px-2 py-1.5 text-xs"
+                            value={AMBALAJ_TURLERI.includes(k.packaging_type as (typeof AMBALAJ_TURLERI)[number]) ? k.packaging_type : "Diğer"}
+                            onChange={(e) =>
+                              setKalemler((prev) => prev.map((row, j) => (j === i ? { ...row, packaging_type: e.target.value === "Diğer" ? "" : e.target.value } : row)))
+                            }
+                          >
+                            {AMBALAJ_TURLERI.map((a) => (
+                              <option key={a} value={a}>{a}</option>
+                            ))}
+                          </select>
+                          <input
+                            className="border border-gray-300 rounded px-2 py-1.5 text-xs w-full"
+                            type="number" min="1" placeholder="Adet"
+                            value={k.packaging_count}
+                            onChange={(e) =>
+                              setKalemler((prev) => prev.map((row, j) => (j === i ? { ...row, packaging_count: Math.max(1, parseInt(e.target.value) || 1) } : row)))
+                            }
+                          />
+                          <input
+                            className="border border-gray-300 rounded px-2 py-1.5 text-xs w-full"
+                            type="number" min="0" step="any" placeholder="Miktar"
+                            value={k.quantity}
+                            onChange={(e) =>
+                              setKalemler((prev) => prev.map((row, j) => (j === i ? { ...row, quantity: parseFloat(e.target.value) || 0 } : row)))
+                            }
+                          />
+                          <select
+                            className="border border-gray-300 rounded px-2 py-1.5 text-xs"
+                            value={k.unit}
+                            onChange={(e) =>
+                              setKalemler((prev) => prev.map((row, j) => (j === i ? { ...row, unit: e.target.value } : row)))
+                            }
+                          >
+                            <option value="kg">kg</option><option value="lt">lt</option><option value="adet">adet</option>
+                          </select>
+                        </div>
+                        {!AMBALAJ_TURLERI.includes(k.packaging_type as (typeof AMBALAJ_TURLERI)[number]) && (
+                          <input
+                            className="border border-gray-300 rounded px-2 py-1.5 text-xs w-full mt-2"
+                            placeholder="Ambalaj türünü yaz..."
+                            value={k.packaging_type}
+                            onChange={(e) =>
+                              setKalemler((prev) => prev.map((row, j) => (j === i ? { ...row, packaging_type: e.target.value } : row)))
+                            }
+                          />
+                        )}
+                        <div className="flex items-center gap-3 mt-2">
+                          <label className="text-[11px] flex items-center gap-1">
+                            <input type="checkbox" checked={k.is_lq}
+                              onChange={(e) => setKalemler((prev) => prev.map((row, j) => (j === i ? { ...row, is_lq: e.target.checked } : row)))} />
+                            LQ
+                          </label>
+                          <label className="text-[11px] flex items-center gap-1">
+                            <input type="checkbox" checked={k.is_eq}
+                              onChange={(e) => setKalemler((prev) => prev.map((row, j) => (j === i ? { ...row, is_eq: e.target.checked } : row)))} />
+                            EQ
+                          </label>
+                          <button
+                            onClick={() => setDuzenlenenIndex(null)}
+                            className="ml-auto px-3 py-1 rounded bg-blue-600 text-white text-[11px] font-medium hover:bg-blue-700"
+                          >
+                            ✓ Bitti
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : (
+                    <tr key={i} className="border-t hover:bg-gray-50">
+                      <td className="p-2.5 font-semibold whitespace-nowrap">UN {k.un_number}</td>
+                      <td className="p-2.5">
+                        {k.proper_shipping_name}
+                        {k.is_lq && <span className="ml-1 text-green-700 border border-green-700 rounded px-1">LQ</span>}
+                        {k.is_eq && <span className="ml-1 text-blue-800 border border-blue-800 rounded px-1">EQ</span>}
+                      </td>
+                      <td className="p-2.5 text-center">{k.adr_class || "—"}/{k.packing_group || "—"}</td>
+                      <td className="p-2.5 text-center">{k.transport_category || "?"}</td>
+                      <td className="p-2.5">{k.packaging_count}× {k.packaging_type || "—"}</td>
+                      <td className="p-2.5 text-right whitespace-nowrap">{k.quantity} {k.unit}</td>
+                      {canWrite && (
+                        <td className="p-2.5 text-right whitespace-nowrap">
+                          <button onClick={() => setDuzenlenenIndex(i)}
+                            title="Ambalaj/miktar/LQ-EQ düzenle"
+                            className="text-gray-400 hover:text-blue-600 mr-2">✏️</button>
+                          <button onClick={() => {
+                            setKalemler((p) => p.filter((_, j) => j !== i));
+                            setDuzenlenenIndex((prev) => (prev === null ? null : prev > i ? prev - 1 : prev === i ? null : prev));
+                          }}
+                            title="Satırı sil"
+                            className="text-gray-400 hover:text-red-500">✕</button>
+                        </td>
+                      )}
+                    </tr>
+                  )
+                )}
               </tbody>
             </table>
           </section>
