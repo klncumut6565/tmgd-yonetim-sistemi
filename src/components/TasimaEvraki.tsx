@@ -902,6 +902,38 @@ export default function TasimaEvraki({
     yukle();
   }
 
+  /**
+   * PDF'i indirmeden, tarayıcının kendi PDF görüntüleyicisiyle YENİ
+   * SEKMEDE açar — "önizleme". Pencere ÖNCE (senkron) açılır, PDF
+   * üretimi (async) bittiğinde blob URL'i o pencereye yüklenir; bu
+   * sıra, mobil Safari'nin açılır pencere engelleyicisine takılmayı
+   * önler (Mobilden Tara akışındaki AYNI teknik).
+   */
+  async function pdfOnizle() {
+    const pencere = window.open("", "_blank");
+    if (!pencere) {
+      setMesaj("Yeni sekme açılamadı — tarayıcının açılır pencere engelleyicisini kontrol et.");
+      return;
+    }
+    try {
+      const doc = await evrakPdfUret({
+        firmaAdi, evrakNo: evrakNo || "(taslak)",
+        tarih: tarih.split("-").reverse().join("."),
+        gonderen: gonderenAdres.trim() ? `${gonderen}\n${gonderenAdres.trim()}` : gonderen,
+        alici: aliciAdres.trim() ? `${alici}\n${aliciAdres.trim()}` : alici,
+        tasiyici,
+        surucu: seciliSurucu, arac: seciliArac,
+        surucuManuel, aracManuel,
+        kalemler, puan, plakaGerekli, muafiyetsiz, tunel, notlar,
+      });
+      const blobUrl = URL.createObjectURL(doc.output("blob"));
+      pencere.location.href = blobUrl;
+    } catch (e) {
+      pencere.close();
+      setMesaj("Önizleme oluşturulamadı: " + (e instanceof Error ? e.message : String(e)));
+    }
+  }
+
   async function pdfIndir() {
     // PDF her basışta EKRANDAKİ GÜNCEL listeden üretilir — bayatlama olamaz.
     const doc = await evrakPdfUret({
@@ -1358,6 +1390,11 @@ export default function TasimaEvraki({
                 💾 Kaydet
               </button>
             )}
+            <button onClick={pdfOnizle} disabled={kalemler.length === 0}
+              title={kalemler.length === 0 ? "Önizlemek için önce en az bir ürün ekleyin" : "PDF'i yeni sekmede önizle"}
+              className="px-4 py-2 rounded-lg border text-sm font-medium hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-white transition-colors">
+              👁️ Önizle
+            </button>
             <button onClick={pdfIndir} disabled={kalemler.length === 0}
               title={kalemler.length === 0 ? "PDF indirmek için önce en az bir ürün ekleyin" : "Evrakı PDF olarak indir"}
               className="px-4 py-2 rounded-lg border text-sm font-medium hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-white transition-colors">
