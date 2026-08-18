@@ -188,6 +188,9 @@ async function evrakPdfUret(args: {
   tasiyici: string;
   surucu: Surucu | null;
   arac: Arac | null;
+  /** Kayıtlı sürücü/araç seçilmediyse elle yazılan serbest metin. */
+  surucuManuel: string;
+  aracManuel: string;
   kalemler: Kalem[];
   puan: number;
   plakaGerekli: boolean;
@@ -240,8 +243,12 @@ async function evrakPdfUret(args: {
 
   // Taşıyıcı / Sürücü / Araç şeridi
   doc.setFontSize(8);
-  const surucuAd = args.surucu ? `${args.surucu.first_name} ${args.surucu.last_name}` : "—";
-  const aracBilgi = args.arac ? `${args.arac.plate_number}${args.arac.brand ? " · " + args.arac.brand : ""}` : "—";
+  const surucuAd = args.surucu
+    ? `${args.surucu.first_name} ${args.surucu.last_name}`
+    : (args.surucuManuel.trim() || "—");
+  const aracBilgi = args.arac
+    ? `${args.arac.plate_number}${args.arac.brand ? " · " + args.arac.brand : ""}`
+    : (args.aracManuel.trim() || "—");
   doc.setFont(FONT, "bold"); doc.text("Taşıyıcı:", M, y);
   doc.setFont(FONT, "normal"); doc.text(args.tasiyici || "—", M + 15, y);
   doc.setFont(FONT, "bold"); doc.text("Sürücü:", M + 78, y);
@@ -399,6 +406,11 @@ export default function TasimaEvraki({
   const [tasiyici, setTasiyici] = useState("");
   const [surucuId, setSurucuId] = useState("");
   const [aracId, setAracId] = useState("");
+  // Sistemde kayıtlı olmayan sürücü/araç için serbest metin girişi —
+  // dropdown'dan seçim yapılmadıysa bu metin kullanılır (bkz. migration
+  // 052_tasima_evraki_manuel_surucu_arac.sql).
+  const [surucuManuel, setSurucuManuel] = useState("");
+  const [aracManuel, setAracManuel] = useState("");
   const [notlar, setNotlar] = useState("");
   const [kalemler, setKalemler] = useState<Kalem[]>([]);
 
@@ -776,7 +788,7 @@ export default function TasimaEvraki({
 
   function temizle() {
     setEvrakId(null); setEvrakNo(evrakNoUret()); setAlici(""); setAliciAdres(""); setTasiyici("");
-    setSurucuId(""); setAracId(""); setNotlar(""); setKalemler([]);
+    setSurucuId(""); setAracId(""); setSurucuManuel(""); setAracManuel(""); setNotlar(""); setKalemler([]);
     setGonderen(firmaAdi); setGonderenAdres(firmaAdresVarsayilan); setMesaj("");
     setTarih(new Date().toISOString().slice(0, 10));
   }
@@ -812,6 +824,7 @@ export default function TasimaEvraki({
     }
     setTasiyici(ev.carrier || ""); setSurucuId(ev.driver_id || "");
     setAracId(ev.vehicle_id || ""); setNotlar(ev.notes || "");
+    setSurucuManuel(ev.driver_manual || ""); setAracManuel(ev.vehicle_manual || "");
     setKalemler(((it || []) as Record<string, unknown>[]).map((r) => {
       // Karışık yükleme motoru etiketlerle çalışır; kayıtlı kalemlerde
       // labels saklanmadığından envanterdeki eş kayıttan tamamlanır.
@@ -854,6 +867,10 @@ export default function TasimaEvraki({
       consignee: aliciAdres.trim() ? `${alici.trim()}\n${aliciAdres.trim()}` : alici.trim(),
       carrier: tasiyici.trim(),
       driver_id: surucuId || null, vehicle_id: aracId || null,
+      // Kayıtlı sürücü/araç seçildiyse manuel metin YOK SAYILIR (ikisi
+      // birlikte kullanılmaz) — bkz. migration 052.
+      driver_manual: surucuId ? null : (surucuManuel.trim() || null),
+      vehicle_manual: aracId ? null : (aracManuel.trim() || null),
       status: "Kaydedildi", total_points: muafiyetsiz ? null : puan,
       orange_plate_required: plakaGerekli,
       tunnel_restriction_code: tunel === "—" ? null : tunel,
@@ -894,6 +911,7 @@ export default function TasimaEvraki({
       alici: aliciAdres.trim() ? `${alici}\n${aliciAdres.trim()}` : alici,
       tasiyici,
       surucu: seciliSurucu, arac: seciliArac,
+      surucuManuel, aracManuel,
       kalemler, puan, plakaGerekli, muafiyetsiz, tunel, notlar,
     });
     doc.save(`tasima_evraki_${(evrakNo || "taslak").replace(/[^\w-]/g, "_")}.pdf`);
@@ -1029,23 +1047,61 @@ export default function TasimaEvraki({
             <div>
               <label className={ETIKET}>Sürücü</label>
               <select className={GIRIS} value={surucuId}
-                onChange={(e) => setSurucuId(e.target.value)} disabled={!canWrite}>
+                onChange={(e) => {
+                  setSurucuId(e.target.value);
+                  if (e.target.value) setSurucuManuel("");
+                }}
+                disabled={!canWrite}>
                 <option value="">Seçilmedi (opsiyonel)</option>
                 {suruculer.map((s) => (
                   <option key={s.id} value={s.id}>{s.first_name} {s.last_name}</option>
                 ))}
               </select>
+              <input
+                className={GIRIS + " mt-1.5"}
+                placeholder="veya elle yaz — örn. alt yüklenici sürücüsü"
+                value={surucuManuel}
+                onChange={(e) => {
+                  setSurucuManuel(e.target.value);
+                  if (e.target.value) setSurucuId("");
+                }}
+                disabled={!canWrite || !!surucuId}
+              />
+              {surucuId ? (
+                <p className="text-[11px] text-gray-400 mt-1">Kayıtlı sürücü seçildi — elle yazmak için önce seçimi kaldır.</p>
+              ) : (
+                <p className="text-[11px] text-gray-400 mt-1">Sistemde kayıtlı değilse (ör. alt yüklenici) buraya elle yaz.</p>
+              )}
             </div>
 
             <div>
               <label className={ETIKET}>Araç</label>
               <select className={GIRIS} value={aracId}
-                onChange={(e) => setAracId(e.target.value)} disabled={!canWrite}>
+                onChange={(e) => {
+                  setAracId(e.target.value);
+                  if (e.target.value) setAracManuel("");
+                }}
+                disabled={!canWrite}>
                 <option value="">Seçilmedi (opsiyonel)</option>
                 {araclar.map((a) => (
                   <option key={a.id} value={a.id}>{a.plate_number}{a.brand ? ` · ${a.brand}` : ""}</option>
                 ))}
               </select>
+              <input
+                className={GIRIS + " mt-1.5"}
+                placeholder="veya elle yaz — örn. plaka"
+                value={aracManuel}
+                onChange={(e) => {
+                  setAracManuel(e.target.value);
+                  if (e.target.value) setAracId("");
+                }}
+                disabled={!canWrite || !!aracId}
+              />
+              {aracId ? (
+                <p className="text-[11px] text-gray-400 mt-1">Kayıtlı araç seçildi — elle yazmak için önce seçimi kaldır.</p>
+              ) : (
+                <p className="text-[11px] text-gray-400 mt-1">Sistemde kayıtlı değilse buraya elle yaz.</p>
+              )}
             </div>
           </div>
         </section>
