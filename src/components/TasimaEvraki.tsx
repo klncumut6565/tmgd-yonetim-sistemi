@@ -339,21 +339,45 @@ async function evrakPdfUret(args: {
   // az kalemli evraklarda ürün listesi ile imza arasında büyük bir boşluk
   // kalıyordu. Artık içeriği takip ediyor, yalnızca sayfaya sığmayacaksa
   // yeni sayfaya geçiyor.
+  //
+  // Kutu yüksekliği 24->32mm büyütüldü: başlık + (sürücü kutusunda) ad
+  // satırının ALTINA, ADR 5.4.1.1.1/f kapsamındaki küçük puntolu beyan
+  // metinleri sığsın diye (bkz. aşağıdaki beyanGoster()).
   let imzaY = y + 6;
-  const IMZA_YUKSEKLIK = 24;
+  const IMZA_YUKSEKLIK = 32;
   if (imzaY + IMZA_YUKSEKLIK > H - 18) {
     doc.addPage();
     imzaY = M + 6;
   }
   const imzaW = (W - 2 * M - 8) / 2;
   doc.setDrawColor(150, 150, 150);
-  doc.rect(M, imzaY, imzaW, 24);
-  doc.rect(M + imzaW + 8, imzaY, imzaW, 24);
+  doc.rect(M, imzaY, imzaW, IMZA_YUKSEKLIK);
+  doc.rect(M + imzaW + 8, imzaY, imzaW, IMZA_YUKSEKLIK);
   doc.setFontSize(7.5); doc.setFont(FONT, "bold");
   doc.text("GÖNDEREN (Ad Soyad / Kaşe / İmza)", M + imzaW / 2, imzaY + 4.5, { align: "center" });
   doc.text("SÜRÜCÜ (Ad Soyad / İmza)", M + imzaW + 8 + imzaW / 2, imzaY + 4.5, { align: "center" });
   doc.setFont(FONT, "normal"); doc.setFontSize(8);
   doc.text(surucuAd, M + imzaW + 8 + imzaW / 2, imzaY + 12, { align: "center" });
+
+  // İmza alanının hemen alt satırı — ADR 5.4.1.1.1/f kapsamındaki
+  // sorumluluk beyanları, küçük puntoyla (6pt) her kutunun tabanına
+  // yaslı basılır.
+  const beyanGoster = (metin: string, merkezX: number) => {
+    const satirlar = doc.splitTextToSize(metin, imzaW - 4);
+    const baslangicY = imzaY + IMZA_YUKSEKLIK - (satirlar.length - 1) * 2.6 - 2.5;
+    doc.text(satirlar, merkezX, baslangicY, { align: "center" });
+  };
+  doc.setFontSize(6);
+  doc.setTextColor(90, 90, 90);
+  beyanGoster(
+    "Tehlikeli maddelerin sınıflandırılması, paketlenmesi ve etiketlenmesinin ADR hükümlerine uygun olduğunu beyan ederim. (ADR 5.4.1.1.1/f)",
+    M + imzaW / 2
+  );
+  beyanGoster(
+    "Yükü teslim aldığımı ve taşımanın ADR hükümlerine uygun olarak gerçekleştirileceğini kabul ederim.",
+    M + imzaW + 8 + imzaW / 2
+  );
+  doc.setTextColor(0, 0, 0);
 
   // Alt bilgi
   doc.setFontSize(6.5); doc.setTextColor(130, 130, 130);
