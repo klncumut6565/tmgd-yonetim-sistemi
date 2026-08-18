@@ -260,9 +260,13 @@ async function kapakSayfasiCiz(
   doc.text("Sorumlu Kişi", W / 2 + 42, imzaY, { align: "center" });
   doc.setFont(FONT, "normal");
   doc.text(veri.hazirlayanAdi || "—", W / 2 - 42, imzaY + 6, { align: "center" });
+  doc.text(veri.onaylayanAdi || "—", W / 2 + 42, imzaY + 6, { align: "center" });
   // NOT: "Sorumlu Kişi" altına daha önce boş bir imza çizgisi çiziliyordu
   // — kullanıcı talebiyle kaldırıldı, örnek kapak sayfasında böyle bir
-  // çizgi yok.
+  // çizgi yok. Ancak isim satırı (bu satır) çizgiyle birlikte yanlışlıkla
+  // silinmişti — Onaylayan/Sorumlu Kişi adı (firms.approver_name, Belge
+  // Oluştur'da girilen) artık burada da görünüyor; sayfa 3'teki imza
+  // bloğuyla (imzaBlokuCiz → ONAYLAYAN) tutarlı.
 
   doc.setFontSize(9.5);
   doc.setFont(FONT, "normal");
