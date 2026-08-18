@@ -142,12 +142,13 @@ function kapakBaslikTablosuCiz(
     doc.line(W - solKenar - sagGenislik, ustY + sagSatirY * i, W - solKenar, ustY + sagSatirY * i);
   }
 
-  // Sol: firma logosu
+  // Sol: firma logosu — kenar boşluğu daraltılıp üst sınır (tavan)
+  // yükseltilerek logo görsel olarak daha büyük görünür şekilde çizilir.
   if (veri.logo) {
     try {
-      const kenar = 2.5;
+      const kenar = 1.2;
       const alanG = solGenislik - 2 * kenar;
-      const alanY = Math.min(yukseklik - 2 * kenar, 22);
+      const alanY = Math.min(yukseklik - 2 * kenar, 27);
       const box = logoKutusuHesapla(veri.logo.enBoyOrani, Math.min(alanG, alanY));
       doc.addImage(
         veri.logo.data,
@@ -448,8 +449,8 @@ function baslikKutusuCiz(doc: JsPDFType, veri: GorevliListesiPdfVerisi) {
   // gerekmez.
   if (veri.logo) {
     try {
-      const box = logoKutusuHesapla(veri.logo.enBoyOrani, BASLIK_KUTUSU_YUKSEKLIK - 4);
-      doc.addImage(veri.logo.data, veri.logo.fmt, M + 2, kutuTop + 2, box.w, box.h);
+      const box = logoKutusuHesapla(veri.logo.enBoyOrani, BASLIK_KUTUSU_YUKSEKLIK - 2);
+      doc.addImage(veri.logo.data, veri.logo.fmt, M + 1, kutuTop + 1, box.w, box.h);
     } catch {
       /* logo eklenemezse başlık kutusu yine çizilsin */
     }
