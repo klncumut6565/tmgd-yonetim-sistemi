@@ -183,20 +183,6 @@ function tunelKisiti(kalemler: Kalem[]): string {
 // ── PDF üretimi ──────────────────────────────────────────────────────────
 const FONT = "LiberationSans";
 
-/** Logoyu, oranını koruyarak verilen kare alana ORTALI sığdırır — diğer
- *  PDF üretim dosyalarındaki (gorevliListesiPdf.ts, aracEvraklariPdf.ts vb.)
- *  AYNI yardımcı fonksiyon. */
-function logoKutusuHesapla(enBoyOrani: number, kutuBoyut: number) {
-  const oran = enBoyOrani > 0 ? enBoyOrani : 1;
-  let w = kutuBoyut;
-  let h = w / oran;
-  if (h > kutuBoyut) {
-    h = kutuBoyut;
-    w = h * oran;
-  }
-  return { w, h };
-}
-
 async function evrakPdfUret(args: {
   firmaAdi: string;
   evrakNo: string;
@@ -232,47 +218,43 @@ async function evrakPdfUret(args: {
   const NAVY: [number, number, number] = [30, 58, 138];
   let y = 14;
 
-  // ── ANTET — logo SAYFA ORTASINDA, altında firma adı ve başlık da
-  // ortalanmış (klasik resmi belge antedi görünümü). Logo yoksa eski
-  // (logosuz) düzen korunur ki firma logosunu henüz yüklememiş
-  // kullanıcılarda gereksiz boşluk kalmasın.
-  if (args.logo) {
-    const antetY = 8;
-    const logoYukseklik = 16;
-    const box = logoKutusuHesapla(args.logo.enBoyOrani, logoYukseklik);
+  // ── FİLİGRAN (antetli kağıt) — firma logosu sayfanın TAM ORTASINDA,
+  // ARKA PLANDA soluk şekilde basılır; içerik bunun ÜZERİNE yazılır.
+  // jsPDF'te opaklık GState ile ayarlanır — logo çizildikten sonra
+  // opaklık 1'e döndürülür ki sonraki tüm metin/çizgiler net kalsın.
+  //
+  // ÖNEMLİ: Bu blok, sayfadaki ilk çizim işlemi olmalı (arka planda
+  // kalması için). Çok sayfalı evraklarda (tablo taşarsa) her yeni
+  // sayfaya da uygulanır — bkz. filigranEkle() çağrıları.
+  const filigranEkle = () => {
+    if (!args.logo) return;
     try {
-      doc.addImage(args.logo.data, args.logo.fmt, W / 2 - box.w / 2, antetY, box.w, box.h);
+      const gs = (doc as unknown as {
+        GState: (o: { opacity: number }) => unknown;
+        setGState: (g: unknown) => void;
+      });
+      gs.setGState(gs.GState({ opacity: 0.08 }));
+      // Logo, sayfa genişliğinin ~%55'i kadar büyük ve tam merkezde
+      const hedefGenislik = W * 0.55;
+      const oran = args.logo.enBoyOrani > 0 ? args.logo.enBoyOrani : 1;
+      const fw = hedefGenislik;
+      const fh = fw / oran;
+      doc.addImage(args.logo.data, args.logo.fmt, W / 2 - fw / 2, H / 2 - fh / 2, fw, fh);
+      gs.setGState(gs.GState({ opacity: 1 }));
     } catch {
-      /* logo eklenemezse antet metinle devam eder */
+      /* GState desteklenmiyorsa filigran atlanır, belge yine üretilir */
     }
+  };
+  filigranEkle();
 
-    let antetMetinY = antetY + logoYukseklik + 6;
-    doc.setFontSize(12); doc.setFont(FONT, "bold"); doc.setTextColor(...NAVY);
-    doc.text(args.firmaAdi, W / 2, antetMetinY, { align: "center", maxWidth: W - 2 * M });
-    antetMetinY += 6;
-    doc.setFontSize(11); doc.setFont(FONT, "bold"); doc.setTextColor(60, 60, 60);
-    doc.text("TAŞIMA EVRAKI", W / 2, antetMetinY, { align: "center" });
-    antetMetinY += 5;
-    doc.setFontSize(7.5); doc.setFont(FONT, "normal"); doc.setTextColor(120, 120, 120);
-    doc.text("ADR Bölüm 5.4.1 uyarınca düzenlenmiştir", W / 2, antetMetinY, { align: "center" });
-    doc.setTextColor(0, 0, 0);
-    antetMetinY += 4;
-
-    doc.setDrawColor(220, 220, 220);
-    doc.setLineWidth(0.3);
-    doc.line(M, antetMetinY, W - M, antetMetinY);
-
-    y = antetMetinY + 6;
-  } else {
-    // Başlık (logosuz düzen)
-    doc.setFontSize(14); doc.setFont(FONT, "bold"); doc.setTextColor(...NAVY);
-    doc.text("TAŞIMA EVRAKI", W / 2, y, { align: "center" });
-    doc.setFontSize(8); doc.setFont(FONT, "normal"); doc.setTextColor(90, 90, 90);
-    y += 5;
-    doc.text("ADR Bölüm 5.4.1 uyarınca düzenlenmiştir", W / 2, y, { align: "center" });
-    doc.setTextColor(0, 0, 0);
-    y += 7;
-  }
+  // Başlık — filigranın üzerine, sayfanın en üstüne ortalanmış
+  doc.setFontSize(14); doc.setFont(FONT, "bold"); doc.setTextColor(...NAVY);
+  doc.text("TAŞIMA EVRAKI", W / 2, y, { align: "center" });
+  doc.setFontSize(8); doc.setFont(FONT, "normal"); doc.setTextColor(90, 90, 90);
+  y += 5;
+  doc.text("ADR Bölüm 5.4.1 uyarınca düzenlenmiştir", W / 2, y, { align: "center" });
+  doc.setTextColor(0, 0, 0);
+  y += 7;
 
   // Evrak No / Tarih
   doc.setFontSize(9); doc.setFont(FONT, "bold");
@@ -400,6 +382,7 @@ async function evrakPdfUret(args: {
   const IMZA_YUKSEKLIK = 32;
   if (imzaY + IMZA_YUKSEKLIK > H - 18) {
     doc.addPage();
+    filigranEkle(); // yeni sayfada da antetli kağıt görünümü korunsun
     imzaY = M + 6;
   }
   const imzaW = (W - 2 * M - 8) / 2;
