@@ -7,10 +7,17 @@
 
 import { useSearchParams } from "next/navigation";
 import BelgeOlusturForm from "@/components/BelgeOlusturForm";
+import CompanyBlockGuard from "@/components/CompanyBlockGuard";
+import { useUser } from "@/hooks/useUser";
 
 export default function BelgeOlusturPage() {
   const searchParams = useSearchParams();
   const preselectFirmId = searchParams.get("firm") || "";
+  const { profile } = useUser();
+
+  // Firma (company) rolü bu sayfayı hiç görmemeli — doğrudan URL ile
+  // gelinse bile yönlendirilir.
+  if (profile?.role === "company") return <CompanyBlockGuard />;
 
   // Not: BelgeOlusturForm, fixedFirmId verilmediğinde kendi firma seçicisini
   // gösterir; bu sayfa yalnızca query param varsa ilk render'da o firmayı

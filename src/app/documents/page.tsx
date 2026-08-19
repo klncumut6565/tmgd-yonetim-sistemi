@@ -12,6 +12,7 @@ import { supabase } from "@/lib/supabase/client";
 import { useUser } from "@/hooks/useUser";
 import { hataCevir } from "@/lib/hataCevir";
 import DateInput from "@/components/DateInput";
+import CompanyBlockGuard from "@/components/CompanyBlockGuard";
 
 type Firm = { id: string; name: string };
 type DocType = { id: string; code: string; name: string };
@@ -70,7 +71,7 @@ function expiryBadge(dateStr: string | null) {
 }
 
 export default function DocumentsPage() {
-  const { canWrite } = useUser();
+  const { canWrite, profile } = useUser();
 
   const [firms, setFirms] = useState<Firm[]>([]);
   const [docTypes, setDocTypes] = useState<DocType[]>([]);
@@ -244,6 +245,10 @@ export default function DocumentsPage() {
     if (error) setError(hataCevir(error));
     else loadAll();
   }
+
+  // Firma (company) rolü bu sayfayı hiç görmemeli — doğrudan URL ile
+  // gelinse bile yönlendirilir.
+  if (profile?.role === "company") return <CompanyBlockGuard />;
 
   return (
     <div className="p-8">
