@@ -56,6 +56,7 @@ type Props = {
                                // olan bu tabloda İSTİSNA olarak kayıt ekleyebilir ve silebilir
                                // (örn. Sürücü Kayıtları, Personel Listesi). Düzenleme (Düzenle) ve
                                // dosya silme bu istisnaya dahil DEĞİLDİR — onlar hep canWrite'a bağlı kalır.
+  addButtonLabel?: string;    // "+ Yeni Ekle" butonunun metni (verilmezse varsayılan "+ Yeni Ekle")
 };
 
 const STATUS_LABELS: Record<string, string> = {
@@ -78,6 +79,7 @@ export default function FirmScopedCrud({
   notepadTemplate,
   dosyaEki = false,
   firmaKullanicisiEkleSilebilir = false,
+  addButtonLabel = "Yeni Ekle",
 }: Props) {
   const { canWrite, profile } = useUser();
   // Firma kullanıcısı (company) istisnası: sadece firmaKullanicisiEkleSilebilir=true
@@ -522,7 +524,7 @@ export default function FirmScopedCrud({
                   (compact ? " ml-auto" : "")
                 }
               >
-                + Yeni Ekle
+                + {addButtonLabel}
               </button>
             )}
           </div>
@@ -903,7 +905,53 @@ export default function FirmScopedCrud({
             </h2>
 
             <div className="space-y-3">
-              {modalFields.map((f) => (
+              {modalFields.map((f, i) => {
+                // "Ad" (first_name) hemen ardından "Soyad" (last_name)
+                // geliyorsa, ikisini AYNI SATIRDA (yan yana) göster —
+                // ikisi de zaten "field-i" olarak tek tek işlendiği için,
+                // last_name'i burada normal akışta ATLA (aşağıda ayrıca
+                // render ediliyor).
+                if (f.key === "last_name" && modalFields[i - 1]?.key === "first_name") {
+                  return null;
+                }
+                const esleskenSoyad =
+                  f.key === "first_name" && modalFields[i + 1]?.key === "last_name"
+                    ? modalFields[i + 1]
+                    : null;
+
+                if (esleskenSoyad) {
+                  return (
+                    <div key={f.key} className="grid grid-cols-2 gap-3">
+                      {[f, esleskenSoyad].map((alan) => (
+                        <div key={alan.key}>
+                          <label className="block text-sm text-gray-600 mb-1">
+                            {alan.label}
+                            {alan.required && <span className="text-red-500"> *</span>}
+                          </label>
+                          <input
+                            name={alan.key}
+                            ref={(el) => {
+                              fieldRefs.current[alan.key] = el;
+                            }}
+                            autoComplete="off"
+                            type="text"
+                            maxLength={alan.maxLength}
+                            value={form[alan.key] || ""}
+                            onChange={(e) => setForm({ ...form, [alan.key]: e.target.value })}
+                            onBlur={(e) => {
+                              if (e.target.value !== (form[alan.key] || "")) {
+                                setForm({ ...form, [alan.key]: e.target.value });
+                              }
+                            }}
+                            className="border p-2 rounded w-full"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  );
+                }
+
+                return (
                 <div key={f.key}>
                   <label className="block text-sm text-gray-600 mb-1">
                     {f.label}
@@ -978,7 +1026,8 @@ export default function FirmScopedCrud({
                     />
                   )}
                 </div>
-              ))}
+                );
+              })}
             </div>
 
             {error && (

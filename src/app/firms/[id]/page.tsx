@@ -1690,6 +1690,7 @@ function FirmDetailInner({
               fixedFirmId={id}
               compact
               firmaKullanicisiEkleSilebilir
+              addButtonLabel="Sürücü Ekle"
             />
           )}
           {surucuAltSekme === "surucu_listesi" && firm && (

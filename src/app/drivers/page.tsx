@@ -11,6 +11,7 @@ export default function DriversPage() {
       fields={DRIVER_FIELDS}
       searchKeys={["first_name", "last_name", "phone", "national_id"]}
       requireActivity="tasimaci"
+      addButtonLabel="Sürücü Ekle"
     />
   );
 }
