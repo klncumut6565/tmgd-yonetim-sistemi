@@ -1689,6 +1689,7 @@ function FirmDetailInner({
               dosyaEki
               fixedFirmId={id}
               compact
+              firmaKullanicisiEkleSilebilir
             />
           )}
           {surucuAltSekme === "surucu_listesi" && firm && (
@@ -1724,6 +1725,7 @@ function FirmDetailInner({
               dosyaEki
               fixedFirmId={id}
               compact
+              firmaKullanicisiEkleSilebilir
             />
           )}
           {personelAltSekme === "gorevli" && firm && (

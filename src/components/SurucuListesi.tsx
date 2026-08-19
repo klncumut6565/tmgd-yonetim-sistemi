@@ -679,6 +679,7 @@ export default function SurucuListesi({
                       value={row.ad_soyad}
                       onChange={(e) => updateRow(row.key, { ad_soyad: e.target.value })}
                       onBlur={() => kaydet(row, idx + 1)}
+                      disabled={!canWrite}
                       placeholder="Ad Soyad"
                       className={HUCRE_INPUT}
                     />
@@ -690,6 +691,7 @@ export default function SurucuListesi({
                       value={row.tc_kimlik_no}
                       onChange={(e) => updateRow(row.key, { tc_kimlik_no: e.target.value })}
                       onBlur={() => kaydet(row, idx + 1)}
+                      disabled={!canWrite}
                       maxLength={11}
                       placeholder="11 haneli T.C. No"
                       className={HUCRE_INPUT}
@@ -705,6 +707,7 @@ export default function SurucuListesi({
                         updateRow(row.key, { src5_sertifikasi: val });
                         kaydet({ ...row, src5_sertifikasi: val }, idx + 1);
                       }}
+                      disabled={!canWrite}
                       className={HUCRE_INPUT}
                     >
                       {SRC5_SECENEKLERI.map((s) => (
@@ -723,6 +726,7 @@ export default function SurucuListesi({
                         updateRow(row.key, { ise_giris_tarihi: date });
                         kaydet(guncel, idx + 1);
                       }}
+                      disabled={!canWrite}
                     />
                   </td>
 
@@ -732,6 +736,7 @@ export default function SurucuListesi({
                       value={row.sertifika_numarasi}
                       onChange={(e) => updateRow(row.key, { sertifika_numarasi: e.target.value })}
                       onBlur={() => kaydet(row, idx + 1)}
+                      disabled={!canWrite}
                       placeholder="Sertifika No"
                       className={HUCRE_INPUT}
                     />
@@ -745,6 +750,7 @@ export default function SurucuListesi({
                         updateRow(row.key, { isten_cikis_tarihi: date });
                         kaydet(guncel, idx + 1);
                       }}
+                      disabled={!canWrite}
                     />
                   </td>
 
@@ -756,6 +762,7 @@ export default function SurucuListesi({
                         updateRow(row.key, { sertifika_gecerlilik_tarihi: date });
                         kaydet(guncel, idx + 1);
                       }}
+                      disabled={!canWrite}
                     />
                   </td>
 
@@ -834,7 +841,7 @@ export default function SurucuListesi({
                         ⏳
                       </span>
                     )}
-                    {!row.kaydediliyor && row.id && (
+                    {!row.kaydediliyor && row.id && canWrite && (
                       <button
                         onClick={() => sil(row)}
                         title="Satırı sil"
