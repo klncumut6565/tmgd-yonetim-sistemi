@@ -36,6 +36,7 @@ import {
   LIBERATION_SANS_BOLD_B64,
 } from "@/lib/pdfFonts";
 import DateInput from "@/components/DateInput";
+import type { LogoData } from "@/lib/aracEvraklariPdf";
 
 // ── Tipler ────────────────────────────────────────────────────────────────
 /** ADR Tablo A satırı (adr_un_numbers tablosu) */
@@ -182,6 +183,20 @@ function tunelKisiti(kalemler: Kalem[]): string {
 // ── PDF üretimi ──────────────────────────────────────────────────────────
 const FONT = "LiberationSans";
 
+/** Logoyu, oranını koruyarak verilen kare alana ORTALI sığdırır — diğer
+ *  PDF üretim dosyalarındaki (gorevliListesiPdf.ts, aracEvraklariPdf.ts vb.)
+ *  AYNI yardımcı fonksiyon. */
+function logoKutusuHesapla(enBoyOrani: number, kutuBoyut: number) {
+  const oran = enBoyOrani > 0 ? enBoyOrani : 1;
+  let w = kutuBoyut;
+  let h = w / oran;
+  if (h > kutuBoyut) {
+    h = kutuBoyut;
+    w = h * oran;
+  }
+  return { w, h };
+}
+
 async function evrakPdfUret(args: {
   firmaAdi: string;
   evrakNo: string;
@@ -200,6 +215,8 @@ async function evrakPdfUret(args: {
   muafiyetsiz: boolean;
   tunel: string;
   notlar: string;
+  /** Firma logosu — antet bandının sol tarafında belirgin şekilde basılır. */
+  logo?: LogoData;
 }) {
   const { default: jsPDF } = (await import("jspdf")) as unknown as {
     default: new (o?: object) => JsPDFType;
@@ -215,14 +232,42 @@ async function evrakPdfUret(args: {
   const NAVY: [number, number, number] = [30, 58, 138];
   let y = 14;
 
-  // Başlık
-  doc.setFontSize(14); doc.setFont(FONT, "bold"); doc.setTextColor(...NAVY);
-  doc.text("TAŞIMA EVRAKI", W / 2, y, { align: "center" });
-  doc.setFontSize(8); doc.setFont(FONT, "normal"); doc.setTextColor(90, 90, 90);
-  y += 5;
-  doc.text("ADR Bölüm 5.4.1 uyarınca düzenlenmiştir", W / 2, y, { align: "center" });
-  doc.setTextColor(0, 0, 0);
-  y += 7;
+  // ── ANTET — sol tarafta belirgin firma logosu, sağda firma unvanı ──────
+  // Logo varsa antet 26mm yüksekliğinde bir bant olarak basılır; logo
+  // yoksa eski (logosuz) düzen korunur ki firma logosunu henüz
+  // yüklememiş kullanıcılarda gereksiz boşluk kalmasın.
+  if (args.logo) {
+    const antetY = 8, antetYukseklik = 22;
+    doc.setDrawColor(220, 220, 220);
+    doc.setLineWidth(0.3);
+    doc.line(M, antetY + antetYukseklik + 3, W - M, antetY + antetYukseklik + 3);
+
+    try {
+      const box = logoKutusuHesapla(args.logo.enBoyOrani, antetYukseklik);
+      doc.addImage(args.logo.data, args.logo.fmt, M, antetY, box.w, box.h);
+    } catch {
+      /* logo eklenemezse antet metinle devam eder */
+    }
+
+    doc.setFontSize(13); doc.setFont(FONT, "bold"); doc.setTextColor(...NAVY);
+    doc.text(args.firmaAdi, W - M, antetY + 8, { align: "right", maxWidth: W - 2 * M - 45 });
+    doc.setFontSize(11); doc.setFont(FONT, "bold"); doc.setTextColor(60, 60, 60);
+    doc.text("TAŞIMA EVRAKI", W - M, antetY + 15, { align: "right" });
+    doc.setFontSize(7.5); doc.setFont(FONT, "normal"); doc.setTextColor(120, 120, 120);
+    doc.text("ADR Bölüm 5.4.1 uyarınca düzenlenmiştir", W - M, antetY + 20, { align: "right" });
+    doc.setTextColor(0, 0, 0);
+
+    y = antetY + antetYukseklik + 9;
+  } else {
+    // Başlık (logosuz düzen)
+    doc.setFontSize(14); doc.setFont(FONT, "bold"); doc.setTextColor(...NAVY);
+    doc.text("TAŞIMA EVRAKI", W / 2, y, { align: "center" });
+    doc.setFontSize(8); doc.setFont(FONT, "normal"); doc.setTextColor(90, 90, 90);
+    y += 5;
+    doc.text("ADR Bölüm 5.4.1 uyarınca düzenlenmiştir", W / 2, y, { align: "center" });
+    doc.setTextColor(0, 0, 0);
+    y += 7;
+  }
 
   // Evrak No / Tarih
   doc.setFontSize(9); doc.setFont(FONT, "bold");
@@ -431,6 +476,7 @@ export default function TasimaEvraki({
   const [gonderen, setGonderen] = useState(firmaAdi);
   const [gonderenAdres, setGonderenAdres] = useState("");
   const [firmaAdresVarsayilan, setFirmaAdresVarsayilan] = useState("");
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [alici, setAlici] = useState("");
   const [aliciAdres, setAliciAdres] = useState("");
 
@@ -510,7 +556,7 @@ export default function TasimaEvraki({
         .select("id, title, address")
         .eq("firm_id", firmId).order("title"),
       supabase.from("firms")
-        .select("address, district, city")
+        .select("address, district, city, logo_url")
         .eq("id", firmId).single(),
     ]);
     if (env.error && /does not exist|not find the table/i.test(env.error.message || "")) {
@@ -524,6 +570,7 @@ export default function TasimaEvraki({
     // Alıcı rehberi henüz oluşturulmamışsa (migration 035 çalışmadıysa)
     // sessizce boş geç — evrak düzenleme yine de çalışsın.
     setAliciListesi((alc.data as Consignee[]) || []);
+    setLogoUrl((frm.data as { logo_url: string | null } | null)?.logo_url ?? null);
 
     // Gönderen adresi — Gönderen zaten firmanın kendi unvanına ("firmaAdi")
     // varsayılan geldiği için, adres de firmanın kendi kayıtlı adresine
@@ -896,6 +943,37 @@ export default function TasimaEvraki({
     setMesaj("");
   }
 
+  /** Firma logosunu, PDF'e gömülebilecek hazır bir dataURL'e çevirir —
+   *  diğer PDF üretim ekranlarındaki (SurucuListesi.tsx, GorevliListesi.
+   *  tsx vb.) AYNI fonksiyon. */
+  async function logoDataUrl(): Promise<LogoData> {
+    if (!logoUrl) return null;
+    try {
+      const { data: signed } = await supabase.storage
+        .from("firm-files")
+        .createSignedUrl(logoUrl, 600);
+      if (!signed?.signedUrl) return null;
+      const res = await fetch(signed.signedUrl);
+      const blob = await res.blob();
+      const fmt: "PNG" | "JPEG" = blob.type.includes("png") ? "PNG" : "JPEG";
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const r = new FileReader();
+        r.onload = () => resolve(r.result as string);
+        r.onerror = reject;
+        r.readAsDataURL(blob);
+      });
+      const enBoyOrani = await new Promise<number>((resolve) => {
+        const img = new Image();
+        img.onload = () => resolve(img.width / img.height || 1);
+        img.onerror = () => resolve(1);
+        img.src = dataUrl;
+      });
+      return { data: dataUrl, fmt, enBoyOrani };
+    } catch {
+      return null;
+    }
+  }
+
   /** Başarılıysa kaydedilen evrağın ID'sini döner, başarısızsa null —
    *  pdfYazdir() bu dönüş değeriyle "önce kaydet, sonra yazdır" akışını
    *  kurar. Kaydet butonunun kendisi bu dönüş değerini kullanmıyor
@@ -968,6 +1046,7 @@ export default function TasimaEvraki({
       return;
     }
     try {
+      const logo = await logoDataUrl();
       const doc = await evrakPdfUret({
         firmaAdi, evrakNo: evrakNo || "(taslak)",
         tarih: tarih.split("-").reverse().join("."),
@@ -977,6 +1056,7 @@ export default function TasimaEvraki({
         surucu: seciliSurucu, arac: seciliArac,
         surucuManuel, aracManuel,
         kalemler, puan, plakaGerekli, muafiyetsiz, tunel, notlar,
+        logo,
       });
       const blobUrl = URL.createObjectURL(doc.output("blob"));
       pencere.location.href = blobUrl;
@@ -1007,6 +1087,7 @@ export default function TasimaEvraki({
       return;
     }
     try {
+      const logo = await logoDataUrl();
       const doc = await evrakPdfUret({
         firmaAdi, evrakNo: evrakNo || "(taslak)",
         tarih: tarih.split("-").reverse().join("."),
@@ -1016,6 +1097,7 @@ export default function TasimaEvraki({
         surucu: seciliSurucu, arac: seciliArac,
         surucuManuel, aracManuel,
         kalemler, puan, plakaGerekli, muafiyetsiz, tunel, notlar,
+        logo,
       });
       const blobUrl = URL.createObjectURL(doc.output("blob"));
       pencere.location.href = blobUrl;
@@ -1042,6 +1124,7 @@ export default function TasimaEvraki({
 
   async function pdfIndir() {
     // PDF her basışta EKRANDAKİ GÜNCEL listeden üretilir — bayatlama olamaz.
+    const logo = await logoDataUrl();
     const doc = await evrakPdfUret({
       firmaAdi, evrakNo: evrakNo || "(taslak)",
       tarih: tarih.split("-").reverse().join("."),
@@ -1051,6 +1134,7 @@ export default function TasimaEvraki({
       surucu: seciliSurucu, arac: seciliArac,
       surucuManuel, aracManuel,
       kalemler, puan, plakaGerekli, muafiyetsiz, tunel, notlar,
+      logo,
     });
     doc.save(`tasima_evraki_${(evrakNo || "taslak").replace(/[^\w-]/g, "_")}.pdf`);
   }
@@ -1578,9 +1662,10 @@ export default function TasimaEvraki({
         <section className="border border-gray-200 rounded-xl bg-white p-4">
           <div className="flex flex-wrap items-center gap-2">
             {canWrite && (
-              <button onClick={kaydet}
-                className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition-colors">
-                💾 Kaydet
+              <button onClick={pdfYazdir} disabled={kalemler.length === 0}
+                title={kalemler.length === 0 ? "Kaydetmek için önce en az bir ürün ekleyin" : "Evrakı kaydedip yazdırma diyaloğunu aç"}
+                className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+                💾 Kaydet ve Yazdır
               </button>
             )}
             <button onClick={pdfOnizle} disabled={kalemler.length === 0}
@@ -1593,21 +1678,14 @@ export default function TasimaEvraki({
               className="px-4 py-2 rounded-lg border text-sm font-medium hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-white transition-colors">
               📄 PDF İndir {kalemler.length > 0 ? `(${kalemler.length} ürün)` : ""}
             </button>
-            {canWrite && (
-              <button onClick={pdfYazdir} disabled={kalemler.length === 0}
-                title={kalemler.length === 0 ? "Yazdırmak için önce en az bir ürün ekleyin" : "Evrakı kaydedip yazdırma diyaloğunu aç"}
-                className="px-4 py-2 rounded-lg border text-sm font-medium hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-white transition-colors">
-                🖨️ Yazdır
-              </button>
-            )}
             <p className="text-[11px] text-gray-400 ml-auto">* zorunlu alan</p>
           </div>
           {kalemler.length === 0 && (
-            <p className="text-[11px] text-gray-400 mt-2">PDF indirmek için yukarıdan en az bir ürün ekle.</p>
+            <p className="text-[11px] text-gray-400 mt-2">Kaydetmek için yukarıdan en az bir ürün ekle.</p>
           )}
           {canWrite && kalemler.length > 0 && (
             <p className="text-[11px] text-gray-400 mt-2">
-              🖨️ Yazdır, evrağı kaydedip yazdırma diyaloğunu açar — evrak bu işlemden sonra
+              💾 Kaydet ve Yazdır, evrağı kaydedip yazdırma diyaloğunu açar — evrak bu işlemden sonra
               Sevkiyatlar sekmesinde listelenir.
             </p>
           )}
