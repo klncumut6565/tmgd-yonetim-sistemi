@@ -16,8 +16,11 @@
 //     (Streamlit'teki "bayat PDF" hatasının buradaki karşılığı yapısal
 //     olarak imkânsız: PDF bir yerde saklanmaz, her basışta üretilir).
 //
-// Yetki: Kaydet/Sil yalnızca yazabilir() ekibi (RLS de zorlar); company
-// kullanıcısı evrakları görüntüleyip PDF indirebilir.
+// Yetki: Kaydet/Sil hem yazabilir() ekibi HEM DE firma kullanıcısı (company)
+// için açık — company kendi firmasının taşıma evrakını oluşturup
+// düzenleyebilir/silebilir (bkz. database/migrations/053_tasima_evraki_company_yazma.sql).
+// RLS bunu kullanıcının kendi firmasıyla sınırlar; company başka bir firmanın
+// evrakına asla yazamaz.
 // =========================================================================
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -408,7 +411,11 @@ export default function TasimaEvraki({
    *  otomatik olarak editöre yükler (bkz. evrakAc()). */
   preselectEvrakId?: string;
 }) {
-  const { canWrite } = useUser();
+  const { canWrite: canWriteGenel, profile } = useUser();
+  // Taşıma Evrakı için ayrık yetki: genel yazma yetkisi olanlar (TMGD ekibi)
+  // VEYA kendi firmasındaki 'company' kullanıcısı. Diğer tüm ekranlarda
+  // company hâlâ salt okunur — bu yalnızca bu bileşene özel bir istisna.
+  const canWrite = canWriteGenel || profile?.role === "company";
 
   const [envanter, setEnvanter] = useState<Envanter[]>([]);
   const [suruculer, setSuruculer] = useState<Surucu[]>([]);

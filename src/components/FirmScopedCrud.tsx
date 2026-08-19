@@ -51,6 +51,11 @@ type Props = {
   notepadTemplate?: string;    // yeni kayıt oluşturulduğunda not defterine ön dolu gelecek şablon
   dosyaEki?: boolean;          // true ise her kayda dosya eklenebilir ve sağda önizleme paneli açılır
                                // (araç ruhsat/muayene, sürücü SRC5, personel eğitim belgesi vb.)
+  firmaKullanicisiEkleSilebilir?: boolean;
+                               // true ise "company" rolündeki firma kullanıcısı normalde salt-okunur
+                               // olan bu tabloda İSTİSNA olarak kayıt ekleyebilir ve silebilir
+                               // (örn. Sürücü Kayıtları, Personel Listesi). Düzenleme (Düzenle) ve
+                               // dosya silme bu istisnaya dahil DEĞİLDİR — onlar hep canWrite'a bağlı kalır.
 };
 
 const STATUS_LABELS: Record<string, string> = {
@@ -72,8 +77,19 @@ export default function FirmScopedCrud({
   notepadLabel,
   notepadTemplate,
   dosyaEki = false,
+  firmaKullanicisiEkleSilebilir = false,
 }: Props) {
-  const { canWrite } = useUser();
+  const { canWrite, profile } = useUser();
+  // Firma kullanıcısı (company) istisnası: sadece firmaKullanicisiEkleSilebilir=true
+  // olan tablolarda (Sürücü Kayıtları, Personel Listesi) geçerli — kayıt ekleyip
+  // silebilir ama düzenleyemez, dosya silemez. Diğer her yerde normal canWrite geçerli.
+  const companyEkleSilIstisnasi =
+    firmaKullanicisiEkleSilebilir && profile?.role === "company";
+  const canAdd = canWrite || companyEkleSilIstisnasi;
+  const canEditRow = canWrite;
+  const canDeleteRow = canWrite || companyEkleSilIstisnasi;
+  const canDeleteFile = canWrite;
+  const hasActionsColumn = canAdd || canEditRow || canDeleteRow || !!notepadField || dosyaEki;
   const [firms, setFirms] = useState<Firm[]>([]);
   const [firmId, setFirmId] = useState(fixedFirmId || "");
   const [rows, setRows] = useState<Row[]>([]);
@@ -497,7 +513,7 @@ export default function FirmScopedCrud({
         <div className={notepadField || dosyaEki ? "flex-1 min-w-0" : ""}>
           <div className="flex items-center justify-between mb-4">
             {!compact && <h1 className="text-3xl font-bold">{title}</h1>}
-            {canWrite && (
+            {canAdd && (
               <button
                 onClick={openCreateForm}
                 disabled={!firmId}
@@ -577,7 +593,7 @@ export default function FirmScopedCrud({
                       {f.label}
                     </th>
                   ))}
-                  {(canWrite || notepadField) && (
+                  {hasActionsColumn && (
                     <th className="text-right p-3 font-medium">İşlemler</th>
                   )}
                 </tr>
@@ -585,7 +601,7 @@ export default function FirmScopedCrud({
               <tbody>
                 {loading && (
                   <tr>
-                    <td colSpan={tableFields.length + (canWrite ? 1 : 0)} className="p-4 text-gray-500">
+                    <td colSpan={tableFields.length + (hasActionsColumn ? 1 : 0)} className="p-4 text-gray-500">
                       Yükleniyor...
                     </td>
                   </tr>
@@ -593,12 +609,12 @@ export default function FirmScopedCrud({
 
                 {!loading && filteredRows.length === 0 && (
                   <tr>
-                    <td colSpan={tableFields.length + (canWrite ? 1 : 0)} className="p-4 text-gray-500">
+                    <td colSpan={tableFields.length + (hasActionsColumn ? 1 : 0)} className="p-4 text-gray-500">
                       {!firmId
                         ? requireActivity && firms.length === 0
                           ? "Bu faaliyet konusuna sahip firma bulunamadı. Firma faaliyet konularını Firmalar sayfasından düzenleyebilirsin."
                           : "Önce bir firma seç."
-                        : canWrite
+                        : canAdd
                           ? "Kayıt bulunamadı. Sağ üstten yeni ekleyebilirsin."
                           : "Kayıt bulunamadı."}
                     </td>
@@ -630,7 +646,7 @@ export default function FirmScopedCrud({
                           {renderCell(row, f)}
                         </td>
                       ))}
-                      {(canWrite || notepadField || dosyaEki) && (
+                      {hasActionsColumn && (
                         <td className="p-3 text-right whitespace-nowrap">
                           {dosyaEki && (
                             <button
@@ -668,27 +684,27 @@ export default function FirmScopedCrud({
                               📝 Not
                             </button>
                           )}
-                          {canWrite && (
-                            <>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  openEditForm(row);
-                                }}
-                                className="text-blue-600 hover:underline mr-3"
-                              >
-                                Düzenle
-                              </button>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  deleteRow(row);
-                                }}
-                                className="text-red-600 hover:underline"
-                              >
-                                Sil
-                              </button>
-                            </>
+                          {canEditRow && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openEditForm(row);
+                              }}
+                              className="text-blue-600 hover:underline mr-3"
+                            >
+                              Düzenle
+                            </button>
+                          )}
+                          {canDeleteRow && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                deleteRow(row);
+                              }}
+                              className="text-red-600 hover:underline"
+                            >
+                              Sil
+                            </button>
                           )}
                         </td>
                       )}
@@ -764,7 +780,7 @@ export default function FirmScopedCrud({
                           >
                             📄 {d.file_name}
                           </button>
-                          {canWrite && (
+                          {canDeleteFile && (
                             <button
                               onClick={() => dosyaSil(d)}
                               title="Sil"

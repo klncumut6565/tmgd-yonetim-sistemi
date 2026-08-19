@@ -28,6 +28,7 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase/client";
+import { useUser } from "@/hooks/useUser";
 import { hataCevir } from "@/lib/hataCevir";
 import { gorevliListesiExcelOlustur } from "@/lib/gorevliListesiExcel";
 import { gorevliListesiPdfOlustur, type LogoData } from "@/lib/gorevliListesiPdf";
@@ -175,6 +176,11 @@ export default function GorevliListesi({
   const [error, setError] = useState("");
   const [mesaj, setMesaj] = useState("");
   const [busy, setBusy] = useState(false);
+  // Görevli Listesi salt görüntüleme + PDF/Excel çıktısı amaçlıdır; içerik
+  // düzenleme ve satır silme yalnızca yazma yetkisi olan roller (super_admin,
+  // admin, tmgd, assistant) içindir — firma kullanıcısı (company) dahil
+  // yazma yetkisi olmayan roller yalnızca görüntüleyebilir.
+  const { canWrite } = useUser();
 
   const [hazirlayanAdi, setHazirlayanAdi] = useState("");
   const [onaylayanAdi, setOnaylayanAdi] = useState("");
@@ -517,6 +523,7 @@ export default function GorevliListesi({
                           kaydet({ ...row, gorevSecim: val }, idx + 1);
                         }
                       }}
+                      disabled={!canWrite}
                       className={HUCRE_INPUT}
                     >
                       {GOREV_SECENEKLERI.map((g) => (
@@ -531,6 +538,7 @@ export default function GorevliListesi({
                         value={row.gorevSerbest}
                         onChange={(e) => updateRow(row.key, { gorevSerbest: e.target.value })}
                         onBlur={() => kaydet(row, idx + 1)}
+                        disabled={!canWrite}
                         placeholder="Görev başlığı yazın"
                         className={HUCRE_INPUT + " mt-1"}
                       />
@@ -548,6 +556,7 @@ export default function GorevliListesi({
                           kaydet({ ...row, yapilacakSecim: val }, idx + 1);
                         }
                       }}
+                      disabled={!canWrite}
                       className={HUCRE_INPUT}
                     >
                       {YAPILACAK_GOREVLER_SECIMLERI.map((g) => (
@@ -565,6 +574,7 @@ export default function GorevliListesi({
                           updateRow(row.key, { yapilacakSerbest: e.target.value })
                         }
                         onBlur={() => kaydet(row, idx + 1)}
+                        disabled={!canWrite}
                         placeholder="Görev tanımı yazın"
                         rows={2}
                         className={HUCRE_INPUT + " mt-1"}
@@ -579,6 +589,7 @@ export default function GorevliListesi({
                         updateRow(row.key, { bagli_oldugu_birim: e.target.value })
                       }
                       onBlur={() => kaydet(row, idx + 1)}
+                      disabled={!canWrite}
                       rows={Math.max(1, row.bagli_oldugu_birim.split("\n").length)}
                       placeholder="Birden fazlaysa her satıra bir tane yazın"
                       className={HUCRE_INPUT + " resize-none leading-4"}
@@ -596,6 +607,7 @@ export default function GorevliListesi({
                         updateRow(row.key, { sorumlu_kisiler: e.target.value })
                       }
                       onBlur={() => kaydet(row, idx + 1)}
+                      disabled={!canWrite}
                       rows={Math.max(1, row.sorumlu_kisiler.split("\n").length)}
                       placeholder="Ad Soyad (birden fazlaysa her satıra bir isim yazın)"
                       className={HUCRE_INPUT + " resize-none leading-4"}
@@ -613,6 +625,7 @@ export default function GorevliListesi({
                           kaydet({ ...row, dokumanSecim: val }, idx + 1);
                         }
                       }}
+                      disabled={!canWrite}
                       className={HUCRE_INPUT}
                     >
                       {DOKUMAN_NO_SECIMLERI.map((g) => (
@@ -628,6 +641,7 @@ export default function GorevliListesi({
                           updateRow(row.key, { dokumanSerbest: e.target.value })
                         }
                         onBlur={() => kaydet(row, idx + 1)}
+                        disabled={!canWrite}
                         placeholder="Döküman no / tanımı yazın"
                         rows={2}
                         className={HUCRE_INPUT + " mt-1"}
@@ -641,6 +655,7 @@ export default function GorevliListesi({
                       value={row.egitim_tarihi}
                       onChange={(e) => updateRow(row.key, { egitim_tarihi: e.target.value })}
                       onBlur={() => kaydet(row, idx + 1)}
+                      disabled={!canWrite}
                       className={HUCRE_INPUT}
                     />
                   </td>
@@ -651,7 +666,7 @@ export default function GorevliListesi({
                         ⏳
                       </span>
                     )}
-                    {!row.kaydediliyor && row.id && (
+                    {!row.kaydediliyor && row.id && canWrite && (
                       <button
                         onClick={() => sil(row)}
                         title="Satırı sil"

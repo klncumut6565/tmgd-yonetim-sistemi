@@ -28,6 +28,7 @@ import { supabase } from "@/lib/supabase/client";
 import { authFetch } from "@/lib/supabase/authFetch";
 import { hataCevir } from "@/lib/hataCevir";
 import { pdfIlkSayfayiGorselYap } from "@/lib/pdfSayfaGorseli";
+import { useUser } from "@/hooks/useUser";
 import {
   aracEvraklariPdfOlustur,
   type AracEvrakBelgesi,
@@ -92,6 +93,7 @@ export default function AracEvraklari({
   });
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [hazirlayanAdi, setHazirlayanAdi] = useState("");
+  const { canWrite } = useUser();
 
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -506,21 +508,23 @@ export default function AracEvraklari({
         <div className="flex items-center justify-between gap-2">
           <span className="text-sm font-medium">{baslik}</span>
           <div className="flex items-center gap-2 text-xs shrink-0">
-            <label className="inline-flex items-center gap-1 text-blue-600 hover:underline cursor-pointer">
-              📎 {dosyalar.length > 0 ? "Dosya Ekle" : "Yükle"}
-              <input
-                type="file"
-                accept="image/*,.pdf"
-                multiple
-                className="hidden"
-                onChange={(e) => {
-                  const files = e.target.files;
-                  if (files && files.length > 0) onYukle(files);
-                  e.target.value = "";
-                }}
-              />
-            </label>
-            {onMobilTara && tarayiciYapilandirilmis && (
+            {canWrite && (
+              <label className="inline-flex items-center gap-1 text-blue-600 hover:underline cursor-pointer">
+                📎 {dosyalar.length > 0 ? "Dosya Ekle" : "Yükle"}
+                <input
+                  type="file"
+                  accept="image/*,.pdf"
+                  multiple
+                  className="hidden"
+                  onChange={(e) => {
+                    const files = e.target.files;
+                    if (files && files.length > 0) onYukle(files);
+                    e.target.value = "";
+                  }}
+                />
+              </label>
+            )}
+            {onMobilTara && tarayiciYapilandirilmis && canWrite && (
               <button
                 type="button"
                 onClick={onMobilTara}
@@ -545,14 +549,16 @@ export default function AracEvraklari({
                 >
                   📄 {d.file_name}
                 </button>
-                <button
-                  type="button"
-                  onClick={() => onSil(d)}
-                  className="text-red-500 hover:text-red-700 ml-2 shrink-0"
-                  title="Kaldır"
-                >
-                  ✕
-                </button>
+                {canWrite && (
+                  <button
+                    type="button"
+                    onClick={() => onSil(d)}
+                    className="text-red-500 hover:text-red-700 ml-2 shrink-0"
+                    title="Kaldır"
+                  >
+                    ✕
+                  </button>
+                )}
               </div>
             ))}
           </div>

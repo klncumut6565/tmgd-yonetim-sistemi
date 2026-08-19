@@ -12,6 +12,7 @@ import { useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
 import { useUser } from "@/hooks/useUser";
 import { hataCevir } from "@/lib/hataCevir";
+import CompanyBlockGuard from "@/components/CompanyBlockGuard";
 
 type Task = {
   id: string;
@@ -68,7 +69,7 @@ export default function TasksPage() {
 
 function TasksPageInner() {
   const searchParams = useSearchParams();
-  const { canWrite } = useUser();
+  const { canWrite, profile } = useUser();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [firms, setFirms] = useState<Firm[]>([]);
   const [title, setTitle] = useState("");
@@ -219,6 +220,10 @@ function TasksPageInner() {
     loadFirms();
     loadTasks();
   }, []);
+
+  // Firma (company) rolü bu sayfayı hiç görmemeli — doğrudan URL ile
+  // gelinse bile yönlendirilir.
+  if (profile?.role === "company") return <CompanyBlockGuard />;
 
   return (
     <div className="p-6">

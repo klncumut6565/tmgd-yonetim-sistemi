@@ -181,6 +181,10 @@ function FirmDetailInner({
   const searchParams = useSearchParams();
   const { canWrite, profile } = useUser();
   const isSuperAdminOnly = profile?.role === "super_admin";
+  const isCompany = profile?.role === "company";
+  // Firma (company) rolünden gizlenen sekmeler: Görevler, Belgeler,
+  // Belge Oluştur, Firma Bilgileri (genel).
+  const COMPANY_GIZLI_SEKMELER: TabKey[] = ["tasks", "documents", "belge_olustur", "genel"];
 
   const [firm, setFirm] = useState<Firm | null>(null);
   const [loading, setLoading] = useState(true);
@@ -236,7 +240,11 @@ function FirmDetailInner({
       "vehicles", "drivers", "employees", "visits",
       "adr_transport", "genel", "denetim", "notlar",
     ];
-    if (tabParam && (validTabs as string[]).includes(tabParam)) {
+    if (
+      tabParam &&
+      (validTabs as string[]).includes(tabParam) &&
+      !(isCompany && COMPANY_GIZLI_SEKMELER.includes(tabParam as TabKey))
+    ) {
       setTab(tabParam as TabKey);
     }
 
@@ -395,6 +403,7 @@ function FirmDetailInner({
   const TASIMACI_SEKMELERI: TabKey[] = ["vehicles", "drivers"];
   const visibleTabs = TABS.filter((t) => {
     if (t.key === "denetim" || t.key === "notlar") return isSuperAdminOnly;
+    if (isCompany && COMPANY_GIZLI_SEKMELER.includes(t.key)) return false;
     return isTasimaci || !TASIMACI_SEKMELERI.includes(t.key);
   });
 
@@ -406,6 +415,15 @@ function FirmDetailInner({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [firm, isTasimaci]);
+
+  // Firma (company) rolü, gizli sekmelerden birine (örn. eski bir yer
+  // imi veya doğrudan URL ile) düşerse Belge Takip'e yönlendirilir.
+  useEffect(() => {
+    if (isCompany && COMPANY_GIZLI_SEKMELER.includes(tab)) {
+      setTab("belge_takip");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isCompany, tab]);
 
   // Takip bölümleri — firma faaliyetlerine göre
   const sections: ChecklistSection[] = useMemo(() => {
@@ -1671,6 +1689,7 @@ function FirmDetailInner({
               dosyaEki
               fixedFirmId={id}
               compact
+              firmaKullanicisiEkleSilebilir
             />
           )}
           {surucuAltSekme === "surucu_listesi" && firm && (
@@ -1706,6 +1725,7 @@ function FirmDetailInner({
               dosyaEki
               fixedFirmId={id}
               compact
+              firmaKullanicisiEkleSilebilir
             />
           )}
           {personelAltSekme === "gorevli" && firm && (

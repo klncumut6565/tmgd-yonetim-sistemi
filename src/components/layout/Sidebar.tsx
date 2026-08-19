@@ -7,7 +7,9 @@ import { useUser } from "@/hooks/useUser";
 const menu = [
   { title: "Gösterge Paneli", href: "/dashboard" },
   { title: "Firmalar", href: "/firms" },
-  { title: "Görevler", href: "/tasks" },
+  // NOT: "Görevler" (/tasks) menüde yalnızca firma (company) rolü DIŞINDAKİ
+  // kullanıcılara gösterilir — aşağıdaki visibleMenu filtresine bakınız.
+  { title: "Görevler", href: "/tasks", hideForCompany: true },
   // NOT: "Belgeler" (/documents) ve "Belge Oluştur" (/belge-olustur)
   // menüden kaldırıldı — firma bağlamı olmadan kullanışlı değillerdi
   // (her ikisinde de önce firma seçmek gerekiyordu). Aynı işlevler firma
@@ -27,13 +29,15 @@ export default function Sidebar() {
   const pathname = usePathname();
   const { isSuperAdmin, profile } = useUser();
   const isAdmin = profile?.role === "admin";
+  const isCompany = profile?.role === "company";
+  const visibleMenu = menu.filter((item) => !(isCompany && item.hideForCompany));
 
   return (
     <aside className="w-60 border-r min-h-screen p-4 shrink-0">
       <div className="font-bold text-lg mb-6">TMGD Sistemi</div>
 
       <nav className="space-y-1">
-        {menu.map((item) => {
+        {visibleMenu.map((item) => {
           const active = pathname === item.href;
           return (
             <Link
