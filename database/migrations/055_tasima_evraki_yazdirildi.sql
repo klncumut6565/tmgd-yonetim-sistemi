@@ -1,5 +1,5 @@
 -- ============================================================================
--- Migration 053: Taşıma Evrakı — Yazdırıldı Zaman Damgası
+-- Migration 055: Taşıma Evrakı — Yazdırıldı Zaman Damgası
 -- ----------------------------------------------------------------------------
 -- AMAC: "Sevkiyatlar" ekranı yalnızca fiilen YAZDIRILMIŞ (şoföre teslim
 -- edilmeye hazır) taşıma evraklarını listeler — sadece kaydedilmiş ama hiç
@@ -37,7 +37,7 @@ WHERE table_schema = 'public'
 -- MIGRATION KAYDI
 -- ----------------------------------------------------------------------------
 
-INSERT INTO public._migrations (id) VALUES ('053_tasima_evraki_yazdirildi')
+INSERT INTO public._migrations (id) VALUES ('055_tasima_evraki_yazdirildi')
 ON CONFLICT DO NOTHING;
 
 NOTIFY pgrst, 'reload schema';
