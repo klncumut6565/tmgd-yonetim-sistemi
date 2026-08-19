@@ -889,16 +889,20 @@ export default function TasimaEvraki({
     setMesaj("");
   }
 
-  async function kaydet() {
-    if (!evrakNo.trim()) { setMesaj("Evrak No zorunlu."); return; }
-    if (kalemler.length === 0) { setMesaj("En az bir ürün ekle."); return; }
+  /** Başarılıysa kaydedilen evrağın ID'sini döner, başarısızsa null —
+   *  pdfYazdir() bu dönüş değeriyle "önce kaydet, sonra yazdır" akışını
+   *  kurar. Kaydet butonunun kendisi bu dönüş değerini kullanmıyor
+   *  (geriye dönük uyumlu, davranış değişmedi). */
+  async function kaydet(): Promise<string | null> {
+    if (!evrakNo.trim()) { setMesaj("Evrak No zorunlu."); return null; }
+    if (kalemler.length === 0) { setMesaj("En az bir ürün ekle."); return null; }
     if (
       karisikYasak &&
       !confirm(
         "DİKKAT: Bu evraktaki maddeler arasında ADR 7.5.2'ye göre KARIŞIK YÜKLEME YASAĞI var. Aynı taşıma ünitesinde taşınamazlar.\n\nYine de kaydedilsin mi?"
       )
     ) {
-      return;
+      return null;
     }
     setMesaj("");
     const govde = {
@@ -919,11 +923,11 @@ export default function TasimaEvraki({
     let id = evrakId;
     if (id) {
       const { error } = await supabase.from("transport_documents").update(govde).eq("id", id);
-      if (error) { setMesaj("Kaydedilemedi: " + hataCevir(error)); return; }
+      if (error) { setMesaj("Kaydedilemedi: " + hataCevir(error)); return null; }
       await supabase.from("transport_document_items").delete().eq("document_id", id);
     } else {
       const { data, error } = await supabase.from("transport_documents").insert(govde).select("id").single();
-      if (error || !data) { setMesaj("Kaydedilemedi: " + hataCevir(error)); return; }
+      if (error || !data) { setMesaj("Kaydedilemedi: " + hataCevir(error)); return null; }
       id = data.id;
       setEvrakId(id);
     }
@@ -937,9 +941,10 @@ export default function TasimaEvraki({
         quantity: k.quantity, unit: k.unit, is_lq: k.is_lq, is_eq: k.is_eq,
       }))
     );
-    if (itemErr) { setMesaj("Ürünler kaydedilemedi: " + hataCevir(itemErr)); return; }
+    if (itemErr) { setMesaj("Ürünler kaydedilemedi: " + hataCevir(itemErr)); return null; }
     setMesaj(`✓ Evrak kaydedildi (${kalemler.length} ürün).`);
     yukle();
+    return id;
   }
 
   /**
@@ -971,6 +976,60 @@ export default function TasimaEvraki({
     } catch (e) {
       pencere.close();
       setMesaj("Önizleme oluşturulamadı: " + (e instanceof Error ? e.message : String(e)));
+    }
+  }
+
+  /**
+   * Evrağı önce kaydeder (kayıtlı değilse yeni oluşturur, kayıtlıysa
+   * güncel hâliyle üzerine yazar), sonra PDF'i yeni sekmede açıp
+   * tarayıcının native yazdırma diyaloğunu (window.print()) otomatik
+   * tetikler. Kullanıcı diyalogdan "Yazdır"a basmasa/iptal etse bile,
+   * evrak zaten "Sevkiyatlar" ekranında görünür hâle gelir — diyaloğun
+   * açılmış olması, evrağın fiilen elden çıkarılmak üzere hazırlandığının
+   * yeterli bir işaretidir (bkz. printed_at, migration 053).
+   */
+  async function pdfYazdir() {
+    const pencere = window.open("", "_blank");
+    if (!pencere) {
+      setMesaj("Yeni sekme açılamadı — tarayıcının açılır pencere engelleyicisini kontrol et.");
+      return;
+    }
+    const id = await kaydet();
+    if (!id) {
+      pencere.close();
+      return;
+    }
+    try {
+      const doc = await evrakPdfUret({
+        firmaAdi, evrakNo: evrakNo || "(taslak)",
+        tarih: tarih.split("-").reverse().join("."),
+        gonderen: gonderenAdres.trim() ? `${gonderen}\n${gonderenAdres.trim()}` : gonderen,
+        alici: aliciAdres.trim() ? `${alici}\n${aliciAdres.trim()}` : alici,
+        tasiyici,
+        surucu: seciliSurucu, arac: seciliArac,
+        surucuManuel, aracManuel,
+        kalemler, puan, plakaGerekli, muafiyetsiz, tunel, notlar,
+      });
+      const blobUrl = URL.createObjectURL(doc.output("blob"));
+      pencere.location.href = blobUrl;
+      // PDF sekmesi yüklenip tarayıcının native görüntüleyicisi hazır
+      // olsun diye kısa bir bekleme sonrası yazdırma diyaloğu tetiklenir.
+      setTimeout(() => {
+        try {
+          pencere.print();
+        } catch {
+          /* bazı tarayıcılarda cross-origin kısıtı olabilir — kullanıcı
+             sekmedeki native yazdır ikonunu kullanabilir */
+        }
+      }, 700);
+
+      await supabase
+        .from("transport_documents")
+        .update({ printed_at: new Date().toISOString() })
+        .eq("id", id);
+      yukle();
+    } catch (e) {
+      setMesaj("Yazdırma hazırlanamadı: " + (e instanceof Error ? e.message : String(e)));
     }
   }
 
@@ -1527,10 +1586,23 @@ export default function TasimaEvraki({
               className="px-4 py-2 rounded-lg border text-sm font-medium hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-white transition-colors">
               📄 PDF İndir {kalemler.length > 0 ? `(${kalemler.length} ürün)` : ""}
             </button>
+            {canWrite && (
+              <button onClick={pdfYazdir} disabled={kalemler.length === 0}
+                title={kalemler.length === 0 ? "Yazdırmak için önce en az bir ürün ekleyin" : "Evrakı kaydedip yazdırma diyaloğunu aç"}
+                className="px-4 py-2 rounded-lg border text-sm font-medium hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-white transition-colors">
+                🖨️ Yazdır
+              </button>
+            )}
             <p className="text-[11px] text-gray-400 ml-auto">* zorunlu alan</p>
           </div>
           {kalemler.length === 0 && (
             <p className="text-[11px] text-gray-400 mt-2">PDF indirmek için yukarıdan en az bir ürün ekle.</p>
+          )}
+          {canWrite && kalemler.length > 0 && (
+            <p className="text-[11px] text-gray-400 mt-2">
+              🖨️ Yazdır, evrağı kaydedip yazdırma diyaloğunu açar — evrak bu işlemden sonra
+              Sevkiyatlar sekmesinde listelenir.
+            </p>
           )}
           {mesaj && <p className="text-sm mt-2 text-gray-700">{mesaj}</p>}
         </section>

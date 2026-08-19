@@ -24,6 +24,7 @@ type Sevkiyat = {
   total_points: number | null;
   orange_plate_required: boolean | null;
   tunnel_restriction_code: string | null;
+  printed_at: string | null;
   created_at: string;
 };
 
@@ -39,6 +40,14 @@ function tarihYaz(iso: string | null): string {
   const m = iso.match(/^(\d{4})-(\d{2})-(\d{2})/);
   if (!m) return iso;
   return `${m[3]}.${m[2]}.${m[1]}`;
+}
+
+function tarihSaatYaz(iso: string | null): string {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "—";
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${p(d.getDate())}.${p(d.getMonth() + 1)}.${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}`;
 }
 
 export default function Sevkiyatlar({
@@ -61,9 +70,13 @@ export default function Sevkiyatlar({
     const { data, error: err } = await supabase
       .from("transport_documents")
       .select(
-        "id, document_no, transport_date, consignor, consignee, carrier, status, total_points, orange_plate_required, tunnel_restriction_code, created_at"
+        "id, document_no, transport_date, consignor, consignee, carrier, status, total_points, orange_plate_required, tunnel_restriction_code, printed_at, created_at"
       )
       .eq("firm_id", firmId)
+      // Sevkiyat = fiilen YAZDIRILMIŞ evrak. Sadece kaydedilmiş ama hiç
+      // yazdırılmamış taslaklar bu listede görünmez — bkz. TasimaEvraki.
+      // tsx → pdfYazdir() (migration 053).
+      .not("printed_at", "is", null)
       // Taşıma TARİHİNE göre sıralı (en yeni sevkiyat en üstte); tarih
       // boş bırakılmış (nadir) kayıtlar en sona düşer.
       .order("transport_date", { ascending: false, nullsFirst: false })
@@ -98,7 +111,8 @@ export default function Sevkiyatlar({
       <div className="mb-3">
         <h3 className="font-semibold text-sm">Sevkiyatlar</h3>
         <p className="text-xs text-gray-500 mt-0.5">
-          Onay verilmiş (kaydedilmiş) tüm taşıma evrakları — taşıma tarihine göre sıralı.
+          Fiilen yazdırılmış (sevk edilmeye hazırlanmış) taşıma evrakları — taşıma tarihine göre sıralı.
+          Kaydedilip henüz yazdırılmamış taslak evraklar burada listelenmez.
         </p>
       </div>
 
@@ -117,7 +131,7 @@ export default function Sevkiyatlar({
       {!loading && !error && gosterilen.length === 0 && (
         <div className="border rounded-xl p-8 text-center text-gray-400 text-sm">
           {sevkiyatlar.length === 0
-            ? "Henüz kaydedilmiş sevkiyat yok — Taşıma Evrakı sekmesinden evrak kaydettikçe burada listelenir."
+            ? "Henüz yazdırılmış sevkiyat yok — Taşıma Evrakı sekmesinden 🖨️ Yazdır ile bir evrak yazdırdıkça burada listelenir."
             : "Aramanla eşleşen sevkiyat yok."}
         </div>
       )}
@@ -134,6 +148,7 @@ export default function Sevkiyatlar({
                 <th className="p-2.5 font-medium">Taşıyıcı</th>
                 <th className="p-2.5 font-medium text-center">1.1.3.6</th>
                 <th className="p-2.5 font-medium text-center">Turuncu Plaka</th>
+                <th className="p-2.5 font-medium whitespace-nowrap">Yazdırıldı</th>
                 <th className="p-2.5 font-medium"></th>
               </tr>
             </thead>
@@ -156,6 +171,7 @@ export default function Sevkiyatlar({
                       <span className="text-gray-400">—</span>
                     )}
                   </td>
+                  <td className="p-2.5 whitespace-nowrap text-gray-500">{tarihSaatYaz(s.printed_at)}</td>
                   <td className="p-2.5 text-right">
                     <button
                       onClick={() => onAc(s.id)}
