@@ -232,32 +232,37 @@ async function evrakPdfUret(args: {
   const NAVY: [number, number, number] = [30, 58, 138];
   let y = 14;
 
-  // ── ANTET — sol tarafta belirgin firma logosu, sağda firma unvanı ──────
-  // Logo varsa antet 26mm yüksekliğinde bir bant olarak basılır; logo
-  // yoksa eski (logosuz) düzen korunur ki firma logosunu henüz
-  // yüklememiş kullanıcılarda gereksiz boşluk kalmasın.
+  // ── ANTET — logo SAYFA ORTASINDA, altında firma adı ve başlık da
+  // ortalanmış (klasik resmi belge antedi görünümü). Logo yoksa eski
+  // (logosuz) düzen korunur ki firma logosunu henüz yüklememiş
+  // kullanıcılarda gereksiz boşluk kalmasın.
   if (args.logo) {
-    const antetY = 8, antetYukseklik = 22;
-    doc.setDrawColor(220, 220, 220);
-    doc.setLineWidth(0.3);
-    doc.line(M, antetY + antetYukseklik + 3, W - M, antetY + antetYukseklik + 3);
-
+    const antetY = 8;
+    const logoYukseklik = 16;
+    const box = logoKutusuHesapla(args.logo.enBoyOrani, logoYukseklik);
     try {
-      const box = logoKutusuHesapla(args.logo.enBoyOrani, antetYukseklik);
-      doc.addImage(args.logo.data, args.logo.fmt, M, antetY, box.w, box.h);
+      doc.addImage(args.logo.data, args.logo.fmt, W / 2 - box.w / 2, antetY, box.w, box.h);
     } catch {
       /* logo eklenemezse antet metinle devam eder */
     }
 
-    doc.setFontSize(13); doc.setFont(FONT, "bold"); doc.setTextColor(...NAVY);
-    doc.text(args.firmaAdi, W - M, antetY + 8, { align: "right", maxWidth: W - 2 * M - 45 });
+    let antetMetinY = antetY + logoYukseklik + 6;
+    doc.setFontSize(12); doc.setFont(FONT, "bold"); doc.setTextColor(...NAVY);
+    doc.text(args.firmaAdi, W / 2, antetMetinY, { align: "center", maxWidth: W - 2 * M });
+    antetMetinY += 6;
     doc.setFontSize(11); doc.setFont(FONT, "bold"); doc.setTextColor(60, 60, 60);
-    doc.text("TAŞIMA EVRAKI", W - M, antetY + 15, { align: "right" });
+    doc.text("TAŞIMA EVRAKI", W / 2, antetMetinY, { align: "center" });
+    antetMetinY += 5;
     doc.setFontSize(7.5); doc.setFont(FONT, "normal"); doc.setTextColor(120, 120, 120);
-    doc.text("ADR Bölüm 5.4.1 uyarınca düzenlenmiştir", W - M, antetY + 20, { align: "right" });
+    doc.text("ADR Bölüm 5.4.1 uyarınca düzenlenmiştir", W / 2, antetMetinY, { align: "center" });
     doc.setTextColor(0, 0, 0);
+    antetMetinY += 4;
 
-    y = antetY + antetYukseklik + 9;
+    doc.setDrawColor(220, 220, 220);
+    doc.setLineWidth(0.3);
+    doc.line(M, antetMetinY, W - M, antetMetinY);
+
+    y = antetMetinY + 6;
   } else {
     // Başlık (logosuz düzen)
     doc.setFontSize(14); doc.setFont(FONT, "bold"); doc.setTextColor(...NAVY);
