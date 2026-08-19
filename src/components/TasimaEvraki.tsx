@@ -472,6 +472,10 @@ export default function TasimaEvraki({
   // listeden seçilir (migration 035: firm_consignees)
   const [aliciListesi, setAliciListesi] = useState<Consignee[]>([]);
   const [aliciKaydediliyor, setAliciKaydediliyor] = useState(false);
+  // Taşıyıcı rehberi (migration 058: firm_carriers) — alıcı rehberiyle
+  // AYNI desen.
+  const [tasiyiciListesi, setTasiyiciListesi] = useState<Consignee[]>([]);
+  const [tasiyiciKaydediliyor, setTasiyiciKaydediliyor] = useState(false);
   const [tasiyici, setTasiyici] = useState("");
   const [surucuId, setSurucuId] = useState("");
   const [aracId, setAracId] = useState("");
@@ -527,7 +531,7 @@ export default function TasimaEvraki({
   const [eq, setEq] = useState(false);
 
   const yukle = useCallback(async () => {
-    const [env, sur, arc, evr, alc, frm] = await Promise.all([
+    const [env, sur, arc, evr, alc, tsy, frm] = await Promise.all([
       supabase.from("firm_chemicals")
         .select("id, un_number, proper_shipping_name, adr_class, classification_code, packing_group, tunnel_code, transport_category, labels, trade_name")
         .eq("firm_id", firmId).order("un_number"),
@@ -541,6 +545,9 @@ export default function TasimaEvraki({
         .select("id, document_no, transport_date, status, total_points, tunnel_restriction_code")
         .eq("firm_id", firmId).order("created_at", { ascending: false }).limit(50),
       supabase.from("firm_consignees")
+        .select("id, title, address")
+        .eq("firm_id", firmId).order("title"),
+      supabase.from("firm_carriers")
         .select("id, title, address")
         .eq("firm_id", firmId).order("title"),
       supabase.from("firms")
@@ -558,6 +565,9 @@ export default function TasimaEvraki({
     // Alıcı rehberi henüz oluşturulmamışsa (migration 035 çalışmadıysa)
     // sessizce boş geç — evrak düzenleme yine de çalışsın.
     setAliciListesi((alc.data as Consignee[]) || []);
+    // Taşıyıcı rehberi henüz oluşturulmamışsa (migration 058 çalışmadıysa)
+    // sessizce boş geç — evrak düzenleme yine de çalışsın.
+    setTasiyiciListesi((tsy.data as Consignee[]) || []);
     setLogoUrl((frm.data as { logo_url: string | null } | null)?.logo_url ?? null);
 
     // Gönderen adresi — Gönderen zaten firmanın kendi unvanına ("firmaAdi")
@@ -801,24 +811,62 @@ export default function TasimaEvraki({
   }, [seciliArac, plakaGerekli, kalemler.length]);
 
   /** Girilen alıcıyı bu firmanın rehberine kaydeder (bir dahaki sefere listeden seçilir). */
+  /**
+   * Rehber kaydı (alıcı veya taşıyıcı) — ÖNEMLİ: burada supabase.upsert()
+   * KULLANILMIYOR. Çünkü bu tabloların benzersizlik indeksi bir İFADE
+   * indeksi (firm_id, lower(title)) — upsert'ün onConflict hedefi düz
+   * sütun listesi ("firm_id,title") olduğu için Postgres bunu eşleştiremiyor
+   * ve "no unique or exclusion constraint matching the ON CONFLICT
+   * specification" hatasıyla kayıt SESSIZCE BAŞARISIZ oluyordu — kullanıcı
+   * "kaydedildi" görüp sonraki evrakta rehberi boş buluyordu.
+   *
+   * Çözüm: önce büyük/küçük harf duyarsız (ilike) arama yapılır, kayıt
+   * varsa UPDATE, yoksa INSERT edilir. Bu, ifade indeksiyle de uyumludur.
+   */
+  async function rehbereKaydet(
+    tablo: "firm_consignees" | "firm_carriers",
+    unvan: string,
+    adres: string
+  ): Promise<string | null> {
+    const { data: mevcut } = await supabase
+      .from(tablo)
+      .select("id")
+      .eq("firm_id", firmId)
+      .ilike("title", unvan)
+      .maybeSingle();
+
+    const govde = { title: unvan, address: adres.trim() || null };
+    const { error } = mevcut
+      ? await supabase.from(tablo).update(govde).eq("id", mevcut.id)
+      : await supabase.from(tablo).insert({ firm_id: firmId, ...govde });
+
+    if (error) {
+      return /does not exist|not find the table/i.test(error.message)
+        ? `Rehber için veritabanı güncellemesi (${tablo === "firm_consignees" ? "035_firm_consignees" : "058_firm_carriers"}.sql) gerekli.`
+        : "Kaydedilemedi: " + error.message;
+    }
+    return null;
+  }
+
   async function aliciyiRehbereKaydet() {
     const unvan = alici.trim();
     if (!unvan) { setMesaj("Önce alıcı unvanını yaz."); return; }
     setAliciKaydediliyor(true);
-    const { error } = await supabase.from("firm_consignees").upsert(
-      { firm_id: firmId, title: unvan, address: aliciAdres.trim() || null },
-      { onConflict: "firm_id,title" }
-    );
+    const hata = await rehbereKaydet("firm_consignees", unvan, aliciAdres);
     setAliciKaydediliyor(false);
-    if (error) {
-      setMesaj(
-        /does not exist|not find the table/i.test(error.message)
-          ? "Alıcı rehberi için veritabanı güncellemesi (035_firm_consignees.sql) gerekli."
-          : "Alıcı kaydedilemedi: " + error.message
-      );
-      return;
-    }
+    if (hata) { setMesaj(hata); return; }
     setMesaj(`✓ "${unvan}" alıcı rehberine kaydedildi.`);
+    yukle();
+  }
+
+  async function tasiyiciyiRehbereKaydet() {
+    const unvan = tasiyici.trim();
+    if (!unvan) { setMesaj("Önce taşıyıcı unvanını yaz."); return; }
+    setTasiyiciKaydediliyor(true);
+    const hata = await rehbereKaydet("firm_carriers", unvan, "");
+    setTasiyiciKaydediliyor(false);
+    if (hata) { setMesaj(hata); return; }
+    setMesaj(`✓ "${unvan}" taşıyıcı rehberine kaydedildi.`);
     yukle();
   }
 
@@ -1244,8 +1292,33 @@ export default function TasimaEvraki({
 
             <div>
               <label className={ETIKET}>Taşıyıcı firma</label>
+              {tasiyiciListesi.length > 0 && (
+                <select
+                  className={GIRIS + " mb-1.5"}
+                  value=""
+                  onChange={(e) => {
+                    const sec = tasiyiciListesi.find((t) => t.id === e.target.value);
+                    if (sec) setTasiyici(sec.title);
+                  }}
+                  disabled={!canWrite}
+                >
+                  <option value="">📋 Kayıtlı taşıyıcılardan seç...</option>
+                  {tasiyiciListesi.map((t) => (
+                    <option key={t.id} value={t.id}>{t.title}</option>
+                  ))}
+                </select>
+              )}
               <input className={GIRIS} placeholder="Taşıyıcı firma unvanı"
                 value={tasiyici} onChange={(e) => setTasiyici(e.target.value)} disabled={!canWrite} />
+              {canWrite && tasiyici.trim() && (
+                <button
+                  onClick={tasiyiciyiRehbereKaydet}
+                  disabled={tasiyiciKaydediliyor}
+                  className="text-xs text-blue-600 hover:underline mt-1.5 disabled:opacity-50"
+                >
+                  {tasiyiciKaydediliyor ? "Kaydediliyor..." : "💾 Bu taşıyıcıyı rehbere kaydet"}
+                </button>
+              )}
             </div>
 
             <div>
