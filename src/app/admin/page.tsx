@@ -470,7 +470,7 @@ function UsersTab() {
                       Aktif Et
                     </button>
                   )}
-                  {isSuperAdmin && (
+                  {(isSuperAdmin || (isAdmin && u.role !== "super_admin")) && (
                     <button
                       onClick={() => removeUser(u)}
                       className="text-red-600 hover:underline"
