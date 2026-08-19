@@ -394,6 +394,7 @@ export default function TasimaEvraki({
   firmaAdi,
   prefillUnNumbers,
   prefillMiktar,
+  preselectEvrakId,
 }: {
   firmId: string;
   firmaAdi: string;
@@ -403,6 +404,9 @@ export default function TasimaEvraki({
   prefillUnNumbers?: string[];
   /** Asistandan gelen miktar — forma doldurulur, onay yine kullanıcıda. */
   prefillMiktar?: number;
+  /** Sevkiyatlar sekmesinden "Aç" ile gelindiğinde, bu ID'li evrakı
+   *  otomatik olarak editöre yükler (bkz. evrakAc()). */
+  preselectEvrakId?: string;
 }) {
   const { canWrite } = useUser();
 
@@ -527,6 +531,13 @@ export default function TasimaEvraki({
   }, [firmId]);
 
   useEffect(() => { yukle(); }, [yukle]);
+
+  // Sevkiyatlar sekmesinden "Aç" ile gelindiyse, ilk yüklemeden sonra
+  // ilgili evrakı otomatik editöre yükle.
+  useEffect(() => {
+    if (preselectEvrakId) evrakAc(preselectEvrakId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [preselectEvrakId]);
 
   // Tablo A araması (debounce'lu)
   useEffect(() => {

@@ -24,6 +24,7 @@ import {
 import FirmScopedCrud from "@/components/FirmScopedCrud";
 import KimyasalEnvanter from "@/components/KimyasalEnvanter";
 import TasimaEvraki from "@/components/TasimaEvraki";
+import Sevkiyatlar from "@/components/Sevkiyatlar";
 import GorevliListesi from "@/components/GorevliListesi";
 import SurucuListesi from "@/components/SurucuListesi";
 import AracEvraklari from "@/components/AracEvraklari";
@@ -184,7 +185,10 @@ function FirmDetailInner({
   const [firm, setFirm] = useState<Firm | null>(null);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<TabKey>("belge_takip");
-  const [adrAltSekme, setAdrAltSekme] = useState<"evrak" | "envanter">("evrak");
+  const [adrAltSekme, setAdrAltSekme] = useState<"evrak" | "envanter" | "sevkiyat">("evrak");
+  // Sevkiyatlar sekmesinden "Aç" ile Taşıma Evrakı editörüne geçilirken
+  // hangi evrağın otomatik yükleneceği.
+  const [preselectEvrakId, setPreselectEvrakId] = useState<string | undefined>(undefined);
   const [personelAltSekme, setPersonelAltSekme] = useState<"liste" | "gorevli">("liste");
   const [surucuAltSekme, setSurucuAltSekme] = useState<"liste" | "surucu_listesi">("liste");
   const [aracAltSekme, setAracAltSekme] = useState<"liste" | "arac_evraki">("liste");
@@ -1736,7 +1740,7 @@ function FirmDetailInner({
             ADR bilgileri ortak Tablo A&apos;dan (2.939 kayıt) otomatik gelir.
           </p>
           <div className="flex gap-2 mb-4">
-            {(["evrak", "envanter"] as const).map((alt) => (
+            {(["evrak", "sevkiyat", "envanter"] as const).map((alt) => (
               <button
                 key={alt}
                 onClick={() => setAdrAltSekme(alt)}
@@ -1747,7 +1751,7 @@ function FirmDetailInner({
                     : "bg-white hover:bg-gray-50")
                 }
               >
-                {alt === "evrak" ? "📄 Taşıma Evrakı" : "🧪 Kimyasal Envanter"}
+                {alt === "evrak" ? "📄 Taşıma Evrakı" : alt === "sevkiyat" ? "🚚 Sevkiyatlar" : "🧪 Kimyasal Envanter"}
               </button>
             ))}
           </div>
@@ -1756,12 +1760,22 @@ function FirmDetailInner({
               <KimyasalEnvanter firmId={id} firmaAdi={firm?.name || ""} />
             </div>
           )}
+          {adrAltSekme === "sevkiyat" && (
+            <Sevkiyatlar
+              firmId={id}
+              onAc={(evrakId) => {
+                setPreselectEvrakId(evrakId);
+                setAdrAltSekme("evrak");
+              }}
+            />
+          )}
           {adrAltSekme === "evrak" && firm && (
             <TasimaEvraki
               firmId={id}
               firmaAdi={firm.name}
               prefillUnNumbers={evrakPrefillUns}
               prefillMiktar={evrakPrefillMiktar}
+              preselectEvrakId={preselectEvrakId}
             />
           )}
         </div>
