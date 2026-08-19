@@ -63,7 +63,12 @@ export default function Sidebar() {
             { title: "Kimyasal Envanter", href: "https://kimyasal-envanter-xejzjdukscnznm6dgtmvp5.streamlit.app", icon: "🧪" },
             { title: "MSDS Özetleyici", href: "https://msds-ozetleyici-pro.streamlit.app", icon: "📄" },
             { title: "Karışık Yükleme", href: "/adr?tab=karisik", icon: "⚠" },
-          ].map((app) => (
+          ]
+            // Firma (company) kullanıcısı harici Streamlit uygulamalarını
+            // görmez — bunlar TMGD'nin kendi çalışma araçları. Yalnızca
+            // uygulama içi "Karışık Yükleme" kontrolü görünür kalır.
+            .filter((app) => !isCompany || !app.href.startsWith("http"))
+            .map((app) => (
             <a
               key={app.href}
               href={app.href}
