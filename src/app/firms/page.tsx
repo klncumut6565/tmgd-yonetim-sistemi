@@ -40,7 +40,8 @@ const SILME_KODU = "0000";
 
 export default function FirmsPage() {
   const router = useRouter();
-  const { isSuperAdmin, canWrite } = useUser();
+  const { isSuperAdmin, canWrite, profile } = useUser();
+  const isAdmin = profile?.role === "admin";
 
   const [firms, setFirms] = useState<Firm[]>([]);
   const [loading, setLoading] = useState(true);
@@ -363,7 +364,7 @@ export default function FirmsPage() {
                   <th className="text-left p-3 font-medium text-gray-600">Durum</th>
                   <th className="text-left p-3 font-medium text-gray-600">Son Ziyaret</th>
                   <th className="text-left p-3 font-medium text-gray-600">Belge Durumu</th>
-                  {isSuperAdmin && <th className="p-3" />}
+                  {(isSuperAdmin || isAdmin) && <th className="p-3" />}
                 </tr>
               </thead>
               <tbody>
@@ -452,7 +453,7 @@ export default function FirmsPage() {
                         );
                       })()}
                     </td>
-                    {isSuperAdmin && (
+                    {(isSuperAdmin || isAdmin) && (
                       <td className="p-3 text-right">
                         <button
                           onClick={(e) => {
