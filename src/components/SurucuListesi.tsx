@@ -25,6 +25,7 @@ import { surucuListesiExcelOlustur } from "@/lib/surucuListesiExcel";
 import { surucuListesiPdfOlustur, type LogoData, type SurucuBelgeEki } from "@/lib/surucuListesiPdf";
 import { pdfIlkSayfayiGorselYap } from "@/lib/pdfSayfaGorseli";
 import DateInput from "@/components/DateInput";
+import { useUser } from "@/hooks/useUser";
 
 type SurucuKaydi = {
   id: string;
@@ -136,6 +137,7 @@ export default function SurucuListesi({
   const [error, setError] = useState("");
   const [mesaj, setMesaj] = useState("");
   const [busy, setBusy] = useState(false);
+  const { canWrite } = useUser();
 
   const [hazirlayanAdi, setHazirlayanAdi] = useState("");
   const [onaylayanAdi, setOnaylayanAdi] = useState("");
@@ -775,16 +777,18 @@ export default function SurucuListesi({
                             >
                               📎 {ad || "Belge"}
                             </button>
-                            <button
-                              type="button"
-                              onClick={() => belgeSil(row, tur)}
-                              title="Belgeyi kaldır"
-                              className="text-red-500 hover:text-red-700 shrink-0"
-                            >
-                              ✕
-                            </button>
+                            {canWrite && (
+                              <button
+                                type="button"
+                                onClick={() => belgeSil(row, tur)}
+                                title="Belgeyi kaldır"
+                                className="text-red-500 hover:text-red-700 shrink-0"
+                              >
+                                ✕
+                              </button>
+                            )}
                           </div>
-                        ) : (
+                        ) : canWrite ? (
                           <div className="flex flex-col items-start gap-0.5">
                             <label
                               className={
@@ -817,6 +821,8 @@ export default function SurucuListesi({
                               </button>
                             )}
                           </div>
+                        ) : (
+                          <span className="text-xs text-gray-300">—</span>
                         )}
                       </td>
                     );

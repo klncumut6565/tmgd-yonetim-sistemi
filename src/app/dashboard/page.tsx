@@ -13,6 +13,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase/client";
 import AuditLogWidget from "@/components/audit/AuditLogWidget";
+import { useUser } from "@/hooks/useUser";
 
 type Counts = {
   firms: number;
@@ -74,6 +75,8 @@ function DaysBadge({ date }: { date: string }) {
 }
 
 export default function DashboardPage() {
+  const { profile } = useUser();
+  const isCompany = profile?.role === "company";
   const [counts, setCounts] = useState<Counts>({ firms: 0, openTasks: 0, documents: 0, vehicles: 0 });
   const [drivers, setDrivers] = useState<ExpiringItem[]>([]);
   const [vehicles, setVehicles] = useState<ExpiringItem[]>([]);
@@ -284,42 +287,47 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Son görevler */}
-      <h2 className="text-xl font-bold mb-3">Son Görevler</h2>
-      <div className="border rounded-xl overflow-hidden">
-        <table className="w-full text-sm">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="text-left p-3 font-medium text-gray-600">Görev</th>
-              <th className="text-left p-3 font-medium text-gray-600">Firma</th>
-              <th className="text-left p-3 font-medium text-gray-600">Durum</th>
-              <th className="text-left p-3 font-medium text-gray-600">Öncelik</th>
-              <th className="text-left p-3 font-medium text-gray-600">Termin</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading && (
-              <tr>
-                <td colSpan={5} className="p-4 text-gray-500">Yükleniyor...</td>
-              </tr>
-            )}
-            {!loading && tasks.length === 0 && (
-              <tr>
-                <td colSpan={5} className="p-4 text-gray-500">Henüz görev yok.</td>
-              </tr>
-            )}
-            {tasks.map((t) => (
-              <tr key={t.id} className="border-t">
-                <td className="p-3">{t.title}</td>
-                <td className="p-3 text-gray-500">{t.firms?.name || "—"}</td>
-                <td className="p-3">{STATUS_TR[t.status] || t.status}</td>
-                <td className="p-3">{PRIORITY_TR[t.priority] || t.priority}</td>
-                <td className="p-3">{t.due_date || "—"}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      {/* Son görevler — firma (company) kullanıcısından gizli: bu bilgi
+          Görevler ekranıyla birlikte firma kullanıcısına kapalı tutuluyor. */}
+      {!isCompany && (
+        <>
+          <h2 className="text-xl font-bold mb-3">Son Görevler</h2>
+          <div className="border rounded-xl overflow-hidden">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="text-left p-3 font-medium text-gray-600">Görev</th>
+                  <th className="text-left p-3 font-medium text-gray-600">Firma</th>
+                  <th className="text-left p-3 font-medium text-gray-600">Durum</th>
+                  <th className="text-left p-3 font-medium text-gray-600">Öncelik</th>
+                  <th className="text-left p-3 font-medium text-gray-600">Termin</th>
+                </tr>
+              </thead>
+              <tbody>
+                {loading && (
+                  <tr>
+                    <td colSpan={5} className="p-4 text-gray-500">Yükleniyor...</td>
+                  </tr>
+                )}
+                {!loading && tasks.length === 0 && (
+                  <tr>
+                    <td colSpan={5} className="p-4 text-gray-500">Henüz görev yok.</td>
+                  </tr>
+                )}
+                {tasks.map((t) => (
+                  <tr key={t.id} className="border-t">
+                    <td className="p-3">{t.title}</td>
+                    <td className="p-3 text-gray-500">{t.firms?.name || "—"}</td>
+                    <td className="p-3">{STATUS_TR[t.status] || t.status}</td>
+                    <td className="p-3">{PRIORITY_TR[t.priority] || t.priority}</td>
+                    <td className="p-3">{t.due_date || "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
 
       {/* Audit log widget — sadece admin/super_admin görür, migration yoksa gizlenir */}
       <AuditLogWidget />
