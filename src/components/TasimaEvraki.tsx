@@ -345,7 +345,7 @@ async function evrakPdfUret(args: {
     x = M;
     hucreler.forEach((h, ci) => {
       if (ci === 2) {
-        doc.text(adSatirlari, x + 1.5, y + 3.8);
+        doc.text(adSatirlari, x + 1.5, y + 3.8, { maxWidth: kolonlar[ci].w - 3 });
       } else {
         doc.text(h, x + kolonlar[ci].w / 2, y + satirH / 2 + 1.2, { align: "center" });
       }
