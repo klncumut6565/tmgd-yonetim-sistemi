@@ -19,7 +19,7 @@ import { hataCevir } from "@/lib/hataCevir";
 export type FieldType = "text" | "number" | "date" | "select" | "textarea";
 
 export type FieldDef = {
-  key: string;                 // veritabanı sütun adı
+  key: string;                 // veritabanı sütun adı (mergedKeys varsa GERÇEK bir sütun değildir, bkz. aşağı)
   label: string;               // ekranda görünen etiket
   type?: FieldType;            // varsayılan: text
   required?: boolean;          // zorunlu alan mı
@@ -29,6 +29,12 @@ export type FieldDef = {
   textareaRows?: number;       // type=textarea için satır sayısı (varsayılan 4)
   maxLength?: number;          // veritabanındaki varchar(n) sınırı; girişte de engellenir
                                // (örn. plate_number varchar(20), national_id varchar(20))
+  mergedKeys?: [string, string];
+                               // Bu alan GERÇEK bir DB sütunu değil, iki sütunu (örn.
+                               // ["first_name","last_name"]) TEK bir "Ad Soyad" girişi
+                               // olarak göstermek için kullanılır: form/tabloda tek input,
+                               // kaydedilirken ilk boşluğa göre iki sütuna bölünür, listede
+                               // ve düzenle formunda iki sütun " " ile birleştirilip gösterilir.
 };
 
 type Firm = { id: string; name: string; activities?: string[] | null; orphan?: boolean };
@@ -369,6 +375,13 @@ export default function FirmScopedCrud({
     setEditingId(row.id);
     const filled: Record<string, string> = {};
     modalFields.forEach((f) => {
+      if (f.mergedKeys) {
+        const [ilkKey, ikinciKey] = f.mergedKeys;
+        const ilk = row[ilkKey] == null ? "" : String(row[ilkKey]);
+        const ikinci = row[ikinciKey] == null ? "" : String(row[ikinciKey]);
+        filled[f.key] = [ilk, ikinci].filter(Boolean).join(" ");
+        return;
+      }
       const v = row[f.key];
       filled[f.key] = v == null ? "" : String(v);
     });
@@ -438,6 +451,17 @@ export default function FirmScopedCrud({
     const payload: Record<string, unknown> = { firm_id: firmId };
     for (const f of modalFields) {
       const raw = guncelForm[f.key];
+      if (f.mergedKeys) {
+        // "Ad Soyad" tek girişini İLK BOŞLUĞA göre iki gerçek sütuna böl —
+        // soyadda kendi içinde boşluk olabileceği için split ilk boşlukta
+        // durur (örn. "Ali Veli Kaya" -> Ad: "Ali", Soyad: "Veli Kaya").
+        const [ilkKey, ikinciKey] = f.mergedKeys;
+        const temiz = (raw || "").trim();
+        const bosluk = temiz.indexOf(" ");
+        payload[ilkKey] = bosluk === -1 ? (temiz || null) : temiz.slice(0, bosluk);
+        payload[ikinciKey] = bosluk === -1 ? null : temiz.slice(bosluk + 1).trim() || null;
+        continue;
+      }
       if (raw === undefined || raw === "") {
         payload[f.key] = null;
       } else if (f.type === "number") {
@@ -499,6 +523,13 @@ export default function FirmScopedCrud({
   }
 
   function renderCell(row: Row, f: FieldDef) {
+    if (f.mergedKeys) {
+      const [ilkKey, ikinciKey] = f.mergedKeys;
+      const ilk = row[ilkKey] == null ? "" : String(row[ilkKey]);
+      const ikinci = row[ikinciKey] == null ? "" : String(row[ikinciKey]);
+      const birlesik = [ilk, ikinci].filter(Boolean).join(" ");
+      return birlesik || "—";
+    }
     const v = row[f.key];
     if (v == null || v === "") return "—";
     if (f.key === "status") return STATUS_LABELS[String(v)] || String(v);

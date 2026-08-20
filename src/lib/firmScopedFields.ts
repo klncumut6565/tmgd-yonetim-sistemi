@@ -27,8 +27,7 @@ export const VEHICLE_FIELDS: FieldDef[] = [
 ];
 
 export const DRIVER_FIELDS: FieldDef[] = [
-  { key: "first_name", label: "Ad", type: "text", required: true },
-  { key: "last_name", label: "Soyad", type: "text", required: true },
+  { key: "ad_soyad", label: "Ad Soyad", type: "text", required: true, mergedKeys: ["first_name", "last_name"] },
   { key: "national_id", label: "T.C. Kimlik No", type: "text", inTable: false, maxLength: 20 },
   { key: "phone", label: "Telefon", type: "text" },
   { key: "email", label: "E-posta", type: "text", inTable: false },
