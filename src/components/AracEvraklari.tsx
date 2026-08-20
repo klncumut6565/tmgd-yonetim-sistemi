@@ -409,6 +409,20 @@ export default function AracEvraklari({
    * sıra, mobil Safari'nin açılır pencere engelleyicisine takılmayı
    * önler (TasimaEvraki.tsx'teki AYNI teknik).
    */
+  /**
+   * PDF'i indirmeden yeni sekmede önizler.
+   *
+   * NEDEN doğrudan `pencere.location.href = blobUrl` DEĞİL:
+   * Araç Evrakı PDF'i diğer belgelere göre çok daha uzun sürede üretiliyor
+   * (Ek-1..Ek-10 için onlarca dosya indirilip, PDF olanlar görsele
+   * çevriliyor) ve sonuç blob'u çok büyük oluyor. Bu uzun sessiz bekleme
+   * boyunca açık kalan boş `about:blank` sekmesine sonradan yapılan
+   * gezinme bazı tarayıcılarda yok sayılıyor ve sekme BOŞ kalıyordu.
+   *
+   * Çözüm: pencere açılır açılmaz içine bir "hazırlanıyor" ekranı yazılır
+   * (sekme artık gerçek bir belge, boş değil), PDF hazır olunca da blob
+   * bir <iframe> içine gömülür — location gezinmesine hiç gerek kalmaz.
+   */
   async function pdfOnizle() {
     const secilenArac = araclar.find((a) => a.id === secilenAracId);
     if (!secilenArac) {
@@ -420,6 +434,16 @@ export default function AracEvraklari({
       setError("Yeni sekme açılamadı — tarayıcının açılır pencere engelleyicisini kontrol et.");
       return;
     }
+
+    pencere.document.write(
+      `<!DOCTYPE html><html><head><meta charset="utf-8">` +
+        `<title>Araç Evrakı — hazırlanıyor…</title></head>` +
+        `<body style="margin:0;font-family:system-ui,sans-serif;display:flex;` +
+        `align-items:center;justify-content:center;height:100vh;color:#475569">` +
+        `<p>📄 Araç evrakı hazırlanıyor, lütfen bekleyin…</p></body></html>`
+    );
+    pencere.document.close();
+
     setBusy(true);
     setError("");
     try {
@@ -433,10 +457,17 @@ export default function AracEvraklari({
         logo,
         belgeler,
       });
+      // Kullanıcı bu arada sekmeyi kapatmış olabilir.
+      if (pencere.closed) return;
+
       const url = URL.createObjectURL(blob);
-      pencere.location.href = url;
+      pencere.document.title = `${secilenArac.plate_number} — Araç Evrakı`;
+      pencere.document.body.innerHTML =
+        `<iframe src="${url}" style="border:0;width:100%;height:100vh" ` +
+        `title="Araç Evrakı"></iframe>`;
+      pencere.document.body.style.margin = "0";
     } catch (e) {
-      pencere.close();
+      if (!pencere.closed) pencere.close();
       setError(hataCevir(e as { message?: string }));
     } finally {
       setBusy(false);

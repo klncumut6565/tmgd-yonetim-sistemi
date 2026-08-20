@@ -513,12 +513,32 @@ export default function SurucuListesi({
    * sıra, mobil Safari'nin açılır pencere engelleyicisine takılmayı
    * önler (TasimaEvraki.tsx'teki AYNI teknik).
    */
+  /**
+   * PDF'i indirmeden yeni sekmede önizler.
+   *
+   * AracEvraklari.tsx'teki AYNI dayanıklı yöntem: pencere açılır açılmaz
+   * içine bir "hazırlanıyor" ekranı yazılır (sekme boş kalmaz), PDF hazır
+   * olunca blob bir <iframe>'e gömülür. Doğrudan `location.href = blobUrl`
+   * kullanılmıyor; SRC5/Ehliyet ekleri indirilip görsele çevrildiği için
+   * üretim uzun sürebiliyor ve bu sessiz bekleme sonrası yapılan gezinme
+   * bazı tarayıcılarda yok sayılıp sekme boş kalabiliyordu.
+   */
   async function pdfOnizle() {
     const pencere = window.open("", "_blank");
     if (!pencere) {
       setError("Yeni sekme açılamadı — tarayıcının açılır pencere engelleyicisini kontrol et.");
       return;
     }
+
+    pencere.document.write(
+      `<!DOCTYPE html><html><head><meta charset="utf-8">` +
+        `<title>Sürücü Listesi — hazırlanıyor…</title></head>` +
+        `<body style="margin:0;font-family:system-ui,sans-serif;display:flex;` +
+        `align-items:center;justify-content:center;height:100vh;color:#475569">` +
+        `<p>📄 Sürücü listesi hazırlanıyor, lütfen bekleyin…</p></body></html>`
+    );
+    pencere.document.close();
+
     setBusy(true);
     setError("");
     try {
@@ -533,10 +553,16 @@ export default function SurucuListesi({
         logo,
         ekler,
       });
+      if (pencere.closed) return;
+
       const url = URL.createObjectURL(blob);
-      pencere.location.href = url;
+      pencere.document.title = "Sürücü Listesi";
+      pencere.document.body.innerHTML =
+        `<iframe src="${url}" style="border:0;width:100%;height:100vh" ` +
+        `title="Sürücü Listesi"></iframe>`;
+      pencere.document.body.style.margin = "0";
     } catch (e) {
-      pencere.close();
+      if (!pencere.closed) pencere.close();
       setError(hataCevir(e as { message?: string }));
     } finally {
       setBusy(false);
