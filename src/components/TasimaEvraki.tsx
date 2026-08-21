@@ -307,9 +307,9 @@ async function evrakPdfUret(args: {
 
   // Ürün tablosu
   const kolonlar = [
-    { b: "No", w: 8 }, { b: "UN No", w: 17 }, { b: "Resmi Taşıma Adı", w: 62 },
+    { b: "No", w: 8 }, { b: "UN No", w: 17 }, { b: "Uygun Sevkiyat Adı", w: 62 },
     { b: "Sınıf", w: 12 }, { b: "PG", w: 10 }, { b: "Tünel", w: 13 },
-    { b: "Ambalaj", w: 32 }, { b: "Adet", w: 11 }, { b: "Miktar", w: 21 },
+    { b: "Taşıma Türü", w: 32 }, { b: "Adet", w: 11 }, { b: "Miktar", w: 21 },
   ];
   const tabloW = kolonlar.reduce((a, k) => a + k.w, 0);
   // Başlık satırı
@@ -345,9 +345,12 @@ async function evrakPdfUret(args: {
     x = M;
     hucreler.forEach((h, ci) => {
       if (ci === 2) {
-        doc.text(adSatirlari, x + 1.5, y + 3.8);
+        doc.text(adSatirlari, x + 1.5, y + 3.8, { maxWidth: kolonlar[ci].w - 3 });
       } else {
-        doc.text(h, x + kolonlar[ci].w / 2, y + satirH / 2 + 1.2, { align: "center" });
+        doc.text(h, x + kolonlar[ci].w / 2, y + satirH / 2 + 1.2, { 
+          align: "center",
+          maxWidth: kolonlar[ci].w - 1 
+        });
       }
       x += kolonlar[ci].w;
     });
