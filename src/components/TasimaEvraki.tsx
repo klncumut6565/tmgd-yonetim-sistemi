@@ -199,6 +199,7 @@ async function evrakPdfUret(args: {
   kalemler: Kalem[];
   puan: number;
   plakaGerekli: boolean;
+  emniyetGerekli: boolean;
   muafiyetsiz: boolean;
   tunel: string;
   notlar: string;
@@ -392,9 +393,10 @@ async function evrakPdfUret(args: {
 
   // ADR uyumluluk şeridi
   doc.setFillColor(args.plakaGerekli ? 254 : 240, args.plakaGerekli ? 242 : 253, args.plakaGerekli ? 242 : 244);
-  doc.rect(M, y, W - 2 * M, 12, "F");
+  const sheriditYukseklik = args.emniyetGerekli ? 17 : 12;
+  doc.rect(M, y, W - 2 * M, sheriditYukseklik, "F");
   doc.setDrawColor(args.plakaGerekli ? 220 : 22, args.plakaGerekli ? 38 : 163, args.plakaGerekli ? 38 : 74);
-  doc.rect(M, y, W - 2 * M, 12);
+  doc.rect(M, y, W - 2 * M, sheriditYukseklik);
   doc.setFontSize(8); doc.setFont(FONT, "bold");
   const puanMetni = args.muafiyetsiz
     ? "1.1.3.6 muafiyeti YOK (Taşıma Kategorisi 0 veya bilinmeyen madde içeriyor)"
@@ -404,9 +406,13 @@ async function evrakPdfUret(args: {
     args.plakaGerekli ? "TURUNCU PLAKA ZORUNLU" : "Turuncu plaka gerekmez (1.1.3.6 muafiyeti)",
     M + 3, y + 9.5
   );
+  if (args.emniyetGerekli) {
+    doc.setDrawColor(220, 38, 38);
+    doc.text("EMNİYET PLANI ZORUNLU", M + 3, y + 14);
+  }
   doc.setFont(FONT, "normal");
   doc.text(`Tünel Kısıtlaması: ${args.tunel}`, W - M - 3, y + 7.5, { align: "right" });
-  y += 16;
+  y += sheriditYukseklik + 4;
 
   if (args.notlar.trim()) {
     doc.setFontSize(7.5);
@@ -1146,7 +1152,7 @@ export default function TasimaEvraki({
         tasiyici,
         surucu: seciliSurucu, arac: seciliArac,
         surucuManuel, aracManuel,
-        kalemler, puan, plakaGerekli, muafiyetsiz, tunel, notlar,
+        kalemler, puan, plakaGerekli, emniyetGerekli: emniyet.required, muafiyetsiz, tunel, notlar,
         logo,
       });
       const blobUrl = URL.createObjectURL(doc.output("blob"));
@@ -1188,7 +1194,7 @@ export default function TasimaEvraki({
         tasiyici,
         surucu: seciliSurucu, arac: seciliArac,
         surucuManuel, aracManuel,
-        kalemler, puan, plakaGerekli, muafiyetsiz, tunel, notlar,
+        kalemler, puan, plakaGerekli, emniyetGerekli: emniyet.required, muafiyetsiz, tunel, notlar,
         logo,
       });
       const blobUrl = URL.createObjectURL(doc.output("blob"));
@@ -1226,7 +1232,7 @@ export default function TasimaEvraki({
       tasiyici,
       surucu: seciliSurucu, arac: seciliArac,
       surucuManuel, aracManuel,
-      kalemler, puan, plakaGerekli, muafiyetsiz, tunel, notlar,
+      kalemler, puan, plakaGerekli, emniyetGerekli: emniyet.required, muafiyetsiz, tunel, notlar,
       logo,
     });
     doc.save(`tasima_evraki_${(evrakNo || "taslak").replace(/[^\w-]/g, "_")}.pdf`);
