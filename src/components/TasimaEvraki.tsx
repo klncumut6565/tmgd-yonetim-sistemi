@@ -1259,6 +1259,17 @@ export default function TasimaEvraki({
   const GIRIS =
     "border border-gray-300 rounded-lg px-3 py-2 text-sm w-full outline-none transition-colors " +
     "focus:border-blue-500 focus:ring-1 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-400";
+  
+  // Zorunlu alan kontrolleri — doldurulmayan alanları hafif kırmızıyla göster
+  const isEvrakNoEmpty = !evrakNo.trim();
+  const isAliciEmpty = !alici.trim();
+  const isKalemlerEmpty = kalemler.length === 0;
+  
+  const getInputClass = (isEmpty: boolean) => 
+    isEmpty ? GIRIS + " bg-red-50 border-red-200" : GIRIS;
+  
+  const getContainerClass = (isEmpty: boolean) =>
+    isEmpty ? "p-3 rounded-lg bg-red-50" : "";
 
   return (
     <div className="lg:flex lg:gap-5 lg:items-start">
@@ -1283,7 +1294,7 @@ export default function TasimaEvraki({
               <label className={ETIKET}>Evrak No *</label>
               <div className="flex items-center gap-2">
                 <input
-                  className={GIRIS}
+                  className={getInputClass(isEvrakNoEmpty)}
                   value={evrakNo}
                   onChange={(e) => setEvrakNo(e.target.value)}
                   disabled={!canWrite}
@@ -1319,10 +1330,10 @@ export default function TasimaEvraki({
             </div>
 
             <div>
-              <label className={ETIKET}>Alıcı firma unvanı</label>
+              <label className={ETIKET}>Alıcı firma unvanı *</label>
               {aliciListesi.length > 0 && (
                 <select
-                  className={GIRIS + " mb-1.5"}
+                  className={getInputClass(isAliciEmpty) + " mb-1.5"}
                   value=""
                   onChange={(e) => {
                     const sec = aliciListesi.find((a) => a.id === e.target.value);
@@ -1339,9 +1350,9 @@ export default function TasimaEvraki({
                   ))}
                 </select>
               )}
-              <input className={GIRIS} placeholder="Firma unvanı"
+              <input className={getInputClass(isAliciEmpty)} placeholder="Firma unvanı"
                 value={alici} onChange={(e) => setAlici(e.target.value)} disabled={!canWrite} />
-              <textarea className={GIRIS + " mt-1.5"} rows={2}
+              <textarea className={getInputClass(false) + " mt-1.5"} rows={2}
                 placeholder="Alıcı adresi"
                 value={aliciAdres} onChange={(e) => setAliciAdres(e.target.value)} disabled={!canWrite} />
               {canWrite && alici.trim() && (
@@ -1656,11 +1667,23 @@ export default function TasimaEvraki({
         )}
 
         {/* ── ÜRÜN LİSTESİ ──────────────────────────────────────────── */}
-        {kalemler.length > 0 && (
-          <section className="border border-gray-200 rounded-xl bg-white overflow-hidden">
-            <div className="px-4 py-3 border-b bg-gray-50">
+        <section className={`border rounded-xl overflow-hidden ${
+          isKalemlerEmpty 
+            ? "border-red-200 bg-red-50" 
+            : "border-gray-200 bg-white"
+        }`}>
+          <div className={`px-4 py-3 border-b ${
+            isKalemlerEmpty 
+              ? "bg-red-100 border-red-200" 
+              : "bg-gray-50 border-gray-200"
+          }`}>
+            {kalemler.length > 0 ? (
               <h4 className="font-semibold text-sm">Evraktaki Ürünler ({kalemler.length})</h4>
-            </div>
+            ) : (
+              <h4 className="font-semibold text-sm text-red-700">⚠️ En az bir ürün ekleyin *</h4>
+            )}
+          </div>
+          {kalemler.length > 0 ? (
             <table className="w-full text-xs">
               <thead className="bg-gray-50 text-left text-gray-500">
                 <tr>
@@ -1782,8 +1805,8 @@ export default function TasimaEvraki({
                 )}
               </tbody>
             </table>
-          </section>
-        )}
+            ) : null}
+        </section>
 
         {/* ── KAYDET / PDF ──────────────────────────────────────────── */}
         <section className="border border-gray-200 rounded-xl bg-white p-4">
