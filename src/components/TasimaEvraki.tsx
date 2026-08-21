@@ -276,9 +276,13 @@ async function evrakPdfUret(args: {
   // Logo yüksekliği + başlık alanı + Gönderen kutusu arasına mesafe (4mm)
   y += Math.max(logoH, 20) + 4;
 
-  // Gönderen / Alıcı kutuları — yükseklik, unvan + adresin (artık ikisi de
-  // isim+adres birleşik basılıyor) rahat sığması için 22->26mm büyütüldü.
-  const kutuY = y, kutuH = 26, kutuW = (W - 2 * M - 4) / 2;
+  // Gönderen / Alıcı kutuları — yükseklik dinamik, sorumlu kişi varsa arttır
+  let kutuH = 26;
+  if (args.gonderenSorumlu) {
+    const sorumluSatirlari = doc.splitTextToSize(args.gonderenSorumlu, (W - 2 * M - 4) / 2 - 4);
+    kutuH = 26 + Math.max(0, (sorumluSatirlari.length - 1) * 3.4);
+  }
+  const kutuY = y, kutuW = (W - 2 * M - 4) / 2;
   doc.setDrawColor(180, 180, 180); doc.setLineWidth(0.3);
   doc.rect(M, kutuY, kutuW, kutuH);
   doc.rect(M + kutuW + 4, kutuY, kutuW, kutuH);
@@ -286,16 +290,22 @@ async function evrakPdfUret(args: {
   doc.text("GÖNDEREN", M + 2, kutuY + 4.5);
   doc.text("ALICI", M + kutuW + 6, kutuY + 4.5);
   doc.setFont(FONT, "normal"); doc.setTextColor(0, 0, 0); doc.setFontSize(8.5);
-  doc.text(doc.splitTextToSize(args.gonderen || "—", kutuW - 4), M + 2, kutuY + 9.5);
-  doc.text(doc.splitTextToSize(args.alici || "—", kutuW - 4), M + kutuW + 6, kutuY + 9.5);
   
-  // Gönderen sorumlu kişi — küçük yazı ile kutunun altında
+  // Gönderen: firma unvanı + adres
+  doc.text(doc.splitTextToSize(args.gonderen || "—", kutuW - 4), M + 2, kutuY + 9.5);
+  
+  // Gönderen sorumlu kişi adı (boşsa gösterilmesin)
   if (args.gonderenSorumlu) {
-    doc.setFontSize(7); doc.setFont(FONT, "normal"); doc.setTextColor(80, 80, 80);
-    doc.text(`Sorumlu: ${args.gonderenSorumlu}`, M, kutuY + kutuH + 3.5);
+    doc.setFontSize(7.5);
+    const sorumluSatirlari = doc.splitTextToSize(args.gonderenSorumlu, kutuW - 4);
+    const gonderenSatirlari = doc.splitTextToSize(args.gonderen || "—", kutuW - 4);
+    const baslamaY = kutuY + 9.5 + gonderenSatirlari.length * 3.4 + 1.5;
+    doc.text(sorumluSatirlari, M + 2, baslamaY);
   }
   
-  y = kutuY + kutuH + (args.gonderenSorumlu ? 8 : 5);
+  doc.text(doc.splitTextToSize(args.alici || "—", kutuW - 4), M + kutuW + 6, kutuY + 9.5);
+  
+  y = kutuY + kutuH + 5;
 
   // Taşıyıcı / Sürücü / Araç şeridi
   doc.setFontSize(8);
