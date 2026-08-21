@@ -340,7 +340,13 @@ async function evrakPdfUret(args: {
       k.proper_shipping_name + (k.is_lq ? "  [LQ]" : "") + (k.is_eq ? "  [EQ]" : ""),
       kolonlar[2].w - 3
     );
-    const satirH = Math.max(6, adSatirlari.length * 3.4 + 2.4);
+    // Taşıma Türü sütunundaki metinler de kontrol et — satır sayısı maksimum olmalı
+    let maxSatirSayisi = adSatirlari.length;
+    if (k.packaging_type) {
+      const tasimaturuSatirlari = doc.splitTextToSize(k.packaging_type, kolonlar[6].w - 1);
+      maxSatirSayisi = Math.max(maxSatirSayisi, tasimaturuSatirlari.length);
+    }
+    const satirH = Math.max(6, maxSatirSayisi * 3.4 + 2.4);
     if (i % 2 === 1) {
       doc.setFillColor(245, 247, 251);
       doc.rect(M, y, tabloW, satirH, "F");
@@ -356,8 +362,14 @@ async function evrakPdfUret(args: {
     x = M;
     hucreler.forEach((h, ci) => {
       if (ci === 2) {
+        // Ürün adı — çok satırlı
         doc.text(adSatirlari, x + 1.5, y + 3.8, { maxWidth: kolonlar[ci].w - 3 });
+      } else if (ci === 6) {
+        // Taşıma Türü — çok satırlı olabilir
+        const tasimaturuSatirlari = doc.splitTextToSize(h, kolonlar[ci].w - 2);
+        doc.text(tasimaturuSatirlari, x + 1.5, y + 3.8);
       } else {
+        // Diğer sütunlar — tek satır, merkez
         doc.text(h, x + kolonlar[ci].w / 2, y + satirH / 2 + 1.2, { 
           align: "center",
           maxWidth: kolonlar[ci].w - 1 
