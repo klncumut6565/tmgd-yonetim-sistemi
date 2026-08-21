@@ -233,9 +233,9 @@ async function evrakPdfUret(args: {
         GState: (o: { opacity: number }) => unknown;
         setGState: (g: unknown) => void;
       });
-      gs.setGState(gs.GState({ opacity: 0.08 }));
-      // Logo, sayfa genişliğinin ~%55'i kadar büyük ve tam merkezde
-      const hedefGenislik = W * 0.55;
+      gs.setGState(gs.GState({ opacity: 0.16 }));
+      // Logo, sayfa genişliğinin ~%65'i kadar büyük ve tam merkezde
+      const hedefGenislik = W * 0.65;
       const oran = args.logo.enBoyOrani > 0 ? args.logo.enBoyOrani : 1;
       const fw = hedefGenislik;
       const fh = fw / oran;
