@@ -188,6 +188,7 @@ async function evrakPdfUret(args: {
   evrakNo: string;
   tarih: string;
   gonderen: string;
+  gonderenSorumlu: string;
   alici: string;
   tasiyici: string;
   surucu: Surucu | null;
@@ -286,7 +287,14 @@ async function evrakPdfUret(args: {
   doc.setFont(FONT, "normal"); doc.setTextColor(0, 0, 0); doc.setFontSize(8.5);
   doc.text(doc.splitTextToSize(args.gonderen || "—", kutuW - 4), M + 2, kutuY + 9.5);
   doc.text(doc.splitTextToSize(args.alici || "—", kutuW - 4), M + kutuW + 6, kutuY + 9.5);
-  y = kutuY + kutuH + 5;
+  
+  // Gönderen sorumlu kişi — küçük yazı ile kutunun altında
+  if (args.gonderenSorumlu) {
+    doc.setFontSize(7); doc.setFont(FONT, "normal"); doc.setTextColor(80, 80, 80);
+    doc.text(`Sorumlu: ${args.gonderenSorumlu}`, M, kutuY + kutuH + 3.5);
+  }
+  
+  y = kutuY + kutuH + (args.gonderenSorumlu ? 8 : 5);
 
   // Taşıyıcı / Sürücü / Araç şeridi
   doc.setFontSize(8);
@@ -503,6 +511,7 @@ export default function TasimaEvraki({
   const [tarih, setTarih] = useState(() => new Date().toISOString().slice(0, 10));
   const [gonderen, setGonderen] = useState(firmaAdi);
   const [gonderenAdres, setGonderenAdres] = useState("");
+  const [gonderenSorumlu, setGonderenSorumlu] = useState("");
   const [firmaAdresVarsayilan, setFirmaAdresVarsayilan] = useState("");
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [alici, setAlici] = useState("");
@@ -962,7 +971,7 @@ export default function TasimaEvraki({
   function temizle() {
     setEvrakId(null); setEvrakNo(evrakNoUret()); setAlici(""); setAliciAdres(""); setTasiyici("");
     setSurucuId(""); setAracId(""); setSurucuManuel(""); setAracManuel(""); setNotlar(""); setKalemler([]);
-    setGonderen(firmaAdi); setGonderenAdres(firmaAdresVarsayilan); setMesaj("");
+    setGonderen(firmaAdi); setGonderenAdres(firmaAdresVarsayilan); setGonderenSorumlu(""); setMesaj("");
     setTarih(new Date().toISOString().slice(0, 10));
   }
 
@@ -986,6 +995,7 @@ export default function TasimaEvraki({
       setGonderen(gonderenTam);
       setGonderenAdres(firmaAdresVarsayilan);
     }
+    setGonderenSorumlu(ev.sender_person_name || "");
     const aliciTam = ev.consignee || "";
     const ilkSatirSonu = aliciTam.indexOf("\n");
     if (ilkSatirSonu > -1) {
@@ -1072,6 +1082,7 @@ export default function TasimaEvraki({
     const govde = {
       firm_id: firmId, document_no: evrakNo.trim(), transport_date: tarih,
       consignor: gonderenAdres.trim() ? `${gonderen.trim()}\n${gonderenAdres.trim()}` : gonderen.trim(),
+      sender_person_name: gonderenSorumlu.trim() || null,
       consignee: aliciAdres.trim() ? `${alici.trim()}\n${aliciAdres.trim()}` : alici.trim(),
       carrier: tasiyici.trim(),
       driver_id: surucuId || null, vehicle_id: aracId || null,
@@ -1130,6 +1141,7 @@ export default function TasimaEvraki({
         firmaAdi, evrakNo: evrakNo || "(taslak)",
         tarih: tarih.split("-").reverse().join("."),
         gonderen: gonderenAdres.trim() ? `${gonderen}\n${gonderenAdres.trim()}` : gonderen,
+        gonderenSorumlu,
         alici: aliciAdres.trim() ? `${alici}\n${aliciAdres.trim()}` : alici,
         tasiyici,
         surucu: seciliSurucu, arac: seciliArac,
@@ -1171,6 +1183,7 @@ export default function TasimaEvraki({
         firmaAdi, evrakNo: evrakNo || "(taslak)",
         tarih: tarih.split("-").reverse().join("."),
         gonderen: gonderenAdres.trim() ? `${gonderen}\n${gonderenAdres.trim()}` : gonderen,
+        gonderenSorumlu,
         alici: aliciAdres.trim() ? `${alici}\n${aliciAdres.trim()}` : alici,
         tasiyici,
         surucu: seciliSurucu, arac: seciliArac,
@@ -1208,6 +1221,7 @@ export default function TasimaEvraki({
       firmaAdi, evrakNo: evrakNo || "(taslak)",
       tarih: tarih.split("-").reverse().join("."),
       gonderen: gonderenAdres.trim() ? `${gonderen}\n${gonderenAdres.trim()}` : gonderen,
+      gonderenSorumlu,
       alici: aliciAdres.trim() ? `${alici}\n${aliciAdres.trim()}` : alici,
       tasiyici,
       surucu: seciliSurucu, arac: seciliArac,
@@ -1294,6 +1308,8 @@ export default function TasimaEvraki({
               <textarea className={GIRIS + " mt-1.5"} rows={2}
                 placeholder="Gönderen adresi"
                 value={gonderenAdres} onChange={(e) => setGonderenAdres(e.target.value)} disabled={!canWrite} />
+              <input className={GIRIS + " mt-1.5"} placeholder="Sorumlu kişi adı soyadı"
+                value={gonderenSorumlu} onChange={(e) => setGonderenSorumlu(e.target.value)} disabled={!canWrite} />
             </div>
 
             <div>
