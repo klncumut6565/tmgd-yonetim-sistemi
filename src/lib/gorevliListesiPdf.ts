@@ -575,13 +575,16 @@ export async function gorevliListesiPdfOlustur(
     // Sütun genişlikleri, kullanıcının paylaştığı örnek Excel'deki
     // (TMFB_Faaliyetleri_Görevli_Listesi.xlsx) sütun genişlik ORANLARI
     // korunarak sayfa kullanılabilir genişliğine (267mm) ölçeklendi.
+    // Güncellemeler:
+    // - Tehlikeli Madde Görev Başlığı %50 daraltıldı (53.9 → 27)
+    // - Yapılacak Görevler daraltılan kısım eklenip genişletildi (44.2 → 71)
     columnStyles: {
       0: { cellWidth: 15.2, halign: "center" },
-      1: { cellWidth: 53.9 },
-      2: { cellWidth: 44.2 },
-      3: { cellWidth: 36.3 },
-      4: { cellWidth: 29.0 },
-      5: { cellWidth: 51.0 },
+      1: { cellWidth: 27, overflow: "linebreak" },
+      2: { cellWidth: 71, overflow: "linebreak" },
+      3: { cellWidth: 36.3, overflow: "linebreak" },
+      4: { cellWidth: 29.0, overflow: "linebreak" },
+      5: { cellWidth: 51.0, overflow: "linebreak" },
       6: { cellWidth: 37.4, halign: "center" },
     },
     head: [
