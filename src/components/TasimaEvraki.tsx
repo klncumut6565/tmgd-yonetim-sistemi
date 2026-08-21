@@ -247,6 +247,11 @@ async function evrakPdfUret(args: {
   };
   filigranEkle();
 
+  // Evrak No / Tarih — sağ üst köşe
+  doc.setFontSize(9); doc.setFont(FONT, "bold"); doc.setTextColor(0, 0, 0);
+  doc.text(`Evrak No: ${args.evrakNo}`, W - M, y + 2, { align: "right" });
+  doc.text(`Tarih: ${args.tarih}`, W - M, y + 7, { align: "right" });
+
   // Sol üst kısıma firma logosu — 25mm x 25mm
   if (args.logo) {
     try {
@@ -266,12 +271,6 @@ async function evrakPdfUret(args: {
   doc.text("ADR Bölüm 5.4.1 uyarınca düzenlenmiştir", W / 2, y + 13, { align: "center" });
   doc.setTextColor(0, 0, 0);
   y += 20;
-
-  // Evrak No / Tarih
-  doc.setFontSize(9); doc.setFont(FONT, "bold");
-  doc.text(`Evrak No: ${args.evrakNo}`, M, y);
-  doc.text(`Tarih: ${args.tarih}`, W - M, y, { align: "right" });
-  y += 6;
 
   // Gönderen / Alıcı kutuları — yükseklik, unvan + adresin (artık ikisi de
   // isim+adres birleşik basılıyor) rahat sığması için 22->26mm büyütüldü.
