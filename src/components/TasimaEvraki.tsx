@@ -253,11 +253,12 @@ async function evrakPdfUret(args: {
   doc.text(`Tarih: ${args.tarih}`, W - M, y + 7, { align: "right" });
 
   // Sol üst kısıma firma logosu — 25mm x 25mm
+  let logoH = 0;
   if (args.logo) {
     try {
       const logoW = 25;
       const oran = args.logo.enBoyOrani > 0 ? args.logo.enBoyOrani : 1;
-      const logoH = logoW / oran;
+      logoH = logoW / oran;
       doc.addImage(args.logo.data, args.logo.fmt, M, y, logoW, logoH);
     } catch {
       /* Logo eklenmezse devam et */
@@ -270,7 +271,8 @@ async function evrakPdfUret(args: {
   doc.setFontSize(8); doc.setFont(FONT, "normal"); doc.setTextColor(90, 90, 90);
   doc.text("ADR Bölüm 5.4.1 uyarınca düzenlenmiştir", W / 2, y + 13, { align: "center" });
   doc.setTextColor(0, 0, 0);
-  y += 20;
+  // Logo yüksekliği + başlık alanı + Gönderen kutusu arasına mesafe (4mm)
+  y += Math.max(logoH, 20) + 4;
 
   // Gönderen / Alıcı kutuları — yükseklik, unvan + adresin (artık ikisi de
   // isim+adres birleşik basılıyor) rahat sığması için 22->26mm büyütüldü.
