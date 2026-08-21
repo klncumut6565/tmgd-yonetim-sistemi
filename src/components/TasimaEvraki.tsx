@@ -944,10 +944,12 @@ export default function TasimaEvraki({
     if (!secim) { setMesaj("Önce bir kimyasal seç (envanterden ya da Tablo A'dan)."); return; }
     const q = parseFloat(miktar);
     if (isNaN(q) || q <= 0) { setMesaj("Geçerli bir miktar gir."); return; }
+    const tasimaTuru = (ambalajTuru === "Diğer" ? ambalajDiger.trim() : ambalajTuru.trim());
+    if (!tasimaTuru) { setMesaj("Ambalaj Türü seç."); return; }
     setMesaj("");
     setKalemler((prev) => [...prev, {
       ...secim,
-      packaging_type: (ambalajTuru === "Diğer" ? ambalajDiger.trim() : ambalajTuru.trim()),
+      packaging_type: tasimaTuru,
       packaging_count: Math.max(1, parseInt(ambalajAdet) || 1),
       quantity: q, unit: birim, is_lq: lq, is_eq: eq,
     }]);
@@ -1620,7 +1622,8 @@ export default function TasimaEvraki({
                   <input type="checkbox" checked={eq} onChange={(e) => setEq(e.target.checked)} />
                   EQ <span className="text-gray-400">— İstisnai Miktar ⓘ</span>
                 </label>
-                <button onClick={kalemEkle} disabled={!seciliKimyasal && !seciliTabloA}
+                <button onClick={kalemEkle} 
+                  disabled={(!seciliKimyasal && !seciliTabloA) || !ambalajTuru || (ambalajTuru === "Diğer" && !ambalajDiger.trim())}
                   className="ml-auto px-4 py-2 rounded-lg bg-blue-600 text-white text-xs font-medium hover:bg-blue-700 disabled:bg-gray-200 disabled:text-gray-400 transition-colors">
                   + Ürünü Ekle
                 </button>
