@@ -402,24 +402,40 @@ async function evrakPdfUret(args: {
   y += 4;
 
   // ADR uyumluluk şeridi
+  const muafiyetKapsaminda = !args.muafiyetsiz && !args.plakaGerekli;
+  const sheriditYukseklik = (args.emniyetGerekli ? 5 : 0) + (muafiyetKapsaminda ? 5 : 0) + 12;
+  
   doc.setFillColor(args.plakaGerekli ? 254 : 240, args.plakaGerekli ? 242 : 253, args.plakaGerekli ? 242 : 244);
-  const sheriditYukseklik = args.emniyetGerekli ? 17 : 12;
   doc.rect(M, y, W - 2 * M, sheriditYukseklik, "F");
   doc.setDrawColor(args.plakaGerekli ? 220 : 22, args.plakaGerekli ? 38 : 163, args.plakaGerekli ? 38 : 74);
   doc.rect(M, y, W - 2 * M, sheriditYukseklik);
   doc.setFontSize(8); doc.setFont(FONT, "bold");
+  
   const puanMetni = args.muafiyetsiz
     ? "1.1.3.6 muafiyeti YOK (Taşıma Kategorisi 0 veya bilinmeyen madde içeriyor)"
     : `1.1.3.6 Puanı: ${args.puan.toFixed(0)} / 1000`;
   doc.text(puanMetni, M + 3, y + 5);
+  
+  let nextLineY = y + 9.5;
+  
+  // Muafiyet kapsamındaysa açık cümle göster
+  if (muafiyetKapsaminda) {
+    doc.setTextColor(22, 163, 74);
+    doc.text("1.1.3.6 MUAFİYETİ (MİKTAR) TAŞINMA YAPILMAKTADIR", M + 3, nextLineY);
+    nextLineY += 5;
+  }
+  
+  doc.setTextColor(0, 0, 0);
   doc.text(
     args.plakaGerekli ? "TURUNCU PLAKA ZORUNLU" : "Turuncu plaka gerekmez (1.1.3.6 muafiyeti)",
-    M + 3, y + 9.5
+    M + 3, nextLineY
   );
+  
   if (args.emniyetGerekli) {
     doc.setDrawColor(220, 38, 38);
-    doc.text("EMNİYET PLANI ZORUNLU", M + 3, y + 14);
+    doc.text("EMNİYET PLANI ZORUNLU", M + 3, nextLineY + 5);
   }
+  
   doc.setFont(FONT, "normal");
   doc.text(`Tünel Kısıtlaması: ${args.tunel}`, W - M - 3, y + 7.5, { align: "right" });
   y += sheriditYukseklik + 4;
