@@ -284,13 +284,26 @@ async function evrakPdfUret(args: {
   const aracBilgi = args.arac
     ? `${args.arac.plate_number}${args.arac.brand ? " · " + args.arac.brand : ""}`
     : (args.aracManuel.trim() || "—");
-  doc.setFont(FONT, "bold"); doc.text("Taşıyıcı:", M, y);
-  doc.setFont(FONT, "normal"); doc.text(args.tasiyici || "—", M + 15, y);
-  doc.setFont(FONT, "bold"); doc.text("Sürücü:", M + 78, y);
-  doc.setFont(FONT, "normal"); doc.text(surucuAd, M + 91, y);
-  doc.setFont(FONT, "bold"); doc.text("Araç:", M + 140, y);
-  doc.setFont(FONT, "normal"); doc.text(aracBilgi, M + 150, y);
-  y += 6;
+  // Taşıyıcı / Sürücü / Araç şeridi — üç alan sabit sütunlarda.
+  // ÖNEMLİ: değerler kendi sütun genişliğine SARILIR (splitTextToSize);
+  // aksi halde uzun bir taşıyıcı unvanı yandaki "Sürücü" alanının üzerine
+  // taşıp okunmaz hale geliyordu. Satır yüksekliği, en çok satıra sarılan
+  // alana göre belirlenir.
+  const seritSutunlar = [
+    { etiket: "Taşıyıcı:", deger: args.tasiyici || "—", x: M, degerX: M + 15, genislik: 78 - 15 - 3 },
+    { etiket: "Sürücü:", deger: surucuAd, x: M + 78, degerX: M + 91, genislik: 140 - 91 - 3 },
+    { etiket: "Araç:", deger: aracBilgi, x: M + 140, degerX: M + 150, genislik: W - M - 150 },
+  ];
+  let seritEnFazlaSatir = 1;
+  for (const s of seritSutunlar) {
+    doc.setFont(FONT, "bold");
+    doc.text(s.etiket, s.x, y);
+    doc.setFont(FONT, "normal");
+    const satirlar: string[] = doc.splitTextToSize(s.deger, s.genislik);
+    doc.text(satirlar, s.degerX, y);
+    if (satirlar.length > seritEnFazlaSatir) seritEnFazlaSatir = satirlar.length;
+  }
+  y += 6 + (seritEnFazlaSatir - 1) * 3.6;
 
   // Ürün tablosu
   const kolonlar = [
