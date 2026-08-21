@@ -765,6 +765,7 @@ export default function TasimaEvraki({
           un_number: k.un_number,
           proper_shipping_name: k.proper_shipping_name,
           adr_class: k.adr_class,
+          packing_group: k.packing_group,
         }))
       ),
     [kalemler]

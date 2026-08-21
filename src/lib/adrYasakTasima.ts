@@ -91,6 +91,12 @@ export type YasakKontrolGirdi = {
   un_number: string;
   proper_shipping_name: string;
   adr_class?: string | null;
+  /** ADR Tablo A ambalaj grubu. Taşınması yasak / ADR'ye tabi olmayan
+   *  maddelerde Tablo A'da bu hücreye ("TAŞINMASI YASAKTIR",
+   *  "ADR'YE TABİ DEĞİLDİR" gibi) satırın tamamını kapsayan bir not
+   *  yazılır ve kalan sütunlar boş bırakılır — bu yüzden yasak tespiti
+   *  yalnızca madde ADINA değil, bu alana da bakmalıdır. */
+  packing_group?: string | null;
 };
 
 /**
@@ -111,6 +117,28 @@ export function yasakTasimaKontrol(madde: YasakKontrolGirdi): YasakSonuc {
     if (kalip.test(ad)) {
       return { yasak: true, kontrolGerekli: false, sebep };
     }
+  }
+
+  // 2b) Ambalaj grubu hücresindeki satır-genel not (bkz. YasakKontrolGirdi
+  //     .packing_group açıklaması). Tablo A'da 28 madde bu şekilde
+  //     işaretlidir ve madde ADINDA hiçbir yasak ibaresi geçmez — yalnızca
+  //     ada bakan (2) numaralı kontrol bunları KAÇIRIYORDU.
+  const ag = (madde.packing_group || "").toString();
+  if (/taşınma(sı|si)\s*yasak|tasinmasi\s*yasak/i.test(ag)) {
+    return {
+      yasak: true,
+      kontrolGerekli: false,
+      sebep: "ADR Tablo A'da bu madde için 'TAŞINMASI YASAKTIR' kaydı bulunuyor",
+    };
+  }
+  if (/tabi\s*değildir|tabi\s*degildir/i.test(ag)) {
+    return {
+      yasak: false,
+      kontrolGerekli: true,
+      sebep:
+        "ADR Tablo A'da bu madde için \"ADR'YE TABİ DEĞİLDİR\" kaydı var — " +
+        "taşıma ADR kapsamı dışında olabilir, kapsamı doğrulayın",
+    };
   }
 
   // 3) Şüpheli — kullanıcı doğrulamalı

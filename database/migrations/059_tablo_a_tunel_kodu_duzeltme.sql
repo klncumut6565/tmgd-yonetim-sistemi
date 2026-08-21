@@ -26,6 +26,16 @@ WHERE tunnel_code IN ('V1', 'V12', 'V13')
   AND un_number IN ('3077', '3082', '3291', '3549');
 
 -- ----------------------------------------------------------------------------
+-- EK DÜZELTME: UN 0331 / 0332 — tehlike tanımlama no (Kemler) alanı
+-- ----------------------------------------------------------------------------
+-- Sınıf 1 (patlayıcı) maddelerin ADR Tablo A sütun (20)'si BOŞTUR. 384 Sınıf 1
+-- satırının 382'sinde bu alan doğru şekilde boşken, yalnızca bu 2 satırda
+-- sınıflandırma kodu (1.5D) yanlışlıkla bu alana da kopyalanmış.
+UPDATE public.adr_un_numbers
+SET hazard_no = ''
+WHERE un_number IN ('0331', '0332') AND hazard_no = '1.5D';
+
+-- ----------------------------------------------------------------------------
 -- DOĞRULAMA — sonuç boş dönmeli (hiç V-kodu kalmamalı)
 -- ----------------------------------------------------------------------------
 
