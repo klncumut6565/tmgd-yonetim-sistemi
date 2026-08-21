@@ -247,14 +247,25 @@ async function evrakPdfUret(args: {
   };
   filigranEkle();
 
-  // Başlık — filigranın üzerine, sayfanın en üstüne ortalanmış
+  // Sol üst kısıma firma logosu — 25mm x 25mm
+  if (args.logo) {
+    try {
+      const logoW = 25;
+      const oran = args.logo.enBoyOrani > 0 ? args.logo.enBoyOrani : 1;
+      const logoH = logoW / oran;
+      doc.addImage(args.logo.data, args.logo.fmt, M, y, logoW, logoH);
+    } catch {
+      /* Logo eklenmezse devam et */
+    }
+  }
+
+  // Başlık — sayfanın en üstüne ortalanmış (kaydırma yok)
   doc.setFontSize(14); doc.setFont(FONT, "bold"); doc.setTextColor(...NAVY);
-  doc.text("TAŞIMA EVRAKI", W / 2, y, { align: "center" });
+  doc.text("TAŞIMA EVRAKI", W / 2, y + 8, { align: "center" });
   doc.setFontSize(8); doc.setFont(FONT, "normal"); doc.setTextColor(90, 90, 90);
-  y += 5;
-  doc.text("ADR Bölüm 5.4.1 uyarınca düzenlenmiştir", W / 2, y, { align: "center" });
+  doc.text("ADR Bölüm 5.4.1 uyarınca düzenlenmiştir", W / 2, y + 13, { align: "center" });
   doc.setTextColor(0, 0, 0);
-  y += 7;
+  y += 20;
 
   // Evrak No / Tarih
   doc.setFontSize(9); doc.setFont(FONT, "bold");
