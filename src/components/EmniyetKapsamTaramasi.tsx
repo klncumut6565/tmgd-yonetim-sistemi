@@ -223,6 +223,20 @@ export default function EmniyetKapsamTaramasi({ firmId, firmaAdi }: Props) {
     }
   }
 
+  /** HAZIRLAYAN (firmaya atanmış TMGD) ve ONAYLAYAN (firmanın kayıtlı
+   *  onaylayan kişisi) isimlerini, BelgeOlusturForm.tsx'teki AYNI
+   *  kaynaklardan çeker — get_firm_tmgd_name RPC + firms.approver_name. */
+  async function imzaIsimleriGetir(): Promise<{ hazirlayanAdi: string; onaylayanAdi: string }> {
+    const [tmgdSonuc, firmaSonuc] = await Promise.all([
+      supabase.rpc("get_firm_tmgd_name", { p_firm_id: firmId }),
+      supabase.from("firms").select("approver_name").eq("id", firmId).single(),
+    ]);
+    const hazirlayanAdi = (tmgdSonuc.data as string | null) || "";
+    const onaylayanAdi =
+      (firmaSonuc.data as { approver_name: string | null } | null)?.approver_name || "";
+    return { hazirlayanAdi, onaylayanAdi };
+  }
+
   async function raporOnizle() {
     if (!summary) return;
     const pencere = window.open("", "_blank");
@@ -233,11 +247,14 @@ export default function EmniyetKapsamTaramasi({ firmId, firmaAdi }: Props) {
     setPdfUretiliyor(true);
     try {
       const logo = await logoDataUrl();
+      const { hazirlayanAdi, onaylayanAdi } = await imzaIsimleriGetir();
       const bugun = new Date().toLocaleDateString("tr-TR");
       const veri: GuvenlikPlaniRaporVerisi = {
         firmaAdi,
         tarih: bugun,
         gecerlilikSuresi: "2 Yıl",
+        hazirlayanAdi,
+        onaylayanAdi,
         summary,
         logo: logo ?? undefined,
       };
@@ -257,11 +274,14 @@ export default function EmniyetKapsamTaramasi({ firmId, firmaAdi }: Props) {
     setPdfUretiliyor(true);
     try {
       const logo = await logoDataUrl();
+      const { hazirlayanAdi, onaylayanAdi } = await imzaIsimleriGetir();
       const bugun = new Date().toLocaleDateString("tr-TR");
       const veri: GuvenlikPlaniRaporVerisi = {
         firmaAdi,
         tarih: bugun,
         gecerlilikSuresi: "2 Yıl",
+        hazirlayanAdi,
+        onaylayanAdi,
         summary,
         logo: logo ?? undefined,
       };

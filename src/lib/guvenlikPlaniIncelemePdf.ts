@@ -61,7 +61,6 @@ export type GuvenlikPlaniRaporVerisi = {
   firmaAdi: string;
   tarih: string; // gg.aa.yyyy
   gecerlilikSuresi?: string; // örn. "2 Yıl"
-  hazirlayanUnvan?: string; // örn. "Tehlikeli Madde Güvenlik Danışmanı"
   hazirlayanAdi?: string;
   onaylayanAdi?: string;
   summary: ScopeSummary;
@@ -296,33 +295,53 @@ function kapanisSayfasiCiz(doc: JsPDFType, veri: GuvenlikPlaniRaporVerisi): void
   doc.setFont(FONT, "normal");
   y += 20;
 
-  const kutuW = (W - 2 * M - 10) / 2;
-  const kutuH = 32;
-  doc.setDrawColor(180, 180, 180);
-  doc.setLineWidth(0.3);
-  doc.rect(M, y, kutuW, kutuH);
-  doc.rect(M + kutuW + 10, y, kutuW, kutuH);
+  const kutuY = y;
+  const kutuYukseklik = 18;
+  const kolonGenislik = (W - 2 * M) / 3;
 
-  doc.setFontSize(8.5);
-  doc.setFont(FONT, "bold");
-  doc.text("HAZIRLAYAN", M + kutuW / 2, y + 6, { align: "center" });
-  doc.text("ONAYLAYAN", M + kutuW + 10 + kutuW / 2, y + 6, { align: "center" });
-  doc.setFont(FONT, "normal");
-  doc.setFontSize(7.5);
-  doc.text(
-    veri.hazirlayanUnvan || "Tehlikeli Madde Güvenlik Danışmanı",
-    M + kutuW / 2,
-    y + 11,
-    { align: "center" }
-  );
-  if (veri.hazirlayanAdi) {
+  // KONTROL EDEN kutusu, Belge Oluştur akışındaki AYNI kural gereği,
+  // firma/atamadan bağımsız her zaman sabit TMGD Koordinatörü'dür.
+  const isimler = [veri.hazirlayanAdi?.trim() || "", "YAKUP ATAŞ", veri.onaylayanAdi?.trim() || ""];
+  const basliklar = ["HAZIRLAYAN", "KONTROL EDEN", "ONAYLAYAN"];
+  // ONAYLAYAN sütununda isim girilip girilmediğine göre unvan değişir —
+  // BelgeOlusturForm.tsx → altTabloCiz() ile birebir aynı mantık.
+  const altBasliklar = [
+    "Tehlikeli Madde Güvenlik Danışmanı",
+    "Tehlikeli Madde Güvenlik Danışmanı Koordinatörü",
+    "Sorumlu Kişi",
+  ];
+  const isimliUnvanlar = [altBasliklar[0], altBasliklar[1], "Tesis Sorumlusu"];
+
+  doc.setDrawColor(0, 0, 0);
+  doc.setLineWidth(0.3);
+  doc.rect(M, kutuY, W - 2 * M, kutuYukseklik);
+  doc.line(M + kolonGenislik, kutuY, M + kolonGenislik, kutuY + kutuYukseklik);
+  doc.line(M + kolonGenislik * 2, kutuY, M + kolonGenislik * 2, kutuY + kutuYukseklik);
+
+  basliklar.forEach((b, i) => {
+    const x = M + kolonGenislik * i + kolonGenislik / 2;
+    const isim = isimler[i];
+
+    doc.setFontSize(7.5);
     doc.setFont(FONT, "bold");
-    doc.text(veri.hazirlayanAdi, M + kutuW / 2, y + kutuH - 5, { align: "center" });
-  }
-  if (veri.onaylayanAdi) {
-    doc.setFont(FONT, "bold");
-    doc.text(veri.onaylayanAdi, M + kutuW + 10 + kutuW / 2, y + kutuH - 5, { align: "center" });
-  }
+    doc.text(b, x, kutuY + 5, { align: "center" });
+
+    if (isim) {
+      doc.setFontSize(7.5);
+      doc.setFont(FONT, "bold");
+      doc.text(isim.toLocaleUpperCase("tr-TR"), x, kutuY + 10.5, {
+        align: "center",
+        maxWidth: kolonGenislik - 4,
+      });
+      doc.setFontSize(6);
+      doc.setFont(FONT, "normal");
+      doc.text(isimliUnvanlar[i], x, kutuY + 14.3, { align: "center", maxWidth: kolonGenislik - 4 });
+    } else {
+      doc.setFontSize(6.5);
+      doc.setFont(FONT, "normal");
+      doc.text(altBasliklar[i], x, kutuY + 10.5, { align: "center", maxWidth: kolonGenislik - 4 });
+    }
+  });
 
   doc.setFontSize(7);
   doc.setFont(FONT, "normal");
