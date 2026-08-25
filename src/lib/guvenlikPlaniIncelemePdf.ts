@@ -269,21 +269,6 @@ function kapakSayfasiCiz(doc: JsPDFType, veri: GuvenlikPlaniRaporVerisi) {
     y += 5.4;
   });
 
-  // Kapsam sonucu — ADR 1.10.3.2 gereğine göre kısa özet
-  y += 6;
-  const gerekli = veri.summary.inScope > 0;
-  doc.setFontSize(10.5);
-  doc.setFont(FONT, "bold");
-  doc.setTextColor(...(gerekli ? ([185, 28, 28] as [number, number, number]) : ([22, 128, 61] as [number, number, number])));
-  const sonucSatirlari = doc.splitTextToSize(
-    gerekli
-      ? `ADR TABLO 1.10.3.1.2 KAPSAMINDA ${veri.summary.inScope} KİMYASAL TESPİT EDİLMİŞTİR — GÜVENLİK PLANI HAZIRLANMASI GEREKMEKTEDİR`
-      : "ADR TABLO 1.10.3.1.2 KAPSAMINDA MADDE TESPİT EDİLMEMİŞTİR — GÜVENLİK PLANI HAZIRLANMASINA GEREK YOKTUR",
-    genislik - 10
-  );
-  doc.text(sonucSatirlari, ortaX, y, { align: "center" });
-  doc.setTextColor(0, 0, 0);
-
   imzaTablosuCiz(doc, veri, 218, 42.7);
 
   // Sağ alt köşe: TMGDK kurumsal logosu + karekod
@@ -368,23 +353,28 @@ function ozetKutusuCiz(doc: JsPDFType, summary: ScopeSummary, y: number): number
 function tabloCiz(
   doc: JsPDFType,
   veri: GuvenlikPlaniRaporVerisi,
-  yBaslangic: number
+  yBaslangic: number,
+  baslangicSayfaNo: number
 ): number {
   const sonuclar = veri.summary.results;
+  // Gerekçe metni satırlardaki en uzun içerik olduğundan, satır yüksekliğini
+  // (dolayısıyla toplam sayfa sayısını) belirleyen asıl etken bu sütun.
+  // Toplam genişlik (W-2M ≈ 185mm) tam kullanılacak şekilde Gerekçe'ye
+  // ağırlık verilip diğer sütunlar sıkıştırıldı.
   const kolonlar = [
-    { b: "No", w: 7 },
-    { b: "UN No", w: 14 },
-    { b: "Uygun Sevkiyat Adı", w: 31 },
-    { b: "Ticari Ad", w: 24 },
-    { b: "Sınıf", w: 11 },
-    { b: "PG", w: 8 },
-    { b: "Mod", w: 13 },
-    { b: "Sonuç", w: 21 },
-    { b: "Gerekçe", w: 41 },
+    { b: "No", w: 6 },
+    { b: "UN No", w: 13 },
+    { b: "Uygun Sevkiyat Adı", w: 30 },
+    { b: "Ticari Ad", w: 22 },
+    { b: "Sınıf", w: 10 },
+    { b: "PG", w: 7 },
+    { b: "Mod", w: 11 },
+    { b: "Sonuç", w: 18 },
+    { b: "Gerekçe", w: 68 },
   ];
   const tabloW = kolonlar.reduce((a, k) => a + k.w, 0);
   let y = yBaslangic;
-  let sayfaNo = 2;
+  let sayfaNo = baslangicSayfaNo;
 
   const baslikCiz = () => {
     doc.setFillColor(...RENK_VURGU);
@@ -528,6 +518,189 @@ function kapanisSayfasiCiz(doc: JsPDFType, veri: GuvenlikPlaniRaporVerisi, sayfa
   doc.setTextColor(0, 0, 0);
 }
 
+/** ADR Tablo 1.10.3.1.2'deki eşik satırları — sadece bu sayfada referans
+ *  olarak basılır (motorun kendi eşik mantığı adrSecurityPlan.ts'te). */
+const ADR_TABLO_1_10_3_SATIRLARI: {
+  sinif: string;
+  altGrup: string;
+  madde: string;
+  tank: string;
+  dokme: string;
+  ambalaj: string;
+}[] = [
+  { sinif: "1", altGrup: "1.1", madde: "Patlayıcılar", tank: "a", dokme: "a", ambalaj: "0" },
+  { sinif: "1", altGrup: "1.2", madde: "Patlayıcılar", tank: "a", dokme: "a", ambalaj: "0" },
+  { sinif: "1", altGrup: "1.3", madde: "Uyumluluk grubu C patlayıcılar", tank: "a", dokme: "a", ambalaj: "0" },
+  {
+    sinif: "1",
+    altGrup: "1.4",
+    madde:
+      "Patlayıcılar, UN No. 0104, 0237, 0255, 0267, 0289, 0361, 0365, 0366, 0440, 0441, 0455, 0456, 0500, 0512 ve 0513",
+    tank: "a",
+    dokme: "a",
+    ambalaj: "0",
+  },
+  { sinif: "1", altGrup: "1.5", madde: "Patlayıcılar", tank: "0", dokme: "a", ambalaj: "0" },
+  { sinif: "1", altGrup: "1.6", madde: "Patlayıcılar", tank: "a", dokme: "a", ambalaj: "0" },
+  {
+    sinif: "2",
+    altGrup: "",
+    madde: "Alevlenebilir, zehirli olmayan gazlar (Yalnızca F veya FC harflerini içeren sınıflandırma kodları)",
+    tank: "3000",
+    dokme: "a",
+    ambalaj: "b",
+  },
+  {
+    sinif: "2",
+    altGrup: "",
+    madde: "Zehirli gazlar (T, TF, TC, TO, TFC veya TOC harflerini içeren sınıflandırma kodları) aerosoller hariç",
+    tank: "0",
+    dokme: "a",
+    ambalaj: "0",
+  },
+  { sinif: "3", altGrup: "", madde: "Paketleme grubu I ve II'deki alevlenebilir sıvılar", tank: "3000", dokme: "a", ambalaj: "b" },
+  { sinif: "3", altGrup: "", madde: "Duyarlılığı azaltılmış patlayıcılar", tank: "0", dokme: "a", ambalaj: "0" },
+  { sinif: "4.1", altGrup: "", madde: "Duyarlılığı azaltılmış patlayıcılar", tank: "a", dokme: "a", ambalaj: "0" },
+  { sinif: "4.2", altGrup: "", madde: "Paketleme grubu I'deki maddeler", tank: "3000", dokme: "a", ambalaj: "b" },
+  { sinif: "4.3", altGrup: "", madde: "Paketleme grubu I'deki maddeler", tank: "3000", dokme: "a", ambalaj: "b" },
+  { sinif: "5.1", altGrup: "", madde: "Paketleme grubu I'deki yükseltgen sıvılar", tank: "3000", dokme: "a", ambalaj: "b" },
+  {
+    sinif: "5.1",
+    altGrup: "",
+    madde:
+      "Perkloratlar, amonyum nitrat, amonyum nitrat gübreler ve amonyum nitrat emülsiyonlar veya süspansiyonlar veya jeller",
+    tank: "3000",
+    dokme: "3000",
+    ambalaj: "b",
+  },
+  { sinif: "6.1", altGrup: "", madde: "Paketleme grubu I'deki zehirli maddeler", tank: "0", dokme: "a", ambalaj: "0" },
+  {
+    sinif: "6.2",
+    altGrup: "",
+    madde:
+      "Bulaşıcı madde Kategori A (UN No. 2814 ve 2900 hayvansal malzemeler hariç) ve Tıbbi atık Kategori A'daki (UN No. 3549)",
+    tank: "a",
+    dokme: "0",
+    ambalaj: "0",
+  },
+  { sinif: "8", altGrup: "", madde: "Paketleme grubu I'deki aşındırıcı maddeler", tank: "3000", dokme: "a", ambalaj: "b" },
+];
+
+/** Kapak sonrası 2. sayfa: ADR Bölüm 1.10.3 (Ciddi sonuçlara neden
+ *  olabilecek tehlikeli mallara ilişkin hükümler) özeti + Tablo
+ *  1.10.3.1.2'nin tam metni — kullanıcının paylaştığı ADR 2025 Cilt I
+ *  referans alınarak. */
+function emniyetHukumleriSayfasiCiz(doc: JsPDFType, veri: GuvenlikPlaniRaporVerisi): void {
+  doc.addPage();
+  cerceveCiz(doc);
+  baslikKutusuCiz(doc, veri, "Sayfa 2");
+  imzaTablosuCiz(doc, veri);
+
+  const genislik = W - 2 * M;
+  let y = CERCEVE_KENAR + 26 + 8;
+
+  doc.setFontSize(10.5);
+  doc.setFont(FONT, "bold");
+  doc.setTextColor(...RENK_VURGU);
+  doc.text("ADR BÖLÜM 1.10.3 — CİDDİ SONUÇLARA NEDEN OLABİLECEK", M, y);
+  y += 4.3;
+  doc.text("TEHLİKELİ MALLARA İLİŞKİN HÜKÜMLER", M, y);
+  doc.setTextColor(0, 0, 0);
+  y += 6;
+
+  doc.setFontSize(7.8);
+  doc.setFont(FONT, "normal");
+  const paragraf = doc.splitTextToSize(
+    "1.10.3.1.1 Ciddi sonuçlara neden olabilecek tehlikeli mallar, bir terör olayında kötü amaçlı kullanılma " +
+      "potansiyeline sahip ve kitlesel ölümler, kitlesel yaralanmalar veya özellikle Sınıf 7 için kitlesel " +
+      "sosyoekonomik yıkımlar gibi ciddi sonuçlar doğurabilecek tehlikeli mallardır.\n" +
+      "1.10.3.1.2 Sınıf 7 haricindeki sınıflarda yer alan ciddi sonuçlar doğurabilecek tehlikeli malların listesi, " +
+      "aşağıdaki Tablo 1.10.3.1.2'de listelenen ve burada belirtilen miktarlardan daha fazla taşınan tehlikeli " +
+      "mallardır.",
+    genislik
+  );
+  doc.text(paragraf, M, y);
+  y += paragraf.length * 3.6 + 5;
+
+  doc.setFontSize(9);
+  doc.setFont(FONT, "bold");
+  doc.text("Tablo 1.10.3.1.2: Ciddi sonuçlara neden olabilecek tehlikeli malların listesi", M, y);
+  y += 5;
+
+  const kolonlar = [
+    { b: "Sınıf", w: 13 },
+    { b: "Alt Grup", w: 15 },
+    { b: "Madde veya Nesne", w: 100 },
+    { b: "Tank (L)", w: 19 },
+    { b: "Dökme (kg)", w: 19 },
+    { b: "Ambalaj (kg)", w: 19.2 },
+  ];
+  const tabloW = kolonlar.reduce((a, k) => a + k.w, 0);
+
+  doc.setFillColor(...RENK_VURGU);
+  doc.rect(M, y, tabloW, 6.5, "F");
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(7.2);
+  doc.setFont(FONT, "bold");
+  let x = M;
+  for (const k of kolonlar) {
+    doc.text(k.b, x + 1.5, y + 4.3, { maxWidth: k.w - 2 });
+    x += k.w;
+  }
+  doc.setTextColor(0, 0, 0);
+  y += 6.5;
+
+  ADR_TABLO_1_10_3_SATIRLARI.forEach((satir, i) => {
+    doc.setFontSize(6.8);
+    doc.setFont(FONT, "normal");
+    const maddeSatirlari = doc.splitTextToSize(satir.madde, kolonlar[2].w - 3);
+    const satirH = Math.max(4.6, maddeSatirlari.length * 2.9 + 1.8);
+
+    if (i % 2 === 1) {
+      doc.setFillColor(245, 247, 250);
+      doc.rect(M, y, tabloW, satirH, "F");
+    }
+
+    x = M;
+    doc.text(satir.sinif, x + 1.5, y + 3.2);
+    x += kolonlar[0].w;
+    doc.text(satir.altGrup || "—", x + 1.5, y + 3.2);
+    x += kolonlar[1].w;
+    doc.text(maddeSatirlari, x + 1.5, y + 3.2);
+    x += kolonlar[2].w;
+    doc.text(satir.tank, x + kolonlar[3].w / 2, y + 3.2, { align: "center" });
+    x += kolonlar[3].w;
+    doc.text(satir.dokme, x + kolonlar[4].w / 2, y + 3.2, { align: "center" });
+    x += kolonlar[4].w;
+    doc.text(satir.ambalaj, x + kolonlar[5].w / 2, y + 3.2, { align: "center" });
+
+    doc.setDrawColor(225, 228, 232);
+    doc.setLineWidth(0.15);
+    doc.line(M, y + satirH, M + tabloW, y + satirH);
+
+    y += satirH;
+  });
+
+  y += 3;
+  doc.setFontSize(6.6);
+  doc.setFont(FONT, "normal");
+  doc.setTextColor(90, 90, 90);
+  const dipnotlar = [
+    "a: İlgili değil.",
+    "b: Miktar ne olursa olsun, 1.10.3 hükümleri uygulanmaz.",
+    "c: Bu sütunda belirtilen bir değer, Bölüm 3.2, Tablo A, Sütun (10) veya (12) uyarınca, tanklarda taşıma için " +
+      "izin verilmişse geçerlidir. Bu sütundaki talimat, tanklarda taşınmasına izin verilmeyen maddeler ile ilgili değildir.",
+    "d: Bu sütunda belirtilen bir değer, Bölüm 3.2, Tablo A, Sütun (10) veya (17) uyarınca, dökme yük taşıma için " +
+      "izin verilmişse geçerlidir. Bu sütundaki talimat, dökme yük taşınmasına izin verilmeyen maddeler ile ilgili değildir.",
+  ];
+  dipnotlar.forEach((d) => {
+    const satirlar = doc.splitTextToSize(d, genislik);
+    doc.text(satirlar, M, y);
+    y += satirlar.length * 3.2;
+  });
+  doc.setTextColor(0, 0, 0);
+}
+
 export async function guvenlikPlaniIncelemeRaporuUret(
   veri: GuvenlikPlaniRaporVerisi
 ): Promise<JsPDFType> {
@@ -536,10 +709,13 @@ export async function guvenlikPlaniIncelemeRaporuUret(
   // 1) Kapak sayfası
   kapakSayfasiCiz(doc, veri);
 
-  // 2) İçerik: özet kutuları + madde inceleme tablosu
+  // 2) ADR Bölüm 1.10.3 hükümleri + Tablo 1.10.3.1.2 referans sayfası
+  emniyetHukumleriSayfasiCiz(doc, veri);
+
+  // 3) İçerik: özet kutuları + madde inceleme tablosu
   doc.addPage();
   cerceveCiz(doc);
-  baslikKutusuCiz(doc, veri, "Sayfa 2");
+  baslikKutusuCiz(doc, veri, "Sayfa 3");
   imzaTablosuCiz(doc, veri);
 
   let y = CERCEVE_KENAR + 26 + 8;
@@ -553,9 +729,9 @@ export async function guvenlikPlaniIncelemeRaporuUret(
   doc.setTextColor(0, 0, 0);
   y += 4;
 
-  const sonSayfaNo = tabloCiz(doc, veri, y);
+  const sonSayfaNo = tabloCiz(doc, veri, y, 3);
 
-  // 3) Kapanış: genel sonuç cümlesi
+  // 4) Kapanış: genel sonuç cümlesi
   kapanisSayfasiCiz(doc, veri, sonSayfaNo + 1);
 
   return doc;
