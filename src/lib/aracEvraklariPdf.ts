@@ -272,7 +272,7 @@ async function yaziliTalimatEkleriEkle(doc: JsPDFType, ekNo: number, logo?: Logo
 
   for (const gorselYolu of YAZILI_TALIMAT_TABLO_GORSELLERI) {
     const dataUrl = await statikGorselGetir(gorselYolu);
-    if (dataUrl) await gorselliEkSayfasiEkle(doc, ekNo, "YAZILI TALİMAT (devam)", dataUrl);
+    if (dataUrl) await gorselliEkSayfasiEkle(doc, ekNo, "YAZILI TALİMAT (devam)", dataUrl, logo);
   }
 }
 
