@@ -121,10 +121,11 @@ export default function EmniyetKapsamTaramasi({ firmId, firmaAdi }: Props) {
       const basliklar = (grid[basIdx] || []).map(norm);
       const kolBul = (...adaylar: string[]) =>
         basliklar.findIndex((h) => adaylar.some((a) => h.includes(a)));
+      const adKol = kolBul("ürün", "urun", "madde adı", "kimyasal", "ticari", "product", "ad");
       const miktarKol = kolBul("miktar", "yıllık", "yillik", "quantity", "amount");
       const ambalajKol = kolBul("ambalaj", "packag");
 
-      const ham: { un: string; miktar: string; ambalaj: string }[] = [];
+      const ham: { un: string; ad: string; miktar: string; ambalaj: string }[] = [];
       for (let i = basIdx + 1; i < grid.length; i++) {
         const row = grid[i] || [];
         const unHam = String(row[unKol] ?? "").replace(/\D/g, "");
@@ -132,6 +133,7 @@ export default function EmniyetKapsamTaramasi({ firmId, firmaAdi }: Props) {
         const un = unHam.slice(0, 4);
         ham.push({
           un,
+          ad: adKol >= 0 ? String(row[adKol] ?? "").trim() : "",
           miktar: miktarKol >= 0 ? String(row[miktarKol] ?? "").trim() : "",
           ambalaj: ambalajKol >= 0 ? String(row[ambalajKol] ?? "").trim() : "",
         });
@@ -153,23 +155,25 @@ export default function EmniyetKapsamTaramasi({ firmId, firmaAdi }: Props) {
       });
 
       // 5) SecurityPlanItem listesine dönüştür
-      const items: SecurityPlanItem[] = ham
-        .map((h) => {
-          const t = tabloAMap.get(h.un);
-          if (!t) return null;
-          const miktarSayi = parseFloat(h.miktar.replace(",", "."));
-          return {
-            un_number: t.un_number,
-            proper_shipping_name: t.proper_shipping_name,
-            adr_class: t.class,
-            classification_code: t.classification_code,
-            packing_group: t.packing_group,
-            packaging_type: h.ambalaj || null,
-            quantity: Number.isFinite(miktarSayi) ? miktarSayi : NaN,
-            unit: "",
-          } satisfies SecurityPlanItem;
-        })
-        .filter((x): x is SecurityPlanItem => x !== null);
+      const eslesenler: (SecurityPlanItem | null)[] = ham.map((h): SecurityPlanItem | null => {
+        const t = tabloAMap.get(h.un);
+        if (!t) return null;
+        const miktarSayi = parseFloat(h.miktar.replace(",", "."));
+        return {
+          un_number: t.un_number,
+          proper_shipping_name: t.proper_shipping_name,
+          trade_name: h.ad || null,
+          adr_class: t.class,
+          classification_code: t.classification_code,
+          packing_group: t.packing_group,
+          packaging_type: h.ambalaj || null,
+          quantity: Number.isFinite(miktarSayi) ? miktarSayi : NaN,
+          unit: "",
+        };
+      });
+      const items: SecurityPlanItem[] = eslesenler.filter(
+        (x): x is SecurityPlanItem => x !== null
+      );
 
       if (items.length === 0) {
         setMesaj("Dosyadaki UN numaraları Tablo A'da bulunamadı — eşleştirme yapılamadı.");
@@ -330,8 +334,10 @@ export default function EmniyetKapsamTaramasi({ firmId, firmaAdi }: Props) {
             <table className="w-full text-xs">
               <thead className="bg-gray-50">
                 <tr>
+                  <th className="text-center p-2 font-medium text-gray-600 w-8">No</th>
                   <th className="text-left p-2 font-medium text-gray-600">UN No</th>
-                  <th className="text-left p-2 font-medium text-gray-600">Ürün Adı</th>
+                  <th className="text-left p-2 font-medium text-gray-600">Uygun Sevkiyat Adı</th>
+                  <th className="text-left p-2 font-medium text-gray-600">Ticari Ad</th>
                   <th className="text-center p-2 font-medium text-gray-600">Sınıf</th>
                   <th className="text-center p-2 font-medium text-gray-600">PG</th>
                   <th className="text-center p-2 font-medium text-gray-600">Mod</th>
@@ -351,8 +357,10 @@ export default function EmniyetKapsamTaramasi({ firmId, firmaAdi }: Props) {
                         : ""
                     }`}
                   >
+                    <td className="p-2 text-center text-gray-400">{i + 1}</td>
                     <td className="p-2 font-medium">UN {r.un_number}</td>
-                    <td className="p-2 text-gray-600 max-w-[200px] truncate">{r.proper_shipping_name}</td>
+                    <td className="p-2 text-gray-600 max-w-[180px] truncate">{r.proper_shipping_name}</td>
+                    <td className="p-2 text-gray-600 max-w-[140px] truncate">{r.trade_name || "—"}</td>
                     <td className="p-2 text-center">{r.adr_class || "—"}</td>
                     <td className="p-2 text-center">{r.packing_group || "—"}</td>
                     <td className="p-2 text-center">{r.mode}</td>
@@ -369,7 +377,7 @@ export default function EmniyetKapsamTaramasi({ firmId, firmaAdi }: Props) {
                         {r.status === "in_scope" ? "KAPSAMDA" : r.status === "undetermined" ? "BELİRSİZ" : "KAPSAM DIŞI"}
                       </span>
                     </td>
-                    <td className="p-2 text-gray-500 max-w-[260px]">{r.conclusion}</td>
+                    <td className="p-2 text-gray-500 max-w-[240px]">{r.conclusion}</td>
                   </tr>
                 ))}
               </tbody>

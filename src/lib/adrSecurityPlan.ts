@@ -28,6 +28,8 @@ export type SecurityPlanItem = {
   packaging_type: string | null;
   quantity: number;
   unit: string;
+  /** Firma envanterindeki ticari ad (varsa) — L1 dosyasından gelir. */
+  trade_name?: string | null;
 };
 
 export type SecurityPlanResult = {
@@ -315,6 +317,7 @@ export type ItemScopeStatus = "in_scope" | "out_of_scope" | "undetermined";
 export type ItemScopeResult = {
   un_number: string;
   proper_shipping_name: string;
+  trade_name: string | null;
   adr_class: string | null;
   classification_code: string | null;
   packing_group: string | null;
@@ -345,6 +348,7 @@ export function evaluateItemScope(item: SecurityPlanItem): ItemScopeResult {
   const base = {
     un_number: un,
     proper_shipping_name: item.proper_shipping_name,
+    trade_name: item.trade_name || null,
     adr_class: item.adr_class,
     classification_code: item.classification_code,
     packing_group: item.packing_group,
@@ -474,8 +478,17 @@ export type ScopeSummary = {
 };
 
 /** Envanterdeki tüm maddeler için toplu kapsam taraması + özet sayaçlar. */
+/** Sıralama önceliği: kapsamda > belirsiz > kapsam dışı. */
+const STATUS_SIRA: Record<ItemScopeStatus, number> = {
+  in_scope: 0,
+  undetermined: 1,
+  out_of_scope: 2,
+};
+
 export function scanInventoryScope(items: SecurityPlanItem[]): ScopeSummary {
-  const results = items.map(evaluateItemScope);
+  const results = items
+    .map(evaluateItemScope)
+    .sort((a, b) => STATUS_SIRA[a.status] - STATUS_SIRA[b.status]);
   return {
     total: results.length,
     inScope: results.filter((r) => r.status === "in_scope").length,

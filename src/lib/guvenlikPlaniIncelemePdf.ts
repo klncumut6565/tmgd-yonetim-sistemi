@@ -130,13 +130,15 @@ const SONUC_ETIKET: Record<ItemScopeResult["status"], string> = {
 /** Madde inceleme tablosunu (çok sayfalı olabilir) çizer. */
 function tabloCiz(doc: JsPDFType, sonuclar: ItemScopeResult[], yBaslangic: number): void {
   const kolonlar = [
-    { b: "UN No", w: 16 },
-    { b: "Ürün Adı", w: 48 },
-    { b: "Sınıf", w: 14 },
-    { b: "PG", w: 10 },
-    { b: "Mod", w: 16 },
-    { b: "Sonuç", w: 24 },
-    { b: "Gerekçe", w: 52 },
+    { b: "No", w: 7 },
+    { b: "UN No", w: 14 },
+    { b: "Uygun Sevkiyat Adı", w: 33 },
+    { b: "Ticari Ad", w: 26 },
+    { b: "Sınıf", w: 12 },
+    { b: "PG", w: 9 },
+    { b: "Mod", w: 14 },
+    { b: "Sonuç", w: 22 },
+    { b: "Gerekçe", w: 43 },
   ];
   const tabloW = kolonlar.reduce((a, k) => a + k.w, 0);
   let y = yBaslangic;
@@ -159,9 +161,10 @@ function tabloCiz(doc: JsPDFType, sonuclar: ItemScopeResult[], yBaslangic: numbe
   baslikCiz();
 
   sonuclar.forEach((s, i) => {
-    const gerekceSatirlari = doc.splitTextToSize(s.conclusion, kolonlar[6].w - 3);
-    const adSatirlari = doc.splitTextToSize(s.proper_shipping_name, kolonlar[1].w - 3);
-    const maxSatir = Math.max(gerekceSatirlari.length, adSatirlari.length, 1);
+    const gerekceSatirlari = doc.splitTextToSize(s.conclusion, kolonlar[8].w - 3);
+    const adSatirlari = doc.splitTextToSize(s.proper_shipping_name, kolonlar[2].w - 3);
+    const ticariAdSatirlari = doc.splitTextToSize(s.trade_name || "—", kolonlar[3].w - 3);
+    const maxSatir = Math.max(gerekceSatirlari.length, adSatirlari.length, ticariAdSatirlari.length, 1);
     const satirH = Math.max(6, maxSatir * 3.2 + 2);
 
     if (y + satirH > H - 25) {
@@ -179,22 +182,26 @@ function tabloCiz(doc: JsPDFType, sonuclar: ItemScopeResult[], yBaslangic: numbe
     doc.setFont(FONT, "normal");
     doc.setTextColor(0, 0, 0);
     let x = M;
-    doc.text(`UN ${s.un_number}`, x + 1.5, y + 3.6);
+    doc.text(String(i + 1), x + 1.5, y + 3.6);
     x += kolonlar[0].w;
-    doc.text(adSatirlari, x + 1.5, y + 3.6);
+    doc.text(`UN ${s.un_number}`, x + 1.5, y + 3.6);
     x += kolonlar[1].w;
-    doc.text(s.adr_class || "—", x + 1.5, y + 3.6);
+    doc.text(adSatirlari, x + 1.5, y + 3.6);
     x += kolonlar[2].w;
-    doc.text(s.packing_group || "—", x + 1.5, y + 3.6);
+    doc.text(ticariAdSatirlari, x + 1.5, y + 3.6);
     x += kolonlar[3].w;
-    doc.text(s.mode, x + 1.5, y + 3.6);
+    doc.text(s.adr_class || "—", x + 1.5, y + 3.6);
     x += kolonlar[4].w;
+    doc.text(s.packing_group || "—", x + 1.5, y + 3.6);
+    x += kolonlar[5].w;
+    doc.text(s.mode, x + 1.5, y + 3.6);
+    x += kolonlar[6].w;
     doc.setFont(FONT, "bold");
     doc.setTextColor(...SONUC_RENK[s.status]);
     doc.text(SONUC_ETIKET[s.status], x + 1.5, y + 3.6);
     doc.setTextColor(0, 0, 0);
     doc.setFont(FONT, "normal");
-    x += kolonlar[5].w;
+    x += kolonlar[7].w;
     doc.text(gerekceSatirlari, x + 1.5, y + 3.6);
 
     doc.setDrawColor(225, 228, 232);
