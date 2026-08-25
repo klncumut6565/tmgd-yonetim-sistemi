@@ -17,7 +17,6 @@
 
 import { useState } from "react";
 import { supabase } from "@/lib/supabase/client";
-import { hataCevir } from "@/lib/hataCevir";
 import {
   scanInventoryScope,
   type SecurityPlanItem,
@@ -180,7 +179,7 @@ export default function EmniyetKapsamTaramasi({ firmId, firmaAdi }: Props) {
       setSummary(scanInventoryScope(items));
       setMesaj(`✓ ${items.length} kimyasal tarandı (dosya: ${dosya.file_name}).`);
     } catch (e) {
-      setMesaj("Tarama sırasında hata: " + hataCevir(e));
+      setMesaj("Tarama sırasında hata: " + (e instanceof Error ? e.message : String(e)));
     } finally {
       setTaraniyor(false);
     }
