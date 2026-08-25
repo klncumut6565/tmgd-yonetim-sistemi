@@ -102,7 +102,7 @@ function unInt(un: string | null): number {
 }
 
 /** Ambalaj türünden taşıma modu indeksi: 0=tank, 1=dökme, 2=ambalaj */
-function modeIndexForItem(item: SecurityPlanItem): number {
+export function modeIndexForItem(item: SecurityPlanItem): number {
   const pt = (item.packaging_type || "").trim().toLowerCase();
   if (pt.includes("tank")) return 0;
   if (pt.includes("dökme") || pt.includes("dokme")) return 1;
@@ -113,7 +113,7 @@ function modeIndexForItem(item: SecurityPlanItem): number {
  * Bir kalem için Tablo 1.10.3.1.2 satır anahtarını üretir.
  * null dönerse madde tablo kapsamı dışındadır (muaf).
  */
-function getTableKey(item: SecurityPlanItem): string | null {
+export function getTableKey(item: SecurityPlanItem): string | null {
   const clsRaw = (item.adr_class || "").trim().split(/\s+/)[0] || "";
   const pgRaw = (item.packing_group || "").trim().toUpperCase();
   // Bazı kayıtlarda PG Arap rakamıyla gelebiliyor — Roma'ya normalize et
@@ -289,4 +289,198 @@ export function checkSecurityPlan(
   }
 
   return result;
+}
+
+// ============================================================================
+// MADDE BAZLI KAPSAM TARAMASI (L1 Envanter Listesi için)
+// ----------------------------------------------------------------------------
+// checkSecurityPlan() bir SEVKİYATIN toplu değerlendirmesini yapar (ADR 1.10.4
+// muafiyeti + Tablo 1.10.3.1.2 kombinasyonu). Bu bölüm ise firmanın envanterindeki
+// HER BİR maddeyi TEK BAŞINA, Tablo 1.10.3.1.2'ye göre değerlendirir:
+//   - Madde bu tabloda hiç yer almıyor mu (sınıf/AG kombinasyonu tablo dışı)?
+//     → KAPSAM DIŞI, miktardan bağımsız.
+//   - Tabloda yer alıyor ama o taşıma modu için "a" (uygulanamaz) mı?
+//     → KAPSAM DIŞI, miktardan bağımsız.
+//   - Tabloda yer alıyor ve "b" (miktar ne olursa olsun muaf) mı?
+//     → KAPSAM DIŞI, miktardan bağımsız.
+//   - Tabloda yer alıyor ve eşik 0 (her miktarda gerekli) mı?
+//     → KAPSAMDA, miktardan bağımsız.
+//   - Tabloda sayısal bir eşik varsa: envanterde miktar bilgisi VARSA
+//     karşılaştırılır (KAPSAMDA/KAPSAM DIŞI); YOKSA yalnızca eşik değeri
+//     bilgi olarak sunulur ("KAPSAM BELİRSİZ — miktar doğrulanmalı").
+// ============================================================================
+
+export type ItemScopeStatus = "in_scope" | "out_of_scope" | "undetermined";
+
+export type ItemScopeResult = {
+  un_number: string;
+  proper_shipping_name: string;
+  adr_class: string | null;
+  classification_code: string | null;
+  packing_group: string | null;
+  mode: string;                 // "Tank" | "Dökme" | "Ambalaj"
+  status: ItemScopeStatus;
+  threshold: number | null;     // null=uygulanamaz, -1=miktar ne olursa olsun muaf, 0=her miktarda gerekli, N=sayısal eşik
+  thresholdUnit: string | null; // "litre" | "kg" | null
+  quantityKnown: boolean;
+  quantity: number | null;
+  conclusion: string;           // İnsan-okur sonuç cümlesi (rapor tablosunda "SONUÇ" kolonu)
+};
+
+const MOD_ADI_TR = ["Tank", "Dökme", "Ambalaj"];
+
+/**
+ * Envanterdeki TEK bir maddeyi Tablo 1.10.3.1.2'ye göre değerlendirir.
+ * quantity verilmemişse (undefined/null) sadece eşik bilgisi sunulur,
+ * kapsam durumu "undetermined" (miktar doğrulanmalı) olarak işaretlenir.
+ */
+export function evaluateItemScope(item: SecurityPlanItem): ItemScopeResult {
+  const clsRaw = (item.adr_class || "").trim().split(/\s+/)[0] || "";
+  const pg = (item.packing_group || "—").trim().toUpperCase();
+  const modIdx = modeIndexForItem(item);
+  const modAdi = MOD_ADI_TR[modIdx];
+  const un = item.un_number || "—";
+  const quantityKnown = typeof item.quantity === "number" && !isNaN(item.quantity) && item.quantity > 0;
+
+  const base = {
+    un_number: un,
+    proper_shipping_name: item.proper_shipping_name,
+    adr_class: item.adr_class,
+    classification_code: item.classification_code,
+    packing_group: item.packing_group,
+    mode: modAdi,
+    quantityKnown,
+    quantity: quantityKnown ? item.quantity : null,
+  };
+
+  // Sınıf 7 — Tablo 1.10.3.1.2 kapsamamıyor, aktivite eşiği (1.10.3.1.3) ayrı.
+  if (clsRaw.startsWith("7")) {
+    return {
+      ...base,
+      status: "undetermined",
+      threshold: null,
+      thresholdUnit: null,
+      conclusion:
+        `UN ${un} (Sınıf 7, radyoaktif): Tablo 1.10.3.1.2 kapsamına girmez, aktivite eşiği ` +
+        `(Tablo 1.10.3.1.3) radyonüklid bilgisi gerektirir — TMGD tarafından ayrıca değerlendirilmelidir.`,
+    };
+  }
+
+  const key = getTableKey(item);
+  if (key === null) {
+    return {
+      ...base,
+      status: "out_of_scope",
+      threshold: null,
+      thresholdUnit: null,
+      conclusion:
+        `Sınıf ${clsRaw || "—"}, Ambalajlama Grubu ${pg} olarak sınıflandırılmıştır. ` +
+        `Bu sınıflandırma ADR Tablo 1.10.3.1.2 kapsamına girmemektedir. ` +
+        `Bu nedenle güvenlik planı hazırlanmasına gerek yoktur.`,
+    };
+  }
+
+  const esikSinif = clsRaw.startsWith("1.") ? "1" : clsRaw;
+  const satir = THRESHOLDS[`${esikSinif}|${key}`];
+  if (!satir) {
+    return {
+      ...base,
+      status: "out_of_scope",
+      threshold: null,
+      thresholdUnit: null,
+      conclusion: `UN ${un} (Sınıf ${clsRaw}): Tablo 1.10.3.1.2'de karşılık gelen satır bulunamadı — kapsam dışı kabul edildi.`,
+    };
+  }
+
+  const limit = satir[modIdx];
+  const birim = modIdx === 0 ? "litre" : "kg";
+
+  if (limit === null) {
+    return {
+      ...base,
+      status: "out_of_scope",
+      threshold: null,
+      thresholdUnit: null,
+      conclusion:
+        `Sınıf ${clsRaw} maddesi, ${modAdi} taşıma şekli için Tablo 1.10.3.1.2'de uygulanabilir değildir (not "a"). ` +
+        `Bu nedenle güvenlik planı hazırlanmasına gerek yoktur.`,
+    };
+  }
+  if (limit === -1) {
+    return {
+      ...base,
+      status: "out_of_scope",
+      threshold: -1,
+      thresholdUnit: null,
+      conclusion:
+        `Sınıf ${clsRaw} maddesi [${modAdi}]: miktar ne olursa olsun ADR 1.10.3 hükümlerine tabi değildir ` +
+        `(Tablo 1.10.3.1.2, not "b"). Bu nedenle güvenlik planı hazırlanmasına gerek yoktur.`,
+    };
+  }
+  if (limit === 0) {
+    return {
+      ...base,
+      status: "in_scope",
+      threshold: 0,
+      thresholdUnit: birim,
+      conclusion:
+        `Sınıf ${clsRaw} maddesi [${modAdi}]: Tablo 1.10.3.1.2 kapsamında, miktar sınırı olmaksızın ` +
+        `HER MİKTARDA güvenlik planı GEREKLİDİR.`,
+    };
+  }
+
+  // Sayısal eşik (N litre/kg)
+  if (!quantityKnown) {
+    return {
+      ...base,
+      status: "undetermined",
+      threshold: limit,
+      thresholdUnit: birim,
+      conclusion:
+        `Sınıf ${clsRaw} maddesi [${modAdi}]: Tablo 1.10.3.1.2 kapsamındadır — eşik ${limit} ${birim}. ` +
+        `Envanterde yıllık miktar bilgisi bulunmadığından kesin kapsam durumu belirlenemedi; ` +
+        `firma kayıtlarındaki fiili miktarla karşılaştırılmalıdır.`,
+    };
+  }
+  const deger = item.quantity;
+  if (deger > limit) {
+    return {
+      ...base,
+      status: "in_scope",
+      threshold: limit,
+      thresholdUnit: birim,
+      conclusion:
+        `Sınıf ${clsRaw} maddesi [${modAdi}]: ${deger} ${birim} miktarı, Tablo 1.10.3.1.2'deki ${limit} ${birim} ` +
+        `eşiğini aştığından güvenlik planı GEREKLİDİR.`,
+    };
+  }
+  return {
+    ...base,
+    status: "out_of_scope",
+    threshold: limit,
+    thresholdUnit: birim,
+    conclusion:
+      `Sınıf ${clsRaw} maddesi [${modAdi}]: ${deger} ${birim} miktarı, Tablo 1.10.3.1.2'deki ${limit} ${birim} ` +
+      `eşiğinin altında kaldığından güvenlik planı hazırlanmasına gerek yoktur.`,
+  };
+}
+
+export type ScopeSummary = {
+  total: number;
+  inScope: number;
+  outOfScope: number;
+  undetermined: number;
+  results: ItemScopeResult[];
+};
+
+/** Envanterdeki tüm maddeler için toplu kapsam taraması + özet sayaçlar. */
+export function scanInventoryScope(items: SecurityPlanItem[]): ScopeSummary {
+  const results = items.map(evaluateItemScope);
+  return {
+    total: results.length,
+    inScope: results.filter((r) => r.status === "in_scope").length,
+    outOfScope: results.filter((r) => r.status === "out_of_scope").length,
+    undetermined: results.filter((r) => r.status === "undetermined").length,
+    results,
+  };
 }
