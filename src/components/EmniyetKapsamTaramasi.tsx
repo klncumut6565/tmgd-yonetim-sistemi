@@ -219,6 +219,35 @@ export default function EmniyetKapsamTaramasi({ firmId, firmaAdi }: Props) {
     }
   }
 
+  async function raporOnizle() {
+    if (!summary) return;
+    const pencere = window.open("", "_blank");
+    if (!pencere) {
+      setMesaj("Yeni sekme açılamadı — tarayıcının açılır pencere engelleyicisini kontrol et.");
+      return;
+    }
+    setPdfUretiliyor(true);
+    try {
+      const logo = await logoDataUrl();
+      const bugun = new Date().toLocaleDateString("tr-TR");
+      const veri: GuvenlikPlaniRaporVerisi = {
+        firmaAdi,
+        tarih: bugun,
+        gecerlilikSuresi: "2 Yıl",
+        summary,
+        logo: logo ?? undefined,
+      };
+      const doc = await guvenlikPlaniIncelemeRaporuUret(veri);
+      const blobUrl = URL.createObjectURL(doc.output("blob"));
+      pencere.location.href = blobUrl;
+    } catch (e) {
+      pencere.close();
+      setMesaj("Önizleme oluşturulamadı: " + (e instanceof Error ? e.message : String(e)));
+    } finally {
+      setPdfUretiliyor(false);
+    }
+  }
+
   async function raporIndir() {
     if (!summary) return;
     setPdfUretiliyor(true);
@@ -280,7 +309,14 @@ export default function EmniyetKapsamTaramasi({ firmId, firmaAdi }: Props) {
             </p>
           )}
 
-          <div className="flex justify-end">
+          <div className="flex justify-end gap-2">
+            <button
+              onClick={raporOnizle}
+              disabled={pdfUretiliyor}
+              className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 text-sm hover:bg-gray-50 disabled:opacity-50"
+            >
+              👁️ Önizle
+            </button>
             <button
               onClick={raporIndir}
               disabled={pdfUretiliyor}
