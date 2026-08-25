@@ -18,6 +18,7 @@ import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
 import { yasakTasimaKontrol } from "@/lib/adrYasakTasima";
+import EmniyetKapsamTaramasi from "@/components/EmniyetKapsamTaramasi";
 import {
   UnRow,
   CalcItem,
@@ -53,7 +54,7 @@ function statusBadge(s: string) {
   return <span className={`text-xs px-2 py-0.5 rounded ${cls}`}>{label}</span>;
 }
 
-type Tab = "search"|"muafiyet"|"karisik";
+type Tab = "search"|"muafiyet"|"karisik"|"emniyet";
 
 // ── Arama kutusu — ana component DIŞINDA tanımlanmalı ────────────────────
 // İçeride tanımlanırsa her render'da yeniden oluşur → input focus kaybeder.
@@ -131,6 +132,21 @@ function AdrPageInner() {
   const [showMixDrop, setShowMixDrop] = useState(false);
   const mixRef = useRef<HTMLDivElement>(null);
 
+  // "Emniyet Planı Kapsam Taraması" sekmesi — firma seçici (bu sekmede
+  // firmanın L1 dosyasından tarama yapılır, diğer sekmeler firma bağımsız).
+  const [emniyetFirms, setEmniyetFirms] = useState<{ id: string; name: string }[]>([]);
+  const [emniyetFirmId, setEmniyetFirmId] = useState("");
+  useEffect(() => {
+    if (emniyetFirms.length > 0) return;
+    supabase
+      .from("firms")
+      .select("id, name")
+      .eq("status", "active")
+      .order("name")
+      .then(({ data }) => setEmniyetFirms((data as { id: string; name: string }[]) || []));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const doSearch = useCallback(async (q:string, setRes:(r:UnRow[])=>void, setLoad:(b:boolean)=>void) => {
     const t = q.trim(); if (!t) { setRes([]); return; }
     setLoad(true);
@@ -149,7 +165,7 @@ function AdrPageInner() {
   // doldurulmus olarak acar.
   useEffect(() => {
     const tabParam = searchParams.get("tab");
-    if (tabParam === "search" || tabParam === "muafiyet" || tabParam === "karisik") {
+    if (tabParam === "search" || tabParam === "muafiyet" || tabParam === "karisik" || tabParam === "emniyet") {
       setTab(tabParam);
     }
 
@@ -246,6 +262,7 @@ function AdrPageInner() {
     {key:"search",label:"UN Sorgulama"},
     {key:"muafiyet",label:"Muafiyet Hesabı"},
     {key:"karisik",label:"Karışık Yükleme"},
+    {key:"emniyet",label:"Emniyet Planı Kapsam Taraması"},
   ];
 
 
@@ -497,6 +514,34 @@ function AdrPageInner() {
                 ⚠ Bu araç ADR Tablo 7.5.2.1'in basitleştirilmiş uygulamasıdır. Sınıf 1 miktar bazlı muafiyetler ve tank taşımacılığı özel kuralları kapsam dışıdır. Üretimde kullanılmadan önce TMGD/DGSA tarafından doğrulanması önerilir.
               </p>
             </div>
+          )}
+        </div>
+      )}
+
+      {/* ── EMNİYET PLANI KAPSAM TARAMASI ── */}
+      {tab==="emniyet"&&(
+        <div className="space-y-5">
+          <div className="max-w-md">
+            <label className="block text-[11px] font-semibold uppercase tracking-wide text-gray-500 mb-1">
+              Firma
+            </label>
+            <select
+              className="border p-2.5 w-full rounded-xl text-sm"
+              value={emniyetFirmId}
+              onChange={(e)=>setEmniyetFirmId(e.target.value)}
+            >
+              <option value="">Firma seçin...</option>
+              {emniyetFirms.map((f)=>(
+                <option key={f.id} value={f.id}>{f.name}</option>
+              ))}
+            </select>
+          </div>
+          {emniyetFirmId && (
+            <EmniyetKapsamTaramasi
+              key={emniyetFirmId}
+              firmId={emniyetFirmId}
+              firmaAdi={emniyetFirms.find((f)=>f.id===emniyetFirmId)?.name || ""}
+            />
           )}
         </div>
       )}

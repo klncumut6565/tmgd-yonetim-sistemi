@@ -63,7 +63,7 @@ export default function Sidebar() {
             { title: "Kimyasal Envanter", href: "https://kimyasal-envanter-xejzjdukscnznm6dgtmvp5.streamlit.app", icon: "🧪" },
             { title: "MSDS Özetleyici", href: "https://msds-ozetleyici-pro.streamlit.app", icon: "📄" },
             { title: "Karışık Yükleme", href: "/adr?tab=karisik", icon: "⚠" },
-            { title: "Emniyet Planı Kapsam Taraması", href: "/adr/emniyet-plani", icon: "🛡" },
+            { title: "Emniyet Planı Kapsam Taraması", href: "/adr?tab=emniyet", icon: "🛡" },
           ]
             // Firma (company) kullanıcısı harici Streamlit uygulamalarını
             // görmez — bunlar TMGD'nin kendi çalışma araçları. Yalnızca
