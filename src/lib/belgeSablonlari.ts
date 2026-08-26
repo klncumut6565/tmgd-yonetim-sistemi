@@ -1422,12 +1422,13 @@ export const BELGE_SABLONLARI: Record<string, BelgeSablonu> = {
       { type: "subheading", text: "Aksi Durumlar ve Notlar" },
       { type: "paragraph", text: "…………………………………………………………………………………………………………………" },
       { type: "subheading", text: "6. Kontrolü Yapan" },
-      { type: "bullet", items: [
-        "Adı Soyadı: ……………………………",
-        "Görevi (TMGD / Sürücü / Yetkili): ……………………………",
-        "İmza: ……………………………",
-        "Tarih: ……………………………",
-      ]},
+      { type: "table",
+        colWidths: [1, 1],
+        rows: [
+          ["Adı Soyadı: ……………………………", "İmza: ……………………………"],
+          ["Görevi (TMGD / Sürücü / Yetkili): ……………………………", "Tarih: ……………………………"],
+        ],
+      },
     ],
   },
 
