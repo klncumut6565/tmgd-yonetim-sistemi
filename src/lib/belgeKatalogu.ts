@@ -103,13 +103,13 @@ export const CATALOG: CatalogItem[] = [
   // ---------------- KONTROL FORMLARI ----------------
   { code: "K1", name: "Teslim Alınan Konteyner Kontrol Formu (Alıcı)", category: "K", activities: ["alici"] },
   { code: "K2", name: "Boşaltma Sonrası Arındırma / Kapatma Kontrol Formu", category: "K", activities: ["bosaltan"] },
-  { code: "K3", name: "Sevkiyat Uygunluk Kontrol Formu (Gönderen)", category: "K", activities: ["gonderen"] },
-  { code: "K4", name: "Yükleme Kontrol Formu (Ayırım · Etiket · Emniyet)", category: "K", activities: ["yukleyen"] },
+  { code: "K3", name: "Sevkiyat Uygunluk Kontrol Formu (Gönderen · Yükleyen · Dolduran)", category: "K", activities: ["gonderen", "yukleyen"] },
   { code: "K5", name: "Boş / Temizlenmiş Konteyner Takip Formu", category: "K", activities: ["bosaltan"] },
   { code: "K6", name: "Paketleme Kontrol Formu (Basınçlı Ekipman · İşaret/Etiket)", category: "K", activities: ["paketleyen"] },
   { code: "K7", name: "Dolum Kontrol Formu (Muayene · Plaka · Sızdırmazlık)", category: "K", activities: ["dolduran"] },
-  { code: "K8", name: "Taşıt Teçhizat Kontrol Formu (KKE · Yangın Teçhizatı)", category: "K", activities: ["tasimaci"] },
+  { code: "K8", name: "Taşımacı Kontrol Dökümanı (Yönetmelik Md.22)", category: "K", activities: ["tasimaci"] },
   { code: "K9", name: "Taşıt / Sürücü Belge Kontrol ve Takip Formu", category: "K", activities: ["tasimaci"] },
+  { code: "K10", name: "Taşıt Teçhizat Kontrol Formu (KKE · Yangınla Mücadele — ADR 8.1.4/8.1.5)", category: "K", activities: ["tasimaci"] },
 
   // ---------------- LİSTELER ----------------
   { code: "L1", name: "Tehlikeli Madde Envanter Listesi", category: "L", activities: [] },
