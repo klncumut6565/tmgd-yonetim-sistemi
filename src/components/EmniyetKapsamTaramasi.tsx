@@ -122,8 +122,16 @@ export default function EmniyetKapsamTaramasi({ firmId, firmaAdi }: Props) {
       const kolBul = (...adaylar: string[]) =>
         basliklar.findIndex((h) => adaylar.some((a) => h.includes(a)));
       const adKol = kolBul("ürün", "urun", "madde adı", "kimyasal", "ticari", "product", "ad");
-      const miktarKol = kolBul("miktar", "yıllık", "yillik", "quantity", "amount");
-      const ambalajKol = kolBul("ambalaj", "packag");
+      const miktarKol = kolBul("miktar", "yıllık", "yillik", "quantity", "amount", "tonaj", "kapasite");
+      // "Taşıma Modu/Şekli/Türü" (tank/dökme/ambalaj) ile "Ambalaj Tipi"
+      // (varil/IBC/bidon) genelde farklı kolonlardır — önce taşıma modunu
+      // arıyoruz, yoksa ambalaj kolonuna düşüyoruz (tek kolon kullanan
+      // dosyalarda genelde oraya "tank"/"dökme" de yazılır).
+      const tasimaModuKol = kolBul(
+        "taşıma modu", "tasima modu", "taşıma şekli", "tasima sekli",
+        "taşıma türü", "tasima turu", "taşıma tipi", "tasima tipi"
+      );
+      const ambalajKol = tasimaModuKol >= 0 ? tasimaModuKol : kolBul("ambalaj", "packag");
 
       const ham: { un: string; ad: string; miktar: string; ambalaj: string }[] = [];
       for (let i = basIdx + 1; i < grid.length; i++) {
@@ -361,6 +369,7 @@ export default function EmniyetKapsamTaramasi({ firmId, firmaAdi }: Props) {
                   <th className="text-center p-2 font-medium text-gray-600">Sınıf</th>
                   <th className="text-center p-2 font-medium text-gray-600">PG</th>
                   <th className="text-center p-2 font-medium text-gray-600">Mod</th>
+                  <th className="text-center p-2 font-medium text-gray-600">Miktar</th>
                   <th className="text-center p-2 font-medium text-gray-600">Sonuç</th>
                   <th className="text-left p-2 font-medium text-gray-600">Gerekçe</th>
                 </tr>
@@ -384,6 +393,9 @@ export default function EmniyetKapsamTaramasi({ firmId, firmaAdi }: Props) {
                     <td className="p-2 text-center">{r.adr_class || "—"}</td>
                     <td className="p-2 text-center">{r.packing_group || "—"}</td>
                     <td className="p-2 text-center">{r.mode}</td>
+                    <td className="p-2 text-center">
+                      {r.quantityKnown ? `${r.quantity} ${r.thresholdUnit || ""}` : "—"}
+                    </td>
                     <td className="p-2 text-center">
                       <span
                         className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${

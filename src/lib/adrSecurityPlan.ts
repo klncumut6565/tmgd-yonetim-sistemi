@@ -106,8 +106,8 @@ function unInt(un: string | null): number {
 /** Ambalaj türünden taşıma modu indeksi: 0=tank, 1=dökme, 2=ambalaj */
 export function modeIndexForItem(item: SecurityPlanItem): number {
   const pt = (item.packaging_type || "").trim().toLowerCase();
-  if (pt.includes("tank")) return 0;
-  if (pt.includes("dökme") || pt.includes("dokme")) return 1;
+  if (pt.includes("tank") || pt.includes("sarnıç") || pt.includes("sarnic") || pt.includes("tanker")) return 0;
+  if (pt.includes("dökme") || pt.includes("dokme") || pt.includes("bulk")) return 1;
   return 2; // IBC, varil, bidon, kutu, çuval, kompozit...
 }
 
