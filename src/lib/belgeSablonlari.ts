@@ -1411,6 +1411,13 @@ export const BELGE_SABLONLARI: Record<string, BelgeSablonu> = {
           ["Kişisel Koruyucu Donanım (Eldiven, Koruyucu Gözlük, El Feneri vb.) Araçta Mevcut mu?", "☐", "☐"],
           ["Yangın Söndürme Cihazları (ADR 8.1.4 Kapsamında, Kontrol Tarihi Güncel) Mevcut mu?", "☐", "☐"],
           ["Diğer Güvenlik ve Acil Durum Ekipmanları (Takoz, İkaz Üçgeni vb.) Mevcut mu?", "☐", "☐"],
+        ],
+      },
+      { type: "subheading", text: "5. Ek Bilgiler" },
+      { type: "table",
+        headers: ["Kontrol Maddesi", "Evet", "Hayır"],
+        colWidths: [5.2, 0.9, 0.9],
+        rows: [
           ["Yükleme ve Boşaltma Talimatlarına Uygunluk Sağlanmış mı?", "☐", "☐"],
         ],
       },
