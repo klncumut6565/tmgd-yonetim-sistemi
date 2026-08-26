@@ -1618,7 +1618,13 @@ async function renderYapilandirilmisBelge(
     doc.addPage(); // kapak 1. sayfa olduğundan içerik her zaman yeni sayfada
 
     baslikTablosuCiz(doc, firmAdi, code, belgeAdi, sablon, logo, bugun, idx + 1, toplamSayfa, baslikYukseklik, adLines);
-    altTabloCiz(doc, hazirlayanAdi, onaylayanAdi);
+    // KONTROL FORMU türünde belgeler kendi içinde (blocks) zaten bir
+    // "Onay / Kontrolü Yapan" imza bölümü içerir — sistemin otomatik
+    // HAZIRLAYAN/ONAYLAYAN tablosu bu yüzden yalnızca kapak sayfasında
+    // basılır, içerik sayfalarında tekrarlanmaz (çift imza alanı olmasın).
+    if (sablon.docType !== "KONTROL FORMU") {
+      altTabloCiz(doc, hazirlayanAdi, onaylayanAdi);
+    }
 
     let y = headerAlt;
     for (const satir of sayfaSatirlari) {
@@ -1670,7 +1676,9 @@ async function renderYapilandirilmisBelge(
   if (posterVeri) {
     doc.addPage();
     baslikTablosuCiz(doc, firmAdi, code, belgeAdi, sablon, logo, bugun, toplamSayfa, toplamSayfa, baslikYukseklik, adLines);
-    altTabloCiz(doc, hazirlayanAdi, onaylayanAdi);
+    if (sablon.docType !== "KONTROL FORMU") {
+      altTabloCiz(doc, hazirlayanAdi, onaylayanAdi);
+    }
 
     const kutuG = genislik;
     const kutuY = FOOTER_UST - headerAlt;
