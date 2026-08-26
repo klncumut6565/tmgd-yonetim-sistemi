@@ -1044,8 +1044,8 @@ function tabloHucreSatirlari(
   return metin.split("\n").flatMap((parca) => doc.splitTextToSize(parca, genislik - 3));
 }
 
-const TABLO_SATIR_YUKSEKLIGI = 4.6;
-const TABLO_PADDING = 1.6;
+const TABLO_SATIR_YUKSEKLIGI = 4.0;
+const TABLO_PADDING = 1.2;
 
 function tabloYuksekligiHesapla(
   doc: JsPDFType,
