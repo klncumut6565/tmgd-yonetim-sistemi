@@ -2,7 +2,7 @@
 // BELGE KATALOĞU — merkezî yapılandırma
 // =====================================================================
 // Kaynak: "Genelge Kapsamında İstenenler" çalışma dosyası.
-// Kod şeması: P1–P8 (Prosedür), T1–T21 (Talimat), K1–K9 (Kontrol Formu),
+// Kod şeması: P1–P8 (Prosedür), T1–T21 (Talimat), K1–K7 (Kontrol Formu),
 //             L1–L4 (Liste), SA1–SA3 (Sefer/Aktarım).
 //
 // ✏️ Belge adlarını / faaliyet eşlemelerini değiştirmek için sadece
@@ -103,13 +103,11 @@ export const CATALOG: CatalogItem[] = [
   // ---------------- KONTROL FORMLARI ----------------
   { code: "K1", name: "Teslim Alınan Konteyner Kontrol Formu (Alıcı)", category: "K", activities: ["alici"] },
   { code: "K2", name: "Boşaltma Sonrası Arındırma / Kapatma Kontrol Formu", category: "K", activities: ["bosaltan"] },
-  { code: "K3", name: "Sevkiyat Uygunluk Kontrol Formu (Gönderen · Yükleyen · Dolduran)", category: "K", activities: ["gonderen", "yukleyen"] },
+  { code: "K3", name: "Sevkiyat Uygunluk Kontrol Formu (Gönderen · Yükleyen · Dolduran)", category: "K", activities: ["gonderen", "yukleyen", "dolduran"] },
+  { code: "K4", name: "ADR Paketleme Kontrol Formu", category: "K", activities: ["paketleyen"] },
   { code: "K5", name: "Boş / Temizlenmiş Konteyner Takip Formu", category: "K", activities: ["bosaltan"] },
-  { code: "K6", name: "Paketleme Kontrol Formu (Basınçlı Ekipman · İşaret/Etiket)", category: "K", activities: ["paketleyen"] },
-  { code: "K7", name: "Dolum Kontrol Formu (Muayene · Plaka · Sızdırmazlık)", category: "K", activities: ["dolduran"] },
-  { code: "K8", name: "Taşımacı Kontrol Dökümanı (Yönetmelik Md.22)", category: "K", activities: ["tasimaci"] },
-  { code: "K9", name: "Taşıt / Sürücü Belge Kontrol ve Takip Formu", category: "K", activities: ["tasimaci"] },
-  { code: "K10", name: "Taşıt Teçhizat Kontrol Formu (KKE · Yangınla Mücadele — ADR 8.1.4/8.1.5)", category: "K", activities: ["tasimaci"] },
+  { code: "K6", name: "Taşımacı Kontrol Dökümanı (Yönetmelik Md.22)", category: "K", activities: ["tasimaci"] },
+  { code: "K7", name: "Taşıt Teçhizat Kontrol Formu (KKE · Yangınla Mücadele — ADR 8.1.4/8.1.5)", category: "K", activities: ["tasimaci"] },
 
   // ---------------- LİSTELER ----------------
   { code: "L1", name: "Tehlikeli Madde Envanter Listesi", category: "L", activities: [] },
