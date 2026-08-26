@@ -1436,6 +1436,10 @@ export const BELGE_SABLONLARI: Record<string, BelgeSablonu> = {
   K2: {
     docType: "KONTROL FORMU",
     yayinTarihi: "14.02.2026",
+    // Orijinal belgedeki ADR sınıf etiketleri referans posteri, diğer
+    // içerik sayfalarıyla aynı çerçeve/başlık/imza tablosuyla, son sayfa
+    // olarak eklenir.
+    posterYolu: "/belge-posterleri/K2.png",
     blocks: [
       { type: "paragraph", text: "Onay kısmına yazılan; \"i\" harfi ilgili değil, \"√\" mevcut/kontrol yapıldı, \"X\" mevcut değil/kontrol yapılmadı anlamına gelir." },
       { type: "subheading", text: "1. Tehlike İkaz İşaretleri ve Turuncu Plaka Kontrolü" },
@@ -1447,6 +1451,12 @@ export const BELGE_SABLONLARI: Record<string, BelgeSablonu> = {
           ["Tank ve dökme taşıma için aracın önünde arkasında yazılı turuncu plaka ve her iki yanında arkasında tehlike ikaz işareti mevcut mu?", "□", "□", "□"],
           ["Konteyner ile yük taşınması durumunda konteynerin dört tarafında tehlike ikaz işareti ve UN numarası mevcut mu?", "□", "□", "□"],
         ],
+      },
+      { type: "images",
+        ids: ["k2_ambalajli_arac", "k2_tanker", "k2_konteyner"],
+        sutun: 3,
+        yukseklik: 24,
+        note: "Sırasıyla: ambalajlı taşıma (boş turuncu plaka), tank/dökme taşıma (yazılı turuncu plaka + tehlike ikaz işareti), konteynerli taşıma (dört yüzde tehlike ikaz işareti + UN No).",
       },
       { type: "subheading", text: "2. Genel Bilgiler" },
       { type: "bullet", items: [
@@ -1504,6 +1514,12 @@ export const BELGE_SABLONLARI: Record<string, BelgeSablonu> = {
       },
       { type: "subheading", text: "Açıklama / Notlar" },
       { type: "paragraph", text: "………………………………………………………………………………………………………………………………………………………………………" },
+      { type: "images",
+        ids: ["k2_turuncu_plaka_aciklama"],
+        sutun: 1,
+        yukseklik: 62,
+        note: "Turuncu plaka ve taşıma türü örnekleri: numarasız/numaralı turuncu plaka, paketli taşımacılık, tanker taşımacılığı.",
+      },
     ],
   },
 
