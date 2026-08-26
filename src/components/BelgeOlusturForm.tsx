@@ -1204,6 +1204,60 @@ function satirYuksekligi(doc: JsPDFType, satir: Satir, genislik: number): number
   return SATIR_YUKSEKLIGI[satir.tur] + (satir.tur === "altbaslik" ? 2 + ALTBASLIK_ON_BOSLUK : 0);
 }
 
+/** Bir tablo satırını, mevcut sayfada kalan boşluğa göre ikiye böler:
+ *  sığan kadar satır ilk parçada kalır, kalanı (aynı başlıklarla, sayfa
+ *  başında tekrar) ikinci parçaya devreder. En az başlık + 1 veri satırı
+ *  sığmıyorsa ya da bölmeye gerek yoksa (zaten tamamı sığıyor) null
+ *  döner — bu durumda çağıran taraf eski (tabloyu bölmeden bir sonraki
+ *  sayfaya atma) davranışına düşer. */
+function tabloyuBol(
+  doc: JsPDFType,
+  tablo: Extract<Satir, { tur: "tablo" }>,
+  genislik: number,
+  kalanBosluk: number
+): { ilkParca: Satir; kalanParca: Satir } | null {
+  const kolonSayisi = (tablo.headers || tablo.rows[0] || []).length;
+  const kolonGenislikleri = tabloKolonGenislikleri(genislik, kolonSayisi, tablo.colWidths);
+
+  let yukseklik = 0;
+  if (tablo.headers) {
+    const satirSayilari = tablo.headers.map(
+      (h, i) => tabloHucreSatirlari(doc, h, kolonGenislikleri[i], 7.5, true).length
+    );
+    yukseklik += Math.max(...satirSayilari) * TABLO_SATIR_YUKSEKLIGI + TABLO_PADDING * 2;
+  }
+
+  let bolunecekIndex = -1;
+  for (let i = 0; i < tablo.rows.length; i++) {
+    const satirSayilari = tablo.rows[i].map(
+      (hucre, j) => tabloHucreSatirlari(doc, hucre, kolonGenislikleri[j], 8, false).length
+    );
+    const rowYukseklik = Math.max(...satirSayilari) * TABLO_SATIR_YUKSEKLIGI + TABLO_PADDING * 2;
+    if (yukseklik + rowYukseklik > kalanBosluk) break;
+    yukseklik += rowYukseklik;
+    bolunecekIndex = i;
+  }
+
+  if (bolunecekIndex < 0) return null; // başlık + 1 satır bile sığmıyor
+  if (bolunecekIndex === tablo.rows.length - 1) return null; // zaten tamamı sığıyor
+
+  return {
+    ilkParca: {
+      tur: "tablo",
+      headers: tablo.headers,
+      rows: tablo.rows.slice(0, bolunecekIndex + 1),
+      colWidths: tablo.colWidths,
+    },
+    kalanParca: {
+      tur: "tablo",
+      headers: tablo.headers,
+      rows: tablo.rows.slice(bolunecekIndex + 1),
+      note: tablo.note,
+      colWidths: tablo.colWidths,
+    },
+  };
+}
+
 function sayfalaraBol(
   doc: JsPDFType,
   satirlar: Satir[],
@@ -1215,18 +1269,71 @@ function sayfalaraBol(
   let mevcutSayfa: Satir[] = [];
   let mevcutYukseklik = 0;
 
-  for (let i = 0; i < satirlar.length; i++) {
-    const satir = satirlar[i];
-    const kendiYuksekligi = satirYuksekligi(doc, satir, genislik);
+  // satirlar parametresi değiştirilmez; bölünen tablo parçaları bu
+  // kopyaya (kuyruk) eklenir.
+  const kuyruk: Satir[] = [...satirlar];
 
-    // Dul/yetim başlık önleme: bir altbaşlık, hemen altındaki ilk içerik
-    // satırından (paragraf/madde/tablo/görsel) koparılıp sayfa sonunda tek
-    // başına bırakılmasın diye, sığma kontrolü başlık + bir sonraki satırın
-    // TOPLAM yüksekliğiyle yapılır. Sığmıyorsa başlık da bir sonraki sayfaya
-    // atılır (yalnızca kendi yüksekliği değil, ikisi birlikte taşınır).
+  while (kuyruk.length > 0) {
+    const satir = kuyruk.shift()!;
+    const kendiYuksekligi = satirYuksekligi(doc, satir, genislik);
+    const kalanBoslukBu = kullanilabilirYukseklik - mevcutYukseklik;
+
+    // Dul/yetim önleme + boş sayfa önleme: bir altbaşlığın hemen ardından
+    // gelen tablo mevcut sayfaya toplu sığmıyorsa, önce tabloyu BÖLMEYİ
+    // dene (başlık + sığan kadar satır burada kalsın, kalanı devam
+    // sayfasında kendi başlığıyla sürsün). Bu, önceki sayfanın yarı boş
+    // kalıp bölümün neredeyse boş bir sayfada başlamasını önler.
+    if (satir.tur === "altbaslik") {
+      const sonraki = kuyruk[0];
+      if (sonraki && sonraki.tur === "tablo") {
+        const toplam = kendiYuksekligi + satirYuksekligi(doc, sonraki, genislik);
+        if (toplam > kalanBoslukBu && mevcutSayfa.length > 0) {
+          const tabloIcinKalanBosluk = kalanBoslukBu - kendiYuksekligi;
+          const bolunmus =
+            tabloIcinKalanBosluk > 0 ? tabloyuBol(doc, sonraki, genislik, tabloIcinKalanBosluk) : null;
+          if (bolunmus) {
+            kuyruk.shift(); // orijinal (bölünmemiş) tabloyu kuyruktan çıkar
+            mevcutSayfa.push(satir);
+            mevcutYukseklik += kendiYuksekligi;
+            mevcutSayfa.push(bolunmus.ilkParca);
+            sayfalar.push(mevcutSayfa);
+            mevcutSayfa = [];
+            mevcutYukseklik = 0;
+            kuyruk.unshift(bolunmus.kalanParca);
+            continue;
+          }
+          // Bölme mümkün değilse (başlık + 1 satır bile sığmıyor): eski
+          // davranışa dön — başlık + tablo birlikte sonraki sayfaya gider.
+          sayfalar.push(mevcutSayfa);
+          mevcutSayfa = [];
+          mevcutYukseklik = 0;
+          mevcutSayfa.push(satir);
+          mevcutYukseklik += kendiYuksekligi;
+          continue;
+        }
+      }
+    }
+
+    // Bağımsız (bir altbaşlığa hemen bağlı olmayan) büyük tablo: mevcut
+    // sayfada bir miktar içerik varsa ve tablo sığmıyorsa, aynı şekilde
+    // bölmeyi dene.
+    if (satir.tur === "tablo" && mevcutSayfa.length > 0 && kendiYuksekligi > kalanBoslukBu) {
+      const bolunmus = tabloyuBol(doc, satir, genislik, kalanBoslukBu);
+      if (bolunmus) {
+        mevcutSayfa.push(bolunmus.ilkParca);
+        sayfalar.push(mevcutSayfa);
+        mevcutSayfa = [];
+        mevcutYukseklik = 0;
+        kuyruk.unshift(bolunmus.kalanParca);
+        continue;
+      }
+    }
+
+    // Genel kural: dul/yetim başlık önleme (başlık + bir sonraki satırın
+    // TOPLAM yüksekliğiyle sığma kontrolü).
     let kontrolYuksekligi = kendiYuksekligi;
     if (satir.tur === "altbaslik") {
-      const sonraki = satirlar[i + 1];
+      const sonraki = kuyruk[0];
       if (sonraki && sonraki.tur !== "altbaslik") {
         kontrolYuksekligi += satirYuksekligi(doc, sonraki, genislik);
       }
