@@ -1111,8 +1111,8 @@ function tabloCiz(
       doc.setFontSize(fontSize);
       doc.setFont(FONT, kalin ? "bold" : "normal");
       doc.setTextColor(kalin && doluRenk ? 255 : 20, kalin && doluRenk ? 255 : 20, kalin && doluRenk ? 255 : 20);
-      doc.text(satirlar, kx + kolonGenislikleri[i] / 2, y + TABLO_PADDING + TABLO_SATIR_YUKSEKLIGI * 0.75, {
-        align: "center",
+      doc.text(satirlar, kx + TABLO_PADDING + 0.5, y + TABLO_PADDING + TABLO_SATIR_YUKSEKLIGI * 0.75, {
+        align: "left",
         maxWidth: kolonGenislikleri[i] - 3,
       });
       doc.rect(kx, y, kolonGenislikleri[i], satirYuksekligi);
