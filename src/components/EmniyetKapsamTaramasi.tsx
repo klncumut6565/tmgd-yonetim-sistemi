@@ -15,12 +15,13 @@
 // envanterindeki HER madde, miktarından bağımsız olarak Tablo 1.10.3.1.2
 // kapsamına girip girmediği açısından AYRI AYRI değerlendirilir.
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase/client";
 import {
-  scanInventoryScope,
+  evaluateItemScope,
   type SecurityPlanItem,
   type ScopeSummary,
+  type ItemScopeResult,
 } from "@/lib/adrSecurityPlan";
 import {
   guvenlikPlaniIncelemeRaporuUret,
@@ -45,15 +46,62 @@ type Props = {
 export default function EmniyetKapsamTaramasi({ firmId, firmaAdi }: Props) {
   const [taraniyor, setTaraniyor] = useState(false);
   const [mesaj, setMesaj] = useState("");
-  const [summary, setSummary] = useState<ScopeSummary | null>(null);
   const [pdfUretiliyor, setPdfUretiliyor] = useState(false);
+
+  // Taranan ham kalemler (orijinal L1 sırasıyla) + ilk taramada belirlenen
+  // gösterim sırası (kapsamda > belirsiz > kapsam dışı) sabit tutulur —
+  // kullanıcı bir satıra manuel miktar girdiğinde tablo yeniden
+  // sıralanıp satırlar yer değiştirmesin (input odağı kaybolmasın) diye.
+  const [items, setItems] = useState<SecurityPlanItem[] | null>(null);
+  const [siraIndeksleri, setSiraIndeksleri] = useState<number[] | null>(null);
+  // Kullanıcının "Miktar" hücresine elle girdiği değerler — items
+  // dizisindeki orijinal index'e göre anahtarlanır. Doluysa o satır bu
+  // miktara göre; boşsa mevcut (eşik gösteren) mantığa göre değerlendirilir.
+  const [manuelMiktarlar, setManuelMiktarlar] = useState<Record<number, string>>({});
+
+  const STATUS_SIRA: Record<ItemScopeResult["status"], number> = {
+    in_scope: 0,
+    undetermined: 1,
+    out_of_scope: 2,
+  };
+
+  // Her render'da: manuel girilen miktarlar varsa o satırlar için quantity
+  // override edilip evaluateItemScope() yeniden çağrılır; sıra sabit kalır.
+  const results = useMemo<ItemScopeResult[] | null>(() => {
+    if (!items || !siraIndeksleri) return null;
+    return siraIndeksleri.map((idx) => {
+      const orijinal = items[idx];
+      const manuelStr = manuelMiktarlar[idx];
+      let it = orijinal;
+      if (manuelStr && manuelStr.trim() !== "") {
+        const sayi = parseFloat(manuelStr.trim().replace(",", "."));
+        if (Number.isFinite(sayi) && sayi > 0) {
+          it = { ...orijinal, quantity: sayi };
+        }
+      }
+      return evaluateItemScope(it);
+    });
+  }, [items, siraIndeksleri, manuelMiktarlar]);
+
+  const summary = useMemo<ScopeSummary | null>(() => {
+    if (!results) return null;
+    return {
+      total: results.length,
+      inScope: results.filter((r) => r.status === "in_scope").length,
+      outOfScope: results.filter((r) => r.status === "out_of_scope").length,
+      undetermined: results.filter((r) => r.status === "undetermined").length,
+      results,
+    };
+  }, [results]);
 
   const ETIKET = "block text-[11px] font-semibold uppercase tracking-wide text-gray-500 mb-1";
 
   async function l1DenTara() {
     setTaraniyor(true);
     setMesaj("");
-    setSummary(null);
+    setItems(null);
+    setSiraIndeksleri(null);
+    setManuelMiktarlar({});
     try {
       // 1) L1'e yüklenmiş en güncel dosyayı bul
       const { data: dosyalar, error: dErr } = await supabase
@@ -208,7 +256,13 @@ export default function EmniyetKapsamTaramasi({ firmId, firmaAdi }: Props) {
         return;
       }
 
-      setSummary(scanInventoryScope(items));
+      // İlk gösterim sırası (kapsamda > belirsiz > kapsam dışı) burada
+      // bir kez hesaplanıp sabitlenir — sonraki manuel miktar girişleri
+      // bu sırayı değiştirmez (bkz. results useMemo).
+      const ilkDegerlendirme = items.map((it, idx) => ({ idx, r: evaluateItemScope(it) }));
+      ilkDegerlendirme.sort((a, b) => STATUS_SIRA[a.r.status] - STATUS_SIRA[b.r.status]);
+      setItems(items);
+      setSiraIndeksleri(ilkDegerlendirme.map((x) => x.idx));
       setMesaj(`✓ ${items.length} kimyasal tarandı (dosya: ${dosya.file_name}).`);
     } catch (e) {
       setMesaj("Tarama sırasında hata: " + (e instanceof Error ? e.message : String(e)));
@@ -379,6 +433,10 @@ export default function EmniyetKapsamTaramasi({ firmId, firmaAdi }: Props) {
           </div>
 
           <div className="border border-gray-200 rounded-xl bg-white overflow-hidden">
+            <p className="text-[11px] text-gray-400 px-3 pt-2">
+              Miktar hücresine sevkiyat başına değer girersen o satır bu miktara göre kesin
+              sonuçla yeniden değerlendirilir; boş bırakırsan mevcut eşik bilgisi geçerli kalır.
+            </p>
             <table className="w-full text-xs">
               <thead className="bg-gray-50">
                 <tr>
@@ -414,7 +472,26 @@ export default function EmniyetKapsamTaramasi({ firmId, firmaAdi }: Props) {
                     <td className="p-2 text-center">{r.packing_group || "—"}</td>
                     <td className="p-2 text-center">{r.mode}</td>
                     <td className="p-2 text-center">
-                      {r.quantityKnown ? `${r.quantity} ${r.thresholdUnit || ""}` : "—"}
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        placeholder="—"
+                        className="w-16 text-center border border-gray-200 rounded px-1 py-0.5 text-xs focus:border-blue-400 focus:outline-none"
+                        value={
+                          siraIndeksleri
+                            ? manuelMiktarlar[siraIndeksleri[i]] ?? ""
+                            : ""
+                        }
+                        onChange={(e) => {
+                          if (!siraIndeksleri) return;
+                          const orijinalIdx = siraIndeksleri[i];
+                          const deger = e.target.value;
+                          setManuelMiktarlar((prev) => ({ ...prev, [orijinalIdx]: deger }));
+                        }}
+                      />
+                      {r.thresholdUnit && (
+                        <span className="text-[10px] text-gray-400 ml-1">{r.thresholdUnit}</span>
+                      )}
                     </td>
                     <td className="p-2 text-center">
                       <span
