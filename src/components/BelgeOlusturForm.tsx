@@ -328,11 +328,17 @@ export default function BelgeOlusturForm({ fixedFirmId, initialFirmId, compact =
     }
   }
 
-  async function generate() {
+  async function generate(mod: "indir" | "onizle" = "indir") {
     if (!firm || selected.length === 0) return;
     setBusy(true);
     setMsg("");
     setError("");
+
+    // Önizlemede: tarayıcının popup engelleyicisini atlatmak için TÜM
+    // pencereler, herhangi bir async işlemden ÖNCE (senkron, tıklama
+    // olayının içinde) açılır — sonradan blob URL'leri atanır.
+    const onizlemePencereleri: (Window | null)[] =
+      mod === "onizle" ? selected.map(() => window.open("", "_blank")) : [];
 
     try {
       const { jsPDF } = await import("jspdf");
@@ -348,8 +354,9 @@ export default function BelgeOlusturForm({ fixedFirmId, initialFirmId, compact =
       // Onaylayan (tesis sorumlusu) firma bazlı hatırlanır: bu üretimde
       // yazılan isim, önceki kayıttan farklıysa firmaya işlenir; böylece
       // aynı firma bir daha seçildiğinde alan kendiliğinden dolu gelir.
+      // Önizlemede DB'ye yazılmaz (salt okunur kullanıcılar da önizleyebilsin).
       const yeniOnaylayan = onaylayanAdi.trim();
-      if (yeniOnaylayan && yeniOnaylayan !== (firm.approver_name || "")) {
+      if (mod === "indir" && yeniOnaylayan && yeniOnaylayan !== (firm.approver_name || "")) {
         const { error: kayitHatasi } = await supabase
           .from("firms")
           .update({ approver_name: yeniOnaylayan })
@@ -372,7 +379,8 @@ export default function BelgeOlusturForm({ fixedFirmId, initialFirmId, compact =
         }
       }
 
-      for (const code of selected) {
+      for (let i = 0; i < selected.length; i++) {
+        const code = selected[i];
         const item = CATALOG.find((c) => c.code === code);
         if (!item) continue;
 
@@ -425,6 +433,17 @@ export default function BelgeOlusturForm({ fixedFirmId, initialFirmId, compact =
           renderBasitBelge(doc, firm, item, logo, notes, bugun);
         }
 
+        if (mod === "onizle") {
+          const pencere = onizlemePencereleri[i];
+          if (pencere) {
+            const blobUrl = URL.createObjectURL(doc.output("blob"));
+            pencere.location.href = blobUrl;
+          }
+          // Önizlemede Belge Takip'te "tamamlandı" işaretlenmez — bu,
+          // yalnızca göz atmak için, henüz gerçek üretim/teslim değildir.
+          continue;
+        }
+
         doc.save(`${firm.name}_${item.code}.pdf`);
 
         // Belge Takip'te tamamlandı işaretle
@@ -440,8 +459,12 @@ export default function BelgeOlusturForm({ fixedFirmId, initialFirmId, compact =
         );
       }
 
-      setMsg(`✓ ${selected.length} belge oluşturuldu ve Belge Takip listesinde işaretlendi.`);
-      setSelected([]);
+      if (mod === "onizle") {
+        setMsg(`✓ ${selected.length} belge önizlendi.`);
+      } else {
+        setMsg(`✓ ${selected.length} belge oluşturuldu ve Belge Takip listesinde işaretlendi.`);
+        setSelected([]);
+      }
     } catch (e) {
       setError("Belge oluşturulamadı: " + hataCevir(e as { message?: string }));
     } finally {
@@ -687,15 +710,24 @@ export default function BelgeOlusturForm({ fixedFirmId, initialFirmId, compact =
             />
           </label>
 
-          <button
-            onClick={generate}
-            disabled={!canWrite || busy || !firm || selected.length === 0}
-            className="w-full px-4 py-2 rounded bg-blue-600 text-white disabled:opacity-50"
-          >
-            {busy
-              ? "Oluşturuluyor..."
-              : `✦ Belgeyi Oluştur${selected.length ? ` (${selected.length})` : ""}`}
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={() => generate("onizle")}
+              disabled={busy || !firm || selected.length === 0}
+              className="flex-1 px-4 py-2 rounded border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+            >
+              {busy ? "…" : `👁️ Önizle${selected.length ? ` (${selected.length})` : ""}`}
+            </button>
+            <button
+              onClick={() => generate("indir")}
+              disabled={!canWrite || busy || !firm || selected.length === 0}
+              className="flex-1 px-4 py-2 rounded bg-blue-600 text-white disabled:opacity-50"
+            >
+              {busy
+                ? "Oluşturuluyor..."
+                : `✦ Belgeyi Oluştur${selected.length ? ` (${selected.length})` : ""}`}
+            </button>
+          </div>
           {!canWrite && (
             <p className="text-xs text-gray-400 mt-2">
               Hesabın salt okunur — belge oluşturamazsın.
