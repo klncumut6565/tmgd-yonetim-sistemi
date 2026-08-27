@@ -242,40 +242,56 @@ function ziyaretAylari(contractStart: string | null): ChecklistItem[] {
   return items;
 }
 
-// Sözleşme başlangıç YILINDAN GEÇEN YILA kadar, her yıl için ayrı bir
-// Yıllık Faaliyet Raporu (ADR 1.8.3.3) maddesi üretir.
+// HER ZAMAN geçen yılın (currentYear - 1) Yıllık Faaliyet Raporu (ADR
+// 1.8.3.3) en azından listede görünür — sözleşme tarihinden bağımsız
+// olarak. Sözleşme daha eski bir yıldaysa, o yıldan itibaren geçen yıla
+// kadar TÜM eksik yıllar da eklenir.
 //
-// İÇİNDE BULUNULAN YIL DAHİL EDİLMEZ: Bir yılın faaliyet raporu, o yıl
-// TAMAMLANDIKTAN sonra hazırlanır ve ertesi yılın Nisan ayı sonuna kadar
-// verilir. Örnek: 2026 raporu, 2027 Nisan sonuna kadar verilir — dolayısıyla
-// 2026 içindeyken bu madde henüz gündemde değildir ve listede görünmemelidir.
-// Son görünen madde: (içinde bulunulan yıl - 1).
+// SORUMLULUK KURALI: Bir yılın raporu, o yıl tamamlandıktan sonra
+// hazırlanır ve TAKİP EDEN YILIN MAYIS BAŞINA kadar teslim edilir.
+// TMGD, göreve başladığı anda bu teslim tarihi henüz geçmemiş bir
+// raporun sorumluluğunu ÜSTLENİR:
+//   • Sözleşme, İÇİNDE BULUNULAN YILIN Mayıs ayından ÖNCE (Ocak–Nisan)
+//     başladıysa → GEÇEN YILIN raporu henüz teslim edilmemiştir (teslim
+//     tarihi olan Mayıs başı henüz gelmemiştir), TMGD bundan sorumludur.
+//     Örnek: 01.03.2026 sözleşme → 2025 raporu Mayıs 2026 başına kadar
+//     TMGD tarafından hazırlanmalıdır.
+//   • Sözleşme, Mayıs ayı veya sonrasında başladıysa → geçen yılın
+//     teslim tarihi (Mayıs başı) zaten geçmiştir, sorumluluk önceki
+//     TMGD'ye aittir; TMGD ilk kez KENDİ BAŞLADIĞI yıldan sorumlu olur
+//     (o yılın raporu ise ancak takip eden yıl gündeme gelir).
 //
-// İSTİSNA: Sözleşme, başlangıç yılının Mayıs ayı veya sonrasında
-// başladıysa, o ilk yılın raporu listeye DAHİL EDİLMEZ — çünkü rapor
-// son tarihi (ertesi yılın Nisan sonu) için sorumluluk önceki TMGD
-// firmasına aittir.
+// İÇİNDE BULUNULAN YIL asla listede görünmez — henüz tamamlanmadığı
+// için raporu hazırlanamaz (bkz. sonRaporYili = currentYear - 1).
 function yillikFaaliyetRaporlari(contractStart: string | null): ChecklistItem[] {
   const now = new Date();
   const currentYear = now.getFullYear();
+  const sonRaporYili = currentYear - 1; // her zaman: en son gösterilecek yıl
 
-  let startYear = currentYear;
-  let ilkYiliHaricTut = false;
+  // Varsayılan (sözleşme bilgisi yok ya da geçen yıldan da eskiyse):
+  // en azından geçen yılın raporu gösterilir.
+  let startYear = sonRaporYili;
 
   if (contractStart) {
     const cs = new Date(contractStart);
-    startYear = cs.getFullYear();
-    if (cs.getMonth() >= 4) { // 0-indeksli: Mayıs = 4
-      ilkYiliHaricTut = true;
+    const sozlesmeYili = cs.getFullYear();
+    const mayisOncesi = cs.getMonth() < 4; // 0-indeksli: Mayıs = 4
+
+    if (sozlesmeYili <= sonRaporYili) {
+      // Sözleşme geçen yıl veya daha eski bir yılda başlamış: normal
+      // akış — sözleşme yılından itibaren (mayıs istisnasına göre ilk
+      // yıl dahil/hariç) geçen yıla kadar tüm yıllar listelenir.
+      startYear = mayisOncesi ? sozlesmeYili : sozlesmeYili + 1;
+    } else {
+      // Sözleşme İÇİNDE BULUNULAN YILDA (ya da ileride) başlamış: geçen
+      // yılın raporundan TMGD'nin sorumlu olup olmadığı yukarıdaki
+      // kurala göre belirlenir.
+      startYear = mayisOncesi ? sonRaporYili : currentYear;
     }
   }
 
-  // Raporlanabilir en son yıl: geçen yıl (bkz. yukarıdaki açıklama)
-  const sonRaporYili = currentYear - 1;
-
   const items: ChecklistItem[] = [];
   for (let y = startYear; y <= sonRaporYili; y++) {
-    if (y === startYear && ilkYiliHaricTut) continue;
     items.push({
       code: "YFR",
       period: String(y),
