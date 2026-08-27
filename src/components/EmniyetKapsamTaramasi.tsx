@@ -123,14 +123,25 @@ export default function EmniyetKapsamTaramasi({ firmId, firmaAdi }: Props) {
         basliklar.findIndex((h) => adaylar.some((a) => h.includes(a)));
       const adKol = kolBul("ürün", "urun", "madde adı", "kimyasal", "ticari", "product", "ad");
       const miktarKol = kolBul("miktar", "yıllık", "yillik", "quantity", "amount", "tonaj", "kapasite");
-      // "Taşıma Modu/Şekli/Türü" (tank/dökme/ambalaj) ile "Ambalaj Tipi"
-      // (varil/IBC/bidon) genelde farklı kolonlardır — önce taşıma modunu
-      // arıyoruz, yoksa ambalaj kolonuna düşüyoruz (tek kolon kullanan
-      // dosyalarda genelde oraya "tank"/"dökme" de yazılır).
-      const tasimaModuKol = kolBul(
-        "taşıma modu", "tasima modu", "taşıma şekli", "tasima sekli",
-        "taşıma türü", "tasima turu", "taşıma tipi", "tasima tipi"
+      // "Taşıma Modu" kolonu farklı adlarla gelebilir. Bir dosyada hem
+      // fiziksel "Ambalaj Tipi" (varil/IBC/bidon) hem de taşıma modu
+      // ("AMBALAJLI/ TANK/ DÖKME" gibi 3 seçeneği başlıkta birden
+      // listeleyen) kolonu bulunabiliyor — sadece "ambalaj" kelimesini
+      // arayan basit eşleştirme yanlışlıkla ilkini (paket tipini)
+      // yakalayabilir. Bu yüzden önce "ambalajlı" + "tank" + "dökme"
+      // kelimelerinin HEPSİNİN birden geçtiği başlığı arıyoruz (taşıma
+      // modu kolonunun kendine özgü imzası), sonra genel isimlere,
+      // en son da düz "ambalaj"/"packag" kolonuna düşüyoruz.
+      const ucSecenekliKol = basliklar.findIndex(
+        (h) => h.includes("ambalajlı") && h.includes("tank") && h.includes("dökme")
       );
+      const tasimaModuKol =
+        ucSecenekliKol >= 0
+          ? ucSecenekliKol
+          : kolBul(
+              "taşıma modu", "tasima modu", "taşıma şekli", "tasima sekli",
+              "taşıma türü", "tasima turu", "taşıma tipi", "tasima tipi"
+            );
       const ambalajKol = tasimaModuKol >= 0 ? tasimaModuKol : kolBul("ambalaj", "packag");
 
       const ham: { un: string; ad: string; miktar: string; ambalaj: string }[] = [];
