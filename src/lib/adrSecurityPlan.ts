@@ -443,9 +443,8 @@ export function evaluateItemScope(item: SecurityPlanItem): ItemScopeResult {
       conclusion:
         `Sınıf ${clsRaw} maddesi [${modAdi}]: bir sevkiyatta/taşımada ${limit} ${birim}'e KADAR (${limit} ${birim} ` +
         `dahil) güvenlik planı hazırlanmasına GEREK YOKTUR; tek seferde ${limit} ${birim}'i AŞARSA güvenlik planı ` +
-        `GEREKLİDİR (Tablo 1.10.3.1.2 — eşik, sevkiyat/taşıma başına miktara göredir, yıllık toplama göre değil). ` +
-        `L1 envanterinde sevkiyat başına miktar bilgisi bulunmadığından kesin sonuç için o taşımadaki fiili ` +
-        `miktarla karşılaştırılmalıdır.`,
+        `GEREKLİDİR (Tablo 1.10.3.1.2). L1 envanterinde sevkiyat başına miktar bilgisi bulunmadığından kesin ` +
+        `sonuç için o taşımadaki fiili miktarla karşılaştırılmalıdır.`,
     };
   }
   const deger = item.quantity;
