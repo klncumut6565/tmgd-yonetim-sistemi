@@ -441,9 +441,10 @@ export function evaluateItemScope(item: SecurityPlanItem): ItemScopeResult {
       threshold: limit,
       thresholdUnit: birim,
       conclusion:
-        `Sınıf ${clsRaw} maddesi [${modAdi}]: Tablo 1.10.3.1.2 kapsamındadır — eşik ${limit} ${birim}. ` +
-        `Envanterde yıllık miktar bilgisi bulunmadığından kesin kapsam durumu belirlenemedi; ` +
-        `firma kayıtlarındaki fiili miktarla karşılaştırılmalıdır.`,
+        `Sınıf ${clsRaw} maddesi [${modAdi}]: ${limit} ${birim}'e KADAR (${limit} ${birim} dahil) güvenlik planı ` +
+        `hazırlanmasına GEREK YOKTUR; ${limit} ${birim}'i AŞARSA güvenlik planı GEREKLİDİR (Tablo 1.10.3.1.2). ` +
+        `L1 envanterinde miktar bilgisi bulunmadığından kesin sonuç için firma kayıtlarındaki fiili miktarla ` +
+        `karşılaştırılmalıdır.`,
     };
   }
   const deger = item.quantity;
