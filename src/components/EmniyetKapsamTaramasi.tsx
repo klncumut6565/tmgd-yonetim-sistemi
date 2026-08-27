@@ -122,7 +122,16 @@ export default function EmniyetKapsamTaramasi({ firmId, firmaAdi }: Props) {
       const kolBul = (...adaylar: string[]) =>
         basliklar.findIndex((h) => adaylar.some((a) => h.includes(a)));
       const adKol = kolBul("ürün", "urun", "madde adı", "kimyasal", "ticari", "product", "ad");
-      const miktarKol = kolBul("miktar", "yıllık", "yillik", "quantity", "amount", "tonaj", "kapasite");
+      // NOT: L1 envanter dosyalarında yıllık/toplam miktar bilgisi
+      // TUTULMUYOR — bu, kullanıcı tarafından teyit edildi. "Kapasite",
+      // "Tonaj" gibi geniş terimlerle bir miktar kolonu aramak, aslında
+      // ambalaj hacmi/adet gibi alakasız bir sütunu yanlışlıkla "yıllık
+      // miktar" sanıp hatalı KAPSAMDA/KAPSAM DIŞI kesin sonuçlar
+      // üretme riski taşıyordu (ör. UN 1203 için "1 litre" okunup yanlışça
+      // KAPSAM DIŞI denmesi). Bu yüzden miktar hiç okunmuyor — quantity
+      // her zaman bilinmiyor kabul edilir, evaluateItemScope() de bu
+      // durumda kesin sonuç yerine ilgili taşıma modu için geçerli sınır
+      // miktarını (eşiği) açık şekilde bildiriyor.
       // L1'in taşıma modu kolonu genelde "AMBALAJLI/ TANK/ DÖKME" gibi 3
       // seçeneği başlıkta birden listeler. (Not: "Ambalaj Tipi" — varil/
       // IBC/bidon gibi paket türü kavramı — Taşıma Evrakı modülüne özeldir
@@ -151,7 +160,7 @@ export default function EmniyetKapsamTaramasi({ firmId, firmaAdi }: Props) {
         ham.push({
           un,
           ad: adKol >= 0 ? String(row[adKol] ?? "").trim() : "",
-          miktar: miktarKol >= 0 ? String(row[miktarKol] ?? "").trim() : "",
+          miktar: "", // bilinçli olarak okunmuyor — yukarıdaki nota bakın
           ambalaj: ambalajKol >= 0 ? String(row[ambalajKol] ?? "").trim() : "",
         });
       }
