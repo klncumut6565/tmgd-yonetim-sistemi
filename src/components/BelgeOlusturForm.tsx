@@ -377,14 +377,18 @@ export default function BelgeOlusturForm({ fixedFirmId, initialFirmId, compact =
         if (!item) continue;
 
         // Belge yönü şablondan gelir; yatay şablonlarda (çok sütunlu
-        // matrisler) sayfa 297x210 olur.
+        // matrisler) İÇERİK sayfaları 297x210 olur. Kapak sayfası
+        // belgenin türünden BAĞIMSIZ olarak her zaman dikeydir (210x297)
+        // — bu yüzden doküman her zaman portrait olarak başlatılır;
+        // içerik yatay ise renderYapilandirilmisBelge kapaktan SONRA
+        // ilk içerik sayfasını manuel olarak landscape'e çevirir.
         const yatayMi = !!belgeSablonu(item.code)?.yatay;
         const doc = new jsPDF({
-          orientation: yatayMi ? "landscape" : "portrait",
+          orientation: "portrait",
           unit: "mm",
           format: "a4",
         });
-        sayfaYonunuAyarla(yatayMi);
+        sayfaYonunuAyarla(false);
         const sablon = belgeSablonu(item.code);
 
         if (sablon) {
@@ -413,7 +417,8 @@ export default function BelgeOlusturForm({ fixedFirmId, initialFirmId, compact =
             notes,
             hazirlayanAdi,
             onaylayanAdi.trim(),
-            faaliyetKapsami
+            faaliyetKapsami,
+            yatayMi
           );
         } else {
           await fontuKaydet(doc);
@@ -1671,9 +1676,18 @@ async function renderYapilandirilmisBelge(
   notlar: string,
   hazirlayanAdi: string,
   onaylayanAdi: string,
-  faaliyetKapsami: string
+  faaliyetKapsami: string,
+  yatayMi: boolean
 ) {
   await fontuKaydet(doc);
+
+  // İçerik satırlarının/tablo genişliklerinin hesaplanması (duzMetneCevir,
+  // sayfalaraBol, baslikYuksekligiHesapla) belgenin GERÇEK içerik yönüne
+  // (yatay/dikey) göre yapılmalı — bu yüzden W/H burada içerik yönüne göre
+  // ayarlanır. Kapak sayfası HER ZAMAN dikeydir; kapak çizilirken W/H
+  // geçici olarak portrait'e alınır (aşağıda kapakSayfasiCiz çağrısından
+  // hemen önce).
+  sayfaYonunuAyarla(yatayMi);
 
   const bugun = new Date().toLocaleDateString("tr-TR");
   // İçerik ana başlığında kod ön eki (SA1 — vb.) kullanılmaz; kod zaten
@@ -1705,7 +1719,12 @@ async function renderYapilandirilmisBelge(
   const posterVeri = sablon.posterYolu ? await posterGorseliGetir(sablon.posterYolu) : null;
   const toplamSayfa = sayfalar.length + (posterVeri ? 1 : 0);
 
-  // Kapak sayfası her belgenin ilk sayfasıdır; içerik ondan sonra başlar.
+  // Kapak sayfası her belgenin ilk sayfasıdır ve HER ZAMAN dikeydir —
+  // belge içeriği yatay olsa bile. jsPDF dokümanı zaten portrait
+  // başlatıldığı için burada ekstra addPage gerekmez, sadece W/H'yi
+  // (içerik hesaplaması için yukarıda yatay ayarlanmışsa) geçici olarak
+  // portrait'e geri alıyoruz.
+  sayfaYonunuAyarla(false);
   kapakSayfasiCiz(
     doc,
     firmAdi,
@@ -1722,7 +1741,16 @@ async function renderYapilandirilmisBelge(
   );
 
   sayfalar.forEach((sayfaSatirlari, idx) => {
-    doc.addPage(); // kapak 1. sayfa olduğundan içerik her zaman yeni sayfada
+    if (idx === 0 && yatayMi) {
+      // İlk içerik sayfasına geçerken belge yataysa sayfa boyutunu da
+      // (a4, landscape) fiilen değiştiriyoruz — jsPDF'te sayfa yönü
+      // addPage() ile açıkça belirtilmelidir, aksi halde önceki (kapak)
+      // sayfanın portrait boyutu korunur.
+      doc.addPage("a4", "landscape");
+      sayfaYonunuAyarla(true);
+    } else {
+      doc.addPage(); // sonraki sayfalar mevcut yönü korur
+    }
 
     baslikTablosuCiz(doc, firmAdi, code, belgeAdi, sablon, logo, bugun, idx + 1, toplamSayfa, baslikYukseklik, adLines);
     // KONTROL FORMU türünde belgeler kendi içinde (blocks) zaten bir
@@ -1781,7 +1809,15 @@ async function renderYapilandirilmisBelge(
   // da görünür kalır. Görsel, içerik kutusuna ORANI KORUNARAK (taşmadan)
   // sığdırılır.
   if (posterVeri) {
-    doc.addPage();
+    if (sayfalar.length === 0 && yatayMi) {
+      // İçerik hiç yoksa (yalnızca kapak + poster), yukarıdaki forEach hiç
+      // çalışmadığı için sayfa hâlâ kapağın portrait boyutunda kalmış
+      // olabilir — poster yataysa burada da açıkça landscape'e geçilir.
+      doc.addPage("a4", "landscape");
+      sayfaYonunuAyarla(true);
+    } else {
+      doc.addPage(); // önceki (içerik) sayfayla aynı yönü korur
+    }
     baslikTablosuCiz(doc, firmAdi, code, belgeAdi, sablon, logo, bugun, toplamSayfa, toplamSayfa, baslikYukseklik, adLines);
     if (sablon.docType !== "KONTROL FORMU") {
       altTabloCiz(doc, hazirlayanAdi, onaylayanAdi);
