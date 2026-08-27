@@ -123,15 +123,13 @@ export default function EmniyetKapsamTaramasi({ firmId, firmaAdi }: Props) {
         basliklar.findIndex((h) => adaylar.some((a) => h.includes(a)));
       const adKol = kolBul("ürün", "urun", "madde adı", "kimyasal", "ticari", "product", "ad");
       const miktarKol = kolBul("miktar", "yıllık", "yillik", "quantity", "amount", "tonaj", "kapasite");
-      // "Taşıma Modu" kolonu farklı adlarla gelebilir. Bir dosyada hem
-      // fiziksel "Ambalaj Tipi" (varil/IBC/bidon) hem de taşıma modu
-      // ("AMBALAJLI/ TANK/ DÖKME" gibi 3 seçeneği başlıkta birden
-      // listeleyen) kolonu bulunabiliyor — sadece "ambalaj" kelimesini
-      // arayan basit eşleştirme yanlışlıkla ilkini (paket tipini)
-      // yakalayabilir. Bu yüzden önce "ambalajlı" + "tank" + "dökme"
-      // kelimelerinin HEPSİNİN birden geçtiği başlığı arıyoruz (taşıma
-      // modu kolonunun kendine özgü imzası), sonra genel isimlere,
-      // en son da düz "ambalaj"/"packag" kolonuna düşüyoruz.
+      // L1'in taşıma modu kolonu genelde "AMBALAJLI/ TANK/ DÖKME" gibi 3
+      // seçeneği başlıkta birden listeler. (Not: "Ambalaj Tipi" — varil/
+      // IBC/bidon gibi paket türü kavramı — Taşıma Evrakı modülüne özeldir
+      // ve L1 kimyasal envanterinde yer almaz; bu iki kavram karışmaz.)
+      // Önce bu 3-seçenekli başlığı, sonra "taşıma modu/şekli/türü/tipi"
+      // gibi alternatif adları, en son da düz "ambalaj"/"packag" kolonunu
+      // ararız.
       const ucSecenekliKol = basliklar.findIndex(
         (h) => h.includes("ambalajlı") && h.includes("tank") && h.includes("dökme")
       );
