@@ -441,10 +441,11 @@ export function evaluateItemScope(item: SecurityPlanItem): ItemScopeResult {
       threshold: limit,
       thresholdUnit: birim,
       conclusion:
-        `Sınıf ${clsRaw} maddesi [${modAdi}]: ${limit} ${birim}'e KADAR (${limit} ${birim} dahil) güvenlik planı ` +
-        `hazırlanmasına GEREK YOKTUR; ${limit} ${birim}'i AŞARSA güvenlik planı GEREKLİDİR (Tablo 1.10.3.1.2). ` +
-        `L1 envanterinde miktar bilgisi bulunmadığından kesin sonuç için firma kayıtlarındaki fiili miktarla ` +
-        `karşılaştırılmalıdır.`,
+        `Sınıf ${clsRaw} maddesi [${modAdi}]: bir sevkiyatta/taşımada ${limit} ${birim}'e KADAR (${limit} ${birim} ` +
+        `dahil) güvenlik planı hazırlanmasına GEREK YOKTUR; tek seferde ${limit} ${birim}'i AŞARSA güvenlik planı ` +
+        `GEREKLİDİR (Tablo 1.10.3.1.2 — eşik, sevkiyat/taşıma başına miktara göredir, yıllık toplama göre değil). ` +
+        `L1 envanterinde sevkiyat başına miktar bilgisi bulunmadığından kesin sonuç için o taşımadaki fiili ` +
+        `miktarla karşılaştırılmalıdır.`,
     };
   }
   const deger = item.quantity;
@@ -455,8 +456,8 @@ export function evaluateItemScope(item: SecurityPlanItem): ItemScopeResult {
       threshold: limit,
       thresholdUnit: birim,
       conclusion:
-        `Sınıf ${clsRaw} maddesi [${modAdi}]: ${deger} ${birim} miktarı, Tablo 1.10.3.1.2'deki ${limit} ${birim} ` +
-        `eşiğini aştığından güvenlik planı GEREKLİDİR.`,
+        `Sınıf ${clsRaw} maddesi [${modAdi}]: sevkiyat başına ${deger} ${birim} miktarı, Tablo 1.10.3.1.2'deki ` +
+        `${limit} ${birim} eşiğini aştığından güvenlik planı GEREKLİDİR.`,
     };
   }
   return {
@@ -465,8 +466,8 @@ export function evaluateItemScope(item: SecurityPlanItem): ItemScopeResult {
     threshold: limit,
     thresholdUnit: birim,
     conclusion:
-      `Sınıf ${clsRaw} maddesi [${modAdi}]: ${deger} ${birim} miktarı, Tablo 1.10.3.1.2'deki ${limit} ${birim} ` +
-      `eşiğinin altında kaldığından güvenlik planı hazırlanmasına gerek yoktur.`,
+      `Sınıf ${clsRaw} maddesi [${modAdi}]: sevkiyat başına ${deger} ${birim} miktarı, Tablo 1.10.3.1.2'deki ` +
+      `${limit} ${birim} eşiğinin altında kaldığından güvenlik planı hazırlanmasına gerek yoktur.`,
   };
 }
 

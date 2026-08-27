@@ -338,7 +338,7 @@ function ozetKutusuCiz(doc: JsPDFType, summary: ScopeSummary, y: number): number
     doc.setFont(FONT, "normal");
     doc.setTextColor(161, 98, 7);
     doc.text(
-      `⚠ ${summary.undetermined} kimyasalın yıllık miktar bilgisi envanterde bulunmadığından kapsam durumu kesinleştirilemedi.`,
+      `⚠ ${summary.undetermined} kimyasalın sevkiyat başına miktar bilgisi envanterde bulunmadığından kapsam durumu kesinleştirilemedi.`,
       M,
       y + 23
     );

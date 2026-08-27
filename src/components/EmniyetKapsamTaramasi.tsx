@@ -122,16 +122,18 @@ export default function EmniyetKapsamTaramasi({ firmId, firmaAdi }: Props) {
       const kolBul = (...adaylar: string[]) =>
         basliklar.findIndex((h) => adaylar.some((a) => h.includes(a)));
       const adKol = kolBul("ürün", "urun", "madde adı", "kimyasal", "ticari", "product", "ad");
-      // NOT: L1 envanter dosyalarında yıllık/toplam miktar bilgisi
-      // TUTULMUYOR — bu, kullanıcı tarafından teyit edildi. "Kapasite",
-      // "Tonaj" gibi geniş terimlerle bir miktar kolonu aramak, aslında
-      // ambalaj hacmi/adet gibi alakasız bir sütunu yanlışlıkla "yıllık
-      // miktar" sanıp hatalı KAPSAMDA/KAPSAM DIŞI kesin sonuçlar
-      // üretme riski taşıyordu (ör. UN 1203 için "1 litre" okunup yanlışça
-      // KAPSAM DIŞI denmesi). Bu yüzden miktar hiç okunmuyor — quantity
-      // her zaman bilinmiyor kabul edilir, evaluateItemScope() de bu
-      // durumda kesin sonuç yerine ilgili taşıma modu için geçerli sınır
-      // miktarını (eşiği) açık şekilde bildiriyor.
+      // NOT: L1 envanter dosyalarında sevkiyat/taşıma başına miktar bilgisi
+      // TUTULMUYOR — bu, kullanıcı tarafından teyit edildi. ADR Tablo
+      // 1.10.3.1.2 eşikleri YILLIK TOPLAMA değil, TEK SEVKİYATTA taşınan
+      // miktara göredir. "Kapasite", "Tonaj" gibi geniş terimlerle bir
+      // miktar kolonu aramak, aslında ambalaj hacmi/adet gibi alakasız
+      // bir sütunu yanlışlıkla miktar sanıp hatalı KAPSAMDA/KAPSAM DIŞI
+      // kesin sonuçlar üretme riski taşıyordu (ör. UN 1203 için "1 litre"
+      // okunup yanlışça KAPSAM DIŞI denmesi). Bu yüzden miktar hiç
+      // okunmuyor — quantity her zaman bilinmiyor kabul edilir,
+      // evaluateItemScope() de bu durumda kesin sonuç yerine ilgili
+      // taşıma modu için geçerli sınır miktarını (sevkiyat başına eşiği)
+      // açık şekilde bildiriyor.
       // L1'in taşıma modu kolonu genelde "AMBALAJLI/ TANK/ DÖKME" gibi 3
       // seçeneği başlıkta birden listeler. (Not: "Ambalaj Tipi" — varil/
       // IBC/bidon gibi paket türü kavramı — Taşıma Evrakı modülüne özeldir
@@ -354,8 +356,8 @@ export default function EmniyetKapsamTaramasi({ firmId, firmaAdi }: Props) {
           </div>
           {summary.undetermined > 0 && (
             <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-              ⚠ {summary.undetermined} kimyasalın yıllık miktar bilgisi L1 dosyasında bulunmadığından
-              kapsam durumu kesinleştirilemedi — firma kayıtlarındaki fiili miktarla karşılaştırılmalı.
+              ⚠ {summary.undetermined} kimyasalın sevkiyat başına miktar bilgisi L1 dosyasında bulunmadığından
+              kapsam durumu kesinleştirilemedi — o taşımadaki fiili miktarla karşılaştırılmalı.
             </p>
           )}
 
