@@ -1211,6 +1211,14 @@ function FirmDetailInner({
                         const expiryInfo = expiryDate ? expiryBadge(expiryDate) : null;
                         const isZiyaret = it.code === "ZR";
                         const visitDate = isZiyaret ? visitByPeriod[it.period] || "" : "";
+                        // Bu kategorilerde "geçerlilik tarihi" kavramı anlamsız —
+                        // prosedür/talimat/kontrol formu/liste/yıllık faaliyet
+                        // raporu/kaza-olay bildirimi hep yeniden üretilen veya
+                        // süreklilik arz eden belgelerdir, bir bitiş tarihi
+                        // taşımazlar. Bu maddelerde geçerlilik girişi/rozeti
+                        // hiç gösterilmez.
+                        const gecerlilikYok =
+                          /^[PTKL]\d/.test(it.code) || it.code === "YFR" || it.code === "D3";
 
                         return (
                           <div key={itemKey} className="px-4 py-2 text-sm hover:bg-gray-50">
@@ -1231,7 +1239,7 @@ function FirmDetailInner({
                                     {itemFiles.length} dosya
                                   </span>
                                 )}
-                                {!isZiyaret && expiryInfo && (
+                                {!isZiyaret && !gecerlilikYok && expiryInfo && (
                                   <span className={"text-[10px] px-1.5 py-0.5 rounded-full shrink-0 " + expiryInfo.className}>
                                     {expiryInfo.label}
                                   </span>
@@ -1271,7 +1279,7 @@ function FirmDetailInner({
                                     onChange={(date) => updateContractStart(date)}
                                   />
                                 </div>
-                              ) : (
+                              ) : gecerlilikYok ? null : (
                                 /* Geçerlilik tarihi — isteğe bağlı. DateInput hibrit bileşeni:
                                    hem GG.AA.YYYY yazılabilir hem 📅 ikonundan takvim açılır. */
                                 <div className="flex items-center gap-1 shrink-0 text-xs text-gray-400">
