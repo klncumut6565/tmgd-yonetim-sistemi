@@ -473,7 +473,12 @@ async function evrakPdfUret(args: {
   doc.text("GÖNDEREN (Ad Soyad / Kaşe / İmza)", M + imzaW / 2, imzaY + 4.5, { align: "center" });
   doc.text("SÜRÜCÜ (Ad Soyad / İmza)", M + imzaW + 8 + imzaW / 2, imzaY + 4.5, { align: "center" });
   doc.setFont(FONT, "normal"); doc.setFontSize(8);
-  doc.text(surucuAd, M + imzaW + 8 + imzaW / 2, imzaY + 12, { align: "center" });
+  // İmza kutusu, sürücünün elle imzalayacağı boş bir alandır — isim
+  // girilmemişse buraya "—" değil, hiçbir şey yazılmaz (üst şeritteki
+  // "Sürücü:" bilgi alanında "—" göstermeye devam edilir, orası ayrı).
+  if (surucuAd !== "—") {
+    doc.text(surucuAd, M + imzaW + 8 + imzaW / 2, imzaY + 12, { align: "center" });
+  }
 
   // İmza alanının hemen alt satırı — ADR 5.4.1.1.1/f kapsamındaki
   // sorumluluk beyanları, küçük puntoyla (6pt) her kutunun tabanına
