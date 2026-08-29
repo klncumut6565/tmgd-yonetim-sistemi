@@ -37,6 +37,7 @@ import {
 } from "@/lib/pdfFonts";
 import DateInput from "@/components/DateInput";
 import type { LogoData } from "@/lib/aracEvraklariPdf";
+import { belgeSablonu } from "@/lib/belgeSablonlari";
 
 // ── Tipler ────────────────────────────────────────────────────────────────
 /** ADR Tablo A satırı (adr_un_numbers tablosu) */
@@ -183,6 +184,189 @@ function tunelKisiti(kalemler: Kalem[]): string {
 // ── PDF üretimi ──────────────────────────────────────────────────────────
 const FONT = "LiberationSans";
 
+/**
+ * Taşıma evrakının hemen ardına, aynı jsPDF dokümanına K3 (Gönderen –
+ * Paketleyen – Yükleyen – Dolduran Kontrol Dökümanı) formunu ekler.
+ *
+ * İçerik TEK KAYNAKTAN (belgeSablonlari.ts → K3) gelir — Belge Oluştur'daki
+ * K3 güncellenirse buradaki de otomatik yansır. Genel bir mini-renderer
+ * (subheading/paragraph/bullet/table) kullanılır; "images" blokları burada
+ * atlanır (checkbox tablosu zaten yeterli bilgi veriyor, evrak PDF'i sade
+ * kalsın diye).
+ *
+ * "2. Genel Bilgiler" ve "6. Onay" bölümlerindeki boş "……" placeholder'ları,
+ * şablondan OLDUĞU GİBİ yazılmaz — bu iki bölüm için args'tan gelen gerçek
+ * evrak verisiyle (tarih, gönderen unvanı, taşıyıcı, plaka, UN/sınıf/PG,
+ * sürücü adı) OTOMATIK doldurulmuş kendi satırları yazılır. Diğer tüm
+ * kontrol maddeleri (checkbox tabloları) fiziksel kontrol gerektirdiği
+ * için BOŞ (□) bırakılır — bunlar otomatik doldurulamaz.
+ */
+function k3FormuCiz(
+  doc: JsPDFType,
+  args: {
+    tarih: string;
+    gonderen: string;
+    tasiyici: string;
+    surucu: Surucu | null;
+    arac: Arac | null;
+    surucuManuel: string;
+    aracManuel: string;
+    kalemler: Kalem[];
+  }
+) {
+  const sablon = belgeSablonu("K3");
+  if (!sablon) return; // şablon bulunamazsa evrak yine de üretilsin
+
+  doc.addPage();
+  const M = 12, W = 210, H = 297;
+  const NAVY: [number, number, number] = [30, 58, 138];
+  const genislik = W - 2 * M;
+  const sayfaSonu = H - 14;
+  let y = 16;
+
+  const yeniSayfaGerekiyorsaAc = (gerekliYukseklik: number) => {
+    if (y + gerekliYukseklik > sayfaSonu) {
+      doc.addPage();
+      y = 16;
+    }
+  };
+
+  doc.setFontSize(12.5); doc.setFont(FONT, "bold"); doc.setTextColor(...NAVY);
+  doc.text("GÖNDEREN – PAKETLEYEN – YÜKLEYEN – DOLDURAN KONTROL DÖKÜMANI (K3)", M, y, { maxWidth: genislik });
+  doc.setTextColor(0, 0, 0);
+  y += 9;
+
+  // ── Otomatik doldurulacak veriler ────────────────────────────────────
+  const kalemOzet = args.kalemler.length > 0
+    ? args.kalemler.map((k) => `UN ${k.un_number} (Sınıf ${k.adr_class || "—"}, PG ${k.packing_group || "—"})`).join("; ")
+    : "—";
+  const aracPlakaBilgi = args.arac?.plate_number || args.aracManuel.trim() || "—";
+  const gonderenUnvanBilgi = (args.gonderen || "").split("\n")[0].trim() || "—";
+  const surucuAdBilgi = args.surucu
+    ? `${args.surucu.first_name} ${args.surucu.last_name}`
+    : args.surucuManuel.trim();
+
+  const ozelBulletListesi: Record<string, string[]> = {
+    "2. Genel Bilgiler": [
+      `Tarih: ${args.tarih}`,
+      `Gönderen (Gönderici) Firma Unvanı: ${gonderenUnvanBilgi}`,
+      `Taşıyıcı Firma Unvanı: ${args.tasiyici || "—"}`,
+      `Araç Plaka No: ${aracPlakaBilgi}`,
+      `Taşınan Madde UN No / Sınıfı / Ambalaj Grubu: ${kalemOzet}`,
+    ],
+    "6. Onay": [
+      "Gönderen – Kaşe / İmza: ……………………………",
+      surucuAdBilgi
+        ? `Taşıyıcı / Şoför Adı Soyadı – İmza: ${surucuAdBilgi}  (İmza: ……………)`
+        : "Taşıyıcı / Şoför Adı Soyadı – İmza: ……………………………",
+    ],
+  };
+
+  let aktifOzelBaslik: string | null = null;
+
+  for (const block of sablon.blocks) {
+    if (block.type === "subheading") {
+      aktifOzelBaslik = ozelBulletListesi[block.text] ? block.text : null;
+      yeniSayfaGerekiyorsaAc(10);
+      doc.setFontSize(9.5); doc.setFont(FONT, "bold"); doc.setTextColor(...NAVY);
+      doc.text(block.text, M, y);
+      doc.setTextColor(0, 0, 0);
+      y += 5.5;
+
+      // Özel bölümse otomatik dolu satırları hemen buraya yaz (şablondaki
+      // boş placeholder bulletini birazdan atlayacağız).
+      if (aktifOzelBaslik) {
+        doc.setFontSize(8.3); doc.setFont(FONT, "normal");
+        ozelBulletListesi[aktifOzelBaslik].forEach((satir) => {
+          const wrapped = doc.splitTextToSize("•  " + satir, genislik - 3);
+          yeniSayfaGerekiyorsaAc(wrapped.length * 4 + 1);
+          doc.text(wrapped, M + 2, y);
+          y += wrapped.length * 4 + 1;
+        });
+        y += 2;
+      }
+    } else if (block.type === "paragraph") {
+      doc.setFontSize(7.5); doc.setFont(FONT, "normal");
+      const wrapped = doc.splitTextToSize(block.text, genislik);
+      yeniSayfaGerekiyorsaAc(wrapped.length * 3.5 + 3);
+      doc.text(wrapped, M, y);
+      y += wrapped.length * 3.5 + 4;
+    } else if (block.type === "bullet") {
+      if (aktifOzelBaslik) {
+        // Şablonun kendi (boş) bullet satırları — otomatik dolu hâli zaten
+        // yukarıda yazıldı, bunu atla.
+        aktifOzelBaslik = null;
+        continue;
+      }
+      doc.setFontSize(8.3); doc.setFont(FONT, "normal");
+      block.items.forEach((item) => {
+        const wrapped = doc.splitTextToSize("•  " + item, genislik - 3);
+        yeniSayfaGerekiyorsaAc(wrapped.length * 4 + 1);
+        doc.text(wrapped, M + 2, y);
+        y += wrapped.length * 4 + 1;
+      });
+      y += 2;
+    } else if (block.type === "table") {
+      const kolonSayisi = (block.headers || block.rows[0] || []).length;
+      const oranlar = block.colWidths && block.colWidths.length === kolonSayisi
+        ? block.colWidths
+        : Array(kolonSayisi).fill(1);
+      const toplamOran = oranlar.reduce((a, b) => a + b, 0);
+      const kolonGenislikleri = oranlar.map((o) => (genislik * o) / toplamOran);
+
+      const satirYukseklikHesapla = (hucreler: string[], fontSize: number) => {
+        doc.setFontSize(fontSize);
+        let maxSatir = 1;
+        hucreler.forEach((h, i) => {
+          const w = doc.splitTextToSize(String(h), kolonGenislikleri[i] - 2);
+          maxSatir = Math.max(maxSatir, w.length);
+        });
+        return maxSatir * 3.2 + 2;
+      };
+
+      if (block.headers) {
+        yeniSayfaGerekiyorsaAc(7);
+        doc.setFillColor(...NAVY);
+        doc.rect(M, y, genislik, 6, "F");
+        doc.setTextColor(255, 255, 255); doc.setFontSize(6.8); doc.setFont(FONT, "bold");
+        let x = M;
+        block.headers.forEach((h, i) => {
+          doc.text(h, x + kolonGenislikleri[i] / 2, y + 4, { align: "center" });
+          x += kolonGenislikleri[i];
+        });
+        doc.setTextColor(0, 0, 0);
+        y += 6;
+      }
+
+      block.rows.forEach((row, ri) => {
+        const satirH = satirYukseklikHesapla(row, 6.8);
+        yeniSayfaGerekiyorsaAc(satirH);
+        if (ri % 2 === 1) {
+          doc.setFillColor(245, 247, 251);
+          doc.rect(M, y, genislik, satirH, "F");
+        }
+        doc.setDrawColor(210, 210, 210); doc.setLineWidth(0.2);
+        doc.rect(M, y, genislik, satirH);
+        let x = M;
+        doc.setFont(FONT, "normal"); doc.setFontSize(6.8); doc.setTextColor(0, 0, 0);
+        row.forEach((cell, ci) => {
+          const wrapped = doc.splitTextToSize(String(cell), kolonGenislikleri[ci] - 2);
+          if (kolonSayisi >= 3 && ci === 1) {
+            // Orta (geniş) sütun — kontrol maddesi metni, sola yaslı
+            doc.text(wrapped, x + 1.5, y + 3.2);
+          } else {
+            doc.text(wrapped, x + kolonGenislikleri[ci] / 2, y + satirH / 2 + 1, { align: "center" });
+          }
+          x += kolonGenislikleri[ci];
+        });
+        y += satirH;
+      });
+      y += 3;
+    }
+    // "images" tipi burada bilinçli olarak atlanıyor.
+  }
+}
+
 async function evrakPdfUret(args: {
   firmaAdi: string;
   evrakNo: string;
@@ -215,297 +399,306 @@ async function evrakPdfUret(args: {
   doc.addFileToVFS("LiberationSans-Bold.ttf", LIBERATION_SANS_BOLD_B64);
   doc.addFont("LiberationSans-Bold.ttf", FONT, "bold");
   doc.setFont(FONT, "normal");
+  function birKopyaCiz() {
 
-  const M = 12, W = 210, H = 297; // A4 mm — H imza konumu hesabında kullanılır
-  const NAVY: [number, number, number] = [30, 58, 138];
-  let y = 14;
+    const M = 12, W = 210, H = 297; // A4 mm — H imza konumu hesabında kullanılır
+    const NAVY: [number, number, number] = [30, 58, 138];
+    let y = 14;
 
-  // ── FİLİGRAN (antetli kağıt) — firma logosu sayfanın TAM ORTASINDA,
-  // ARKA PLANDA soluk şekilde basılır; içerik bunun ÜZERİNE yazılır.
-  // jsPDF'te opaklık GState ile ayarlanır — logo çizildikten sonra
-  // opaklık 1'e döndürülür ki sonraki tüm metin/çizgiler net kalsın.
-  //
-  // ÖNEMLİ: Bu blok, sayfadaki ilk çizim işlemi olmalı (arka planda
-  // kalması için). Çok sayfalı evraklarda (tablo taşarsa) her yeni
-  // sayfaya da uygulanır — bkz. filigranEkle() çağrıları.
-  const filigranEkle = () => {
-    if (!args.logo) return;
-    try {
-      const gs = (doc as unknown as {
-        GState: (o: { opacity: number }) => unknown;
-        setGState: (g: unknown) => void;
-      });
-      gs.setGState(gs.GState({ opacity: 0.16 }));
-      // Logo, sayfa genişliğinin ~%65'i kadar büyük ve tam merkezde
-      const hedefGenislik = W * 0.65;
-      const oran = args.logo.enBoyOrani > 0 ? args.logo.enBoyOrani : 1;
-      const fw = hedefGenislik;
-      const fh = fw / oran;
-      doc.addImage(args.logo.data, args.logo.fmt, W / 2 - fw / 2, H / 2 - fh / 2, fw, fh);
-      gs.setGState(gs.GState({ opacity: 1 }));
-    } catch {
-      /* GState desteklenmiyorsa filigran atlanır, belge yine üretilir */
-    }
-  };
-  filigranEkle();
-
-  // Evrak No / Tarih — sağ üst köşe
-  doc.setFontSize(9); doc.setFont(FONT, "bold"); doc.setTextColor(0, 0, 0);
-  doc.text(`Evrak No: ${args.evrakNo}`, W - M, y + 2, { align: "right" });
-  doc.text(`Tarih: ${args.tarih}`, W - M, y + 7, { align: "right" });
-
-  // Sol üst kısıma firma logosu — 25mm x 25mm
-  let logoH = 0;
-  if (args.logo) {
-    try {
-      const logoW = 25;
-      const oran = args.logo.enBoyOrani > 0 ? args.logo.enBoyOrani : 1;
-      logoH = logoW / oran;
-      doc.addImage(args.logo.data, args.logo.fmt, M, y, logoW, logoH);
-    } catch {
-      /* Logo eklenmezse devam et */
-    }
-  }
-
-  // Başlık — sayfanın en üstüne ortalanmış (kaydırma yok)
-  doc.setFontSize(14); doc.setFont(FONT, "bold"); doc.setTextColor(...NAVY);
-  doc.text("TAŞIMA EVRAKI", W / 2, y + 8, { align: "center" });
-  doc.setFontSize(8); doc.setFont(FONT, "normal"); doc.setTextColor(90, 90, 90);
-  doc.text("ADR Bölüm 5.4.1 uyarınca düzenlenmiştir", W / 2, y + 13, { align: "center" });
-  doc.setTextColor(0, 0, 0);
-  // Logo yüksekliği + başlık alanı + Gönderen kutusu arasına mesafe (4mm)
-  y += Math.max(logoH, 20) + 4;
-
-  // Gönderen / Alıcı kutuları — yükseklik dinamik, sorumlu kişi varsa arttır
-  let kutuH = 26;
-  if (args.gonderenSorumlu) {
-    const sorumluSatirlari = doc.splitTextToSize(args.gonderenSorumlu, (W - 2 * M - 4) / 2 - 4);
-    kutuH = 26 + Math.max(0, (sorumluSatirlari.length - 1) * 3.4);
-  }
-  const kutuY = y, kutuW = (W - 2 * M - 4) / 2;
-  doc.setDrawColor(180, 180, 180); doc.setLineWidth(0.3);
-  doc.rect(M, kutuY, kutuW, kutuH);
-  doc.rect(M + kutuW + 4, kutuY, kutuW, kutuH);
-  doc.setFontSize(7.5); doc.setFont(FONT, "bold"); doc.setTextColor(...NAVY);
-  doc.text("GÖNDEREN", M + 2, kutuY + 4.5);
-  doc.text("ALICI", M + kutuW + 6, kutuY + 4.5);
-  doc.setFont(FONT, "normal"); doc.setTextColor(0, 0, 0); doc.setFontSize(8.5);
-  
-  // Gönderen: firma unvanı + adres
-  doc.text(doc.splitTextToSize(args.gonderen || "—", kutuW - 4), M + 2, kutuY + 9.5);
-  
-  // Gönderen sorumlu kişi adı (boşsa gösterilmesin)
-  if (args.gonderenSorumlu) {
-    doc.setFontSize(7.5);
-    const sorumluSatirlari = doc.splitTextToSize(args.gonderenSorumlu, kutuW - 4);
-    const gonderenSatirlari = doc.splitTextToSize(args.gonderen || "—", kutuW - 4);
-    const baslamaY = kutuY + 9.5 + gonderenSatirlari.length * 3.4 + 1.5;
-    doc.text(sorumluSatirlari, M + 2, baslamaY);
-  }
-  
-  doc.text(doc.splitTextToSize(args.alici || "—", kutuW - 4), M + kutuW + 6, kutuY + 9.5);
-  
-  y = kutuY + kutuH + 5;
-
-  // Taşıyıcı / Sürücü / Araç şeridi
-  doc.setFontSize(8);
-  const surucuAd = args.surucu
-    ? `${args.surucu.first_name} ${args.surucu.last_name}`
-    : (args.surucuManuel.trim() || "—");
-  const aracBilgi = args.arac
-    ? `${args.arac.plate_number}${args.arac.brand ? " · " + args.arac.brand : ""}`
-    : (args.aracManuel.trim() || "—");
-  // Taşıyıcı / Sürücü / Araç şeridi — üç alan sabit sütunlarda.
-  // ÖNEMLİ: değerler kendi sütun genişliğine SARILIR (splitTextToSize);
-  // aksi halde uzun bir taşıyıcı unvanı yandaki "Sürücü" alanının üzerine
-  // taşıp okunmaz hale geliyordu. Satır yüksekliği, en çok satıra sarılan
-  // alana göre belirlenir.
-  const seritSutunlar = [
-    { etiket: "Taşıyıcı:", deger: args.tasiyici || "—", x: M, degerX: M + 15, genislik: 78 - 15 - 3 },
-    { etiket: "Sürücü:", deger: surucuAd, x: M + 78, degerX: M + 91, genislik: 140 - 91 - 3 },
-    { etiket: "Araç:", deger: aracBilgi, x: M + 140, degerX: M + 150, genislik: W - M - 150 },
-  ];
-  let seritEnFazlaSatir = 1;
-  for (const s of seritSutunlar) {
-    doc.setFont(FONT, "bold");
-    doc.text(s.etiket, s.x, y);
-    doc.setFont(FONT, "normal");
-    const satirlar: string[] = doc.splitTextToSize(s.deger, s.genislik);
-    doc.text(satirlar, s.degerX, y);
-    if (satirlar.length > seritEnFazlaSatir) seritEnFazlaSatir = satirlar.length;
-  }
-  y += 6 + (seritEnFazlaSatir - 1) * 3.6;
-
-  // Ürün tablosu
-  const kolonlar = [
-    { b: "No", w: 8 }, { b: "UN No", w: 17 }, { b: "Uygun Sevkiyat Adı", w: 62 },
-    { b: "Sınıf", w: 12 }, { b: "PG", w: 10 }, { b: "Tünel", w: 13 },
-    { b: "Taşıma Türü", w: 32 }, { b: "Adet", w: 11 }, { b: "Miktar", w: 21 },
-  ];
-  const tabloW = kolonlar.reduce((a, k) => a + k.w, 0);
-  // Başlık satırı
-  doc.setFillColor(...NAVY);
-  doc.rect(M, y, tabloW, 6, "F");
-  doc.setTextColor(255, 255, 255); doc.setFontSize(7); doc.setFont(FONT, "bold");
-  let x = M;
-  for (const k of kolonlar) {
-    doc.text(k.b, x + k.w / 2, y + 4, { align: "center" });
-    x += k.w;
-  }
-  y += 6;
-  doc.setTextColor(0, 0, 0); doc.setFont(FONT, "normal"); doc.setFontSize(7.5);
-
-  args.kalemler.forEach((k, i) => {
-    const adSatirlari: string[] = doc.splitTextToSize(
-      k.proper_shipping_name + (k.is_lq ? "  [LQ]" : "") + (k.is_eq ? "  [EQ]" : ""),
-      kolonlar[2].w - 3
-    );
-    // Taşıma Türü sütunundaki metinler de kontrol et — satır sayısı maksimum olmalı
-    let maxSatirSayisi = adSatirlari.length;
-    if (k.packaging_type) {
-      const tasimaturuSatirlari = doc.splitTextToSize(k.packaging_type, kolonlar[6].w - 1);
-      maxSatirSayisi = Math.max(maxSatirSayisi, tasimaturuSatirlari.length);
-    }
-    const satirH = Math.max(6, maxSatirSayisi * 3.4 + 2.4);
-    if (i % 2 === 1) {
-      doc.setFillColor(245, 247, 251);
-      doc.rect(M, y, tabloW, satirH, "F");
-    }
-    doc.setDrawColor(200, 200, 200);
-    doc.rect(M, y, tabloW, satirH);
-    const hucreler = [
-      String(i + 1), `UN ${k.un_number}`, "", k.adr_class || "—",
-      k.packing_group || "—", k.tunnel_code || "—",
-      k.packaging_type || "—", String(k.packaging_count),
-      `${k.quantity} ${k.unit}`,
-    ];
-    x = M;
-    hucreler.forEach((h, ci) => {
-      if (ci === 2) {
-        // Ürün adı — çok satırlı
-        doc.text(adSatirlari, x + 1.5, y + 3.8, { maxWidth: kolonlar[ci].w - 3 });
-      } else if (ci === 6) {
-        // Taşıma Türü — çok satırlı olabilir
-        const tasimaturuSatirlari = doc.splitTextToSize(h, kolonlar[ci].w - 2);
-        doc.text(tasimaturuSatirlari, x + 1.5, y + 3.8);
-      } else {
-        // Diğer sütunlar — tek satır, merkez
-        doc.text(h, x + kolonlar[ci].w / 2, y + satirH / 2 + 1.2, { 
-          align: "center",
-          maxWidth: kolonlar[ci].w - 1 
+    // ── FİLİGRAN (antetli kağıt) — firma logosu sayfanın TAM ORTASINDA,
+    // ARKA PLANDA soluk şekilde basılır; içerik bunun ÜZERİNE yazılır.
+    // jsPDF'te opaklık GState ile ayarlanır — logo çizildikten sonra
+    // opaklık 1'e döndürülür ki sonraki tüm metin/çizgiler net kalsın.
+    //
+    // ÖNEMLİ: Bu blok, sayfadaki ilk çizim işlemi olmalı (arka planda
+    // kalması için). Çok sayfalı evraklarda (tablo taşarsa) her yeni
+    // sayfaya da uygulanır — bkz. filigranEkle() çağrıları.
+    const filigranEkle = () => {
+      if (!args.logo) return;
+      try {
+        const gs = (doc as unknown as {
+          GState: (o: { opacity: number }) => unknown;
+          setGState: (g: unknown) => void;
         });
+        gs.setGState(gs.GState({ opacity: 0.16 }));
+        // Logo, sayfa genişliğinin ~%65'i kadar büyük ve tam merkezde
+        const hedefGenislik = W * 0.65;
+        const oran = args.logo.enBoyOrani > 0 ? args.logo.enBoyOrani : 1;
+        const fw = hedefGenislik;
+        const fh = fw / oran;
+        doc.addImage(args.logo.data, args.logo.fmt, W / 2 - fw / 2, H / 2 - fh / 2, fw, fh);
+        gs.setGState(gs.GState({ opacity: 1 }));
+      } catch {
+        /* GState desteklenmiyorsa filigran atlanır, belge yine üretilir */
       }
-      x += kolonlar[ci].w;
+    };
+    filigranEkle();
+
+    // Evrak No / Tarih — sağ üst köşe
+    doc.setFontSize(9); doc.setFont(FONT, "bold"); doc.setTextColor(0, 0, 0);
+    doc.text(`Evrak No: ${args.evrakNo}`, W - M, y + 2, { align: "right" });
+    doc.text(`Tarih: ${args.tarih}`, W - M, y + 7, { align: "right" });
+
+    // Sol üst kısıma firma logosu — 25mm x 25mm
+    let logoH = 0;
+    if (args.logo) {
+      try {
+        const logoW = 25;
+        const oran = args.logo.enBoyOrani > 0 ? args.logo.enBoyOrani : 1;
+        logoH = logoW / oran;
+        doc.addImage(args.logo.data, args.logo.fmt, M, y, logoW, logoH);
+      } catch {
+        /* Logo eklenmezse devam et */
+      }
+    }
+
+    // Başlık — sayfanın en üstüne ortalanmış (kaydırma yok)
+    doc.setFontSize(14); doc.setFont(FONT, "bold"); doc.setTextColor(...NAVY);
+    doc.text("TAŞIMA EVRAKI", W / 2, y + 8, { align: "center" });
+    doc.setFontSize(8); doc.setFont(FONT, "normal"); doc.setTextColor(90, 90, 90);
+    doc.text("ADR Bölüm 5.4.1 uyarınca düzenlenmiştir", W / 2, y + 13, { align: "center" });
+    doc.setTextColor(0, 0, 0);
+    // Logo yüksekliği + başlık alanı + Gönderen kutusu arasına mesafe (4mm)
+    y += Math.max(logoH, 20) + 4;
+
+    // Gönderen / Alıcı kutuları — yükseklik dinamik, sorumlu kişi varsa arttır
+    let kutuH = 26;
+    if (args.gonderenSorumlu) {
+      const sorumluSatirlari = doc.splitTextToSize(args.gonderenSorumlu, (W - 2 * M - 4) / 2 - 4);
+      kutuH = 26 + Math.max(0, (sorumluSatirlari.length - 1) * 3.4);
+    }
+    const kutuY = y, kutuW = (W - 2 * M - 4) / 2;
+    doc.setDrawColor(180, 180, 180); doc.setLineWidth(0.3);
+    doc.rect(M, kutuY, kutuW, kutuH);
+    doc.rect(M + kutuW + 4, kutuY, kutuW, kutuH);
+    doc.setFontSize(7.5); doc.setFont(FONT, "bold"); doc.setTextColor(...NAVY);
+    doc.text("GÖNDEREN", M + 2, kutuY + 4.5);
+    doc.text("ALICI", M + kutuW + 6, kutuY + 4.5);
+    doc.setFont(FONT, "normal"); doc.setTextColor(0, 0, 0); doc.setFontSize(8.5);
+  
+    // Gönderen: firma unvanı + adres
+    doc.text(doc.splitTextToSize(args.gonderen || "—", kutuW - 4), M + 2, kutuY + 9.5);
+  
+    // Gönderen sorumlu kişi adı (boşsa gösterilmesin)
+    if (args.gonderenSorumlu) {
+      doc.setFontSize(7.5);
+      const sorumluSatirlari = doc.splitTextToSize(args.gonderenSorumlu, kutuW - 4);
+      const gonderenSatirlari = doc.splitTextToSize(args.gonderen || "—", kutuW - 4);
+      const baslamaY = kutuY + 9.5 + gonderenSatirlari.length * 3.4 + 1.5;
+      doc.text(sorumluSatirlari, M + 2, baslamaY);
+    }
+  
+    doc.text(doc.splitTextToSize(args.alici || "—", kutuW - 4), M + kutuW + 6, kutuY + 9.5);
+  
+    y = kutuY + kutuH + 5;
+
+    // Taşıyıcı / Sürücü / Araç şeridi
+    doc.setFontSize(8);
+    const surucuAd = args.surucu
+      ? `${args.surucu.first_name} ${args.surucu.last_name}`
+      : (args.surucuManuel.trim() || "—");
+    const aracBilgi = args.arac
+      ? `${args.arac.plate_number}${args.arac.brand ? " · " + args.arac.brand : ""}`
+      : (args.aracManuel.trim() || "—");
+    // Taşıyıcı / Sürücü / Araç şeridi — üç alan sabit sütunlarda.
+    // ÖNEMLİ: değerler kendi sütun genişliğine SARILIR (splitTextToSize);
+    // aksi halde uzun bir taşıyıcı unvanı yandaki "Sürücü" alanının üzerine
+    // taşıp okunmaz hale geliyordu. Satır yüksekliği, en çok satıra sarılan
+    // alana göre belirlenir.
+    const seritSutunlar = [
+      { etiket: "Taşıyıcı:", deger: args.tasiyici || "—", x: M, degerX: M + 15, genislik: 78 - 15 - 3 },
+      { etiket: "Sürücü:", deger: surucuAd, x: M + 78, degerX: M + 91, genislik: 140 - 91 - 3 },
+      { etiket: "Araç:", deger: aracBilgi, x: M + 140, degerX: M + 150, genislik: W - M - 150 },
+    ];
+    let seritEnFazlaSatir = 1;
+    for (const s of seritSutunlar) {
+      doc.setFont(FONT, "bold");
+      doc.text(s.etiket, s.x, y);
+      doc.setFont(FONT, "normal");
+      const satirlar: string[] = doc.splitTextToSize(s.deger, s.genislik);
+      doc.text(satirlar, s.degerX, y);
+      if (satirlar.length > seritEnFazlaSatir) seritEnFazlaSatir = satirlar.length;
+    }
+    y += 6 + (seritEnFazlaSatir - 1) * 3.6;
+
+    // Ürün tablosu
+    const kolonlar = [
+      { b: "No", w: 8 }, { b: "UN No", w: 17 }, { b: "Uygun Sevkiyat Adı", w: 62 },
+      { b: "Sınıf", w: 12 }, { b: "PG", w: 10 }, { b: "Tünel", w: 13 },
+      { b: "Taşıma Türü", w: 32 }, { b: "Adet", w: 11 }, { b: "Miktar", w: 21 },
+    ];
+    const tabloW = kolonlar.reduce((a, k) => a + k.w, 0);
+    // Başlık satırı
+    doc.setFillColor(...NAVY);
+    doc.rect(M, y, tabloW, 6, "F");
+    doc.setTextColor(255, 255, 255); doc.setFontSize(7); doc.setFont(FONT, "bold");
+    let x = M;
+    for (const k of kolonlar) {
+      doc.text(k.b, x + k.w / 2, y + 4, { align: "center" });
+      x += k.w;
+    }
+    y += 6;
+    doc.setTextColor(0, 0, 0); doc.setFont(FONT, "normal"); doc.setFontSize(7.5);
+
+    args.kalemler.forEach((k, i) => {
+      const adSatirlari: string[] = doc.splitTextToSize(
+        k.proper_shipping_name + (k.is_lq ? "  [LQ]" : "") + (k.is_eq ? "  [EQ]" : ""),
+        kolonlar[2].w - 3
+      );
+      // Taşıma Türü sütunundaki metinler de kontrol et — satır sayısı maksimum olmalı
+      let maxSatirSayisi = adSatirlari.length;
+      if (k.packaging_type) {
+        const tasimaturuSatirlari = doc.splitTextToSize(k.packaging_type, kolonlar[6].w - 1);
+        maxSatirSayisi = Math.max(maxSatirSayisi, tasimaturuSatirlari.length);
+      }
+      const satirH = Math.max(6, maxSatirSayisi * 3.4 + 2.4);
+      if (i % 2 === 1) {
+        doc.setFillColor(245, 247, 251);
+        doc.rect(M, y, tabloW, satirH, "F");
+      }
+      doc.setDrawColor(200, 200, 200);
+      doc.rect(M, y, tabloW, satirH);
+      const hucreler = [
+        String(i + 1), `UN ${k.un_number}`, "", k.adr_class || "—",
+        k.packing_group || "—", k.tunnel_code || "—",
+        k.packaging_type || "—", String(k.packaging_count),
+        `${k.quantity} ${k.unit}`,
+      ];
+      x = M;
+      hucreler.forEach((h, ci) => {
+        if (ci === 2) {
+          // Ürün adı — çok satırlı
+          doc.text(adSatirlari, x + 1.5, y + 3.8, { maxWidth: kolonlar[ci].w - 3 });
+        } else if (ci === 6) {
+          // Taşıma Türü — çok satırlı olabilir
+          const tasimaturuSatirlari = doc.splitTextToSize(h, kolonlar[ci].w - 2);
+          doc.text(tasimaturuSatirlari, x + 1.5, y + 3.8);
+        } else {
+          // Diğer sütunlar — tek satır, merkez
+          doc.text(h, x + kolonlar[ci].w / 2, y + satirH / 2 + 1.2, { 
+            align: "center",
+            maxWidth: kolonlar[ci].w - 1 
+          });
+        }
+        x += kolonlar[ci].w;
+      });
+      y += satirH;
     });
-    y += satirH;
-  });
-  y += 4;
+    y += 4;
 
-  // ADR uyumluluk şeridi
-  const muafiyetKapsaminda = !args.muafiyetsiz && !args.plakaGerekli;
-  const sheriditYukseklik = (args.emniyetGerekli ? 5 : 0) + (muafiyetKapsaminda ? 5 : 0) + 12;
+    // ADR uyumluluk şeridi
+    const muafiyetKapsaminda = !args.muafiyetsiz && !args.plakaGerekli;
+    const sheriditYukseklik = (args.emniyetGerekli ? 5 : 0) + (muafiyetKapsaminda ? 5 : 0) + 12;
   
-  doc.setFillColor(args.plakaGerekli ? 254 : 240, args.plakaGerekli ? 242 : 253, args.plakaGerekli ? 242 : 244);
-  doc.rect(M, y, W - 2 * M, sheriditYukseklik, "F");
-  doc.setDrawColor(args.plakaGerekli ? 220 : 22, args.plakaGerekli ? 38 : 163, args.plakaGerekli ? 38 : 74);
-  doc.rect(M, y, W - 2 * M, sheriditYukseklik);
-  doc.setFontSize(8); doc.setFont(FONT, "bold");
+    doc.setFillColor(args.plakaGerekli ? 254 : 240, args.plakaGerekli ? 242 : 253, args.plakaGerekli ? 242 : 244);
+    doc.rect(M, y, W - 2 * M, sheriditYukseklik, "F");
+    doc.setDrawColor(args.plakaGerekli ? 220 : 22, args.plakaGerekli ? 38 : 163, args.plakaGerekli ? 38 : 74);
+    doc.rect(M, y, W - 2 * M, sheriditYukseklik);
+    doc.setFontSize(8); doc.setFont(FONT, "bold");
   
-  const puanMetni = args.muafiyetsiz
-    ? "1.1.3.6 muafiyeti YOK (Taşıma Kategorisi 0 veya bilinmeyen madde içeriyor)"
-    : `1.1.3.6 Puanı: ${args.puan.toFixed(0)} / 1000`;
-  doc.text(puanMetni, M + 3, y + 5);
+    const puanMetni = args.muafiyetsiz
+      ? "1.1.3.6 muafiyeti YOK (Taşıma Kategorisi 0 veya bilinmeyen madde içeriyor)"
+      : `1.1.3.6 Puanı: ${args.puan.toFixed(0)} / 1000`;
+    doc.text(puanMetni, M + 3, y + 5);
   
-  let nextLineY = y + 9.5;
+    let nextLineY = y + 9.5;
   
-  // Muafiyet kapsamındaysa açık cümle göster
-  if (muafiyetKapsaminda) {
-    doc.setTextColor(22, 163, 74);
-    doc.text("1.1.3.6 MUAFİYETİ (MİKTAR) TAŞINMA YAPILMAKTADIR", M + 3, nextLineY);
-    nextLineY += 5;
-  }
+    // Muafiyet kapsamındaysa açık cümle göster
+    if (muafiyetKapsaminda) {
+      doc.setTextColor(22, 163, 74);
+      doc.text("1.1.3.6 MUAFİYETİ (MİKTAR) TAŞINMA YAPILMAKTADIR", M + 3, nextLineY);
+      nextLineY += 5;
+    }
   
-  doc.setTextColor(0, 0, 0);
-  doc.text(
-    args.plakaGerekli ? "TURUNCU PLAKA ZORUNLU" : "Turuncu plaka gerekmez (1.1.3.6 muafiyeti)",
-    M + 3, nextLineY
-  );
+    doc.setTextColor(0, 0, 0);
+    doc.text(
+      args.plakaGerekli ? "TURUNCU PLAKA ZORUNLU" : "Turuncu plaka gerekmez (1.1.3.6 muafiyeti)",
+      M + 3, nextLineY
+    );
   
-  if (args.emniyetGerekli) {
-    doc.setDrawColor(220, 38, 38);
-    doc.text("EMNİYET PLANI ZORUNLU", M + 3, nextLineY + 5);
-  }
+    if (args.emniyetGerekli) {
+      doc.setDrawColor(220, 38, 38);
+      doc.text("EMNİYET PLANI ZORUNLU", M + 3, nextLineY + 5);
+    }
   
-  doc.setFont(FONT, "normal");
-  doc.text(`Tünel Kısıtlaması: ${args.tunel}`, W - M - 3, y + 7.5, { align: "right" });
-  y += sheriditYukseklik + 4;
-
-  if (args.notlar.trim()) {
-    doc.setFontSize(7.5);
-    doc.setFont(FONT, "bold"); doc.text("Notlar:", M, y);
     doc.setFont(FONT, "normal");
-    const notSatirlari: string[] = doc.splitTextToSize(args.notlar, W - 2 * M - 14);
-    doc.text(notSatirlari, M + 13, y);
-    y += notSatirlari.length * 3.4 + 4;
+    doc.text(`Tünel Kısıtlaması: ${args.tunel}`, W - M - 3, y + 7.5, { align: "right" });
+    y += sheriditYukseklik + 4;
+
+    if (args.notlar.trim()) {
+      doc.setFontSize(7.5);
+      doc.setFont(FONT, "bold"); doc.text("Notlar:", M, y);
+      doc.setFont(FONT, "normal");
+      const notSatirlari: string[] = doc.splitTextToSize(args.notlar, W - 2 * M - 14);
+      doc.text(notSatirlari, M + 13, y);
+      y += notSatirlari.length * 3.4 + 4;
+    }
+
+    // İmza kutuları — içeriğin HEMEN ALTINA yerleştirilir.
+    // Önceden Math.max(y + 4, 250) ile sayfanın en altına sabitleniyordu;
+    // az kalemli evraklarda ürün listesi ile imza arasında büyük bir boşluk
+    // kalıyordu. Artık içeriği takip ediyor, yalnızca sayfaya sığmayacaksa
+    // yeni sayfaya geçiyor.
+    //
+    // Kutu yüksekliği 24->32mm büyütüldü: başlık + (sürücü kutusunda) ad
+    // satırının ALTINA, ADR 5.4.1.1.1/f kapsamındaki küçük puntolu beyan
+    // metinleri sığsın diye (bkz. aşağıdaki beyanGoster()).
+    let imzaY = y + 6;
+    const IMZA_YUKSEKLIK = 32;
+    if (imzaY + IMZA_YUKSEKLIK > H - 18) {
+      doc.addPage();
+      filigranEkle(); // yeni sayfada da antetli kağıt görünümü korunsun
+      imzaY = M + 6;
+    }
+    const imzaW = (W - 2 * M - 8) / 2;
+    doc.setDrawColor(150, 150, 150);
+    doc.rect(M, imzaY, imzaW, IMZA_YUKSEKLIK);
+    doc.rect(M + imzaW + 8, imzaY, imzaW, IMZA_YUKSEKLIK);
+    doc.setFontSize(7.5); doc.setFont(FONT, "bold");
+    doc.text("GÖNDEREN (Ad Soyad / Kaşe / İmza)", M + imzaW / 2, imzaY + 4.5, { align: "center" });
+    doc.text("SÜRÜCÜ (Ad Soyad / İmza)", M + imzaW + 8 + imzaW / 2, imzaY + 4.5, { align: "center" });
+    doc.setFont(FONT, "normal"); doc.setFontSize(8);
+    // İmza kutusu, sürücünün elle imzalayacağı boş bir alandır — isim
+    // girilmemişse buraya "—" değil, hiçbir şey yazılmaz (üst şeritteki
+    // "Sürücü:" bilgi alanında "—" göstermeye devam edilir, orası ayrı).
+    if (surucuAd !== "—") {
+      doc.text(surucuAd, M + imzaW + 8 + imzaW / 2, imzaY + 12, { align: "center" });
+    }
+
+    // İmza alanının hemen alt satırı — ADR 5.4.1.1.1/f kapsamındaki
+    // sorumluluk beyanları, küçük puntoyla (6pt) her kutunun tabanına
+    // yaslı basılır.
+    const beyanGoster = (metin: string, merkezX: number) => {
+      const satirlar = doc.splitTextToSize(metin, imzaW - 4);
+      const baslangicY = imzaY + IMZA_YUKSEKLIK - (satirlar.length - 1) * 2.6 - 2.5;
+      doc.text(satirlar, merkezX, baslangicY, { align: "center" });
+    };
+    doc.setFontSize(6);
+    doc.setTextColor(90, 90, 90);
+    beyanGoster(
+      "Tehlikeli maddelerin sınıflandırılması, paketlenmesi ve etiketlenmesinin ADR hükümlerine uygun olduğunu beyan ederim. (ADR 5.4.1.1.1/f)",
+      M + imzaW / 2
+    );
+    beyanGoster(
+      "Yükü teslim aldığımı ve taşımanın ADR hükümlerine uygun olarak gerçekleştirileceğini kabul ederim.",
+      M + imzaW + 8 + imzaW / 2
+    );
+    doc.setTextColor(0, 0, 0);
+
+    // Alt bilgi
+    doc.setFontSize(6.5); doc.setTextColor(130, 130, 130);
+    doc.text(
+      "Bu belge ADR Yönetmeliği Madde 5.4.1 kapsamında düzenlenmiştir.",
+      W / 2, 290, { align: "center" }
+    );
   }
 
-  // İmza kutuları — içeriğin HEMEN ALTINA yerleştirilir.
-  // Önceden Math.max(y + 4, 250) ile sayfanın en altına sabitleniyordu;
-  // az kalemli evraklarda ürün listesi ile imza arasında büyük bir boşluk
-  // kalıyordu. Artık içeriği takip ediyor, yalnızca sayfaya sığmayacaksa
-  // yeni sayfaya geçiyor.
-  //
-  // Kutu yüksekliği 24->32mm büyütüldü: başlık + (sürücü kutusunda) ad
-  // satırının ALTINA, ADR 5.4.1.1.1/f kapsamındaki küçük puntolu beyan
-  // metinleri sığsın diye (bkz. aşağıdaki beyanGoster()).
-  let imzaY = y + 6;
-  const IMZA_YUKSEKLIK = 32;
-  if (imzaY + IMZA_YUKSEKLIK > H - 18) {
-    doc.addPage();
-    filigranEkle(); // yeni sayfada da antetli kağıt görünümü korunsun
-    imzaY = M + 6;
-  }
-  const imzaW = (W - 2 * M - 8) / 2;
-  doc.setDrawColor(150, 150, 150);
-  doc.rect(M, imzaY, imzaW, IMZA_YUKSEKLIK);
-  doc.rect(M + imzaW + 8, imzaY, imzaW, IMZA_YUKSEKLIK);
-  doc.setFontSize(7.5); doc.setFont(FONT, "bold");
-  doc.text("GÖNDEREN (Ad Soyad / Kaşe / İmza)", M + imzaW / 2, imzaY + 4.5, { align: "center" });
-  doc.text("SÜRÜCÜ (Ad Soyad / İmza)", M + imzaW + 8 + imzaW / 2, imzaY + 4.5, { align: "center" });
-  doc.setFont(FONT, "normal"); doc.setFontSize(8);
-  // İmza kutusu, sürücünün elle imzalayacağı boş bir alandır — isim
-  // girilmemişse buraya "—" değil, hiçbir şey yazılmaz (üst şeritteki
-  // "Sürücü:" bilgi alanında "—" göstermeye devam edilir, orası ayrı).
-  if (surucuAd !== "—") {
-    doc.text(surucuAd, M + imzaW + 8 + imzaW / 2, imzaY + 12, { align: "center" });
-  }
+  birKopyaCiz();
+  doc.addPage();
+  birKopyaCiz();
 
-  // İmza alanının hemen alt satırı — ADR 5.4.1.1.1/f kapsamındaki
-  // sorumluluk beyanları, küçük puntoyla (6pt) her kutunun tabanına
-  // yaslı basılır.
-  const beyanGoster = (metin: string, merkezX: number) => {
-    const satirlar = doc.splitTextToSize(metin, imzaW - 4);
-    const baslangicY = imzaY + IMZA_YUKSEKLIK - (satirlar.length - 1) * 2.6 - 2.5;
-    doc.text(satirlar, merkezX, baslangicY, { align: "center" });
-  };
-  doc.setFontSize(6);
-  doc.setTextColor(90, 90, 90);
-  beyanGoster(
-    "Tehlikeli maddelerin sınıflandırılması, paketlenmesi ve etiketlenmesinin ADR hükümlerine uygun olduğunu beyan ederim. (ADR 5.4.1.1.1/f)",
-    M + imzaW / 2
-  );
-  beyanGoster(
-    "Yükü teslim aldığımı ve taşımanın ADR hükümlerine uygun olarak gerçekleştirileceğini kabul ederim.",
-    M + imzaW + 8 + imzaW / 2
-  );
-  doc.setTextColor(0, 0, 0);
+  k3FormuCiz(doc, args);
 
-  // Alt bilgi
-  doc.setFontSize(6.5); doc.setTextColor(130, 130, 130);
-  doc.text(
-    "Bu belge ADR Yönetmeliği Madde 5.4.1 kapsamında düzenlenmiştir.",
-    W / 2, 290, { align: "center" }
-  );
   return doc;
 }
 
