@@ -1682,12 +1682,22 @@ export default function TasimaEvraki({
                   <input type="checkbox" checked={eq} onChange={(e) => setEq(e.target.checked)} />
                   EQ <span className="text-gray-400">— İstisnai Miktar ⓘ</span>
                 </label>
-                <button onClick={kalemEkle} 
-                  disabled={(!seciliKimyasal && !seciliTabloA) || !ambalajTuru || (ambalajTuru === "Diğer" && !ambalajDiger.trim())}
+                <button onClick={kalemEkle}
+                  disabled={
+                    (!seciliKimyasal && !seciliTabloA) || !ambalajTuru ||
+                    (ambalajTuru === "Diğer" && !ambalajDiger.trim()) ||
+                    !miktar || isNaN(parseFloat(miktar)) || parseFloat(miktar) <= 0
+                  }
+                  title={
+                    !miktar || isNaN(parseFloat(miktar)) || parseFloat(miktar) <= 0
+                      ? "Önce Net Miktar alanına geçerli bir değer gir"
+                      : undefined
+                  }
                   className="ml-auto px-4 py-2 rounded-lg bg-blue-600 text-white text-xs font-medium hover:bg-blue-700 disabled:bg-gray-200 disabled:text-gray-400 transition-colors">
                   + Ürünü Ekle
                 </button>
               </div>
+              {mesaj && <p className="text-xs text-red-600 mt-2">⚠ {mesaj}</p>}
             </div>
           </section>
         )}
