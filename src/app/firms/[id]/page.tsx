@@ -160,6 +160,28 @@ function display(value: unknown): string {
   return TR_VALUES[s] || s;
 }
 
+/**
+ * Alt sekmeler (Araç/Sürücü/Personel/ADR gibi ikinci seviye sekmeler)
+ * için aynı "küp yüzeyi döner gibi" geçiş animasyonunu üretir. Ana
+ * sekme geçişindeki (sekmeDegistir) mantığın tekrar kullanılabilir
+ * hâli — CSS class'ları (tab-flip-out/in) FirmDetailPage içindeki
+ * <style jsx> bloğundan (aynı component ağacı) miras alınır.
+ */
+function useAltSekmeGecis<T>(setValue: (v: T) => void) {
+  const [asama, setAsama] = useState<"in" | "out">("in");
+  const zamanlayici = useRef<ReturnType<typeof setTimeout> | null>(null);
+  function degistir(yeni: T, mevcut: T) {
+    if (yeni === mevcut) return;
+    if (zamanlayici.current) clearTimeout(zamanlayici.current);
+    setAsama("out");
+    zamanlayici.current = setTimeout(() => {
+      setValue(yeni);
+      setAsama("in");
+    }, 140);
+  }
+  return { asama, degistir };
+}
+
 export default function FirmDetailPage({
   params,
 }: {
@@ -212,6 +234,10 @@ function FirmDetailInner({
   const [personelAltSekme, setPersonelAltSekme] = useState<"liste" | "gorevli">("liste");
   const [surucuAltSekme, setSurucuAltSekme] = useState<"liste" | "surucu_listesi">("liste");
   const [aracAltSekme, setAracAltSekme] = useState<"liste" | "arac_evraki">("liste");
+  const aracAltGecis = useAltSekmeGecis<typeof aracAltSekme>(setAracAltSekme);
+  const surucuAltGecis = useAltSekmeGecis<typeof surucuAltSekme>(setSurucuAltSekme);
+  const personelAltGecis = useAltSekmeGecis<typeof personelAltSekme>(setPersonelAltSekme);
+  const adrAltGecis = useAltSekmeGecis<typeof adrAltSekme>(setAdrAltSekme);
   // Mobilden Tara dönüşünde Araç Evrakı Oluştur'un hangi aracı seçili
   // göstereceği (bkz. AracEvraklari 'preselectVehicleId' prop'u).
   const [aracEvrakiPreselectId, setAracEvrakiPreselectId] = useState<string | undefined>(undefined);
@@ -917,7 +943,7 @@ function FirmDetailInner({
       {/* Sekme geçiş animasyonu stilleri — component ömrü boyunca sabit,
           her sekme değişiminde yeniden mount olmasın diye key'li div'in
           DIŞINDA tanımlanır. */}
-      <style jsx>{`
+      <style jsx global>{`
         @keyframes tabFlipOut {
           from { opacity: 1; transform: perspective(1200px) rotateY(0deg) translateX(0); }
           to   { opacity: 0; transform: perspective(1200px) rotateY(-22deg) translateX(-10px); }
@@ -1686,7 +1712,7 @@ function FirmDetailInner({
             {(["liste", "arac_evraki"] as const).map((alt) => (
               <button
                 key={alt}
-                onClick={() => setAracAltSekme(alt)}
+                onClick={() => aracAltGecis.degistir(alt, aracAltSekme)}
                 className={
                   "px-3 py-1.5 rounded-lg text-sm border " +
                   (aracAltSekme === alt
@@ -1698,6 +1724,7 @@ function FirmDetailInner({
               </button>
             ))}
           </div>
+          <div key={aracAltSekme} className={aracAltGecis.asama === "out" ? "tab-flip-out" : "tab-flip-in"}>
           {aracAltSekme === "liste" && (
             <FirmScopedCrud
               table="vehicles"
@@ -1712,6 +1739,7 @@ function FirmDetailInner({
           {aracAltSekme === "arac_evraki" && firm && (
             <AracEvraklari firmId={id} firmaAdi={firm.name} preselectVehicleId={aracEvrakiPreselectId} />
           )}
+          </div>
         </div>
       )}
 
@@ -1721,7 +1749,7 @@ function FirmDetailInner({
             {(["surucu_listesi", "liste"] as const).map((alt) => (
               <button
                 key={alt}
-                onClick={() => setSurucuAltSekme(alt)}
+                onClick={() => surucuAltGecis.degistir(alt, surucuAltSekme)}
                 className={
                   "px-3 py-1.5 rounded-lg text-sm border " +
                   (surucuAltSekme === alt
@@ -1733,6 +1761,7 @@ function FirmDetailInner({
               </button>
             ))}
           </div>
+          <div key={surucuAltSekme} className={surucuAltGecis.asama === "out" ? "tab-flip-out" : "tab-flip-in"}>
           {surucuAltSekme === "liste" && (
             <FirmScopedCrud
               table="drivers"
@@ -1749,6 +1778,7 @@ function FirmDetailInner({
           {surucuAltSekme === "surucu_listesi" && firm && (
             <SurucuListesi firmId={id} firmaAdi={firm.name} />
           )}
+          </div>
         </div>
       )}
 
@@ -1758,7 +1788,7 @@ function FirmDetailInner({
             {(["gorevli", "liste"] as const).map((alt) => (
               <button
                 key={alt}
-                onClick={() => setPersonelAltSekme(alt)}
+                onClick={() => personelAltGecis.degistir(alt, personelAltSekme)}
                 className={
                   "px-3 py-1.5 rounded-lg text-sm border " +
                   (personelAltSekme === alt
@@ -1770,6 +1800,7 @@ function FirmDetailInner({
               </button>
             ))}
           </div>
+          <div key={personelAltSekme} className={personelAltGecis.asama === "out" ? "tab-flip-out" : "tab-flip-in"}>
           {personelAltSekme === "liste" && (
             <FirmScopedCrud
               table="employees"
@@ -1785,6 +1816,7 @@ function FirmDetailInner({
           {personelAltSekme === "gorevli" && firm && (
             <GorevliListesi firmId={id} firmaAdi={firm.name} />
           )}
+          </div>
         </div>
       )}
 
@@ -1817,7 +1849,7 @@ function FirmDetailInner({
             {(["evrak", "sevkiyat", "envanter"] as const).map((alt) => (
               <button
                 key={alt}
-                onClick={() => setAdrAltSekme(alt)}
+                onClick={() => adrAltGecis.degistir(alt, adrAltSekme)}
                 className={
                   "px-3 py-1.5 rounded-lg text-sm border " +
                   (adrAltSekme === alt
@@ -1829,6 +1861,7 @@ function FirmDetailInner({
               </button>
             ))}
           </div>
+          <div key={adrAltSekme} className={adrAltGecis.asama === "out" ? "tab-flip-out" : "tab-flip-in"}>
           {adrAltSekme === "envanter" && (
             <div className="max-w-5xl">
               <KimyasalEnvanter firmId={id} firmaAdi={firm?.name || ""} />
@@ -1852,6 +1885,7 @@ function FirmDetailInner({
               preselectEvrakId={preselectEvrakId}
             />
           )}
+          </div>
         </div>
       )}
 
