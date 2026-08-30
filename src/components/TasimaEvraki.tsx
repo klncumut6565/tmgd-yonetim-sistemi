@@ -37,7 +37,6 @@ import {
 } from "@/lib/pdfFonts";
 import DateInput from "@/components/DateInput";
 import type { LogoData } from "@/lib/aracEvraklariPdf";
-import { belgeSablonu } from "@/lib/belgeSablonlari";
 
 // ── Tipler ────────────────────────────────────────────────────────────────
 /** ADR Tablo A satırı (adr_un_numbers tablosu) */
@@ -186,22 +185,26 @@ const FONT = "LiberationSans";
 
 /**
  * Taşıma evrakının hemen ardına, aynı jsPDF dokümanına K3 (Gönderen –
- * Paketleyen – Yükleyen – Dolduran Kontrol Dökümanı) formunu ekler.
+ * Paketleyen – Yükleyen – Dolduran Kontrol Dökümanı) formunun BİREBİR
+ * orijinal görünümünü ekler.
  *
- * İçerik TEK KAYNAKTAN (belgeSablonlari.ts → K3) gelir — Belge Oluştur'daki
- * K3 güncellenirse buradaki de otomatik yansır. Genel bir mini-renderer
- * (subheading/paragraph/bullet/table) kullanılır; "images" blokları burada
- * atlanır (checkbox tablosu zaten yeterli bilgi veriyor, evrak PDF'i sade
- * kalsın diye).
+ * YÖNTEM: K3'ün orijinal .docx dosyası LibreOffice ile PDF'e, oradan da
+ * 150 DPI PNG'ye çevrilerek k3FormGorselleri.ts'e gömülmüştür — tasarım,
+ * tablo hücre birleşimleri, gömülü görseller (turuncu plaka/araç
+ * illüstrasyonları) ve yazı tipleri BİREBİR korunur (bir mini-renderer'la
+ * yeniden çizilmez, çünkü bu yaklaşım önceki denemede tasarımı bozmuştu).
+ * Bu görseller tam sayfa arka plan olarak basılır; otomatik doldurulacak
+ * veriler (tarih, gönderen unvanı, taşıyıcı, plaka, UN/sınıf/PG, sürücü
+ * adı) SADECE bu görselin üzerine, orijinal belgedeki boş hücrelerin tam
+ * piksel koordinatlarına denk gelecek şekilde (ölçülüp mm'ye çevrilerek)
+ * yazılır. Checkbox tabloları (fiziksel kontrol gerektirdiği için) hiç
+ * dokunulmadan boş kalır.
  *
- * "2. Genel Bilgiler" ve "6. Onay" bölümlerindeki boş "……" placeholder'ları,
- * şablondan OLDUĞU GİBİ yazılmaz — bu iki bölüm için args'tan gelen gerçek
- * evrak verisiyle (tarih, gönderen unvanı, taşıyıcı, plaka, UN/sınıf/PG,
- * sürücü adı) OTOMATIK doldurulmuş kendi satırları yazılır. Diğer tüm
- * kontrol maddeleri (checkbox tabloları) fiziksel kontrol gerektirdiği
- * için BOŞ (□) bırakılır — bunlar otomatik doldurulamaz.
+ * Bu görsel dosyası büyük olduğundan (k3FormGorselleri.ts) DİNAMİK olarak
+ * import edilir — yalnızca bu fonksiyon çağrıldığında (PDF üretilirken)
+ * yüklenir, ana sayfa yükünü artırmaz.
  */
-function k3FormuCiz(
+async function k3FormuCiz(
   doc: JsPDFType,
   args: {
     tarih: string;
@@ -214,27 +217,9 @@ function k3FormuCiz(
     kalemler: Kalem[];
   }
 ) {
-  const sablon = belgeSablonu("K3");
-  if (!sablon) return; // şablon bulunamazsa evrak yine de üretilsin
+  const { K3_FORM_SAYFA1, K3_FORM_SAYFA2 } = await import("@/lib/k3FormGorselleri");
 
-  doc.addPage();
-  const M = 12, W = 210, H = 297;
-  const NAVY: [number, number, number] = [30, 58, 138];
-  const genislik = W - 2 * M;
-  const sayfaSonu = H - 14;
-  let y = 16;
-
-  const yeniSayfaGerekiyorsaAc = (gerekliYukseklik: number) => {
-    if (y + gerekliYukseklik > sayfaSonu) {
-      doc.addPage();
-      y = 16;
-    }
-  };
-
-  doc.setFontSize(12.5); doc.setFont(FONT, "bold"); doc.setTextColor(...NAVY);
-  doc.text("GÖNDEREN – PAKETLEYEN – YÜKLEYEN – DOLDURAN KONTROL DÖKÜMANI (K3)", M, y, { maxWidth: genislik });
-  doc.setTextColor(0, 0, 0);
-  y += 9;
+  const W = 210, H = 297; // A4 mm
 
   // ── Otomatik doldurulacak veriler ────────────────────────────────────
   const kalemOzet = args.kalemler.length > 0
@@ -246,126 +231,47 @@ function k3FormuCiz(
     ? `${args.surucu.first_name} ${args.surucu.last_name}`
     : args.surucuManuel.trim();
 
-  const ozelBulletListesi: Record<string, string[]> = {
-    "2. Genel Bilgiler": [
-      `Tarih: ${args.tarih}`,
-      `Gönderen (Gönderici) Firma Unvanı: ${gonderenUnvanBilgi}`,
-      `Taşıyıcı Firma Unvanı: ${args.tasiyici || "—"}`,
-      `Araç Plaka No: ${aracPlakaBilgi}`,
-      `Taşınan Madde UN No / Sınıfı / Ambalaj Grubu: ${kalemOzet}`,
-    ],
-    "6. Onay": [
-      "Gönderen – Kaşe / İmza: ……………………………",
-      surucuAdBilgi
-        ? `Taşıyıcı / Şoför Adı Soyadı – İmza: ${surucuAdBilgi}  (İmza: ……………)`
-        : "Taşıyıcı / Şoför Adı Soyadı – İmza: ……………………………",
-    ],
-  };
+  // ── Sayfa 1: arka plan + "2. Genel Bilgiler" tablosunun boş hücreleri ──
+  doc.addPage();
+  doc.addImage(K3_FORM_SAYFA1, "PNG", 0, 0, W, H);
 
-  let aktifOzelBaslik: string | null = null;
+  doc.setFont(FONT, "normal");
+  doc.setFontSize(8.5);
+  doc.setTextColor(0, 0, 0);
 
-  for (const block of sablon.blocks) {
-    if (block.type === "subheading") {
-      aktifOzelBaslik = ozelBulletListesi[block.text] ? block.text : null;
-      yeniSayfaGerekiyorsaAc(10);
-      doc.setFontSize(9.5); doc.setFont(FONT, "bold"); doc.setTextColor(...NAVY);
-      doc.text(block.text, M, y);
-      doc.setTextColor(0, 0, 0);
-      y += 5.5;
+  // Koordinatlar, orijinal 1241x1754px (150 DPI) görüntü üzerinde
+  // ölçülüp mm'ye çevrilmiştir (ölçek: 210mm / 1241px ≈ 0.16922 mm/px).
+  // Sağ sütun (değer) x başlangıcı ~65mm; satırların dikey merkezleri
+  // sırasıyla ~98.2 / 105.3 / 112.9 / 119.6 / 127.8 mm — text baseline
+  // için +1.3mm aşağı kaydırılmıştır.
+  const degerX = 65;
+  const genelBilgiler: [string, number][] = [
+    [args.tarih, 99.5],
+    [gonderenUnvanBilgi, 106.6],
+    [args.tasiyici || "—", 114.2],
+    [aracPlakaBilgi, 120.9],
+    [kalemOzet, 127.5],
+  ];
+  genelBilgiler.forEach(([metin, satirY]) => {
+    const wrapped = doc.splitTextToSize(metin, W - degerX - 12);
+    doc.text(wrapped.slice(0, 2), degerX, satirY); // hücre yüksekliği sınırlı, en fazla 2 satır
+  });
 
-      // Özel bölümse otomatik dolu satırları hemen buraya yaz (şablondaki
-      // boş placeholder bulletini birazdan atlayacağız).
-      if (aktifOzelBaslik) {
-        doc.setFontSize(8.3); doc.setFont(FONT, "normal");
-        ozelBulletListesi[aktifOzelBaslik].forEach((satir) => {
-          const wrapped = doc.splitTextToSize("•  " + satir, genislik - 3);
-          yeniSayfaGerekiyorsaAc(wrapped.length * 4 + 1);
-          doc.text(wrapped, M + 2, y);
-          y += wrapped.length * 4 + 1;
-        });
-        y += 2;
-      }
-    } else if (block.type === "paragraph") {
-      doc.setFontSize(7.5); doc.setFont(FONT, "normal");
-      const wrapped = doc.splitTextToSize(block.text, genislik);
-      yeniSayfaGerekiyorsaAc(wrapped.length * 3.5 + 3);
-      doc.text(wrapped, M, y);
-      y += wrapped.length * 3.5 + 4;
-    } else if (block.type === "bullet") {
-      if (aktifOzelBaslik) {
-        // Şablonun kendi (boş) bullet satırları — otomatik dolu hâli zaten
-        // yukarıda yazıldı, bunu atla.
-        aktifOzelBaslik = null;
-        continue;
-      }
-      doc.setFontSize(8.3); doc.setFont(FONT, "normal");
-      block.items.forEach((item) => {
-        const wrapped = doc.splitTextToSize("•  " + item, genislik - 3);
-        yeniSayfaGerekiyorsaAc(wrapped.length * 4 + 1);
-        doc.text(wrapped, M + 2, y);
-        y += wrapped.length * 4 + 1;
-      });
-      y += 2;
-    } else if (block.type === "table") {
-      const kolonSayisi = (block.headers || block.rows[0] || []).length;
-      const oranlar = block.colWidths && block.colWidths.length === kolonSayisi
-        ? block.colWidths
-        : Array(kolonSayisi).fill(1);
-      const toplamOran = oranlar.reduce((a, b) => a + b, 0);
-      const kolonGenislikleri = oranlar.map((o) => (genislik * o) / toplamOran);
+  // ── Sayfa 2: arka plan + "5. Onay" tablosundaki sürücü adı ──────────
+  doc.addPage();
+  doc.addImage(K3_FORM_SAYFA2, "PNG", 0, 0, W, H);
 
-      const satirYukseklikHesapla = (hucreler: string[], fontSize: number) => {
-        doc.setFontSize(fontSize);
-        let maxSatir = 1;
-        hucreler.forEach((h, i) => {
-          const w = doc.splitTextToSize(String(h), kolonGenislikleri[i] - 2);
-          maxSatir = Math.max(maxSatir, w.length);
-        });
-        return maxSatir * 3.2 + 2;
-      };
-
-      if (block.headers) {
-        yeniSayfaGerekiyorsaAc(7);
-        doc.setFillColor(...NAVY);
-        doc.rect(M, y, genislik, 6, "F");
-        doc.setTextColor(255, 255, 255); doc.setFontSize(6.8); doc.setFont(FONT, "bold");
-        let x = M;
-        block.headers.forEach((h, i) => {
-          doc.text(h, x + kolonGenislikleri[i] / 2, y + 4, { align: "center" });
-          x += kolonGenislikleri[i];
-        });
-        doc.setTextColor(0, 0, 0);
-        y += 6;
-      }
-
-      block.rows.forEach((row, ri) => {
-        const satirH = satirYukseklikHesapla(row, 6.8);
-        yeniSayfaGerekiyorsaAc(satirH);
-        if (ri % 2 === 1) {
-          doc.setFillColor(245, 247, 251);
-          doc.rect(M, y, genislik, satirH, "F");
-        }
-        doc.setDrawColor(210, 210, 210); doc.setLineWidth(0.2);
-        doc.rect(M, y, genislik, satirH);
-        let x = M;
-        doc.setFont(FONT, "normal"); doc.setFontSize(6.8); doc.setTextColor(0, 0, 0);
-        row.forEach((cell, ci) => {
-          const wrapped = doc.splitTextToSize(String(cell), kolonGenislikleri[ci] - 2);
-          if (kolonSayisi >= 3 && ci === 1) {
-            // Orta (geniş) sütun — kontrol maddesi metni, sola yaslı
-            doc.text(wrapped, x + 1.5, y + 3.2);
-          } else {
-            doc.text(wrapped, x + kolonGenislikleri[ci] / 2, y + satirH / 2 + 1, { align: "center" });
-          }
-          x += kolonGenislikleri[ci];
-        });
-        y += satirH;
-      });
-      y += 3;
-    }
-    // "images" tipi burada bilinçli olarak atlanıyor.
+  if (surucuAdBilgi) {
+    doc.setFont(FONT, "bold");
+    doc.setFontSize(8.5);
+    // "Taşıyıcı / Şoför Adı Soyadı – İmza" kutusu: sağ sütun x≈101.5mm,
+    // kutunun üst kısmına (y≈247.9mm) yazılır, imza için altı boş kalır.
+    doc.text(surucuAdBilgi, 101.5, 247.9);
+    doc.setFont(FONT, "normal");
   }
+  doc.setTextColor(0, 0, 0);
 }
+
 
 async function evrakPdfUret(args: {
   firmaAdi: string;
@@ -697,7 +603,7 @@ async function evrakPdfUret(args: {
   doc.addPage();
   birKopyaCiz();
 
-  k3FormuCiz(doc, args);
+  await k3FormuCiz(doc, args);
 
   return doc;
 }
