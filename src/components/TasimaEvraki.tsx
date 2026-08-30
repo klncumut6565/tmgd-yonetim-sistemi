@@ -209,6 +209,7 @@ async function k3FormuCiz(
   args: {
     tarih: string;
     gonderen: string;
+    gonderenSorumlu: string;
     tasiyici: string;
     surucu: Surucu | null;
     arac: Arac | null;
@@ -283,18 +284,24 @@ async function k3FormuCiz(
     doc.text(wrapped.slice(0, 2), degerX, satirY); // hücre yüksekliği sınırlı, en fazla 2 satır
   });
 
-  // ── Sayfa 2: arka plan + "5. Onay" tablosundaki sürücü adı ──────────
+  // ── Sayfa 2: arka plan + "5. Onay" tablosundaki isimler ─────────────
   doc.addPage();
   doc.addImage(K3_FORM_SAYFA2, "PNG", 0, 0, W, H);
 
-  if (surucuAdBilgi) {
-    doc.setFont(FONT, "bold");
-    doc.setFontSize(8.5);
-    // "Taşıyıcı / Şoför Adı Soyadı – İmza" kutusu: sağ sütun x≈101.5mm,
-    // kutunun üst kısmına (y≈247.9mm) yazılır, imza için altı boş kalır.
-    doc.text(surucuAdBilgi, 101.5, 247.9);
-    doc.setFont(FONT, "normal");
+  const gonderenSorumluBilgi = args.gonderenSorumlu.trim();
+  doc.setFont(FONT, "bold");
+  doc.setFontSize(8.5);
+  if (gonderenSorumluBilgi) {
+    // "Gönderen – Kaşe / İmza" kutusu: sol sütun x≈19.1mm, kutunun üst
+    // kısmına (y≈247.9mm) yazılır, kaşe/imza için altı boş kalır.
+    doc.text(gonderenSorumluBilgi, 19.1, 247.9);
   }
+  if (surucuAdBilgi) {
+    // "Taşıyıcı / Şoför Adı Soyadı – İmza" kutusu: sağ sütun x≈101.5mm,
+    // aynı satırda.
+    doc.text(surucuAdBilgi, 101.5, 247.9);
+  }
+  doc.setFont(FONT, "normal");
   doc.setTextColor(0, 0, 0);
 }
 
