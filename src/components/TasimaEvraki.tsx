@@ -574,7 +574,17 @@ async function evrakPdfUret(args: {
 
     // ADR uyumluluk şeridi
     const muafiyetKapsaminda = !args.muafiyetsiz && !args.plakaGerekli;
-    const sheriditYukseklik = (args.emniyetGerekli ? 5 : 0) + (muafiyetKapsaminda ? 5 : 0) + 12;
+    // "Turuncu plaka ZORUNLU" satırı artık normal (muafiyet dışı) durumda
+    // YAZILMIYOR — tehlikeli madde taşımasında turuncu plaka zaten
+    // varsayılan bir zorunluluktur, ayrıca belirtilmesine gerek yok.
+    // Yalnızca 1.1.3.6 muafiyeti kapsamındaysa (istisnai/dikkat çekilmesi
+    // gereken durum) "gerekmez" notu gösterilir.
+    const turuncuPlakaSatiriVar = !args.plakaGerekli;
+    const sheriditYukseklik =
+      7 +
+      (muafiyetKapsaminda ? 5 : 0) +
+      (turuncuPlakaSatiriVar ? 5 : 0) +
+      (args.emniyetGerekli ? 5 : 0);
   
     doc.setFillColor(args.plakaGerekli ? 254 : 240, args.plakaGerekli ? 242 : 253, args.plakaGerekli ? 242 : 244);
     doc.rect(M, y, W - 2 * M, sheriditYukseklik, "F");
@@ -597,14 +607,14 @@ async function evrakPdfUret(args: {
     }
   
     doc.setTextColor(0, 0, 0);
-    doc.text(
-      args.plakaGerekli ? "TURUNCU PLAKA ZORUNLU" : "Turuncu plaka gerekmez (1.1.3.6 muafiyeti)",
-      M + 3, nextLineY
-    );
+    if (turuncuPlakaSatiriVar) {
+      doc.text("Turuncu plaka gerekmez (1.1.3.6 muafiyeti)", M + 3, nextLineY);
+      nextLineY += 5;
+    }
   
     if (args.emniyetGerekli) {
       doc.setDrawColor(220, 38, 38);
-      doc.text("EMNİYET PLANI ZORUNLU", M + 3, nextLineY + 5);
+      doc.text("EMNİYET PLANI ZORUNLU", M + 3, nextLineY);
     }
   
     doc.setFont(FONT, "normal");
