@@ -163,9 +163,19 @@ const CAT_MUL: Record<string, number> = { "1": 50, "2": 3, "3": 1, "4": 0 };
 function hesapla1136(kalemler: Kalem[]) {
   // Kategori bazında miktarları topla, SONRA çarp (ADR 1.1.3.6.4).
   const katMiktar: Record<string, number> = {};
-  let muafiyetsiz = false; // Kat.0 veya kategori bilinmiyor → muafiyet yok
+  let muafiyetsiz = false; // Kat.0 / bilinmeyen madde / tank-dökme kalemi varsa → muafiyet yok
   for (const k of kalemler) {
     if (k.is_lq || k.is_eq) continue; // LQ/EQ kalemleri 1.1.3.6 toplamına girmez
+    // ADR 1.1.3.6.3: bu muafiyet YALNIZCA ambalajlı taşımaya uygulanır —
+    // sabit/taşınabilir tank, tank-konteyner veya dökme yük hâlinde
+    // taşınan maddeler için GEÇERLİ DEĞİLDİR. Sevkiyatta böyle bir kalem
+    // varsa TÜMÜ için muafiyet devre dışı kalır (turuncu plaka her
+    // hâlükârda gerekli olur) — miktardan bağımsız.
+    const pt = (k.packaging_type || "").toLocaleLowerCase("tr-TR");
+    if (pt.includes("tank") || pt.includes("tanker") || pt.includes("dökme") || pt.includes("dokme")) {
+      muafiyetsiz = true;
+      continue;
+    }
     const cat = (k.transport_category || "").trim();
     if (!(cat in CAT_MUL)) {
       muafiyetsiz = true;
@@ -2246,7 +2256,7 @@ export default function TasimaEvraki({
             <>
               {muafiyetsiz ? (
                 <p className="text-sm text-red-600 font-semibold mb-2">
-                  1.1.3.6 muafiyeti YOK — Kategori 0 / bilinmeyen madde var.
+                  1.1.3.6 muafiyeti YOK — Kategori 0 / bilinmeyen madde ya da Tank/Tanker/Dökme taşıma var (ADR 1.1.3.6.3 uyarınca bu muafiyet yalnızca ambalajlı taşımaya uygulanır).
                 </p>
               ) : (
                 <>
