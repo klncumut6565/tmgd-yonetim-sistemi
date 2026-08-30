@@ -509,9 +509,13 @@ async function evrakPdfUret(args: {
           // Ürün adı — çok satırlı
           doc.text(adSatirlari, x + 1.5, y + 3.8, { maxWidth: kolonlar[ci].w - 3 });
         } else if (ci === 6) {
-          // Taşıma Türü — çok satırlı olabilir
+          // Taşıma Türü — çok satırlı olabilir; diğer sütunlarla tutarlı
+          // olsun diye hem yatay (align:center) hem dikey (satır sayısına
+          // göre bloğu satırH'nin ortasına yerleştirerek) ortalanır.
           const tasimaturuSatirlari = doc.splitTextToSize(h, kolonlar[ci].w - 2);
-          doc.text(tasimaturuSatirlari, x + 1.5, y + 3.8);
+          const blokYuksekligi = (tasimaturuSatirlari.length - 1) * 3.4;
+          const baslangicY = y + satirH / 2 - blokYuksekligi / 2 + 1.2;
+          doc.text(tasimaturuSatirlari, x + kolonlar[ci].w / 2, baslangicY, { align: "center" });
         } else {
           // Diğer sütunlar — tek satır, merkez
           doc.text(h, x + kolonlar[ci].w / 2, y + satirH / 2 + 1.2, { 
