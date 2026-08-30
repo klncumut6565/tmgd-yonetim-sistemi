@@ -115,6 +115,22 @@ type Kalem = {
   unit: string;
   is_lq: boolean;
   is_eq: boolean;
+  /** Seçilmişse, Avrupa Atık Kataloğu / Atık Yönetimi Yönetmeliği kodu
+   *  (örn. "04 02 19*") — PDF'te Uygun Sevkiyat Adı'nın sonuna eklenir. */
+  atik_kodu: string | null;
+};
+
+/** Atık kodu kütüphanesi kaydı (atik_kodlari_katalogu). Sınıf/AG/tünel/
+ *  kategori/sevkiyat adı BİLİNÇLİ OLARAK burada yok — seçildiğinde
+ *  adr_un_numbers'tan (Tablo A) un_number+packing_group ile canlı
+ *  çekilir (bkz. migration 064'teki tasarım notu). */
+type AtikKodu = {
+  id: string;
+  atik_kodu: string;
+  atik_adi: string;
+  un_number: string;
+  packing_group: string | null;
+  detay: string | null;
 };
 
 type Surucu = { id: string; first_name: string; last_name: string; adr_certificate_no: string | null; adr_valid_until: string | null };
@@ -503,7 +519,10 @@ async function evrakPdfUret(args: {
 
     args.kalemler.forEach((k, i) => {
       const adSatirlari: string[] = doc.splitTextToSize(
-        k.proper_shipping_name + (k.is_lq ? "  [LQ]" : "") + (k.is_eq ? "  [EQ]" : ""),
+        k.proper_shipping_name +
+          (k.is_lq ? "  [LQ]" : "") +
+          (k.is_eq ? "  [EQ]" : "") +
+          (k.atik_kodu ? ` (Atık Kodu: ${k.atik_kodu})` : ""),
         kolonlar[2].w - 3
       );
       // Taşıma Türü sütunundaki metinler de kontrol et — satır sayısı maksimum olmalı
@@ -755,6 +774,15 @@ export default function TasimaEvraki({
   const [tabloAAraniyor, setTabloAAraniyor] = useState(false);
   const [seciliTabloA, setSeciliTabloA] = useState<TabloARow | null>(null);
 
+  // Atık kodu arama — atık kodu veya atık adı yazılarak aranır; seçilince
+  // seciliTabloA GERÇEK Tablo A satırıyla (un_number+packing_group
+  // eşleştirmesiyle) doldurulur, bu yüzden Tablo A akışının geri kalanı
+  // (ambalaj türü, miktar, kalemEkle) hiç değişmeden çalışır.
+  const [atikKoduArama, setAtikKoduArama] = useState("");
+  const [atikKoduSonuclar, setAtikKoduSonuclar] = useState<AtikKodu[]>([]);
+  const [atikKoduAraniyor, setAtikKoduAraniyor] = useState(false);
+  const [seciliAtikKodu, setSeciliAtikKodu] = useState<AtikKodu | null>(null);
+
   /**
    * Envanter içi arama — TİCARİ AD, sevkiyat adı ve UN numarası üzerinden.
    * Envanter zaten bellekte olduğu için sunucuya gitmeye gerek yok.
@@ -870,6 +898,61 @@ export default function TasimaEvraki({
       clearTimeout(zamanlayici);
     };
   }, [tabloAArama]);
+
+  // Atık kodu araması (debounce'lu) — atik_kodlari_katalogu'nda atık
+  // kodu VEYA atık adı üzerinden arar (migration 064).
+  useEffect(() => {
+    const q = atikKoduArama.trim();
+    if (q.length < 2) {
+      setAtikKoduSonuclar([]);
+      return;
+    }
+    let iptal = false;
+    setAtikKoduAraniyor(true);
+    const zamanlayici = setTimeout(async () => {
+      const { data } = await supabase
+        .from("atik_kodlari_katalogu")
+        .select("id, atik_kodu, atik_adi, un_number, packing_group, detay")
+        .or(`atik_kodu.ilike.%${q}%,atik_adi.ilike.%${q}%`)
+        .limit(25);
+      if (!iptal) {
+        setAtikKoduSonuclar((data as AtikKodu[]) ?? []);
+        setAtikKoduAraniyor(false);
+      }
+    }, 300);
+    return () => {
+      iptal = true;
+      clearTimeout(zamanlayici);
+    };
+  }, [atikKoduArama]);
+
+  /**
+   * Bir atık kodu seçildiğinde: un_number (+varsa packing_group) ile
+   * GERÇEK Tablo A satırını (adr_un_numbers) canlı çeker ve seciliTabloA'yı
+   * doldurur — böylece ambalaj türü/miktar/kalemEkle akışı Tablo A'dan
+   * seçim yapılmış gibi DEĞİŞMEDEN çalışır. Sınıf/AG/tünel/kategori/
+   * sevkiyat adı HİÇBİR ZAMAN atik_kodlari_katalogu'ndan alınmaz (bkz.
+   * migration 064 tasarım notu) — her zaman bu canlı sorgudan gelir.
+   */
+  async function atikKoduSec(ak: AtikKodu) {
+    let sorgu = supabase
+      .from("adr_un_numbers")
+      .select("id, un_number, proper_shipping_name, class, classification_code, packing_group, tunnel_code, transport_category, labels")
+      .eq("un_number", ak.un_number);
+    if (ak.packing_group) sorgu = sorgu.eq("packing_group", ak.packing_group);
+    const { data } = await sorgu.limit(1);
+    const satir = (data as TabloARow[] | null)?.[0];
+    if (!satir) {
+      setMesaj(`UN ${ak.un_number} Tablo A'da bulunamadı — bu atık kodu ayrıca kontrol edilmeli.`);
+      return;
+    }
+    setSeciliTabloA(satir);
+    setSeciliKimyasal("");
+    setSeciliAtikKodu(ak);
+    setAtikKoduSonuclar([]);
+    setAtikKoduArama(`${ak.atik_kodu} — ${ak.atik_adi}`);
+    setTabloAArama(`UN ${satir.un_number} — ${satir.proper_shipping_name}`);
+  }
 
   // ADR Asistanı'ndan "UN X'i ekle" geldiyse: envanterde bulunan İLK
   // eşleşmeyi otomatik seç, miktarı BOŞ bırak (kullanıcı girmeli — gerçek
@@ -1166,8 +1249,10 @@ export default function TasimaEvraki({
       packaging_type: tasimaTuru,
       packaging_count: Math.max(1, parseInt(ambalajAdet) || 1),
       quantity: q, unit: birim, is_lq: lq, is_eq: eq,
+      atik_kodu: seciliAtikKodu?.atik_kodu || null,
     }]);
     setSeciliKimyasal(""); setSeciliTabloA(null); setTabloAArama("");
+    setSeciliAtikKodu(null); setAtikKoduArama("");
     setAmbalajTuru(""); setAmbalajDiger(""); setAmbalajAdet("1");
     setMiktar(""); setLq(false); setEq(false);
   }
@@ -1176,6 +1261,7 @@ export default function TasimaEvraki({
     setEvrakId(null); setEvrakNo(evrakNoUret()); setAlici(""); setAliciAdres(""); setTasiyici("");
     setSurucuId(""); setAracId(""); setSurucuManuel(""); setAracManuel(""); setNotlar(""); setKalemler([]);
     setGonderen(firmaAdi); setGonderenAdres(firmaAdresVarsayilan); setGonderenSorumlu(""); setMesaj("");
+    setSeciliAtikKodu(null); setAtikKoduArama("");
     setTarih(new Date().toISOString().slice(0, 10));
   }
 
@@ -1231,6 +1317,7 @@ export default function TasimaEvraki({
       quantity: Number(r.quantity) || 0,
       unit: (r.unit as string) || "kg",
       is_lq: !!r.is_lq, is_eq: !!r.is_eq,
+      atik_kodu: (r.atik_kodu as string) || null,
       };
     }));
     setMesaj("");
@@ -1318,6 +1405,7 @@ export default function TasimaEvraki({
         tunnel_code: k.tunnel_code, transport_category: k.transport_category,
         packaging_type: k.packaging_type || null, packaging_count: k.packaging_count,
         quantity: k.quantity, unit: k.unit, is_lq: k.is_lq, is_eq: k.is_eq,
+        atik_kodu: k.atik_kodu,
       }))
     );
     if (itemErr) { setMesaj("Ürünler kaydedilemedi: " + hataCevir(itemErr)); return null; }
@@ -1778,8 +1866,16 @@ export default function TasimaEvraki({
                 {seciliTabloA && (
                   <p className="text-xs text-blue-700 bg-blue-50 border border-blue-200 rounded-lg p-2 mt-1.5">
                     ✓ Tablo A&apos;dan seçildi: UN {seciliTabloA.un_number} — {seciliTabloA.proper_shipping_name}
+                    {seciliAtikKodu && (
+                      <span className="block text-[11px] text-blue-500 mt-0.5">
+                        Atık Kodu: {seciliAtikKodu.atik_kodu} — {seciliAtikKodu.atik_adi}
+                      </span>
+                    )}
                     <button
-                      onClick={() => { setSeciliTabloA(null); setTabloAArama(""); }}
+                      onClick={() => {
+                        setSeciliTabloA(null); setTabloAArama("");
+                        setSeciliAtikKodu(null); setAtikKoduArama("");
+                      }}
                       className="ml-2 underline text-blue-600"
                     >
                       kaldır
@@ -1787,6 +1883,44 @@ export default function TasimaEvraki({
                   </p>
                 )}
               </div>
+
+              {/* Atık kodu ile arama — yalnızca seciliTabloA/seciliKimyasal
+                  BOŞKEN gösterilir (bir ürün zaten seçiliyse gereksiz). */}
+              {!seciliKimyasal && !seciliTabloA && (
+                <div className="mb-3">
+                  <label className={ETIKET}>veya Atık Kodu / Atık Adı ile Ara</label>
+                  <input
+                    className={GIRIS}
+                    placeholder="🗑️ Örn. 04 02 19 veya 'solvent', 'akü'..."
+                    value={atikKoduArama}
+                    onChange={(e) => setAtikKoduArama(e.target.value)}
+                  />
+                  {atikKoduAraniyor && <p className="text-xs text-gray-400 mt-1.5">Aranıyor...</p>}
+                  {!atikKoduAraniyor && atikKoduArama.trim().length >= 2 && atikKoduSonuclar.length === 0 && (
+                    <p className="text-xs text-gray-400 mt-1.5">Eşleşen atık kodu bulunamadı.</p>
+                  )}
+                  {atikKoduSonuclar.length > 0 && (
+                    <div className="border rounded-lg mt-1.5 bg-white overflow-hidden shadow-sm">
+                      <div className="px-2.5 py-1.5 bg-amber-50 text-[11px] font-semibold text-amber-800 border-b">
+                        🗑️ Atık Kodu Kütüphanesi ({atikKoduSonuclar.length})
+                      </div>
+                      <div className="max-h-40 overflow-y-auto">
+                        {atikKoduSonuclar.map((ak) => (
+                          <button
+                            key={ak.id}
+                            onClick={() => atikKoduSec(ak)}
+                            className="block w-full text-left px-2.5 py-1.5 text-xs hover:bg-amber-50 border-b last:border-b-0"
+                          >
+                            <span className="font-mono font-semibold">{ak.atik_kodu}</span>{" "}
+                            {ak.atik_adi}
+                            <span className="text-gray-400"> · UN {ak.un_number}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Etiketli, ferah bir ızgara — küçük ekranlarda 2 sütuna
                   düşer, tek sıraya sıkıştırmaz (bkz. tasarım notu üstte). */}
