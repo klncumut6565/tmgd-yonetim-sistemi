@@ -572,54 +572,53 @@ async function evrakPdfUret(args: {
     });
     y += 4;
 
-    // ADR uyumluluk şeridi
+    // ADR uyumluluk şeridi — 1.1.3.6 PUAN SAYISI (ve "muafiyet YOK" metni)
+    // artık hiçbir durumda gösterilmiyor; bu, TMGD'nin kendi dahili
+    // hesaplama detayıdır, taşıma evrakında yer almasına gerek yoktur.
+    // Şeritte yalnızca EYLEME dönük/istisnai bilgiler kalır: muafiyet
+    // kapsamındaysa "turuncu plaka gerekmez" notu, emniyet planı
+    // gerekiyorsa o uyarı. İkisi de yoksa (normal durum) şerit hiç
+    // çizilmez.
     const muafiyetKapsaminda = !args.muafiyetsiz && !args.plakaGerekli;
-    // "Turuncu plaka ZORUNLU" satırı artık normal (muafiyet dışı) durumda
-    // YAZILMIYOR — tehlikeli madde taşımasında turuncu plaka zaten
-    // varsayılan bir zorunluluktur, ayrıca belirtilmesine gerek yok.
-    // Yalnızca 1.1.3.6 muafiyeti kapsamındaysa (istisnai/dikkat çekilmesi
-    // gereken durum) "gerekmez" notu gösterilir.
-    const turuncuPlakaSatiriVar = !args.plakaGerekli;
-    const sheriditYukseklik =
-      7 +
-      (muafiyetKapsaminda ? 5 : 0) +
-      (turuncuPlakaSatiriVar ? 5 : 0) +
-      (args.emniyetGerekli ? 5 : 0);
-  
-    doc.setFillColor(args.plakaGerekli ? 254 : 240, args.plakaGerekli ? 242 : 253, args.plakaGerekli ? 242 : 244);
-    doc.rect(M, y, W - 2 * M, sheriditYukseklik, "F");
-    doc.setDrawColor(args.plakaGerekli ? 220 : 22, args.plakaGerekli ? 38 : 163, args.plakaGerekli ? 38 : 74);
-    doc.rect(M, y, W - 2 * M, sheriditYukseklik);
-    doc.setFontSize(8); doc.setFont(FONT, "bold");
-  
-    const puanMetni = args.muafiyetsiz
-      ? "1.1.3.6 muafiyeti YOK (Taşıma Kategorisi 0 veya bilinmeyen madde içeriyor)"
-      : `1.1.3.6 Puanı: ${args.puan.toFixed(0)} / 1000`;
-    doc.text(puanMetni, M + 3, y + 5);
-  
-    let nextLineY = y + 9.5;
-  
-    // Muafiyet kapsamındaysa açık cümle göster
+    const seritSatirlari: { metin: string; renk: [number, number, number] }[] = [];
     if (muafiyetKapsaminda) {
-      doc.setTextColor(22, 163, 74);
-      doc.text("1.1.3.6 MUAFİYETİ (MİKTAR) TAŞINMA YAPILMAKTADIR", M + 3, nextLineY);
-      nextLineY += 5;
+      seritSatirlari.push({ metin: "1.1.3.6 MUAFİYETİ (MİKTAR) TAŞINMA YAPILMAKTADIR", renk: [22, 163, 74] });
+      seritSatirlari.push({ metin: "Turuncu plaka gerekmez (1.1.3.6 muafiyeti)", renk: [0, 0, 0] });
     }
-  
-    doc.setTextColor(0, 0, 0);
-    if (turuncuPlakaSatiriVar) {
-      doc.text("Turuncu plaka gerekmez (1.1.3.6 muafiyeti)", M + 3, nextLineY);
-      nextLineY += 5;
-    }
-  
     if (args.emniyetGerekli) {
-      doc.setDrawColor(220, 38, 38);
-      doc.text("EMNİYET PLANI ZORUNLU", M + 3, nextLineY);
+      seritSatirlari.push({ metin: "EMNİYET PLANI ZORUNLU", renk: [220, 38, 38] });
     }
-  
-    doc.setFont(FONT, "normal");
-    doc.text(`Tünel Kısıtlaması: ${args.tunel}`, W - M - 3, y + 7.5, { align: "right" });
-    y += sheriditYukseklik + 4;
+
+    if (seritSatirlari.length > 0) {
+      // Emniyet planı gerekiyorsa (dikkat çekici, kırmızı) o baskın renk
+      // kullanılır; yalnızca muafiyet varsa (iyi haber) yeşil kullanılır.
+      const renkYesil = muafiyetKapsaminda && !args.emniyetGerekli;
+      const sheriditYukseklik = seritSatirlari.length * 5 + 4;
+      doc.setFillColor(renkYesil ? 240 : 254, renkYesil ? 253 : 242, renkYesil ? 244 : 242);
+      doc.rect(M, y, W - 2 * M, sheriditYukseklik, "F");
+      doc.setDrawColor(renkYesil ? 22 : 220, renkYesil ? 163 : 38, renkYesil ? 74 : 38);
+      doc.rect(M, y, W - 2 * M, sheriditYukseklik);
+      doc.setFontSize(8); doc.setFont(FONT, "bold");
+
+      let lineY = y + 5;
+      seritSatirlari.forEach((s) => {
+        doc.setTextColor(...s.renk);
+        doc.text(s.metin, M + 3, lineY);
+        lineY += 5;
+      });
+      doc.setTextColor(0, 0, 0);
+      doc.setFont(FONT, "normal");
+      doc.text(`Tünel Kısıtlaması: ${args.tunel}`, W - M - 3, y + 7.5, { align: "right" });
+      y += sheriditYukseklik + 4;
+    } else {
+      // Normal durum (muafiyet yok, emniyet planı da gerekmiyor) —
+      // renkli kutu çizilmez, yalnızca tünel kısıtlaması sade bir satır
+      // olarak gösterilir.
+      doc.setFontSize(8); doc.setFont(FONT, "normal"); doc.setTextColor(90, 90, 90);
+      doc.text(`Tünel Kısıtlaması: ${args.tunel}`, W - M - 3, y + 3, { align: "right" });
+      doc.setTextColor(0, 0, 0);
+      y += 7;
+    }
 
     if (args.notlar.trim()) {
       doc.setFontSize(7.5);
