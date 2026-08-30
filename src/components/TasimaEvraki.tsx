@@ -624,7 +624,7 @@ async function evrakPdfUret(args: {
     doc.text("SÜRÜCÜ (Ad Soyad / İmza)", M + imzaW + 8 + imzaW / 2, imzaY + 4.5, { align: "center" });
     doc.setFont(FONT, "normal"); doc.setFontSize(8);
     // İmza kutuları, elle imzalanacak boş alanlardır — isim biliniyorsa
-    // (GÖNDEREN için "Sorumlu kişi adı soyadı" alanı, SÜRÜCÜ için seçili
+    // (GÖNDEREN için "Gönderen sorumlu personel adı soyadı" alanı, SÜRÜCÜ için seçili
     // sürücü/manuel giriş) başlığın hemen altına yazılır; bilinmiyorsa
     // "—" değil, hiçbir şey yazılmaz.
     if (args.gonderenSorumlu.trim()) {
@@ -1526,7 +1526,7 @@ export default function TasimaEvraki({
               <textarea className={GIRIS + " mt-1.5"} rows={2}
                 placeholder="Gönderen adresi"
                 value={gonderenAdres} onChange={(e) => setGonderenAdres(e.target.value)} disabled={!canWrite} />
-              <input className={GIRIS + " mt-1.5"} placeholder="Sorumlu kişi adı soyadı"
+              <input className={GIRIS + " mt-1.5"} placeholder="Gönderen sorumlu personel adı soyadı"
                 value={gonderenSorumlu} onChange={(e) => setGonderenSorumlu(e.target.value)} disabled={!canWrite} />
             </div>
 
