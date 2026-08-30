@@ -1113,14 +1113,22 @@ export default function TasimaEvraki({
 
   /**
    * SRC-5 / ADR sürücü sertifikası kontrolü (canlı).
-   * ADR 8.2.1 uyarınca tehlikeli madde taşıyan sürücünün geçerli
-   * eğitim sertifikası olmalıdır. Muafiyet kapsamındaki (1.1.3.6)
-   * taşımalarda da 8.2.3 farkındalık eğitimi aranır; burada belge
-   * geçerliliği kontrol ediliyor.
+   * ADR 8.2.1 uyarınca tam kapsamlı taşımada geçerli SRC-5 eğitim
+   * sertifikası aranır. AMA 1.1.3.6 (küçük yük) muafiyeti kapsamındaki
+   * taşımalarda SRC-5 sertifikası ARANMAZ — yalnızca genel ADR
+   * farkındalık eğitimi (1.3/8.2.3) yeterlidir, bu sistemde ayrıca takip
+   * edilen resmi bir belge değildir. Bu yüzden muafiyet kapsamındayken
+   * SRC-5 eksikliği "hata" değil bilgilendirme olarak gösterilir.
    */
   const surucuUyari = useMemo(() => {
     if (kalemler.length === 0) return null;
     if (!seciliSurucu) return { seviye: "bilgi" as const, mesaj: "Sürücü seçilmedi — SRC-5 kontrolü yapılamıyor." };
+    if (!plakaGerekli) {
+      return {
+        seviye: "bilgi" as const,
+        mesaj: "1.1.3.6 muafiyeti kapsamında — SRC-5/ADR sertifikası aranmaz, yalnızca genel ADR farkındalık eğitimi (1.3/8.2.3) yeterlidir.",
+      };
+    }
     if (!seciliSurucu.adr_certificate_no) {
       return { seviye: "hata" as const, mesaj: `${seciliSurucu.first_name} ${seciliSurucu.last_name}: SRC-5/ADR sertifika numarası kayıtlı değil.` };
     }
@@ -1137,7 +1145,7 @@ export default function TasimaEvraki({
       return { seviye: "ok" as const, mesaj: `SRC-5 geçerli (${seciliSurucu.adr_valid_until}).` };
     }
     return { seviye: "uyari" as const, mesaj: "SRC-5 geçerlilik tarihi kayıtlı değil." };
-  }, [seciliSurucu, kalemler.length]);
+  }, [seciliSurucu, kalemler.length, plakaGerekli]);
 
   /** Araç ADR uygunluk belgesi kontrolü — muafiyet dışı taşımalarda gerekli. */
   const aracUyari = useMemo(() => {
@@ -2392,15 +2400,45 @@ export default function TasimaEvraki({
             </div>
           )}
 
-          {/* YAZILI TALİMAT — ADR 5.4.3 */}
+          {/* YAZILI TALİMAT — ADR 5.4.3. 1.1.3.6 muafiyeti kapsamındaki
+              taşımalarda yazılı talimat taşıma zorunluluğu YOKTUR. */}
           {kalemler.length > 0 && (
             <div className="mt-3 pt-3 border-t">
               <p className="text-xs font-semibold text-gray-700 mb-1.5">Yazılı Talimat (ADR 5.4.3)</p>
-              <p className="text-xs bg-blue-50 border border-blue-200 rounded p-2 text-blue-900">
-                📋 Taşıma sırasında araçta, sürücünün anlayacağı dilde <strong>yazılı talimat</strong> bulunmalıdır.
-                Yazılı talimat taşınan maddeye değil, <strong>ADR&apos;nin standart formatına</strong> göre hazırlanır
-                (4 sayfalık standart metin) ve taşımacı tarafından sağlanır.
-              </p>
+              {plakaGerekli ? (
+                <p className="text-xs bg-blue-50 border border-blue-200 rounded p-2 text-blue-900">
+                  📋 Taşıma sırasında araçta, sürücünün anlayacağı dilde <strong>yazılı talimat</strong> bulunmalıdır.
+                  Yazılı talimat taşınan maddeye değil, <strong>ADR&apos;nin standart formatına</strong> göre hazırlanır
+                  (4 sayfalık standart metin) ve taşımacı tarafından sağlanır.
+                </p>
+              ) : (
+                <p className="text-xs bg-green-50 border border-green-200 rounded p-2 text-green-800">
+                  ✅ 1.1.3.6 muafiyeti kapsamında — yazılı talimat taşıma zorunluluğu yoktur.
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* ARAÇ ADR DONANIMI — ADR 8.1.4/8.1.5. 1.1.3.6 muafiyeti
+              kapsamında takoz, göz durulama sıvısı, kürek vb. ekipmanın
+              TAMAMI zorunlu değildir; ancak asgari bir yangın söndürücü
+              (2 kg kuru toz veya eşdeğeri, ADR 8.1.4.2) HER DURUMDA
+              zorunludur — bu, muafiyetle kaldırılmaz. */}
+          {kalemler.length > 0 && (
+            <div className="mt-3 pt-3 border-t">
+              <p className="text-xs font-semibold text-gray-700 mb-1.5">Araç ADR Donanımı (ADR 8.1.4/8.1.5)</p>
+              {plakaGerekli ? (
+                <p className="text-xs bg-blue-50 border border-blue-200 rounded p-2 text-blue-900">
+                  🧰 Takoz, üçgen reflektör, göz durulama sıvısı, kürek, kişisel koruyucu donanım ve
+                  yangın söndürme ekipmanının tamamı ADR 8.1.4/8.1.5&apos;e uygun olmalıdır.
+                </p>
+              ) : (
+                <p className="text-xs bg-amber-50 border border-amber-200 rounded p-2 text-amber-800">
+                  ⚠ 1.1.3.6 muafiyeti kapsamında takoz, göz durulama sıvısı, kürek gibi ek ADR
+                  donanımının tamamı zorunlu değildir — ancak asgari <strong>1 adet 2 kg&apos;lık yangın
+                  söndürücü (ADR 8.1.4.2)</strong> her durumda araçta bulunmalıdır, bu muafiyetle kalkmaz.
+                </p>
+              )}
             </div>
           )}
 
