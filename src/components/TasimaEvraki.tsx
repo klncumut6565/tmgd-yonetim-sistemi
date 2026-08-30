@@ -590,9 +590,13 @@ async function evrakPdfUret(args: {
     doc.text("GÖNDEREN (Ad Soyad / Kaşe / İmza)", M + imzaW / 2, imzaY + 4.5, { align: "center" });
     doc.text("SÜRÜCÜ (Ad Soyad / İmza)", M + imzaW + 8 + imzaW / 2, imzaY + 4.5, { align: "center" });
     doc.setFont(FONT, "normal"); doc.setFontSize(8);
-    // İmza kutusu, sürücünün elle imzalayacağı boş bir alandır — isim
-    // girilmemişse buraya "—" değil, hiçbir şey yazılmaz (üst şeritteki
-    // "Sürücü:" bilgi alanında "—" göstermeye devam edilir, orası ayrı).
+    // İmza kutuları, elle imzalanacak boş alanlardır — isim biliniyorsa
+    // (GÖNDEREN için "Sorumlu kişi adı soyadı" alanı, SÜRÜCÜ için seçili
+    // sürücü/manuel giriş) başlığın hemen altına yazılır; bilinmiyorsa
+    // "—" değil, hiçbir şey yazılmaz.
+    if (args.gonderenSorumlu.trim()) {
+      doc.text(args.gonderenSorumlu.trim(), M + imzaW / 2, imzaY + 12, { align: "center" });
+    }
     if (surucuAd !== "—") {
       doc.text(surucuAd, M + imzaW + 8 + imzaW / 2, imzaY + 12, { align: "center" });
     }
