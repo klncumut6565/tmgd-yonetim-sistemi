@@ -6,7 +6,7 @@
 //    görünümlü belge/görev takip listesi + genel ilerleme yüzdesi
 //  - Genel sekmesi: faaliyet konuları (çoklu seçim), sözleşme tarihi, logo
 
-import { Suspense, use, useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, use, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase/client";
@@ -189,6 +189,22 @@ function FirmDetailInner({
   const [firm, setFirm] = useState<Firm | null>(null);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<TabKey>("belge_takip");
+  // Sekmeler arası "küp yüzeyi döner gibi" geçiş animasyonu: sekme
+  // değiştiğinde önce mevcut içerik kısa bir dönüşle (rotateY) kaybolur,
+  // hemen ardından yeni sekme içeriği ters yönden dönerek belirir.
+  // Framer Motion gibi bir kütüphaneye ihtiyaç duymadan, sadece CSS
+  // keyframe + React state ile iki aşamalı (çıkış/giriş) bir geçiş.
+  const [tabGecisAsamasi, setTabGecisAsamasi] = useState<"in" | "out">("in");
+  const tabGecisZamanlayici = useRef<ReturnType<typeof setTimeout> | null>(null);
+  function sekmeDegistir(yeniTab: TabKey) {
+    if (yeniTab === tab) return;
+    if (tabGecisZamanlayici.current) clearTimeout(tabGecisZamanlayici.current);
+    setTabGecisAsamasi("out");
+    tabGecisZamanlayici.current = setTimeout(() => {
+      setTab(yeniTab);
+      setTabGecisAsamasi("in");
+    }, 140);
+  }
   const [adrAltSekme, setAdrAltSekme] = useState<"evrak" | "envanter" | "sevkiyat">("evrak");
   // Sevkiyatlar sekmesinden "Aç" ile Taşıma Evrakı editörüne geçilirken
   // hangi evrağın otomatik yükleneceği.
@@ -885,7 +901,7 @@ function FirmDetailInner({
         {visibleTabs.map((t) => (
           <button
             key={t.key}
-            onClick={() => setTab(t.key)}
+            onClick={() => sekmeDegistir(t.key)}
             className={
               "px-4 py-2 rounded-t whitespace-nowrap " +
               (tab === t.key
@@ -897,6 +913,35 @@ function FirmDetailInner({
           </button>
         ))}
       </div>
+
+      {/* Sekme geçiş animasyonu stilleri — component ömrü boyunca sabit,
+          her sekme değişiminde yeniden mount olmasın diye key'li div'in
+          DIŞINDA tanımlanır. */}
+      <style jsx>{`
+        @keyframes tabFlipOut {
+          from { opacity: 1; transform: perspective(1200px) rotateY(0deg) translateX(0); }
+          to   { opacity: 0; transform: perspective(1200px) rotateY(-22deg) translateX(-10px); }
+        }
+        @keyframes tabFlipIn {
+          from { opacity: 0; transform: perspective(1200px) rotateY(22deg) translateX(10px); }
+          to   { opacity: 1; transform: perspective(1200px) rotateY(0deg) translateX(0); }
+        }
+        .tab-flip-out {
+          animation: tabFlipOut 140ms ease-in forwards;
+          transform-style: preserve-3d;
+          transform-origin: center;
+        }
+        .tab-flip-in {
+          animation: tabFlipIn 180ms ease-out forwards;
+          transform-style: preserve-3d;
+          transform-origin: center;
+        }
+      `}</style>
+
+      {/* Sekme içeriği — "küp yüzeyi döner gibi" 3D geçiş animasyonu.
+          key={tab} ile React her sekme değişiminde bu bloğu yeniden
+          mount eder, animasyon her seferinde baştan oynar. */}
+      <div key={tab} className={tabGecisAsamasi === "out" ? "tab-flip-out" : "tab-flip-in"}>
 
       {/* GENEL — düzenlenebilir form */}
       {tab === "genel" && !editMode && (
@@ -1819,6 +1864,7 @@ function FirmDetailInner({
       {tab === "notlar" && isSuperAdminOnly && (
         <FirmNotesTab firmId={id} />
       )}
+      </div>
     </div>
   );
 }
