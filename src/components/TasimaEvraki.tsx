@@ -216,6 +216,7 @@ async function k3FormuCiz(
     surucuManuel: string;
     aracManuel: string;
     kalemler: Kalem[];
+    firmaFaaliyetleri: string[];
   }
 ) {
   const { K3_FORM_SAYFA1, K3_FORM_SAYFA2 } = await import("@/lib/k3FormGorselleri");
@@ -284,9 +285,28 @@ async function k3FormuCiz(
     doc.text(wrapped.slice(0, 2), degerX, satirY); // hücre yüksekliği sınırlı, en fazla 2 satır
   });
 
-  // ── Sayfa 2: arka plan + "5. Onay" tablosundaki isimler ─────────────
+  // ── Sayfa 2: arka plan ────────────────────────────────────────────────
   doc.addPage();
   doc.addImage(K3_FORM_SAYFA2, "PNG", 0, 0, W, H);
+
+  // "4. Dolduran Kontrolleri" — firmanın kayıtlı faaliyet konuları
+  // arasında "dolduran" YOKSA, bu form fiilen doldurma işlemi yapmayan
+  // bir firma için düzenleniyor demektir; ADR/Yönetmelik Md.20 kapsamı
+  // dışında kaldığı için 10 satırın tamamı otomatik "İlgili Değil" (i)
+  // olarak işaretlenir. "dolduran" faaliyeti varsa, bu fiziksel kontrol
+  // gerektirdiğinden hiçbir işaret konmaz (elle doldurulur).
+  if (!args.firmaFaaliyetleri.includes("dolduran")) {
+    const DOLDURAN_I_X = 159.7; // "i" checkbox'ının ölçülmüş merkezi (mm)
+    const DOLDURAN_SATIR_Y = [
+      138.4, 148.0, 157.6, 167.2, 176.8, 186.4, 195.9, 205.5, 216.9, 228.3,
+    ];
+    doc.setFont(FONT, "bold");
+    doc.setFontSize(6.5);
+    doc.setTextColor(0, 0, 0);
+    DOLDURAN_SATIR_Y.forEach((satirY) => {
+      doc.text("X", DOLDURAN_I_X, satirY + 1.3, { align: "center" });
+    });
+  }
 
   const gonderenSorumluBilgi = args.gonderenSorumlu.trim();
   doc.setFont(FONT, "bold");
@@ -328,6 +348,8 @@ async function evrakPdfUret(args: {
   notlar: string;
   /** Firma logosu — antet bandının sol tarafında belirgin şekilde basılır. */
   logo?: LogoData;
+  /** K3'teki "Dolduran Kontrolleri" bölümünün otomatik işaretlenmesi için. */
+  firmaFaaliyetleri: string[];
 }) {
   const { default: jsPDF } = (await import("jspdf")) as unknown as {
     default: new (o?: object) => JsPDFType;
@@ -691,6 +713,10 @@ export default function TasimaEvraki({
   const [gonderenSorumlu, setGonderenSorumlu] = useState("");
   const [firmaAdresVarsayilan, setFirmaAdresVarsayilan] = useState("");
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  // Firmanın kayıtlı faaliyet konuları (K3'te "Dolduran Kontrolleri"
+  // bölümünün otomatik "İlgili Değil" işaretlenip işaretlenmeyeceğini
+  // belirlemek için kullanılır — bkz. k3FormuCiz()).
+  const [firmaFaaliyetleri, setFirmaFaaliyetleri] = useState<string[]>([]);
   const [alici, setAlici] = useState("");
   const [aliciAdres, setAliciAdres] = useState("");
 
@@ -777,7 +803,7 @@ export default function TasimaEvraki({
         .select("id, title, address")
         .eq("firm_id", firmId).order("title"),
       supabase.from("firms")
-        .select("address, district, city, logo_url")
+        .select("address, district, city, logo_url, activities")
         .eq("id", firmId).single(),
     ]);
     if (env.error && /does not exist|not find the table/i.test(env.error.message || "")) {
@@ -795,6 +821,7 @@ export default function TasimaEvraki({
     // sessizce boş geç — evrak düzenleme yine de çalışsın.
     setTasiyiciListesi((tsy.data as Consignee[]) || []);
     setLogoUrl((frm.data as { logo_url: string | null } | null)?.logo_url ?? null);
+    setFirmaFaaliyetleri((frm.data as { activities: string[] | null } | null)?.activities || []);
 
     // Gönderen adresi — Gönderen zaten firmanın kendi unvanına ("firmaAdi")
     // varsayılan geldiği için, adres de firmanın kendi kayıtlı adresine
@@ -1324,6 +1351,7 @@ export default function TasimaEvraki({
         surucu: seciliSurucu, arac: seciliArac,
         surucuManuel, aracManuel,
         kalemler, puan, plakaGerekli, emniyetGerekli: emniyet.required, muafiyetsiz, tunel, notlar,
+        firmaFaaliyetleri,
         logo,
       });
       const blobUrl = URL.createObjectURL(doc.output("blob"));
@@ -1366,6 +1394,7 @@ export default function TasimaEvraki({
         surucu: seciliSurucu, arac: seciliArac,
         surucuManuel, aracManuel,
         kalemler, puan, plakaGerekli, emniyetGerekli: emniyet.required, muafiyetsiz, tunel, notlar,
+        firmaFaaliyetleri,
         logo,
       });
       const blobUrl = URL.createObjectURL(doc.output("blob"));
@@ -1404,6 +1433,7 @@ export default function TasimaEvraki({
       surucu: seciliSurucu, arac: seciliArac,
       surucuManuel, aracManuel,
       kalemler, puan, plakaGerekli, emniyetGerekli: emniyet.required, muafiyetsiz, tunel, notlar,
+        firmaFaaliyetleri,
       logo,
     });
     doc.save(`tasima_evraki_${(evrakNo || "taslak").replace(/[^\w-]/g, "_")}.pdf`);
