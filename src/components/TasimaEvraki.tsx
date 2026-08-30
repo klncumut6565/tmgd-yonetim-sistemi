@@ -231,9 +231,35 @@ async function k3FormuCiz(
     ? `${args.surucu.first_name} ${args.surucu.last_name}`
     : args.surucuManuel.trim();
 
-  // ── Sayfa 1: arka plan + "2. Genel Bilgiler" tablosunun boş hücreleri ──
+  // ── Sayfa 1: arka plan ───────────────────────────────────────────────
   doc.addPage();
   doc.addImage(K3_FORM_SAYFA1, "PNG", 0, 0, W, H);
+
+  // "1. Tehlike İkaz İşaretleri ve Turuncu Plaka Kontrolü" — evraktaki
+  // gerçek taşıma moduna göre otomatik işaretlenir: seçili moda uyan
+  // satırda "Evet", diğer iki satırda "İlgili Değil" işaretlenir.
+  // Koordinatlar orijinal 1241x1754px (150 DPI) görüntü üzerinde piksel
+  // analiziyle ölçülüp mm'ye çevrilmiştir (checkbox merkezi x≈117.7mm).
+  const paketlemeMetni = args.kalemler.map((k) => (k.packaging_type || "").toLocaleLowerCase("tr-TR")).join(" ");
+  let k3Mod: "ambalaj" | "tank" | "konteyner" = "ambalaj";
+  if (paketlemeMetni.includes("tank") || paketlemeMetni.includes("tanker") || paketlemeMetni.includes("dökme") || paketlemeMetni.includes("dokme")) {
+    k3Mod = "tank";
+  } else if (paketlemeMetni.includes("konteyner") || paketlemeMetni.includes("konteynır")) {
+    k3Mod = "konteyner";
+  }
+  const CB_X = 118.9;
+  const CB_SATIRLARI: Record<"ambalaj" | "tank" | "konteyner", { evet: number; ilgiliDegil: number }> = {
+    ambalaj: { evet: 43.8, ilgiliDegil: 51.1 },
+    tank: { evet: 57.0, ilgiliDegil: 64.3 },
+    konteyner: { evet: 74.0, ilgiliDegil: 81.2 },
+  };
+  doc.setFont(FONT, "bold");
+  doc.setFontSize(7.5);
+  doc.setTextColor(0, 0, 0);
+  (Object.keys(CB_SATIRLARI) as (keyof typeof CB_SATIRLARI)[]).forEach((mod) => {
+    const satirY = mod === k3Mod ? CB_SATIRLARI[mod].evet : CB_SATIRLARI[mod].ilgiliDegil;
+    doc.text("X", CB_X, satirY + 1.3, { align: "center" });
+  });
 
   doc.setFont(FONT, "normal");
   doc.setFontSize(8.5);
