@@ -1726,22 +1726,22 @@ async function renderYapilandirilmisBelge(
   // başlık kutusundaki "Doküman No" alanında yer alır.
   const tamBaslik = belgeAdi;
 
-  // K2 (Boşaltma Konulu Kontrol Dökümanı) ve K3 (Gönderen–Paketleyen–
-  // Yükleyen–Dolduran Kontrol Dökümanı) ÖZEL DURUM: orijinal docx'lerin
-  // tasarımı (kendi başlık kutuları, gömülü görseller, tablo hücre
-  // birleşimleri) bir mini-renderer (blocks) ile YENİDEN OLUŞTURULMAYA
-  // çalışıldığında tasarım bozuluyordu. Bu yüzden ikisi de Taşıma
-  // Evrakı'ndaki K3 formuyla AYNI yöntemi kullanır: orijinal docx
-  // LibreOffice ile PNG'ye çevrilip (k2FormGorselleri.ts /
-  // k3FormGorselleri.ts) arka plan olarak basılır — birebir orijinal
-  // görünüm. Kapak sayfası standart Belge Oluştur formatında kalır.
-  // İçerik sayfalarında da Belge Oluştur'un standart BAŞLIK KUTUSU
-  // (Doküman No/Tarih/logo — logo sol üstte) basılır, ama İMZA TABLOSU
-  // basılmaz (PNG'nin kendi imza/onay bölümü zaten var, üst üste binmesin
-  // diye). PNG, başlık kutusunun ALTINDA kalan alana, EN-BOY ORANI
-  // KORUNARAK (bozulmadan) ortalanmış şekilde yerleştirilir.
-  if (code === "K2" || code === "K3") {
-    sayfaYonunuAyarla(false); // her ikisi de her zaman dikey
+  // K2 (Boşaltma Konulu Kontrol Dökümanı), K3 (Gönderen–Paketleyen–
+  // Yükleyen–Dolduran Kontrol Dökümanı) ve K4 (ADR Paketleme Kontrol
+  // Formu) ÖZEL DURUM: orijinal docx'lerin tasarımı (kendi başlık
+  // kutuları, gömülü görseller, tablo hücre birleşimleri) bir mini-
+  // renderer (blocks) ile YENİDEN OLUŞTURULMAYA çalışıldığında tasarım
+  // bozuluyordu. Bu yüzden hepsi Taşıma Evrakı'ndaki K3 formuyla AYNI
+  // yöntemi kullanır: orijinal docx LibreOffice ile PNG'ye çevrilip
+  // (k2/k3/k4 FormGorselleri.ts) arka plan olarak basılır — birebir
+  // orijinal görünüm. Kapak sayfası standart Belge Oluştur formatında
+  // kalır. İçerik sayfalarında da Belge Oluştur'un standart BAŞLIK
+  // KUTUSU (Doküman No/Tarih/logo — logo sol üstte) basılır, ama İMZA
+  // TABLOSU basılmaz (PNG'nin kendi imza/onay bölümü zaten var, üst
+  // üste binmesin diye). PNG, başlık kutusunun ALTINDA kalan alana,
+  // EN-BOY ORANI KORUNARAK (bozulmadan) ortalanmış şekilde yerleştirilir.
+  if (code === "K2" || code === "K3" || code === "K4") {
+    sayfaYonunuAyarla(false); // hepsi her zaman dikey
     const { yukseklik: baslikYukseklik, adLines } = baslikYuksekligiHesapla(doc, belgeAdi);
     kapakSayfasiCiz(
       doc,
@@ -1758,7 +1758,14 @@ async function renderYapilandirilmisBelge(
       adLines
     );
 
-    const toplamSayfa = 3; // kapak + 2 içerik sayfası
+    const gorseller: string[] =
+      code === "K2"
+        ? await import("@/lib/k2FormGorselleri").then((m) => [m.K2_FORM_SAYFA1, m.K2_FORM_SAYFA2])
+        : code === "K3"
+        ? await import("@/lib/k3FormGorselleri").then((m) => [m.K3_FORM_SAYFA1, m.K3_FORM_SAYFA2])
+        : await import("@/lib/k4FormGorselleri").then((m) => [m.K4_FORM_SAYFA1]);
+
+    const toplamSayfa = 1 + gorseller.length; // kapak + içerik sayfaları
     const headerAlt = CERCEVE_KENAR + baslikYukseklik + 6;
     const kalanYukseklik = CERCEVE_ALT - headerAlt;
     const kalanGenislik = W - 2 * M;
@@ -1778,18 +1785,11 @@ async function renderYapilandirilmisBelge(
       pngY = headerAlt;
     }
 
-    const [sayfa1Gorsel, sayfa2Gorsel] =
-      code === "K2"
-        ? await import("@/lib/k2FormGorselleri").then((m) => [m.K2_FORM_SAYFA1, m.K2_FORM_SAYFA2])
-        : await import("@/lib/k3FormGorselleri").then((m) => [m.K3_FORM_SAYFA1, m.K3_FORM_SAYFA2]);
-
-    doc.addPage();
-    baslikTablosuCiz(doc, firmAdi, code, belgeAdi, sablon, logo, bugun, 2, toplamSayfa, baslikYukseklik, adLines);
-    doc.addImage(sayfa1Gorsel, "PNG", pngX, pngY, pngGenislik, pngYukseklik);
-
-    doc.addPage();
-    baslikTablosuCiz(doc, firmAdi, code, belgeAdi, sablon, logo, bugun, 3, toplamSayfa, baslikYukseklik, adLines);
-    doc.addImage(sayfa2Gorsel, "PNG", pngX, pngY, pngGenislik, pngYukseklik);
+    gorseller.forEach((gorsel, i) => {
+      doc.addPage();
+      baslikTablosuCiz(doc, firmAdi, code, belgeAdi, sablon, logo, bugun, i + 2, toplamSayfa, baslikYukseklik, adLines);
+      doc.addImage(gorsel, "PNG", pngX, pngY, pngGenislik, pngYukseklik);
+    });
     return;
   }
 
