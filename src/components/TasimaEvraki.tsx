@@ -1136,6 +1136,9 @@ export default function TasimaEvraki({
    */
   const surucuUyari = useMemo(() => {
     if (kalemler.length === 0) return null;
+    // Sürücü alanı UI'da hiç gösterilmiyorsa (firma tasimaci değilse) bu
+    // kontrol de anlamsız — gereksiz "Sürücü seçilmedi" uyarısı vermesin.
+    if (!firmaFaaliyetleri.includes("tasimaci")) return null;
     if (!seciliSurucu) return { seviye: "bilgi" as const, mesaj: "Sürücü seçilmedi — SRC-5 kontrolü yapılamıyor." };
     if (!plakaGerekli) {
       return {
@@ -1159,7 +1162,7 @@ export default function TasimaEvraki({
       return { seviye: "ok" as const, mesaj: `SRC-5 geçerli (${seciliSurucu.adr_valid_until}).` };
     }
     return { seviye: "uyari" as const, mesaj: "SRC-5 geçerlilik tarihi kayıtlı değil." };
-  }, [seciliSurucu, kalemler.length, plakaGerekli]);
+  }, [seciliSurucu, kalemler.length, plakaGerekli, firmaFaaliyetleri]);
 
   /** Araç ADR uygunluk belgesi kontrolü — muafiyet dışı taşımalarda gerekli. */
   const aracUyari = useMemo(() => {
@@ -1742,65 +1745,73 @@ export default function TasimaEvraki({
                 value={notlar} onChange={(e) => setNotlar(e.target.value)} disabled={!canWrite} />
             </div>
 
-            <div>
-              <label className={ETIKET}>Sürücü</label>
-              <select className={GIRIS} value={surucuId}
-                onChange={(e) => {
-                  setSurucuId(e.target.value);
-                  if (e.target.value) setSurucuManuel("");
-                }}
-                disabled={!canWrite}>
-                <option value="">Seçilmedi (opsiyonel)</option>
-                {suruculer.map((s) => (
-                  <option key={s.id} value={s.id}>{s.first_name} {s.last_name}</option>
-                ))}
-              </select>
-              <input
-                className={GIRIS + " mt-1.5"}
-                placeholder="veya elle yaz — örn. alt yüklenici sürücüsü"
-                value={surucuManuel}
-                onChange={(e) => {
-                  setSurucuManuel(e.target.value);
-                  if (e.target.value) setSurucuId("");
-                }}
-                disabled={!canWrite || !!surucuId}
-              />
-              {surucuId ? (
-                <p className="text-[11px] text-gray-400 mt-1">Kayıtlı sürücü seçildi — elle yazmak için önce seçimi kaldır.</p>
-              ) : (
-                <p className="text-[11px] text-gray-400 mt-1">Sistemde kayıtlı değilse (ör. alt yüklenici) buraya elle yaz.</p>
-              )}
-            </div>
+            {/* Sürücü ve Araç alanları yalnızca firmanın kayıtlı faaliyet
+                konuları arasında "tasimaci" varsa gösterilir — taşımacılık
+                faaliyeti olmayan bir firma için bu evrağı dolduran zaten
+                sürücü/araç bilgisi girmeyecektir. */}
+            {firmaFaaliyetleri.includes("tasimaci") && (
+              <>
+                <div>
+                  <label className={ETIKET}>Sürücü</label>
+                  <select className={GIRIS} value={surucuId}
+                    onChange={(e) => {
+                      setSurucuId(e.target.value);
+                      if (e.target.value) setSurucuManuel("");
+                    }}
+                    disabled={!canWrite}>
+                    <option value="">Seçilmedi (opsiyonel)</option>
+                    {suruculer.map((s) => (
+                      <option key={s.id} value={s.id}>{s.first_name} {s.last_name}</option>
+                    ))}
+                  </select>
+                  <input
+                    className={GIRIS + " mt-1.5"}
+                    placeholder="veya elle yaz — örn. alt yüklenici sürücüsü"
+                    value={surucuManuel}
+                    onChange={(e) => {
+                      setSurucuManuel(e.target.value);
+                      if (e.target.value) setSurucuId("");
+                    }}
+                    disabled={!canWrite || !!surucuId}
+                  />
+                  {surucuId ? (
+                    <p className="text-[11px] text-gray-400 mt-1">Kayıtlı sürücü seçildi — elle yazmak için önce seçimi kaldır.</p>
+                  ) : (
+                    <p className="text-[11px] text-gray-400 mt-1">Sistemde kayıtlı değilse (ör. alt yüklenici) buraya elle yaz.</p>
+                  )}
+                </div>
 
-            <div>
-              <label className={ETIKET}>Araç</label>
-              <select className={GIRIS} value={aracId}
-                onChange={(e) => {
-                  setAracId(e.target.value);
-                  if (e.target.value) setAracManuel("");
-                }}
-                disabled={!canWrite}>
-                <option value="">Seçilmedi (opsiyonel)</option>
-                {araclar.map((a) => (
-                  <option key={a.id} value={a.id}>{a.plate_number}{a.brand ? ` · ${a.brand}` : ""}</option>
-                ))}
-              </select>
-              <input
-                className={GIRIS + " mt-1.5"}
-                placeholder="veya elle yaz — örn. plaka"
-                value={aracManuel}
-                onChange={(e) => {
-                  setAracManuel(e.target.value);
-                  if (e.target.value) setAracId("");
-                }}
-                disabled={!canWrite || !!aracId}
-              />
-              {aracId ? (
-                <p className="text-[11px] text-gray-400 mt-1">Kayıtlı araç seçildi — elle yazmak için önce seçimi kaldır.</p>
-              ) : (
-                <p className="text-[11px] text-gray-400 mt-1">Sistemde kayıtlı değilse buraya elle yaz.</p>
-              )}
-            </div>
+                <div>
+                  <label className={ETIKET}>Araç</label>
+                  <select className={GIRIS} value={aracId}
+                    onChange={(e) => {
+                      setAracId(e.target.value);
+                      if (e.target.value) setAracManuel("");
+                    }}
+                    disabled={!canWrite}>
+                    <option value="">Seçilmedi (opsiyonel)</option>
+                    {araclar.map((a) => (
+                      <option key={a.id} value={a.id}>{a.plate_number}{a.brand ? ` · ${a.brand}` : ""}</option>
+                    ))}
+                  </select>
+                  <input
+                    className={GIRIS + " mt-1.5"}
+                    placeholder="veya elle yaz — örn. plaka"
+                    value={aracManuel}
+                    onChange={(e) => {
+                      setAracManuel(e.target.value);
+                      if (e.target.value) setAracId("");
+                    }}
+                    disabled={!canWrite || !!aracId}
+                  />
+                  {aracId ? (
+                    <p className="text-[11px] text-gray-400 mt-1">Kayıtlı araç seçildi — elle yazmak için önce seçimi kaldır.</p>
+                  ) : (
+                    <p className="text-[11px] text-gray-400 mt-1">Sistemde kayıtlı değilse buraya elle yaz.</p>
+                  )}
+                </div>
+              </>
+            )}
           </div>
         </section>
 
