@@ -1726,6 +1726,43 @@ async function renderYapilandirilmisBelge(
   // başlık kutusundaki "Doküman No" alanında yer alır.
   const tamBaslik = belgeAdi;
 
+  // K3 (Gönderen–Paketleyen–Yükleyen–Dolduran Kontrol Dökümanı) ÖZEL
+  // DURUM: orijinal docx'in tasarımı (2 sütunlu tablolar, gömülü
+  // görseller, hücre birleşimleri) bir mini-renderer (blocks) ile
+  // YENİDEN OLUŞTURULMAYA çalışıldığında tasarım bozuluyordu (K2'de
+  // aynı sorun yaşanmış ve düzeltilmişti). Bu yüzden K3, Taşıma
+  // Evrakı'ndaki k3FormuCiz() ile AYNI yöntemi kullanır: orijinal docx
+  // LibreOffice ile PNG'ye çevrilip (k3FormGorselleri.ts, iki sayfa)
+  // tam sayfa arka plan olarak basılır — birebir orijinal görünüm.
+  // Kapak sayfası yine standart Belge Oluştur formatında kalır; içerik
+  // sayfalarında PNG'nin KENDİ başlığı ve "5. Onay" bölümü zaten
+  // olduğundan, Belge Oluştur'un başlık kutusu/imza tablosu üzerine
+  // BİNDİRİLMEZ.
+  if (code === "K3") {
+    sayfaYonunuAyarla(false); // K3 her zaman dikey
+    const { yukseklik: baslikYukseklik, adLines } = baslikYuksekligiHesapla(doc, belgeAdi);
+    kapakSayfasiCiz(
+      doc,
+      firmAdi,
+      code,
+      belgeAdi,
+      sablon,
+      logo,
+      bugun,
+      faaliyetKapsami,
+      hazirlayanAdi,
+      onaylayanAdi,
+      baslikYukseklik,
+      adLines
+    );
+    const { K3_FORM_SAYFA1, K3_FORM_SAYFA2 } = await import("@/lib/k3FormGorselleri");
+    doc.addPage();
+    doc.addImage(K3_FORM_SAYFA1, "PNG", 0, 0, W, H);
+    doc.addPage();
+    doc.addImage(K3_FORM_SAYFA2, "PNG", 0, 0, W, H);
+    return;
+  }
+
   const satirlar = duzMetneCevir(doc, sablon, tamBaslik);
   if (notlar.trim()) {
     satirlar.push({ tur: "altbaslik", metin: "Ek Notlar" });
