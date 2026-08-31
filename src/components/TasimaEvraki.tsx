@@ -582,7 +582,7 @@ async function evrakPdfUret(args: {
     const muafiyetKapsaminda = !args.muafiyetsiz && !args.plakaGerekli;
     const seritSatirlari: { metin: string; renk: [number, number, number] }[] = [];
     if (muafiyetKapsaminda) {
-      seritSatirlari.push({ metin: "1.1.3.6 MUAFİYETİ (MİKTAR) TAŞINMA YAPILMAKTADIR", renk: [22, 163, 74] });
+      seritSatirlari.push({ metin: "1.1.3.6 MUAFİYETİ (MİKTAR) KAPSAMINDA TAŞINMA YAPILMAKTADIR", renk: [22, 163, 74] });
       seritSatirlari.push({ metin: "Turuncu plaka gerekmez (1.1.3.6 muafiyeti)", renk: [0, 0, 0] });
     }
     if (args.emniyetGerekli) {
