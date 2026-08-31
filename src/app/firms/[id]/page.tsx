@@ -794,6 +794,9 @@ function FirmDetailInner({
     let done = 0;
     sections.forEach((sec) =>
       sec.items.forEach((it) => {
+        // "Diğer" (D4) zorunlu olmayan, serbest ek belgeler için —
+        // genel ilerleme yüzdesine dahil edilmez.
+        if (it.code === "D4") return;
         total++;
         if (doneSet.has(`${it.code}|${it.period}`)) done++;
       })
@@ -1284,12 +1287,12 @@ function FirmDetailInner({
                         const visitDate = isZiyaret ? visitByPeriod[it.period] || "" : "";
                         // Bu kategorilerde "geçerlilik tarihi" kavramı anlamsız —
                         // prosedür/talimat/kontrol formu/liste/yıllık faaliyet
-                        // raporu/kaza-olay bildirimi hep yeniden üretilen veya
-                        // süreklilik arz eden belgelerdir, bir bitiş tarihi
-                        // taşımazlar. Bu maddelerde geçerlilik girişi/rozeti
-                        // hiç gösterilmez.
+                        // raporu/kaza-olay bildirimi/serbest ek belgeler hep
+                        // yeniden üretilen, süreklilik arz eden ya da opsiyonel
+                        // belgelerdir, bir bitiş tarihi taşımazlar. Bu maddelerde
+                        // geçerlilik girişi/rozeti hiç gösterilmez.
                         const gecerlilikYok =
-                          /^[PTKL]\d/.test(it.code) || it.code === "YFR" || it.code === "D3";
+                          /^[PTKL]\d/.test(it.code) || it.code === "YFR" || it.code === "D3" || it.code === "D4";
 
                         return (
                           <div key={itemKey} className="px-4 py-2 text-sm hover:bg-gray-50">

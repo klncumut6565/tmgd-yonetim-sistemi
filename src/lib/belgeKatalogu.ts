@@ -167,6 +167,7 @@ const SPECIAL_ITEMS: Record<string, { label: string; section: string }> = {
   D1: { label: "Emniyet Planı / Değerlendirme Kaydı", section: "Emniyet Planı · GBF · Diğer" },
   D2: { label: "Güvenlik Bilgi Formları (GBF/SDS) Dosyası", section: "Emniyet Planı · GBF · Diğer" },
   D3: { label: "Kaza / Olay Bildirim Raporları", section: "Emniyet Planı · GBF · Diğer" },
+  D4: { label: "Diğer", section: "Emniyet Planı · GBF · Diğer" },
 };
 
 // Herhangi bir madde kodu (+ dönem) için okunabilir isim döndürür.
@@ -420,6 +421,7 @@ export function buildChecklist(
               { code: "D2", period: "", label: "Güvenlik Bilgi Formları (GBF/SDS) Dosyası" },
             ]),
         { code: "D3", period: "", label: "Kaza / Olay Bildirim Raporları (ADR 1.8.5.3 — varsa)" },
+        { code: "D4", period: "", label: "Diğer (zorunlu olmayan ek belgeler)" },
       ],
     },
   ].filter((s) => s.items.length > 0);
