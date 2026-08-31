@@ -325,9 +325,14 @@ async function k3FormuCiz(
   // olarak işaretlenir. "dolduran" faaliyeti varsa, bu fiziksel kontrol
   // gerektirdiğinden hiçbir işaret konmaz (elle doldurulur).
   if (!args.firmaFaaliyetleri.includes("dolduran")) {
-    const DOLDURAN_I_X = 159.7; // "i" checkbox'ının ölçülmüş merkezi (mm)
+    // NOT: K3'ün "Onay" sütunu ("3. Gönderen-Paketleyen"/"Yükleyen"/
+    // "Dolduran" tabloları) sonradan %50 daraltılıp üç tabloda da aynı
+    // hizaya getirildi (bkz. k3FormGorselleri.ts'teki not) — bu, "Dolduran
+    // Kontrolleri" tablosundaki "i" checkbox'ının konumunu kaydırdı,
+    // koordinatlar yeni görsel üzerinde yeniden ölçüldü.
+    const DOLDURAN_I_X = 192.1; // "i" checkbox'ının ölçülmüş merkezi (mm)
     const DOLDURAN_SATIR_Y = [
-      138.4, 148.0, 157.6, 167.2, 176.8, 186.4, 195.9, 205.5, 216.9, 228.3,
+      134.8, 144.3, 153.9, 163.5, 173.1, 182.7, 192.3, 201.9, 211.4, 221.1,
     ];
     doc.setFont(FONT, "bold");
     doc.setFontSize(6.5);

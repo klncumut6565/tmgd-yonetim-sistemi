@@ -1732,12 +1732,14 @@ async function renderYapilandirilmisBelge(
   // birleşimleri) bir mini-renderer (blocks) ile YENİDEN OLUŞTURULMAYA
   // çalışıldığında tasarım bozuluyordu. Bu yüzden ikisi de Taşıma
   // Evrakı'ndaki K3 formuyla AYNI yöntemi kullanır: orijinal docx
-  // LibreOffice ile PNG'ye çevrilip (k2FormGorselleri.ts / 
-  // k3FormGorselleri.ts) tam sayfa arka plan olarak basılır — birebir
-  // orijinal görünüm. Kapak sayfası yine standart Belge Oluştur
-  // formatında kalır; içerik sayfalarında PNG'nin KENDİ başlığı ve
-  // imza/onay bölümü zaten olduğundan, Belge Oluştur'un başlık kutusu/
-  // imza tablosu üzerine BİNDİRİLMEZ.
+  // LibreOffice ile PNG'ye çevrilip (k2FormGorselleri.ts /
+  // k3FormGorselleri.ts) arka plan olarak basılır — birebir orijinal
+  // görünüm. Kapak sayfası standart Belge Oluştur formatında kalır.
+  // İçerik sayfalarında da Belge Oluştur'un standart BAŞLIK KUTUSU
+  // (Doküman No/Tarih/logo — logo sol üstte) basılır, ama İMZA TABLOSU
+  // basılmaz (PNG'nin kendi imza/onay bölümü zaten var, üst üste binmesin
+  // diye). PNG, başlık kutusunun ALTINDA kalan alana, EN-BOY ORANI
+  // KORUNARAK (bozulmadan) ortalanmış şekilde yerleştirilir.
   if (code === "K2" || code === "K3") {
     sayfaYonunuAyarla(false); // her ikisi de her zaman dikey
     const { yukseklik: baslikYukseklik, adLines } = baslikYuksekligiHesapla(doc, belgeAdi);
@@ -1755,19 +1757,39 @@ async function renderYapilandirilmisBelge(
       baslikYukseklik,
       adLines
     );
-    if (code === "K2") {
-      const { K2_FORM_SAYFA1, K2_FORM_SAYFA2 } = await import("@/lib/k2FormGorselleri");
-      doc.addPage();
-      doc.addImage(K2_FORM_SAYFA1, "PNG", 0, 0, W, H);
-      doc.addPage();
-      doc.addImage(K2_FORM_SAYFA2, "PNG", 0, 0, W, H);
+
+    const toplamSayfa = 3; // kapak + 2 içerik sayfası
+    const headerAlt = CERCEVE_KENAR + baslikYukseklik + 6;
+    const kalanYukseklik = CERCEVE_ALT - headerAlt;
+    const kalanGenislik = W - 2 * M;
+    const pngOrani = 210 / 297; // orijinal PNG'lerin en-boy oranı (A4 dikey)
+    let pngGenislik: number, pngYukseklik: number, pngX: number, pngY: number;
+    if (kalanGenislik / pngOrani <= kalanYukseklik) {
+      // genişlik sınırlayıcı — tam genişlik kullanılır, dikeyde ortalanır
+      pngGenislik = kalanGenislik;
+      pngYukseklik = kalanGenislik / pngOrani;
+      pngX = M;
+      pngY = headerAlt + (kalanYukseklik - pngYukseklik) / 2;
     } else {
-      const { K3_FORM_SAYFA1, K3_FORM_SAYFA2 } = await import("@/lib/k3FormGorselleri");
-      doc.addPage();
-      doc.addImage(K3_FORM_SAYFA1, "PNG", 0, 0, W, H);
-      doc.addPage();
-      doc.addImage(K3_FORM_SAYFA2, "PNG", 0, 0, W, H);
+      // yükseklik sınırlayıcı — tam yükseklik kullanılır, yatayda ortalanır
+      pngYukseklik = kalanYukseklik;
+      pngGenislik = kalanYukseklik * pngOrani;
+      pngX = M + (kalanGenislik - pngGenislik) / 2;
+      pngY = headerAlt;
     }
+
+    const [sayfa1Gorsel, sayfa2Gorsel] =
+      code === "K2"
+        ? await import("@/lib/k2FormGorselleri").then((m) => [m.K2_FORM_SAYFA1, m.K2_FORM_SAYFA2])
+        : await import("@/lib/k3FormGorselleri").then((m) => [m.K3_FORM_SAYFA1, m.K3_FORM_SAYFA2]);
+
+    doc.addPage();
+    baslikTablosuCiz(doc, firmAdi, code, belgeAdi, sablon, logo, bugun, 2, toplamSayfa, baslikYukseklik, adLines);
+    doc.addImage(sayfa1Gorsel, "PNG", pngX, pngY, pngGenislik, pngYukseklik);
+
+    doc.addPage();
+    baslikTablosuCiz(doc, firmAdi, code, belgeAdi, sablon, logo, bugun, 3, toplamSayfa, baslikYukseklik, adLines);
+    doc.addImage(sayfa2Gorsel, "PNG", pngX, pngY, pngGenislik, pngYukseklik);
     return;
   }
 
