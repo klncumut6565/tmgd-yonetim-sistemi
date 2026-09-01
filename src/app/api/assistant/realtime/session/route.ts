@@ -80,14 +80,25 @@ export async function POST(req: NextRequest) {
     .toISOString()
     .replace(/\.\d{3}Z$/, 'Z')
 
+  // NOT (düzeltme): Google'ın resmi "curl" örneği (ai.google.dev/gemini-api/
+  // docs/live-api/ephemeral-tokens) alanları ÜST SEVİYEDE gösteriyordu ve
+  // ilk implementasyon buna göre yazılmıştı — ama gerçek istekte "Unknown
+  // name \"liveConnectConstraints\" at 'auth_token'" hatası alındı. TÜM
+  // resmi SDK örnekleri (Python/JS/Elixir/Rust, docs/ephemeral-tokens'ın
+  // güncel örnekleri) ise alanları bir "config" sarmalayıcısı İÇİNE
+  // koyuyor — bu, REST body şemasının aslında böyle olduğuna ve "curl"
+  // örneğinin bayat/güncellenmemiş olduğuna işaret ediyor. SDK'lar HTTP
+  // body'sini olduğu gibi yansıtır (ayrı bir RPC forma dönüştürmezler).
   const govde = JSON.stringify({
-    uses: 1,
-    expireTime,
-    liveConnectConstraints: {
-      model: GEMINI_LIVE_MODEL,
-      config: {
-        sessionResumption: {},
-        responseModalities: ['AUDIO'],
+    config: {
+      uses: 1,
+      expireTime,
+      liveConnectConstraints: {
+        model: GEMINI_LIVE_MODEL,
+        config: {
+          sessionResumption: {},
+          responseModalities: ['AUDIO'],
+        },
       },
     },
   })
