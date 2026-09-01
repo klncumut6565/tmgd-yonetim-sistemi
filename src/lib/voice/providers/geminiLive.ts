@@ -48,12 +48,19 @@ export class GeminiLiveProvider implements RealtimeProvider {
   }
 
   async connect(session: RealtimeSessionResponse): Promise<void> {
-    // Token hangi API sürümüyle üretildiyse (bkz. /api/assistant/realtime/
-    // session — v1beta/v1alpha arasında otomatik seçim yapabiliyor) WebSocket
-    // yolu da AYNI sürümü kullanmalı, aksi halde token reddedilebilir.
+    // API sürümü: Google'ın resmi dokümantasyonu ephemeral token'lar için
+    // açıkça "only works for the live API, and ONLY with the v1beta version
+    // of the API" diyor — bu yüzden varsayılan v1beta.
     const surum = session.apiVersion || "v1beta";
     const wsPath = `/ws/google.ai.generativelanguage.${surum}.GenerativeService.BidiGenerateContent`;
-    const url = `wss://${WS_HOST}${wsPath}?key=${encodeURIComponent(session.token)}`;
+    // ÖNEMLİ: Ephemeral token NORMAL bir API anahtarı gibi "?key=" ile
+    // GÖNDERİLEMEZ. Resmi dokümantasyon (ephemeral-tokens sayfası, "Connect
+    // to Live API with an ephemeral token" bölümündeki not): "If not using
+    // the SDK, note that ephemeral tokens must either be passed in an
+    // `access_token` query parameter, or in an HTTP `Authorization` header
+    // prefixed by the auth-scheme `Token`." SDK kullanmadığımız (ham
+    // WebSocket) için access_token query parametresi kullanılıyor.
+    const url = `wss://${WS_HOST}${wsPath}?access_token=${encodeURIComponent(session.token)}`;
 
     await new Promise<void>((resolve, reject) => {
       const ws = new WebSocket(url);

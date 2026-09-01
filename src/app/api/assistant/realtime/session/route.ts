@@ -39,7 +39,10 @@ export const maxDuration = 15
 // AYRI ve SABİT tutulur, çünkü Live API farklı bir API yüzeyidir (WebSocket,
 // ses-ses). Model adı zaman içinde değişebilir; güncel isim için Gemini
 // Live API dokümantasyonu kontrol edilmelidir.
-const GEMINI_LIVE_MODEL = 'models/gemini-3.1-flash-live-preview'
+// NOT: Live modeli artık BURADA belirtilmiyor — token'a liveConnectConstraints
+// ile model kilitlemesi yapılmadığı için (bkz. aşağıdaki açıklama), model
+// yalnızca WebSocket "setup" mesajında gönderiliyor (src/lib/voice/providers/
+// geminiLive.ts → GEMINI_LIVE_MODEL). Tek kaynak orası.
 
 // Ephemeral token'ın geçerlilik süresi. Kısa tutulur (güvenlik) ama
 // bağlantı kurmaya yetecek kadar uzun olmalı.
@@ -80,27 +83,25 @@ export async function POST(req: NextRequest) {
     .toISOString()
     .replace(/\.\d{3}Z$/, 'Z')
 
-  // NOT (düzeltme): Google'ın resmi "curl" örneği (ai.google.dev/gemini-api/
-  // docs/live-api/ephemeral-tokens) alanları ÜST SEVİYEDE gösteriyordu ve
-  // ilk implementasyon buna göre yazılmıştı — ama gerçek istekte "Unknown
-  // name \"liveConnectConstraints\" at 'auth_token'" hatası alındı. TÜM
-  // resmi SDK örnekleri (Python/JS/Elixir/Rust, docs/ephemeral-tokens'ın
-  // güncel örnekleri) ise alanları bir "config" sarmalayıcısı İÇİNE
-  // koyuyor — bu, REST body şemasının aslında böyle olduğuna ve "curl"
-  // örneğinin bayat/güncellenmemiş olduğuna işaret ediyor. SDK'lar HTTP
-  // body'sini olduğu gibi yansıtır (ayrı bir RPC forma dönüştürmezler).
+  // Token gövdesi — Google'ın resmi REST örneğine BİREBİR uygun (üst
+  // seviye alanlar, "config" sarmalayıcısı YOK; SDK örneklerindeki
+  // "config: {...}" sarmalayıcısı SDK'nın kendi imzası, HTTP gövdesi
+  // değil).
+  //
+  // liveConnectConstraints BİLİNÇLİ OLARAK GÖNDERİLMİYOR: bu alan
+  // dokümantasyonda opsiyoneldir ("It's also possible to lock an
+  // ephemeral token to a set of configurations") ve tam da bu alan
+  // yüzünden hem v1beta hem v1alpha 400 veriyordu ("Unknown name
+  // \"liveConnectConstraints\" at 'auth_token': Cannot find field") —
+  // görünüşe göre bu hesap/anahtar türünde veya bu API sürümünde alan
+  // kabul edilmiyor. Model ve config'i kısıtlamaya gerek yok, çünkü
+  // WebSocket bağlantısındaki ilk "setup" mesajı (bkz. geminiLive.ts)
+  // zaten modeli, sistem talimatını ve araçları gönderiyor — token'ı
+  // kilitlemek yalnızca ekstra bir güvenlik katmanıydı, işlevsel bir
+  // gereklilik değil.
   const govde = JSON.stringify({
-    config: {
-      uses: 1,
-      expireTime,
-      liveConnectConstraints: {
-        model: GEMINI_LIVE_MODEL,
-        config: {
-          sessionResumption: {},
-          responseModalities: ['AUDIO'],
-        },
-      },
-    },
+    uses: 1,
+    expireTime,
   })
 
   // API sürümü: resmi dokümantasyon v1beta gösteriyor, ancak bazı hesap/
