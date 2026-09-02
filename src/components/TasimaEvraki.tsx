@@ -928,10 +928,21 @@ export default function TasimaEvraki({
     let iptal = false;
     setAtikKoduAraniyor(true);
     const zamanlayici = setTimeout(async () => {
+      // Atık kodları veritabanında boşluklu tutulur ("16 04 01") ama kullanıcı
+      // genelde boşluksuz ("160401") ya da noktalı/tireli ("16.04.01") yazar.
+      // Girdi yalnızca rakam/ayraçtan oluşuyorsa, rakamları ayıklayıp
+      // "16 04 01" biçimine çevirerek İKİNCİ bir desenle de arıyoruz —
+      // böylece her iki yazım da sonuç verir.
+      const sadeceRakam = q.replace(/[^0-9]/g, "");
+      const desenler = [`atik_kodu.ilike.%${q}%`, `atik_adi.ilike.%${q}%`];
+      if (sadeceRakam.length >= 2 && sadeceRakam.length <= 6) {
+        const bosluklu = (sadeceRakam.match(/.{1,2}/g) || []).join(" ");
+        if (bosluklu !== q) desenler.push(`atik_kodu.ilike.%${bosluklu}%`);
+      }
       const { data } = await supabase
         .from("atik_kodlari_katalogu")
         .select("id, atik_kodu, atik_adi, un_number, packing_group, detay")
-        .or(`atik_kodu.ilike.%${q}%,atik_adi.ilike.%${q}%`)
+        .or(desenler.join(","))
         .limit(25);
       if (!iptal) {
         setAtikKoduSonuclar((data as AtikKodu[]) ?? []);
