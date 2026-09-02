@@ -37,6 +37,11 @@ const DEFAULT_SETTINGS: NotifSettings = {
   adr_expiry_days: 45,
 };
 
+/** TMFB (Tehlikeli Madde Faaliyet Belgesi) için ÖZEL uyarı eşiği.
+ *  Yenileme süreci uzun sürdüğü için genel belge eşiğinden (doc_expiry_days)
+ *  bağımsız olarak, son 150 gün kala uyarı verilir. */
+const TMFB_UYARI_GUN = 150;
+
 function daysLabel(d: number): string {
   if (d < 0) return `${Math.abs(d)} gün geçti`;
   if (d === 0) return "Bugün doluyor";
@@ -92,16 +97,43 @@ export default function NotificationBell() {
     // 3) Belge geçerlilik uyarıları (ayara göre) — expiring_documents view'ı
     // artık firm_belgeleri (Belge Takip) maddelerini de UNION ile içeriyor
     // (migration 019), ayrı bir sorguya gerek yok.
+    //
+    // ÖZEL DURUM — TMFB (G1): Tehlikeli Madde Faaliyet Belgesi'nin yenileme
+    // süreci uzun sürdüğü için, genel eşikten (doc_expiry_days, varsayılan
+    // 45 gün) BAĞIMSIZ olarak SON 150 GÜN kala uyarı verilir. Bu yüzden
+    // TMFB için ayrı bir sorgu yapılır ve sonuçlar birleştirilir.
+    const belgeSonuclari: ExpiringDoc[] = [];
+
     if (s.doc_expiry_days > 0) {
       const { data } = await supabase
         .from("expiring_documents")
         .select("id, title, firm_name, days_left, expiry_date")
         .lte("days_left", s.doc_expiry_days)
         .order("days_left");
-      setExpiringDocs((data as ExpiringDoc[]) || []);
-    } else {
-      setExpiringDocs([]);
+      belgeSonuclari.push(...((data as ExpiringDoc[]) || []));
     }
+
+    // TMFB — genel eşik kapalı olsa bile her zaman kontrol edilir.
+    // Başlık, migration 067 ile 'Belge Takip: Tehlikeli Madde Faaliyet
+    // Belgesi (TMFB)' şeklinde üretiliyor; ayrıca documents tablosundaki
+    // (Belge Takip dışı) TMFB kayıtları da yakalansın diye 'TMFB' geçen
+    // tüm başlıklar taranıyor.
+    const { data: tmfbData } = await supabase
+      .from("expiring_documents")
+      .select("id, title, firm_name, days_left, expiry_date")
+      .ilike("title", "%TMFB%")
+      .lte("days_left", TMFB_UYARI_GUN)
+      .order("days_left");
+
+    // Genel sorgu TMFB'yi zaten getirmiş olabilir (eşik yeterince büyükse)
+    // — id bazlı tekilleştirme ile aynı uyarının iki kez görünmesi önlenir.
+    const gorulenIdler = new Set(belgeSonuclari.map((d) => d.id));
+    for (const d of (tmfbData as ExpiringDoc[]) || []) {
+      if (!gorulenIdler.has(d.id)) belgeSonuclari.push(d);
+    }
+
+    belgeSonuclari.sort((a, b) => a.days_left - b.days_left);
+    setExpiringDocs(belgeSonuclari);
 
     // 4) Sürücü + araç belge uyarıları (ayara göre): ADR/SRC-5, Muayene, Ehliyet
     if (s.adr_expiry_days > 0) {
