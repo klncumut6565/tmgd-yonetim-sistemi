@@ -307,6 +307,9 @@ function tanimlarSayfasiCiz(
   doc.addPage("a4", "portrait");
   fontuKaydet(doc);
 
+  // Kapak sayfasıyla AYNI ince çerçeve (bkz. kapakCercevesiCiz).
+  kapakCercevesiCiz(doc);
+
   // Diğer TÜM iç sayfalarla (kapak, yatay tablo sayfası) AYNI başlık
   // kutusu: sol üstte firma logosu, sağ üstte Doküman No/Tarih/Sayfa No
   // bilgi paneli. Önceden bu sayfada eksikti.
