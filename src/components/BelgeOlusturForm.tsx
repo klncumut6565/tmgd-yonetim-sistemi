@@ -158,7 +158,44 @@ export default function BelgeOlusturForm({ fixedFirmId, initialFirmId, compact =
   // Firma faaliyetlerine göre filtrelenmiş katalog, kategoriye göre gruplu
   const grouped = useMemo(() => {
     if (!firm) return [];
-    const items = catalogForActivities(firm.activities || []);
+    let items = catalogForActivities(firm.activities || []);
+    
+    // YFR (Yıllık Faaliyet Raporu) için dinamik yıllar ekle
+    const hasYFR = items.some((i) => i.code === "YFR");
+    if (hasYFR) {
+      // YFR'yi katalogdan çıkar, sonra yıllar için ayrı item'ler ekle
+      items = items.filter((i) => i.code !== "YFR");
+      
+      const now = new Date();
+      const currentYear = now.getFullYear();
+      const sonRaporYili = currentYear - 1;
+      
+      let startYear = sonRaporYili;
+      if (firm.contract_start) {
+        const cs = new Date(firm.contract_start);
+        const sozlesmeYili = cs.getFullYear();
+        const mayisOncesi = cs.getMonth() < 4; // 0-indeksli: Mayıs = 4
+        
+        if (sozlesmeYili <= sonRaporYili) {
+          startYear = mayisOncesi ? sozlesmeYili : sozlesmeYili + 1;
+        } else {
+          startYear = mayisOncesi ? sonRaporYili : currentYear;
+        }
+      }
+      
+      // Yıllar için YFR item'leri oluştur
+      const yfrItems: typeof items = [];
+      for (let y = startYear; y <= sonRaporYili; y++) {
+        yfrItems.push({
+          code: `YFR_${y}`,
+          name: `Yıllık Faaliyet Raporu ${y}`,
+          category: "L",
+          activities: [],
+        });
+      }
+      items = items.concat(yfrItems);
+    }
+    
     return CATEGORY_ORDER.map((cat) => ({
       cat,
       label: CATEGORY_LABELS[cat],
@@ -381,7 +418,16 @@ export default function BelgeOlusturForm({ fixedFirmId, initialFirmId, compact =
 
       for (let i = 0; i < selected.length; i++) {
         const code = selected[i];
-        const item = CATALOG.find((c) => c.code === code);
+        
+        // YFR_2025 gibi dinamik kodları işle
+        let actualCode = code;
+        let yfrPeriod: string | undefined;
+        if (code.startsWith("YFR_")) {
+          actualCode = "YFR";
+          yfrPeriod = code.substring(4); // "2025" gibi yıl bilgisi
+        }
+        
+        const item = CATALOG.find((c) => c.code === actualCode);
         if (!item) continue;
 
         // Belge yönü şablondan gelir; yatay şablonlarda (çok sütunlu
@@ -444,14 +490,14 @@ export default function BelgeOlusturForm({ fixedFirmId, initialFirmId, compact =
           continue;
         }
 
-        doc.save(`${firm.name}_${item.code}.pdf`);
+        doc.save(`${firm.name}_${item.code}${yfrPeriod ? `_${yfrPeriod}` : ""}.pdf`);
 
         // Belge Takip'te tamamlandı işaretle
         await supabase.from("firm_belgeleri").upsert(
           {
             firm_id: firm.id,
             code: item.code,
-            period: "",
+            period: yfrPeriod || "",
             done: true,
             note: notes.trim() || null,
           },
