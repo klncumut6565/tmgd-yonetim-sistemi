@@ -62,6 +62,14 @@ function daysLeft(dateStr: string): number {
   return Math.round((target.getTime() - today.getTime()) / 86400000);
 }
 
+/** Panelde "Yaklaşan Belge Süreleri" için genel pencere (gün). */
+const GENEL_UYARI_GUN = 30;
+
+/** TMFB (Tehlikeli Madde Faaliyet Belgesi) ÖZEL eşiği — yenileme süreci
+ *  uzun sürdüğü için genel 30 günlük pencereden bağımsız olarak son 150
+ *  gün kala gösterilir (NotificationBell ile aynı kural). */
+const TMFB_UYARI_GUN = 150;
+
 function DaysBadge({ date }: { date: string }) {
   const d = daysLeft(date);
   const label = d < 0 ? `${Math.abs(d)} gün geçti` : d === 0 ? "Bugün" : `${d} gün kaldı`;
@@ -80,6 +88,9 @@ export default function DashboardPage() {
   const [counts, setCounts] = useState<Counts>({ firms: 0, openTasks: 0, documents: 0, vehicles: 0 });
   const [drivers, setDrivers] = useState<ExpiringItem[]>([]);
   const [vehicles, setVehicles] = useState<ExpiringItem[]>([]);
+  // Firma/Belge Takip belgeleri (TMFB, sigorta, yetki belgesi, muayene vb.)
+  // — expiring_documents view'ından gelir.
+  const [belgeler, setBelgeler] = useState<ExpiringItem[]>([]);
   const [tasks, setTasks] = useState<RecentTask[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -95,6 +106,8 @@ export default function DashboardPage() {
         expVehAdrRes,
         expVehInspRes,
         expDrvLicRes,
+        expDocsRes,
+        expTmfbRes,
         recentRes,
       ] = await Promise.all([
         supabase.from("firms").select("*", { count: "exact", head: true }),
@@ -107,25 +120,40 @@ export default function DashboardPage() {
         supabase
           .from("adr_expiring_drivers")
           .select("id, first_name, last_name, adr_valid_until, firm_name, days_left")
-          .lte("days_left", 30)
+          .lte("days_left", GENEL_UYARI_GUN)
           .order("days_left")
           .limit(8),
         supabase
           .from("adr_expiring_vehicles")
           .select("id, plate_number, adr_valid_until, firm_name, days_left")
-          .lte("days_left", 30)
+          .lte("days_left", GENEL_UYARI_GUN)
           .order("days_left")
           .limit(8),
         supabase
           .from("expiring_vehicle_inspections")
           .select("id, plate_number, inspection_valid_until, firm_name, days_left")
-          .lte("days_left", 30)
+          .lte("days_left", GENEL_UYARI_GUN)
           .order("days_left")
           .limit(8),
         supabase
           .from("expiring_driver_licenses")
           .select("id, first_name, last_name, driving_license_valid_until, firm_name, days_left")
-          .lte("days_left", 30)
+          .lte("days_left", GENEL_UYARI_GUN)
+          .order("days_left")
+          .limit(8),
+        // Firma/Belge Takip belgeleri — genel 30 günlük pencere
+        supabase
+          .from("expiring_documents")
+          .select("id, title, expiry_date, firm_name, days_left")
+          .lte("days_left", GENEL_UYARI_GUN)
+          .order("days_left")
+          .limit(8),
+        // TMFB — genel pencereden BAĞIMSIZ, 150 gün kala gösterilir
+        supabase
+          .from("expiring_documents")
+          .select("id, title, expiry_date, firm_name, days_left")
+          .ilike("title", "%TMFB%")
+          .lte("days_left", TMFB_UYARI_GUN)
           .order("days_left")
           .limit(8),
         supabase
@@ -195,6 +223,31 @@ export default function DashboardPage() {
 
       setDrivers([...drvAdr, ...drvLic].sort((a, b) => a.days_left - b.days_left));
       setVehicles([...vehAdr, ...vehInsp].sort((a, b) => a.days_left - b.days_left));
+
+      // Firma/Belge Takip belgeleri — genel pencere + TMFB'nin özel
+      // (150 gün) sonuçları birleştirilir. Genel pencere TMFB'yi zaten
+      // getirmiş olabileceğinden id bazlı tekilleştirme yapılır.
+      const belgeHam = [...(expDocsRes.data || []), ...(expTmfbRes.data || [])];
+      const gorulen = new Set<string>();
+      const belgeListesi: ExpiringItem[] = [];
+      for (const b of belgeHam as Record<string, unknown>[]) {
+        const bid = String(b.id);
+        if (gorulen.has(bid)) continue;
+        gorulen.add(bid);
+        // Başlıktaki "Belge Takip: " ön ekini kaldır — panelde zaten
+        // "Firma Belgeleri" başlığı altında gösteriliyor.
+        const baslik = String(b.title).replace(/^Belge Takip:\s*/, "");
+        belgeListesi.push({
+          id: `doc-${bid}`,
+          label: baslik,
+          docType: "Belge",
+          valid_until: String(b.expiry_date),
+          days_left: Number(b.days_left),
+          firm_name: String(b.firm_name),
+        });
+      }
+      setBelgeler(belgeListesi.sort((a, b) => a.days_left - b.days_left));
+
       setTasks((recentRes.data as unknown as RecentTask[]) || []);
       setLoading(false);
     }
@@ -246,7 +299,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Yaklaşan belge süreleri — yan yana iki kolon */}
-      <h2 className="text-xl font-bold mb-3">Yaklaşan Belge Süreleri (30 gün)</h2>
+      <h2 className="text-xl font-bold mb-3">Yaklaşan Belge Süreleri</h2>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-8">
         <div className="border rounded-xl p-4">
           <h3 className="font-medium text-gray-600 mb-3">Sürücü Belgeleri (SRC-5 · Ehliyet)</h3>
@@ -284,6 +337,32 @@ export default function DashboardPage() {
               </li>
             ))}
           </ul>
+        </div>
+
+        {/* Firma belgeleri (Belge Takip) — TMFB, yetki belgesi, sigorta vb.
+            TMFB burada 150 gün kala görünür (özel eşik), diğerleri 30 gün. */}
+        <div className="border rounded-xl p-4 lg:col-span-2">
+          <h3 className="font-medium text-gray-600 mb-3">
+            Firma Belgeleri (TMFB · Yetki · Sigorta · Diğer)
+          </h3>
+          {loading && <p className="text-sm text-gray-500">Yükleniyor...</p>}
+          {!loading && belgeler.length === 0 && (
+            <p className="text-sm text-gray-500">Yaklaşan firma belgesi yok. ✓</p>
+          )}
+          <ul className="space-y-2">
+            {belgeler.map((b) => (
+              <li key={b.id} className="flex items-center justify-between gap-2 text-sm">
+                <span>
+                  {b.label}
+                  <span className="text-gray-400"> · {b.firm_name}</span>
+                </span>
+                <DaysBadge date={b.valid_until} />
+              </li>
+            ))}
+          </ul>
+          <p className="text-[11px] text-gray-400 mt-3">
+            TMFB için yenileme süresi uzun olduğundan uyarı 150 gün kala başlar; diğer belgeler 30 gün.
+          </p>
         </div>
       </div>
 
