@@ -928,11 +928,13 @@ export default function TasimaEvraki({
     let iptal = false;
     setAtikKoduAraniyor(true);
     const zamanlayici = setTimeout(async () => {
-      // Atık kodları veritabanında boşluklu tutulur ("16 04 01") ama kullanıcı
-      // genelde boşluksuz ("160401") ya da noktalı/tireli ("16.04.01") yazar.
-      // Girdi yalnızca rakam/ayraçtan oluşuyorsa, rakamları ayıklayıp
-      // "16 04 01" biçimine çevirerek İKİNCİ bir desenle de arıyoruz —
-      // böylece her iki yazım da sonuç verir.
+      // Atık kodları veritabanında Atık Yönetimi Yönetmeliği'ndeki resmî
+      // gösterimle, YILDIZLI ve boşluklu saklanır: "16 04 01*". Kullanıcı
+      // ise genelde yıldızsız ve/veya boşluksuz yazar ("160401", "16 04 01",
+      // "16.04.01"). Girdi rakam/ayraçtan oluşuyorsa rakamları ayıklayıp
+      // ikişerli gruplayarak kanonik biçimi ("16 04 01") üretir ve ONUNLA da
+      // ararız — ilike deseninin sonundaki % yıldızı kapsadığı için kayıt
+      // her hâlükârda bulunur.
       const sadeceRakam = q.replace(/[^0-9]/g, "");
       const desenler = [`atik_kodu.ilike.%${q}%`, `atik_adi.ilike.%${q}%`];
       if (sadeceRakam.length >= 2 && sadeceRakam.length <= 6) {
