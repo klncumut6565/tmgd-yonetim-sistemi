@@ -249,25 +249,14 @@ async function kapakSayfasiCiz(
     ],
   });
 
-  const kontrolTablosuAlti =
-    (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY;
-
-  // Hazırlayan (TMGD) / Sorumlu Kişi — örnekteki gibi iki sütunlu imza alanı.
-  const imzaY = Math.min(kontrolTablosuAlti + 55, H - 60);
-  doc.setFontSize(9.5);
-  doc.setFont(FONT, "bold");
-  doc.setTextColor(0, 0, 0);
-  doc.text("Hazırlayan (TMGD)", W / 2 - 42, imzaY, { align: "center" });
-  doc.text("Sorumlu Kişi", W / 2 + 42, imzaY, { align: "center" });
-  doc.setFont(FONT, "normal");
-  doc.text(veri.hazirlayanAdi || "—", W / 2 - 42, imzaY + 6, { align: "center" });
-  doc.text(veri.onaylayanAdi || "—", W / 2 + 42, imzaY + 6, { align: "center" });
-  // NOT: "Sorumlu Kişi" altına daha önce boş bir imza çizgisi çiziliyordu
-  // — kullanıcı talebiyle kaldırıldı, örnek kapak sayfasında böyle bir
-  // çizgi yok. Ancak isim satırı (bu satır) çizgiyle birlikte yanlışlıkla
-  // silinmişti — Onaylayan/Sorumlu Kişi adı (firms.approver_name, Belge
-  // Oluştur'da girilen) artık burada da görünüyor; sayfa 3'teki imza
-  // bloğuyla (imzaBlokuCiz → ONAYLAYAN) tutarlı.
+  // HAZIRLAYAN / KONTROL EDEN / ONAYLAYAN imza tablosu — Belge Oluştur
+  // kapak sayfasıyla (BelgeOlusturForm.tsx → altTabloCiz) AYNI çerçeveli
+  // 3 sütunlu tablo ve AYNI konum: sayfanın ALTINA sabitlenir (önceden
+  // 2 sütunlu, çerçevesiz ve tablonun bittiği yere göre kayan bir
+  // yerleşimdi). Doküman No / Düzenleme Tarihi satırlarının ve karekodun
+  // üstünde kalacak şekilde konumlandırılır.
+  const kapakImzaY = H - 34 - 6 - IMZA_BLOK_YUKSEKLIK;
+  imzaBlokuCiz(doc, veri, kapakImzaY);
 
   doc.setFontSize(9.5);
   doc.setFont(FONT, "normal");
@@ -492,11 +481,14 @@ function baslikKutusuCiz(doc: JsPDFType, veri: GorevliListesiPdfVerisi) {
 }
 
 /**
- * HAZIRLAYAN / KONTROL EDEN / ONAYLAYAN üç sütunlu imza bloğu —
- * surucuListesiPdf.ts'teki (imzaBlokuCiz) AYNI çerçevesiz desen.
- * "KONTROL EDEN" her zaman sabit TMGD Koordinatörü'dür (BelgeOlusturForm.
- * tsx'teki kurumsal desenle tutarlı).
+ * HAZIRLAYAN / KONTROL EDEN / ONAYLAYAN üç sütunlu imza tablosu —
+ * BelgeOlusturForm.tsx'teki altTabloCiz() ile AYNI görünüm: dış çerçeve +
+ * iki dikey ayırıcı çizgi (önceden çerçevesizdi, Belge Oluştur'daki
+ * kurumsal desenle tutarlı olsun diye çerçeveli hâle getirildi).
+ * "KONTROL EDEN" her zaman sabit TMGD Koordinatörü'dür.
  */
+const IMZA_BLOK_YUKSEKLIK = 20;
+
 function imzaBlokuCiz(doc: JsPDFType, veri: GorevliListesiPdfVerisi, y: number) {
   const kolonGenislik = (W - 2 * M) / 3;
 
@@ -508,6 +500,13 @@ function imzaBlokuCiz(doc: JsPDFType, veri: GorevliListesiPdfVerisi, y: number) 
     "Sorumlu Kişi",
   ];
   const isimliUnvanlar = [altBasliklar[0], altBasliklar[1], "Tesis Sorumlusu"];
+
+  // Çerçeve + dikey ayırıcılar (Belge Oluştur ile aynı)
+  doc.setDrawColor(0, 0, 0);
+  doc.setLineWidth(0.3);
+  doc.rect(M, y, W - 2 * M, IMZA_BLOK_YUKSEKLIK);
+  doc.line(M + kolonGenislik, y, M + kolonGenislik, y + IMZA_BLOK_YUKSEKLIK);
+  doc.line(M + kolonGenislik * 2, y, M + kolonGenislik * 2, y + IMZA_BLOK_YUKSEKLIK);
 
   basliklar.forEach((b, i) => {
     const x = M + kolonGenislik * i + kolonGenislik / 2;
@@ -564,7 +563,12 @@ export async function gorevliListesiPdfOlustur(
     // ÇİZİLDİKTEN SONRA çiziyor, üst üste biner). 38 = kutuTop(10) +
     // BASLIK_KUTUSU_YUKSEKLIK(24) + 4mm boşluk.
     margin: { top: 38, left: M, right: M },
-    styles: { font: FONT, fontSize: 8.5, cellPadding: 2.5, valign: "middle" },
+    // cellPadding 2.5 → 1.4: her hücrede 4 yönde 2.5mm boşluk, 7 sütunda
+    // yatayda ~35mm, her satırda dikeyde 5mm kayba yol açıyordu — metin
+    // gereksiz yere sarıyor, satırlar şişiyor ve tablo erken taşarak fazladan
+    // sayfa açılmasına neden oluyordu. 1.4mm hâlâ rahat okunur bir nefes
+    // payı bırakır ama kaybı yarıdan fazla azaltır.
+    styles: { font: FONT, fontSize: 8.5, cellPadding: 1.4, valign: "middle" },
     headStyles: {
       font: FONT,
       fontStyle: "bold",
@@ -578,14 +582,18 @@ export async function gorevliListesiPdfOlustur(
     // Güncellemeler:
     // - Tehlikeli Madde Görev Başlığı %50 daraltıldı (53.9 → 27)
     // - Yapılacak Görevler daraltılan kısım eklenip genişletildi (44.2 → 71)
+    // - cellPadding azaltılınca açığa çıkan yer, uzun metinli sütunlara
+    //   (Yapılacak Görevler, Doldurulacak Döküman No, Sorumlu Kişi/ler)
+    //   dağıtıldı; dar/sabit içerikli sütunlar (Sıra No, Eğitim Tarihi)
+    //   biraz kısıldı. Toplam yine 267mm.
     columnStyles: {
-      0: { cellWidth: 15.2, halign: "center" },
-      1: { cellWidth: 27, overflow: "linebreak" },
-      2: { cellWidth: 71, overflow: "linebreak" },
-      3: { cellWidth: 36.3, overflow: "linebreak" },
-      4: { cellWidth: 29.0, overflow: "linebreak" },
-      5: { cellWidth: 51.0, overflow: "linebreak" },
-      6: { cellWidth: 37.4, halign: "center" },
+      0: { cellWidth: 12.0, halign: "center" },
+      1: { cellWidth: 28.0, overflow: "linebreak" },
+      2: { cellWidth: 80.0, overflow: "linebreak" },
+      3: { cellWidth: 34.0, overflow: "linebreak" },
+      4: { cellWidth: 32.0, overflow: "linebreak" },
+      5: { cellWidth: 55.0, overflow: "linebreak" },
+      6: { cellWidth: 26.0, halign: "center" },
     },
     head: [
       [
@@ -625,7 +633,7 @@ export async function gorevliListesiPdfOlustur(
     "Yukarıda Belirtilen Formda kişi/kişiler değişmesi halinde en geç 7 gün içerisinde yazılı olarak Tehlikeli Madde Güvenlik Danışmanına Haber verilmesi gerekmektedir.";
   const dipnotSatirlari = doc.splitTextToSize(dipnotMetni, W - 2 * M);
   const dipnotYukseklik = dipnotSatirlari.length * 3.6;
-  const gerekliYukseklik = dipnotYukseklik + 8 + 20; // dipnot + boşluk + 3 satırlı imza bloğu
+  const gerekliYukseklik = dipnotYukseklik + 8 + IMZA_BLOK_YUKSEKLIK; // dipnot + boşluk + imza tablosu
 
   // ÖNEMLİ: Tablo sayfa sonuna çok yakın bittiyse (dipnot+imza için yer
   // kalmadıysa), dipnotu tabloya sığdırmaya ZORLAMAK yerine (bu, metni
