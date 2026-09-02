@@ -1922,11 +1922,24 @@ export default function TasimaEvraki({
                   envanterSonuclar.length === 0 &&
                   atikKoduSonuclar.length === 0 &&
                   !seciliKimyasal &&
-                  !seciliTabloA && (
+                  !seciliTabloA &&
+                  (/^\s*\d{2}[\s.\-]?\d{2}[\s.\-]?\d{2}\s*\*?\s*$/.test(tabloAArama) ? (
+                    // Girdi 6 haneli bir atık kodu biçiminde ama kütüphanede yok:
+                    // büyük ihtimalle YILDIZSIZ (tehlikesiz) bir Ek-4 kodudur.
+                    // Kütüphane yalnızca yıldızlı (tehlikeli) atıkları içerir,
+                    // çünkü Taşıma Evrakı ADR kapsamındaki sevkiyatlar içindir.
+                    <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-2 mt-1.5">
+                      Bu atık kodu kütüphanede bulunamadı. Kütüphane yalnızca{" "}
+                      <strong>yıldızlı (*) tehlikeli atıkları</strong> içerir — girdiğiniz kod
+                      Atık Yönetimi Yönetmeliği Ek-4&apos;te yıldızsız (tehlikesiz) olarak
+                      listeleniyorsa ADR kapsamında taşınmaz ve taşıma evrakı düzenlenmez.
+                      Kodun doğruluğundan eminseniz UN numarası veya madde adıyla da arayabilirsiniz.
+                    </p>
+                  ) : (
                     <p className="text-xs text-gray-400 mt-1.5">
                       Ne envanterde, ne atık kodu kütüphanesinde ne de Tablo A&apos;da eşleşme bulunamadı.
                     </p>
-                  )}
+                  ))}
                 {tabloASonuclar.length > 0 && (
                   <div className="border rounded-lg mt-1.5 bg-white overflow-hidden shadow-sm">
                     <div className="px-2.5 py-1.5 bg-blue-50 text-[11px] font-semibold text-blue-800 border-b">
