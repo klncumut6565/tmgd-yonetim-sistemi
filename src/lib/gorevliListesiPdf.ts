@@ -251,18 +251,14 @@ async function kapakSayfasiCiz(
 
   // HAZIRLAYAN / KONTROL EDEN / ONAYLAYAN imza tablosu — Belge Oluştur
   // kapak sayfasıyla (BelgeOlusturForm.tsx → altTabloCiz) AYNI çerçeveli
-  // 3 sütunlu tablo ve AYNI konum: sayfanın ALTINA sabitlenir (önceden
-  // 2 sütunlu, çerçevesiz ve tablonun bittiği yere göre kayan bir
-  // yerleşimdi). Doküman No / Düzenleme Tarihi satırlarının ve karekodun
-  // üstünde kalacak şekilde konumlandırılır.
-  const kapakImzaY = H - 34 - 6 - IMZA_BLOK_YUKSEKLIK;
+  // 3 sütunlu tablo ve AYNI konum: sayfanın ALTINA sabitlenir.
+  //
+  // NOT: İmza tablosunun altında daha önce "Doküman No: TMGDK-G1" ve
+  // "Düzenleme Tarihi: ..." satırları vardı — kaldırıldı. Bu bilgiler
+  // zaten kapağın üst başlık kutusunda ve tablo sayfasının bilgi
+  // panelinde yer alıyor, tekrar ediyorlardı.
+  const kapakImzaY = H - 28 - IMZA_BLOK_YUKSEKLIK;
   imzaBlokuCiz(doc, veri, kapakImzaY);
-
-  doc.setFontSize(9.5);
-  doc.setFont(FONT, "normal");
-  doc.setTextColor(90, 90, 90);
-  doc.text("Doküman No: TMGDK-G1", W / 2, H - 34, { align: "center" });
-  doc.text(`Düzenleme Tarihi: ${veri.bugun}`, W / 2, H - 28, { align: "center" });
 
   // Sağ alt köşe: SİAM TMGDK kurumsal logosu + karekod — diğer TÜM
   // belgelerin kapağıyla AYNI yerleşim (bkz. BelgeOlusturForm.tsx).
@@ -403,54 +399,80 @@ function tanimlarSayfasiCiz(
 }
 
 /**
- * Tablo sayfasının üst başlık kutusu — kullanıcının paylaştığı örnek
- * belgeyle (ARITEKS_Görevli_Listesi_Hk.pdf, sayfa 2) AYNI şema:
- *   Sol taraf (geniş)  : "GÖREVLİ LİSTESİ" başlığı + alt açıklama metni
- *   Sağ taraf (dar)    : 4 satırlık bilgi paneli — Doküman No / Yayın
- *                         Tarihi / Revizyon Tarihi / Sayı No
+ * Tablo sayfasının üst başlık kutusu — BelgeOlusturForm.tsx →
+ * baslikTablosuCiz() ile AYNI 3 sütunlu şema:
+ *   Sol hücre (38mm)   : firma logosu (kendi çerçeveli hücresinde)
+ *   Orta hücre         : üstte "GÖREVLİ LİSTESİ" başlığı, ALTINDA yatay
+ *                        ayırıcı çizgi, altta dokümanın açıklaması
+ *   Sağ hücre (45mm)   : 4 satırlık bilgi paneli — Doküman No / Yayın
+ *                        Tarihi / Revizyon Tarihi / Sayfa No
  * Toplam kutu yüksekliği BASLIK_KUTUSU_YUKSEKLIK sabitiyle dışarıya
  * açılır ki autoTable'ın startY/margin.top değerleri bununla tutarlı
  * kalsın (aksi halde devam sayfalarında tablo başlığı bu kutuyla çakışır).
  */
 const BASLIK_KUTUSU_YUKSEKLIK = 24;
-const BILGI_PANELI_GENISLIK = 55;
+const LOGO_HUCRE_GENISLIK = 38;
+const BILGI_PANELI_GENISLIK = 45;
 
 function baslikKutusuCiz(doc: JsPDFType, veri: GorevliListesiPdfVerisi) {
   const kutuTop = 10;
   const kutuGenislik = W - 2 * M;
-  const baslikGenislik = kutuGenislik - BILGI_PANELI_GENISLIK;
   const satirYuksekligi = BASLIK_KUTUSU_YUKSEKLIK / 4;
+  const logoSagKenar = M + LOGO_HUCRE_GENISLIK;
+  const bilgiSolKenar = M + kutuGenislik - BILGI_PANELI_GENISLIK;
 
   doc.setDrawColor(0, 0, 0);
   doc.setLineWidth(0.3);
   doc.rect(M, kutuTop, kutuGenislik, BASLIK_KUTUSU_YUKSEKLIK);
-  // Sol (başlık) / sağ (bilgi paneli) ayırıcı dikey çizgi
-  doc.line(M + baslikGenislik, kutuTop, M + baslikGenislik, kutuTop + BASLIK_KUTUSU_YUKSEKLIK);
+  // Sol (logo) / orta (başlık) ayırıcı dikey çizgi
+  doc.line(logoSagKenar, kutuTop, logoSagKenar, kutuTop + BASLIK_KUTUSU_YUKSEKLIK);
+  // Orta (başlık) / sağ (bilgi paneli) ayırıcı dikey çizgi
+  doc.line(bilgiSolKenar, kutuTop, bilgiSolKenar, kutuTop + BASLIK_KUTUSU_YUKSEKLIK);
+  // Orta hücreyi ikiye ayıran YATAY çizgi (Belge Oluştur'daki EK-3 şeması):
+  // üstte doküman adı, altta açıklaması.
+  const ortaAyirici = kutuTop + BASLIK_KUTUSU_YUKSEKLIK / 2;
+  doc.line(logoSagKenar, ortaAyirici, bilgiSolKenar, ortaAyirici);
   // Bilgi panelindeki 4 satırı ayıran yatay çizgiler
   for (let i = 1; i < 4; i++) {
     const y = kutuTop + i * satirYuksekligi;
-    doc.line(M + baslikGenislik, y, M + kutuGenislik, y);
+    doc.line(bilgiSolKenar, y, M + kutuGenislik, y);
   }
 
-  // Sol üst köşe — firma logosu (kapak sayfasındaki AYNI logo). Başlık
-  // ve alt açıklama metni ORTALANMIŞ olduğu için (bkz. aşağıdaki text
-  // çağrıları) küçük bir köşe logosu bunlarla çakışmaz — kaydırma
-  // gerekmez.
+  // Sol hücre: firma logosu — kendi hücresine, kenarlardan 2.5mm boşlukla
+  // ve oranı korunarak sığdırılır (Belge Oluştur ile aynı yaklaşım).
   if (veri.logo) {
     try {
-      const box = logoKutusuHesapla(veri.logo.enBoyOrani, BASLIK_KUTUSU_YUKSEKLIK - 2);
-      doc.addImage(veri.logo.data, veri.logo.fmt, M + 1, kutuTop + 1, box.w, box.h);
+      const kenar = 2.5;
+      const alanG = LOGO_HUCRE_GENISLIK - 2 * kenar;
+      const alanY = BASLIK_KUTUSU_YUKSEKLIK - 2 * kenar;
+      const oran = veri.logo.enBoyOrani > 0 ? veri.logo.enBoyOrani : 1;
+      let lw = alanG;
+      let lh = lw / oran;
+      if (lh > alanY) {
+        lh = alanY;
+        lw = lh * oran;
+      }
+      // Hücre içinde ortala
+      const lx = M + (LOGO_HUCRE_GENISLIK - lw) / 2;
+      const ly = kutuTop + (BASLIK_KUTUSU_YUKSEKLIK - lh) / 2;
+      doc.addImage(veri.logo.data, veri.logo.fmt, lx, ly, lw, lh);
     } catch {
       /* logo eklenemezse başlık kutusu yine çizilsin */
     }
   }
 
-  // Sol taraf: başlık + alt açıklama
-  doc.setFontSize(12);
+  // Orta hücre — üst yarı: doküman adı
+  const ortaMerkez = (logoSagKenar + bilgiSolKenar) / 2;
+  const ortaGenislik = bilgiSolKenar - logoSagKenar;
+  doc.setFontSize(11);
   doc.setFont(FONT, "bold");
   doc.setTextColor(...RENK_VURGU);
-  doc.text("GÖREVLİ LİSTESİ", M + baslikGenislik / 2, kutuTop + 9, { align: "center" });
+  doc.text("GÖREVLİ LİSTESİ", ortaMerkez, kutuTop + 8, {
+    align: "center",
+    maxWidth: ortaGenislik - 4,
+  });
 
+  // Orta hücre — alt yarı: dokümanın açıklaması
   doc.setFontSize(6.5);
   doc.setFont(FONT, "bold");
   doc.setTextColor(0, 0, 0);
@@ -459,21 +481,21 @@ function baslikKutusuCiz(doc: JsPDFType, veri: GorevliListesiPdfVerisi) {
       "TEHLİKELİ MADDELER İLE İLGİLİ İŞ VE İŞLEMLERDE GÖREV ALAN TÜM",
       "PERSONELE AİT BİLGİLERİN YER ALDIĞI LİSTE",
     ],
-    M + baslikGenislik / 2,
-    kutuTop + 15,
-    { align: "center" }
+    ortaMerkez,
+    ortaAyirici + 4.5,
+    { align: "center", maxWidth: ortaGenislik - 4 }
   );
 
-  // Sağ taraf: bilgi paneli
-  doc.setFontSize(7.5);
+  // Sağ hücre: bilgi paneli
+  doc.setFontSize(7);
   doc.setFont(FONT, "normal");
   doc.setTextColor(0, 0, 0);
-  const bilgiX = M + baslikGenislik + 3;
+  const bilgiX = bilgiSolKenar + 2.5;
   const bilgiSatirlari = [
     `Doküman No: TMGDK-G1`,
     `Yayın Tarihi: ${veri.bugun}`,
     `Revizyon Tarihi: ${veri.bugun}`,
-    `Sayı No: 1/1`,
+    `Sayfa No: 1/1`,
   ];
   bilgiSatirlari.forEach((metin, i) => {
     doc.text(metin, bilgiX, kutuTop + satirYuksekligi * i + satirYuksekligi / 2 + 1.5);
@@ -568,7 +590,20 @@ export async function gorevliListesiPdfOlustur(
     // gereksiz yere sarıyor, satırlar şişiyor ve tablo erken taşarak fazladan
     // sayfa açılmasına neden oluyordu. 1.4mm hâlâ rahat okunur bir nefes
     // payı bırakır ama kaybı yarıdan fazla azaltır.
-    styles: { font: FONT, fontSize: 8.5, cellPadding: 1.4, valign: "middle" },
+    //
+    // minCellHeight + valign:"top": Çok satırlı hücrelerde (özellikle
+    // "Tehlikeli Madde Görev Başlığı" ve "Yapılacak Görevler") satırlar
+    // birbirine yapışık görünüyordu. valign "middle" iken autoTable metni
+    // dikeyde ortalıyor ama satır aralığını değiştirmiyor; "top" + biraz
+    // daha yüksek minCellHeight ile her satır kendi payını alır ve
+    // sarmalanan alt satırlar üst satıra sıkışmış görünmez.
+    styles: {
+      font: FONT,
+      fontSize: 8.5,
+      cellPadding: { top: 1.8, right: 1.4, bottom: 1.8, left: 1.4 },
+      valign: "top",
+      minCellHeight: 7,
+    },
     headStyles: {
       font: FONT,
       fontStyle: "bold",
