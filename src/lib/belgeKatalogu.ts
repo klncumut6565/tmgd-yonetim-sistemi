@@ -168,6 +168,18 @@ const SPECIAL_ITEMS: Record<string, { label: string; section: string }> = {
   D2: { label: "Güvenlik Bilgi Formları (GBF/SDS) Dosyası", section: "Emniyet Planı · GBF · Diğer" },
   D3: { label: "Kaza / Olay Bildirim Raporları", section: "Emniyet Planı · GBF · Diğer" },
   D4: { label: "Diğer", section: "Emniyet Planı · GBF · Diğer" },
+
+  // Araç ve Sürücü Belgeleri — yalnızca faaliyet konusu "tasimaci" olan
+  // firmalarda gösterilir. Bunlar TMGD kapsamındaki ADR belgeleri değil,
+  // taşımacılık faaliyetinin kendi mevzuat belgeleridir; bu yüzden genel
+  // ilerleme yüzdesine DAHİL EDİLMEZ (bkz. firms/[id]/page.tsx → totals).
+  AS1: { label: "K1/K2 Taşıma Yetki Belgesi", section: "Araç ve Sürücü Belgeleri" },
+  AS2: { label: "Taşıt Kartı", section: "Araç ve Sürücü Belgeleri" },
+  AS3: { label: "Araç Muayenesi", section: "Araç ve Sürücü Belgeleri" },
+  AS4: { label: "Araç Ruhsatı", section: "Araç ve Sürücü Belgeleri" },
+  AS5: { label: "Araç Sigorta/Kasko veya Tehlikeli Madde Mali Sorumluluk Sigortası", section: "Araç ve Sürücü Belgeleri" },
+  AS6: { label: "Karayolu ile Atık Taşıma Uygunluk Belgesi", section: "Araç ve Sürücü Belgeleri" },
+  AS7: { label: "SRC-5 Belgeli Şoför Sertifikası", section: "Araç ve Sürücü Belgeleri" },
 };
 
 // Herhangi bir madde kodu (+ dönem) için okunabilir isim döndürür.
@@ -410,6 +422,29 @@ export function buildChecklist(
             { code: "E2", period: "", label: "Göreve Özgü ve Emniyet Eğitimi Kayıtları" },
           ],
     },
+    // Araç ve Sürücü Belgeleri — YALNIZCA faaliyet konusu "tasimaci" olan
+    // firmalarda gösterilir. Bunlar ADR/TMGD kapsamındaki belgeler değil,
+    // taşımacılık faaliyetinin kendi mevzuat belgeleridir (yetki belgesi,
+    // taşıt kartı, muayene, ruhsat, sigorta vb.) — bu yüzden genel
+    // ilerleme yüzdesine dahil edilmez (bkz. firms/[id]/page.tsx →
+    // totals, AS ile başlayan kodlar sayaç dışı bırakılır).
+    ...(activities.includes("tasimaci")
+      ? [
+          {
+            key: "arac_surucu",
+            title: "Araç ve Sürücü Belgeleri",
+            items: [
+              { code: "AS1", period: "", label: "K1/K2 Taşıma Yetki Belgesi" },
+              { code: "AS2", period: "", label: "Taşıt Kartı" },
+              { code: "AS3", period: "", label: "Araç Muayenesi" },
+              { code: "AS4", period: "", label: "Araç Ruhsatı" },
+              { code: "AS5", period: "", label: "Araç Sigorta/Kasko veya Tehlikeli Madde Mali Sorumluluk Sigortası" },
+              { code: "AS6", period: "", label: "Karayolu ile Atık Taşıma Uygunluk Belgesi" },
+              { code: "AS7", period: "", label: "SRC-5 Belgeli Şoför Sertifikası" },
+            ],
+          },
+        ]
+      : []),
     {
       key: "diger",
       title: "Emniyet Planı · GBF · Diğer",

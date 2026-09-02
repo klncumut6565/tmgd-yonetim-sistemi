@@ -794,9 +794,11 @@ function FirmDetailInner({
     let done = 0;
     sections.forEach((sec) =>
       sec.items.forEach((it) => {
-        // "Diğer" (D4) zorunlu olmayan, serbest ek belgeler için —
-        // genel ilerleme yüzdesine dahil edilmez.
-        if (it.code === "D4") return;
+        // Genel ilerleme yüzdesine DAHİL EDİLMEYENLER:
+        //  - D4 "Diğer": zorunlu olmayan, serbest ek belgeler.
+        //  - AS1-AS7 "Araç ve Sürücü Belgeleri": ADR/TMGD kapsamı dışında,
+        //    taşımacılık faaliyetinin kendi mevzuat belgeleri.
+        if (it.code === "D4" || it.code.startsWith("AS")) return;
         total++;
         if (doneSet.has(`${it.code}|${it.period}`)) done++;
       })
