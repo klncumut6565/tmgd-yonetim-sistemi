@@ -257,14 +257,18 @@ async function kapakSayfasiCiz(
   // "Düzenleme Tarihi: ..." satırları vardı — kaldırıldı. Bu bilgiler
   // zaten kapağın üst başlık kutusunda ve tablo sayfasının bilgi
   // panelinde yer alıyor, tekrar ediyorlardı.
-  const kapakImzaY = H - 28 - IMZA_BLOK_YUKSEKLIK;
-  imzaBlokuCiz(doc, veri, kapakImzaY);
-
   // Sağ alt köşe: SİAM TMGDK kurumsal logosu + karekod — diğer TÜM
   // belgelerin kapağıyla AYNI yerleşim (bkz. BelgeOlusturForm.tsx).
   const qrBoyut = 22;
   const qrX = W - M - qrBoyut;
   const qrY = H - qrBoyut - 12;
+
+  // İmza tablosu karekodun ÜZERİNDE, aralarında boşluk kalacak şekilde
+  // konumlandırılır (Belge Oluştur kapak sayfasındaki altTabloCiz/karekod
+  // yerleşimiyle AYNI mantık — bkz. BelgeOlusturForm.tsx kapakSayfasiCiz).
+  // Önceki sabit "H - 28" değeri karekod kutusuyla çakışıyordu.
+  const kapakImzaY = qrY - 3 - IMZA_BLOK_YUKSEKLIK;
+  imzaBlokuCiz(doc, veri, kapakImzaY);
   try {
     doc.addImage(SIAM_QR_B64, "PNG", qrX, qrY, qrBoyut, qrBoyut);
   } catch {
@@ -296,11 +300,17 @@ async function kapakSayfasiCiz(
  */
 function tanimlarSayfasiCiz(
   doc: JsPDFType,
-  autoTable: (doc: JsPDFType, opts: Record<string, unknown>) => void
+  autoTable: (doc: JsPDFType, opts: Record<string, unknown>) => void,
+  veri: GorevliListesiPdfVerisi
 ) {
   sayfaYonunuAyarla(false);
   doc.addPage("a4", "portrait");
   fontuKaydet(doc);
+
+  // Diğer TÜM iç sayfalarla (kapak, yatay tablo sayfası) AYNI başlık
+  // kutusu: sol üstte firma logosu, sağ üstte Doküman No/Tarih/Sayfa No
+  // bilgi paneli. Önceden bu sayfada eksikti.
+  baslikKutusuCiz(doc, veri);
 
   doc.setFontSize(12);
   doc.setFont(FONT, "bold");
@@ -309,12 +319,13 @@ function tanimlarSayfasiCiz(
     "TEHLİKELİ MADDELERİN KARAYOLUYLA TAŞINMASI HAKKINDA YÖNETMELİK",
     W - 2 * M
   );
-  doc.text(baslikSatirlari, W / 2, 18, { align: "center" });
+  const icerikBaslangicY = 10 + BASLIK_KUTUSU_YUKSEKLIK + 10;
+  doc.text(baslikSatirlari, W / 2, icerikBaslangicY, { align: "center" });
 
   doc.setFontSize(10);
   doc.setFont(FONT, "normal");
   doc.setTextColor(0, 0, 0);
-  let y = 18 + baslikSatirlari.length * 5.5 + 3;
+  let y = icerikBaslangicY + baslikSatirlari.length * 5.5 + 3;
   const altBaslikSatirlari = doc.splitTextToSize(
     "Kapsamındaki Tarafların Tanımları ve ADR 1.3 Eğitimi Görevli Listesi",
     W - 2 * M
@@ -568,7 +579,7 @@ export async function gorevliListesiPdfOlustur(
 
   // Sayfa 2 — kullanıcının paylaştığı örnek belgenin ilk sayfası (Taraf
   // Tanımları), aynen eklenir (dikey).
-  tanimlarSayfasiCiz(doc, autoTable);
+  tanimlarSayfasiCiz(doc, autoTable, veri);
 
   // Sayfa 3 — başlık kutusu + tablo (YATAY — uzun metinli sütunlar rahat sığsın diye)
   sayfaYonunuAyarla(true);
