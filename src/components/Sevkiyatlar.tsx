@@ -12,6 +12,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/lib/supabase/client";
 import { hataCevir } from "@/lib/hataCevir";
+import { useUser } from "@/hooks/useUser";
 
 type Sevkiyat = {
   id: string;
@@ -63,6 +64,16 @@ export default function Sevkiyatlar({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [arama, setArama] = useState("");
+  // Silme akışı: önce onay istenir (yanlışlıkla silmeyi önlemek için),
+  // onaylanınca kalemler + evrak birlikte silinir.
+  const [silinecek, setSilinecek] = useState<Sevkiyat | null>(null);
+  const [siliniyor, setSiliniyor] = useState(false);
+
+  const { canWrite: canWriteGenel, profile } = useUser();
+  // TasimaEvraki.tsx ile aynı yetki mantığı: firma kullanıcıları da kendi
+  // evraklarını yönetebilir.
+  const canWrite = canWriteGenel || profile?.role === "company";
+
 
   const yukle = useCallback(async () => {
     setLoading(true);
@@ -90,6 +101,34 @@ export default function Sevkiyatlar({
     }
     setLoading(false);
   }, [firmId]);
+
+  async function sevkiyatSil() {
+    if (!silinecek || !canWrite) return;
+    setSiliniyor(true);
+    setError("");
+    // Önce kalemler (transport_document_items), sonra evrakın kendisi —
+    // FK kısıtı ON DELETE CASCADE olsa bile açıkça silmek güvenli.
+    const { error: kalemErr } = await supabase
+      .from("transport_document_items")
+      .delete()
+      .eq("document_id", silinecek.id);
+    if (kalemErr) {
+      setError("Sevkiyat kalemleri silinemedi: " + hataCevir(kalemErr));
+      setSiliniyor(false);
+      return;
+    }
+    const { error: evrakErr } = await supabase
+      .from("transport_documents")
+      .delete()
+      .eq("id", silinecek.id);
+    setSiliniyor(false);
+    if (evrakErr) {
+      setError("Sevkiyat silinemedi: " + hataCevir(evrakErr));
+      return;
+    }
+    setSilinecek(null);
+    yukle();
+  }
 
   useEffect(() => {
     yukle();
@@ -172,18 +211,56 @@ export default function Sevkiyatlar({
                     )}
                   </td>
                   <td className="p-2.5 whitespace-nowrap text-gray-500">{tarihSaatYaz(s.printed_at)}</td>
-                  <td className="p-2.5 text-right">
+                  <td className="p-2.5 text-right whitespace-nowrap">
                     <button
                       onClick={() => onAc(s.id)}
-                      className="text-blue-600 hover:underline whitespace-nowrap"
+                      className="text-blue-600 hover:underline"
                     >
                       Aç →
                     </button>
+                    {canWrite && (
+                      <button
+                        onClick={() => setSilinecek(s)}
+                        title="Bu sevkiyatı sil"
+                        className="ml-3 text-red-600 hover:underline"
+                      >
+                        Sil
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+      {/* Silme onayı — yanlışlıkla kalıcı veri kaybını önlemek için */}
+      {silinecek && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl max-w-md w-full p-5 shadow-xl">
+            <h4 className="font-semibold text-sm mb-2">Sevkiyatı sil?</h4>
+            <p className="text-xs text-gray-600 mb-1">
+              <strong>{silinecek.document_no}</strong> numaralı, {tarihYaz(silinecek.transport_date)} tarihli
+              sevkiyat ve ona bağlı tüm ürün kalemleri kalıcı olarak silinecek.
+            </p>
+            <p className="text-xs text-red-600 mb-4">Bu işlem geri alınamaz.</p>
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setSilinecek(null)}
+                disabled={siliniyor}
+                className="px-3 py-1.5 rounded-lg border text-sm hover:bg-gray-50 disabled:opacity-50"
+              >
+                Vazgeç
+              </button>
+              <button
+                onClick={sevkiyatSil}
+                disabled={siliniyor}
+                className="px-3 py-1.5 rounded-lg bg-red-600 text-white text-sm hover:bg-red-700 disabled:opacity-50"
+              >
+                {siliniyor ? "Siliniyor..." : "Evet, sil"}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
