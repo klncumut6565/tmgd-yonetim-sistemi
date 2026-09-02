@@ -42,6 +42,11 @@ const DEFAULT_SETTINGS: NotifSettings = {
  *  bağımsız olarak, son 150 gün kala uyarı verilir. */
 const TMFB_UYARI_GUN = 150;
 
+/** TMGD SERTİFİKASI (S2) için ÖZEL uyarı eşiği.
+ *  Genel belge eşiğinden (doc_expiry_days) bağımsız olarak,
+ *  son 120 gün kala uyarı verilir. */
+const TMGD_UYARI_GUN = 120;
+
 function daysLabel(d: number): string {
   if (d < 0) return `${Math.abs(d)} gün geçti`;
   if (d === 0) return "Bugün doluyor";
@@ -125,10 +130,21 @@ export default function NotificationBell() {
       .lte("days_left", TMFB_UYARI_GUN)
       .order("days_left");
 
-    // Genel sorgu TMFB'yi zaten getirmiş olabilir (eşik yeterince büyükse)
+    // TMGD SERTİFİKASI — genel eşik kapalı olsa bile her zaman kontrol edilir.
+    const { data: tmgdData } = await supabase
+      .from("expiring_documents")
+      .select("id, title, firm_name, days_left, expiry_date")
+      .ilike("title", "%TMGD Sertifika%")
+      .lte("days_left", TMGD_UYARI_GUN)
+      .order("days_left");
+
+    // Genel sorgu TMFB/TMGD'yi zaten getirmiş olabilir (eşik yeterince büyükse)
     // — id bazlı tekilleştirme ile aynı uyarının iki kez görünmesi önlenir.
     const gorulenIdler = new Set(belgeSonuclari.map((d) => d.id));
     for (const d of (tmfbData as ExpiringDoc[]) || []) {
+      if (!gorulenIdler.has(d.id)) belgeSonuclari.push(d);
+    }
+    for (const d of (tmgdData as ExpiringDoc[]) || []) {
       if (!gorulenIdler.has(d.id)) belgeSonuclari.push(d);
     }
 

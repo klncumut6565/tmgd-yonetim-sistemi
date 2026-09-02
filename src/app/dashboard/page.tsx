@@ -70,6 +70,10 @@ const GENEL_UYARI_GUN = 30;
  *  gün kala gösterilir (NotificationBell ile aynı kural). */
 const TMFB_UYARI_GUN = 150;
 
+/** TMGD SERTIFIKASI (S2) ÖZEL eşiği — genel 30 günlük pencereden bağımsız
+ *  olarak son 120 gün kala gösterilir. */
+const TMGD_UYARI_GUN = 120;
+
 function DaysBadge({ date }: { date: string }) {
   const d = daysLeft(date);
   const label = d < 0 ? `${Math.abs(d)} gün geçti` : d === 0 ? "Bugün" : `${d} gün kaldı`;
@@ -108,6 +112,7 @@ export default function DashboardPage() {
         expDrvLicRes,
         expDocsRes,
         expTmfbRes,
+        expTmgdRes,
         recentRes,
       ] = await Promise.all([
         supabase.from("firms").select("*", { count: "exact", head: true }),
@@ -154,6 +159,14 @@ export default function DashboardPage() {
           .select("id, title, expiry_date, firm_name, days_left")
           .ilike("title", "%TMFB%")
           .lte("days_left", TMFB_UYARI_GUN)
+          .order("days_left")
+          .limit(8),
+        // TMGD SERTİFİKASI (S2) — genel pencereden BAĞIMSIZ, 120 gün kala gösterilir
+        supabase
+          .from("expiring_documents")
+          .select("id, title, expiry_date, firm_name, days_left")
+          .ilike("title", "%TMGD Sertifika%")
+          .lte("days_left", TMGD_UYARI_GUN)
           .order("days_left")
           .limit(8),
         supabase
@@ -225,9 +238,9 @@ export default function DashboardPage() {
       setVehicles([...vehAdr, ...vehInsp].sort((a, b) => a.days_left - b.days_left));
 
       // Firma/Belge Takip belgeleri — genel pencere + TMFB'nin özel
-      // (150 gün) sonuçları birleştirilir. Genel pencere TMFB'yi zaten
-      // getirmiş olabileceğinden id bazlı tekilleştirme yapılır.
-      const belgeHam = [...(expDocsRes.data || []), ...(expTmfbRes.data || [])];
+      // (150 gün) sonuçları + TMGD Sertifikası'nın özel (120 gün) sonuçları
+      // birleştirilir. id bazlı tekilleştirme yapılır.
+      const belgeHam = [...(expDocsRes.data || []), ...(expTmfbRes.data || []), ...(expTmgdRes.data || [])];
       const gorulen = new Set<string>();
       const belgeListesi: ExpiringItem[] = [];
       for (const b of belgeHam as Record<string, unknown>[]) {
