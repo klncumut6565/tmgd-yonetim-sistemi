@@ -6,6 +6,9 @@ import { useUser } from "@/hooks/useUser";
 
 const menu = [
   { title: "Gösterge Paneli", href: "/dashboard" },
+  // Gösterge Paneli'nin alt sayfası — aylık firma ziyaret takvimi ve
+  // o ay ziyaret edilmemiş firmalar listesi.
+  { title: "Firma Takvimi", href: "/dashboard/firma-takvimi", alt: true },
   { title: "Firmalar", href: "/firms" },
   // NOT: "Görevler" (/tasks) menüde yalnızca firma (company) rolü DIŞINDAKİ
   // kullanıcılara gösterilir — aşağıdaki visibleMenu filtresine bakınız.
@@ -39,12 +42,16 @@ export default function Sidebar() {
       <nav className="space-y-1">
         {visibleMenu.map((item) => {
           const active = pathname === item.href;
+          const alt = "alt" in item && item.alt;
           return (
             <Link
               key={item.href}
               href={item.href}
               className={
-                "block px-3 py-2 rounded " +
+                "block rounded " +
+                // Alt menü: girintili ve bir tık küçük — üst başlığa bağlı
+                // olduğu görsel olarak belli olsun.
+                (alt ? "ml-3 pl-3 pr-3 py-1.5 text-sm border-l " : "px-3 py-2 ") +
                 (active ? "bg-black text-white" : "hover:bg-gray-100")
               }
             >
