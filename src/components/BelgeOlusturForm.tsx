@@ -429,6 +429,50 @@ export default function BelgeOlusturForm({ fixedFirmId, initialFirmId, compact =
         
         const item = CATALOG.find((c) => c.code === actualCode);
         if (!item) continue;
+        
+        // K5, K6, K7 kontrol formları için özel işlem:
+        // Orijinal form PDF'sini kullan (kapak sayfası olmadan — birebir aynı format)
+        if (["K5", "K6", "K7"].includes(actualCode)) {
+          try {
+            // Orijinal kontrol formunun PDF'sini fetch et
+            const pdfRes = await fetch(`/kontrol-formlar/${actualCode}.pdf`);
+            if (!pdfRes.ok) throw new Error(`${actualCode}.pdf bulunamadı`);
+            const pdfBlob = await pdfRes.blob();
+            
+            if (mod === "onizle") {
+              const pencere = onizlemePencereleri[i];
+              if (pencere) {
+                const blobUrl = URL.createObjectURL(pdfBlob);
+                pencere.location.href = blobUrl;
+              }
+              continue;
+            }
+
+            // İndir
+            const url = URL.createObjectURL(pdfBlob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `${firm.name}_${actualCode}.pdf`;
+            a.click();
+            URL.revokeObjectURL(url);
+
+            // Belge Takip'te tamamlandı işaretle
+            await supabase.from("firm_belgeleri").upsert(
+              {
+                firm_id: firm.id,
+                code: item.code,
+                period: yfrPeriod || "",
+                done: true,
+                note: notes.trim() || null,
+              },
+              { onConflict: "firm_id,code,period" }
+            );
+            continue;
+          } catch (e) {
+            setError(`${actualCode} PDF hatası: ${hataCevir(e as { message?: string })}`);
+            continue;
+          }
+        }
 
         // Belge yönü şablondan gelir; yatay şablonlarda (çok sütunlu
         // matrisler) İÇERİK sayfaları 297x210 olur. Kapak sayfası
