@@ -29,6 +29,7 @@ import {
 import { kapakSayfasiOlustur } from "@/lib/kapakSayfasi";
 import { belgeSablonu, BelgeSablonu } from "@/lib/belgeSablonlari";
 import { BELGE_GORSELLERI } from "@/lib/belgeGorselleri";
+import { hazirlayanKasesi, KASE_YAKUP_ATAS } from "@/lib/kaseler";
 import {
   SIAM_LOGO_B64,
   SIAM_LOGO_EN_BOY,
@@ -63,15 +64,12 @@ export default function BelgeOlusturForm({ fixedFirmId, initialFirmId, compact =
   const [selected, setSelected] = useState<string[]>([]);
   const [notes, setNotes] = useState("");
   const [onaylayanAdi, setOnaylayanAdi] = useState("");
-  // DENEME KAŞESİ — yalnızca bu oturumda geçerli, hiçbir yere kaydedilmez.
-  // Amaç: atanmış TMGD'nin kaşesinin HAZIRLAYAN kutusunda nasıl durduğunu
-  // belge üretmeden önce görebilmek.
-  const [kaseFile, setKaseFile] = useState<File | null>(null);
-  const [kasePreview, setKasePreview] = useState<string | null>(null);
-  // KONTROL EDEN (TMGD Koordinatörü) kaşesi — aynı mantık, ikinci sütun.
-  const [kontrolKaseFile, setKontrolKaseFile] = useState<File | null>(null);
-  const [kontrolKasePreview, setKontrolKasePreview] = useState<string | null>(null);
+  // KAŞE / İMZA — işaretlenirse kodda gömülü kaşeler belgeye basılır.
+  // Kaşe görselleri src/lib/kaseler.ts içinde saklanır; elle yükleme yok.
+  const [kaseEkle, setKaseEkle] = useState(false);
   const [hazirlayanAdi, setHazirlayanAdi] = useState("");
+  // Atanmış TMGD'nin kayıtlı bir kaşesi var mı — kutuda bilgilendirme için.
+  const hazirlayanKaseVar = !!hazirlayanKasesi(hazirlayanAdi);
   const [hazirlayanDurum, setHazirlayanDurum] = useState<"yok" | "bulundu" | "yükleniyor">("yok");
   const [kapakUretiliyor, setKapakUretiliyor] = useState(false);
   const [kapakMesaj, setKapakMesaj] = useState("");
@@ -396,12 +394,15 @@ export default function BelgeOlusturForm({ fixedFirmId, initialFirmId, compact =
           : null;
       const bugun = new Date().toLocaleDateString("tr-TR");
 
-      // DENEME KAŞELERİ — seçildiyse jsPDF'in kullanabileceği dataURL'e
-      // çevrilir. Kalıcı değildir; yalnızca bu üretimde geçerlidir.
-      const kaseler = {
-        hazirlayan: kaseFile ? await fileToLogoData(kaseFile) : undefined,
-        kontrol: kontrolKaseFile ? await fileToLogoData(kontrolKaseFile) : undefined,
-      };
+      // KAŞELER — yalnızca kutu işaretliyse basılır. Görseller kodda gömülü
+      // (src/lib/kaseler.ts); HAZIRLAYAN için atanmış TMGD'nin adına göre
+      // seçilir, KONTROL EDEN için koordinatörün kaşesi sabittir.
+      const kaseler = kaseEkle
+        ? {
+            hazirlayan: hazirlayanKasesi(hazirlayanAdi),
+            kontrol: KASE_YAKUP_ATAS,
+          }
+        : undefined;
 
       // Onaylayan (tesis sorumlusu) firma bazlı hatırlanır: bu üretimde
       // yazılan isim, önceki kayıttan farklıysa firmaya işlenir; böylece
@@ -712,96 +713,38 @@ export default function BelgeOlusturForm({ fixedFirmId, initialFirmId, compact =
             </span>
           </label>
 
-          {/* DENEME KAŞELERİ — HAZIRLAYAN ve KONTROL EDEN kutularına
-              basılır. Hiçbir yere kaydedilmez; sadece bu oturumda üretilen
-              belgelerde görünür. Amaç kaşelerin kutuya nasıl oturduğunu
-              belge üretmeden test etmek. */}
-          <div className="mb-4 text-sm border rounded-lg p-3 bg-amber-50/40">
-            <div className="flex items-center justify-between mb-1">
-              <span className="text-gray-700 font-medium">Kaşe Denemesi</span>
-              <span className="text-[10px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">
-                kaydedilmez
+          {/* KAŞE / İMZA — işaretlenirse kodda gömülü kaşeler basılır.
+              HAZIRLAYAN kutusuna firmaya atanmış TMGD'nin kaşesi (tanımlıysa),
+              KONTROL EDEN kutusuna koordinatörün kaşesi gelir. */}
+          <label className="mb-4 flex items-start gap-2 text-sm border rounded-lg p-3 cursor-pointer hover:bg-gray-50">
+            <input
+              type="checkbox"
+              checked={kaseEkle}
+              onChange={(e) => setKaseEkle(e.target.checked)}
+              className="w-4 h-4 mt-0.5"
+            />
+            <span>
+              <span className="text-gray-700 font-medium">
+                Kaşe ve imzaları belgeye ekle
               </span>
-            </div>
-            <p className="text-xs text-gray-400 mb-3">
-              Kaşeler, ilgili kutuda isim ve unvanın altındaki imza boşluğuna
-              basılır. Sonucu görmek için &quot;Önizle&quot; yeterlidir.
-              Şeffaf zeminli PNG en iyi sonucu verir.
-            </p>
-
-            <div className="grid gap-3 sm:grid-cols-2">
-              {[
-                {
-                  etiket: "HAZIRLAYAN — TMGD",
-                  altEtiket: hazirlayanAdi || "Firmaya atanmış TMGD",
-                  onizleme: kasePreview,
-                  ayarla: (f: File | null) => {
-                    setKaseFile(f);
-                    if (kasePreview) URL.revokeObjectURL(kasePreview);
-                    setKasePreview(f ? URL.createObjectURL(f) : null);
-                  },
-                  temizle: () => {
-                    if (kasePreview) URL.revokeObjectURL(kasePreview);
-                    setKaseFile(null);
-                    setKasePreview(null);
-                  },
-                },
-                {
-                  etiket: "KONTROL EDEN — Koordinatör",
-                  altEtiket: "YAKUP ATAŞ",
-                  onizleme: kontrolKasePreview,
-                  ayarla: (f: File | null) => {
-                    setKontrolKaseFile(f);
-                    if (kontrolKasePreview) URL.revokeObjectURL(kontrolKasePreview);
-                    setKontrolKasePreview(f ? URL.createObjectURL(f) : null);
-                  },
-                  temizle: () => {
-                    if (kontrolKasePreview) URL.revokeObjectURL(kontrolKasePreview);
-                    setKontrolKaseFile(null);
-                    setKontrolKasePreview(null);
-                  },
-                },
-              ].map((alan) => (
-                <div key={alan.etiket} className="border rounded-lg p-2.5 bg-white">
-                  <div className="text-xs font-medium text-gray-700">
-                    {alan.etiket}
-                  </div>
-                  <div className="text-[11px] text-gray-400 truncate">
-                    {alan.altEtiket}
-                  </div>
-
-                  <input
-                    type="file"
-                    accept="image/png,image/jpeg"
-                    className="mt-2 block w-full text-xs"
-                    onChange={(e) => alan.ayarla(e.target.files?.[0] || null)}
-                  />
-
-                  {alan.onizleme && (
-                    <div className="mt-2">
-                      {/* Çerçeve, PDF'teki imza boşluğunun en-boy oranına
-                          yakın tutulur — kaşenin sığıp sığmadığı görülsün. */}
-                      <div className="border border-dashed border-gray-400 rounded h-[52px] flex items-center justify-center overflow-hidden bg-white">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={alan.onizleme}
-                          alt={`${alan.etiket} kaşe önizleme`}
-                          className="max-w-full max-h-full object-contain"
-                        />
-                      </div>
-                      <button
-                        type="button"
-                        onClick={alan.temizle}
-                        className="mt-2 text-xs px-2 py-1 rounded border hover:bg-gray-50 w-full"
-                      >
-                        Kaldır
-                      </button>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
+              <span className="block text-xs text-gray-500 mt-0.5">
+                İşaretlenirse HAZIRLAYAN ve KONTROL EDEN kutularına, isim ve
+                unvanın altındaki imza boşluğuna kaşeler basılır.
+              </span>
+              {kaseEkle && (
+                <span className="block text-xs mt-1.5">
+                  <span className={hazirlayanKaseVar ? "text-green-700" : "text-amber-700"}>
+                    {hazirlayanKaseVar
+                      ? `✓ HAZIRLAYAN: ${hazirlayanAdi} kaşesi`
+                      : `⚠ ${hazirlayanAdi || "Atanmış TMGD"} için kayıtlı kaşe yok — o kutu kaşesiz basılır`}
+                  </span>
+                  <span className="block text-green-700">
+                    ✓ KONTROL EDEN: YAKUP ATAŞ kaşesi
+                  </span>
+                </span>
+              )}
+            </span>
+          </label>
 
           <div className="mb-4 text-sm">
             <span className="text-gray-600">Logo</span>
