@@ -1,8 +1,7 @@
 "use client";
 
-// FİRMA TAKVİMİ (Gösterge Paneli bölümü)
-// Gösterge Paneli sayfasında bir alt başlık olarak gösterilir. İki işi
-// bir arada yapar:
+// FİRMA TAKVİMİ
+// Gösterge Paneli'nin alt sayfası. İki işi bir arada yapar:
 //   1) Seçili AYIN ziyaretlerini takvim üzerinde gösterir; bir güne tek
 //      seferde BİRDEN ÇOK firma eklenebilir, tek tek silinebilir.
 //   2) O ay HENÜZ ZİYARET EDİLMEMİŞ firmaları listeler. Takvime bir firma
@@ -51,7 +50,7 @@ function ayBasiOfset(yil: number, ay: number): number {
   return (js + 6) % 7;
 }
 
-export default function FirmaTakvimi() {
+export default function FirmaTakvimiPage() {
   const { canWrite } = useUser();
 
   const bugun = useMemo(() => new Date(), []);
@@ -238,8 +237,16 @@ export default function FirmaTakvimi() {
   );
 
   return (
-    <div>
-      <p className="text-sm text-gray-500 mb-4">
+    <div className="p-6">
+      <div className="flex items-center gap-2 text-sm text-gray-500 mb-1">
+        <Link href="/dashboard" className="hover:underline">
+          Gösterge Paneli
+        </Link>
+        <span>/</span>
+        <span className="text-gray-700">Firma Takvimi</span>
+      </div>
+      <h1 className="text-2xl font-bold mb-1">Firma Takvimi</h1>
+      <p className="text-sm text-gray-500 mb-5">
         Seçili ayın firma ziyaretlerini takvimde görüntüle, ekle ve sil. Ay
         içinde henüz ziyaret edilmemiş firmalar aşağıda listelenir.
       </p>
@@ -485,9 +492,7 @@ export default function FirmaTakvimi() {
                     setSecilenGun(varsayilan);
                     setSecilenFirmalar([f.id]);
                     setFirmaArama("");
-                    document
-                      .getElementById("firma-takvimi")
-                      ?.scrollIntoView({ behavior: "smooth", block: "start" });
+                    window.scrollTo({ top: 0, behavior: "smooth" });
                   }}
                   className="text-xs px-2 py-1 rounded border hover:bg-gray-50 shrink-0"
                 >

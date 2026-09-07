@@ -13,7 +13,6 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase/client";
 import AuditLogWidget from "@/components/audit/AuditLogWidget";
-import FirmaTakvimi from "@/components/FirmaTakvimi";
 import { useUser } from "@/hooks/useUser";
 
 type Counts = {
@@ -376,13 +375,19 @@ export default function DashboardPage() {
       </div>
 
       {/* Yaklaşan belge süreleri — yan yana iki kolon */}
-      {/* Firma Takvimi — aylık ziyaret takvimi + ziyaret edilmeyen firmalar */}
-      <h2 id="firma-takvimi" className="text-xl font-bold mb-3 scroll-mt-4">
-        Firma Takvimi
-      </h2>
-      <div className="mb-8">
-        <FirmaTakvimi />
-      </div>
+      {/* Firma Takvimi — alt sayfa girişi */}
+      <Link
+        href="/dashboard/firma-takvimi"
+        className="flex items-center justify-between border rounded-xl p-4 mb-6 hover:bg-gray-50"
+      >
+        <span>
+          <span className="font-medium">Firma Takvimi</span>
+          <span className="block text-sm text-gray-500">
+            Bu ayın ziyaretlerini takvimde gör, ziyaret edilmeyen firmaları takip et
+          </span>
+        </span>
+        <span className="text-gray-400">›</span>
+      </Link>
 
       <h2 className="text-xl font-bold mb-3">Yaklaşan Belge Süreleri</h2>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-8">
