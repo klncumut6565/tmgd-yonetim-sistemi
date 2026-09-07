@@ -147,6 +147,12 @@ export default function NotificationBell() {
     if (tmgdError) {
       console.error("TMGD Sertifikası sorgu hatası:", tmgdError);
     }
+    
+    // DEBUG: S2 verileri kontrol et
+    console.log("S2 belgesi sayısı:", tmgdData?.length || 0);
+    if (tmgdData && tmgdData.length > 0) {
+      console.log("İlk S2 belgesi:", tmgdData[0]);
+    }
 
     // Genel sorgu TMFB'yi zaten getirmiş olabilir (eşik yeterince büyükse)
     // — id bazlı tekilleştirme ile aynı uyarının iki kez görünmesi önlenir.
@@ -158,20 +164,32 @@ export default function NotificationBell() {
     // TMGD Sertifikası (S2) — firm_belgeleri'nden doğrudan
     // Atanmış TMGD'nin adı user_firms → profiles'ten gelir
     if (tmgdData) {
+      console.log("S2 işleme başlangıcı - toplam belgeler:", tmgdData.length);
       for (const record of (tmgdData as any[]) || []) {
-        if (!record.valid_until) continue;
+        if (!record.valid_until) {
+          console.log("S2: valid_until boş, SKIP");
+          continue;
+        }
         const expiry = new Date(record.valid_until);
         const now = new Date();
         const daysLeft = Math.ceil((expiry.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
         
+        console.log(`S2: ${record.firms?.name} - ${daysLeft} gün kaldı`);
+        
         // 120 günlük eşiği kontrol et
-        if (daysLeft > TMGD_UYARI_GUN) continue;
+        if (daysLeft > TMGD_UYARI_GUN) {
+          console.log(`  → ${daysLeft} gün > ${TMGD_UYARI_GUN} gün EŞIK (HARİÇ TUTULDU)`);
+          continue;
+        }
+        console.log(`  → ${daysLeft} gün ≤ ${TMGD_UYARI_GUN} gün (DAHIL EDILDI)`);
         
         // user_firms[0].profiles'ten TMGD adı
         const tmgdProfiles = record.user_firms?.[0]?.profiles;
         const tmgdAdi = tmgdProfiles 
           ? `${tmgdProfiles.first_name || ""} ${tmgdProfiles.last_name || ""}`.trim()
           : "TMGD (Atanmamış)";
+        
+        console.log(`  → TMGD: ${tmgdAdi}`);
         
         const belgeSonucu: ExpiringDoc = {
           id: `s2_${record.firm_id}_${record.id}`,
@@ -181,6 +199,7 @@ export default function NotificationBell() {
           expiry_date: record.valid_until,
         };
         belgeSonuclari.push(belgeSonucu);
+        console.log(`  → belgeSonuclari'na eklendi`);
       }
     }
 

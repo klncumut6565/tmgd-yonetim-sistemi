@@ -241,14 +241,25 @@ export default function DashboardPage() {
       // birleştirilir. id bazlı tekilleştirme yapılır.
       
       // expTmgdRes'ten S2 belgelerini transform et (firm_belgeleri'nden geliyorlar)
+      console.log("Dashboard S2 belgesi sayısı:", expTmgdRes.data?.length || 0);
+      if (expTmgdRes.data && expTmgdRes.data.length > 0) {
+        console.log("İlk S2 belgesi (Dashboard):", expTmgdRes.data[0]);
+      }
+      
       const tmgdTransform = (expTmgdRes.data as any[] || [])
         .map((record: any) => {
           const expiry = new Date(record.valid_until);
           const now = new Date();
           const daysLeft = Math.ceil((expiry.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
           
+          console.log(`S2 Belgesi: ${record.firms?.name} - ${daysLeft} gün kaldı`);
+          
           // 120 günlük eşiği kontrol et
-          if (daysLeft > TMGD_UYARI_GUN) return null;
+          if (daysLeft > TMGD_UYARI_GUN) {
+            console.log(`  → ${daysLeft} gün > ${TMGD_UYARI_GUN} gün EŞIK (HARİÇ TUTULDU)`);
+            return null;
+          }
+          console.log(`  → ${daysLeft} gün ≤ ${TMGD_UYARI_GUN} gün (DAHIL EDILDI)`);
           
           const tmgdProfiles = record.user_firms?.[0]?.profiles;
           const tmgdAdi = tmgdProfiles 
