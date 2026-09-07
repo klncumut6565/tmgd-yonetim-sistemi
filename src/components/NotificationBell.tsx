@@ -116,7 +116,13 @@ export default function NotificationBell() {
         .select("id, title, firm_name, days_left, expiry_date")
         .lte("days_left", s.doc_expiry_days)
         .order("days_left");
-      belgeSonuclari.push(...((data as ExpiringDoc[]) || []));
+      // TMGD Sertifikası aşağıda kendi (120 günlük) kuralıyla ve atanmış
+      // TMGD'nin adıyla ekleniyor — burada elenerek çift gösterim önlenir.
+      belgeSonuclari.push(
+        ...(((data as ExpiringDoc[]) || []).filter(
+          (d) => !/TMGD Sertifika/i.test(d.title)
+        ))
+      );
     }
 
     // TMFB — genel eşik kapalı olsa bile her zaman kontrol edilir.
@@ -131,27 +137,28 @@ export default function NotificationBell() {
       .lte("days_left", TMFB_UYARI_GUN)
       .order("days_left");
 
-    // TMGD SERTİFİKASI — genel eşik kapalı olsa bile her zaman kontrol edilir.
-    // expiring_documents view'ı (migration 067) firm_belgeleri.S2'yi zaten
-    // 'Belge Takip: TMGD Sertifikası' başlığıyla UNION ediyor — TMFB'de
-    // olduğu gibi doğrudan buradan okunur.
+    // TMGD SERTİFİKASI (S2) — Belge Takip'teki geçerlilik tarihinden
+    // doğrudan okunur (expiring_documents view'ına bağımlı değil).
+    // Sadece firms embed edilir — firm_belgeleri.firm_id → firms.id gerçek
+    // bir foreign key. user_firms ile arasında FK olmadığı için o AYRI
+    // sorgulanır.
     const { data: tmgdData, error: tmgdError } = await supabase
-      .from("expiring_documents")
-      .select("id, title, firm_id, firm_name, days_left, expiry_date")
-      .ilike("title", "%TMGD Sertifikası%")
-      .lte("days_left", TMGD_UYARI_GUN)
-      .order("days_left");
+      .from("firm_belgeleri")
+      .select("id, firm_id, valid_until, firms ( name )")
+      .eq("code", "S2")
+      .not("valid_until", "is", null)
+      .order("valid_until");
 
     if (tmgdError) {
       console.error("TMGD Sertifikası sorgu hatası:", tmgdError);
     }
 
+    const tmgdHam = (tmgdData as Record<string, any>[]) || [];
+
     // Atanmış TMGD'nin adı — roller kısmındaki (user_firms → profiles)
-    // atamadan okunur, ayrı bir hafif sorgu ile (firm_belgeleri ile
-    // user_firms arasında doğrudan bir foreign key olmadığından tek
-    // sorguda embed edilemiyor).
+    // atamadan okunur.
     const tmgdFirmIds = Array.from(
-      new Set(((tmgdData as ExpiringDoc[]) || []).map((d) => d.firm_id).filter((x): x is string => !!x))
+      new Set(tmgdHam.map((r) => r.firm_id).filter(Boolean))
     );
     const tmgdAdlariMap = new Map<string, string>();
     if (tmgdFirmIds.length > 0) {
@@ -159,7 +166,7 @@ export default function NotificationBell() {
         .from("user_firms")
         .select("firm_id, profiles ( first_name, last_name )")
         .in("firm_id", tmgdFirmIds);
-      for (const a of (atamalar as any[]) || []) {
+      for (const a of (atamalar as Record<string, any>[]) || []) {
         const p = a.profiles;
         const adSoyad = p ? `${p.first_name || ""} ${p.last_name || ""}`.trim() : "";
         if (adSoyad) tmgdAdlariMap.set(a.firm_id, adSoyad);
@@ -173,13 +180,22 @@ export default function NotificationBell() {
       if (!gorulenIdler.has(d.id)) belgeSonuclari.push(d);
     }
     
-    // TMGD Sertifikası (S2) — expiring_documents'ten, başlığa atanmış
-    // TMGD'nin adı (varsa) eklenerek
-    for (const d of (tmgdData as ExpiringDoc[]) || []) {
-      const tmgdAdi = d.firm_id ? tmgdAdlariMap.get(d.firm_id) : undefined;
+    // TMGD Sertifikası (S2) — geçerlilik tarihinden kalan gün hesaplanır,
+    // 120 gün eşiği uygulanır, başlığa atanmış TMGD'nin adı eklenir.
+    for (const r of tmgdHam) {
+      const expiry = new Date(String(r.valid_until));
+      const bugun = new Date();
+      const gun = Math.ceil(
+        (expiry.getTime() - bugun.getTime()) / (1000 * 60 * 60 * 24)
+      );
+      if (gun > TMGD_UYARI_GUN) continue;
+      const ad = tmgdAdlariMap.get(r.firm_id);
       belgeSonuclari.push({
-        ...d,
-        title: tmgdAdi ? `TMGD Sertifikası — ${tmgdAdi}` : "TMGD Sertifikası",
+        id: `tmgd-${r.id}`,
+        title: ad ? `TMGD Sertifikası — ${ad}` : "TMGD Sertifikası",
+        firm_name: String(r.firms?.name || ""),
+        days_left: gun,
+        expiry_date: String(r.valid_until),
       });
     }
 

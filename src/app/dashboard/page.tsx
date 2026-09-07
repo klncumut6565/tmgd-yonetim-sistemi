@@ -95,6 +95,8 @@ export default function DashboardPage() {
   // Firma/Belge Takip belgeleri (TMFB, sigorta, yetki belgesi, muayene vb.)
   // — expiring_documents view'ından gelir.
   const [belgeler, setBelgeler] = useState<ExpiringItem[]>([]);
+  // TMGD Sertifikaları (S2) — kendi bölümünde, 120 gün eşiğiyle
+  const [tmgdSertifikalari, setTmgdSertifikalari] = useState<ExpiringItem[]>([]);
   const [tasks, setTasks] = useState<RecentTask[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -161,13 +163,15 @@ export default function DashboardPage() {
           .lte("days_left", TMFB_UYARI_GUN)
           .order("days_left")
           .limit(8),
-        // TMGD SERTİFİKASI (S2) — genel pencereden BAĞIMSIZ, 120 gün kala gösterilir
+        // TMGD SERTİFİKASI (S2) — Belge Takip'teki geçerlilik tarihinden
+        // doğrudan okunur. Sadece firms embed edilir (firm_belgeleri.firm_id
+        // → firms.id gerçek bir foreign key). user_firms AYRI sorgulanır.
         supabase
-          .from("expiring_documents")
-          .select("id, title, expiry_date, firm_id, firm_name, days_left")
-          .ilike("title", "%TMGD Sertifikası%")
-          .lte("days_left", TMGD_UYARI_GUN)
-          .order("days_left"),
+          .from("firm_belgeleri")
+          .select("id, firm_id, valid_until, firms ( name )")
+          .eq("code", "S2")
+          .not("valid_until", "is", null)
+          .order("valid_until"),
         supabase
           .from("tasks")
           .select("id, title, status, priority, due_date, firms ( name )")
@@ -237,40 +241,16 @@ export default function DashboardPage() {
       setVehicles([...vehAdr, ...vehInsp].sort((a, b) => a.days_left - b.days_left));
 
       // Firma/Belge Takip belgeleri — genel pencere + TMFB'nin özel
-      // (150 gün) sonuçları + TMGD Sertifikası'nın özel (120 gün) sonuçları
-      // birleştirilir. id bazlı tekilleştirme yapılır.
-
-      // TMGD Sertifikası (S2) — expiring_documents zaten filtrelenmiş
-      // (ilike + lte) döndürüyor; atanmış TMGD'nin adını (roller kısmından)
-      // eklemek için firm_id'lere göre user_firms'tan ayrı bir sorgu yapılır.
-      const tmgdRows = (expTmgdRes.data as any[]) || [];
-      const tmgdFirmIds = Array.from(new Set(tmgdRows.map((r) => r.firm_id).filter(Boolean)));
-      const tmgdAdlariMap = new Map<string, string>();
-      if (tmgdFirmIds.length > 0) {
-        const { data: atamalar } = await supabase
-          .from("user_firms")
-          .select("firm_id, profiles ( first_name, last_name )")
-          .in("firm_id", tmgdFirmIds);
-        for (const a of (atamalar as any[]) || []) {
-          const p = a.profiles;
-          const adSoyad = p ? `${p.first_name || ""} ${p.last_name || ""}`.trim() : "";
-          if (adSoyad) tmgdAdlariMap.set(a.firm_id, adSoyad);
-        }
-      }
-      const tmgdTransform = tmgdRows.map((r) => {
-        const tmgdAdi = tmgdAdlariMap.get(r.firm_id);
-        return {
-          ...r,
-          title: tmgdAdi ? `TMGD Sertifikası — ${tmgdAdi}` : "TMGD Sertifikası",
-        };
-      });
-
-      const belgeHam = [...(expDocsRes.data || []), ...(expTmfbRes.data || []), ...tmgdTransform];
+      // (150 gün) sonuçları birleştirilir. id bazlı tekilleştirme yapılır.
+      // TMGD Sertifikası artık AYRI bir bölümde gösteriliyor (aşağıda).
+      const belgeHam = [...(expDocsRes.data || []), ...(expTmfbRes.data || [])];
       const gorulen = new Set<string>();
       const belgeListesi: ExpiringItem[] = [];
       for (const b of belgeHam as Record<string, unknown>[]) {
         const bid = String(b.id);
         if (gorulen.has(bid)) continue;
+        // TMGD Sertifikası kendi bölümünde gösteriliyor — burada elenir.
+        if (/TMGD Sertifika/i.test(String(b.title))) continue;
         gorulen.add(bid);
         // Başlıktaki "Belge Takip: " ön ekini kaldır — panelde zaten
         // "Firma Belgeleri" başlığı altında gösteriliyor.
@@ -285,6 +265,47 @@ export default function DashboardPage() {
         });
       }
       setBelgeler(belgeListesi.sort((a, b) => a.days_left - b.days_left));
+
+      // ---- TMGD Sertifikaları (S2) — kendi bölümü, 120 gün eşiği ----------
+      // Belge Takip'teki "📅 Geçerlilik" tarihinden hesaplanır.
+      const tmgdHam = (expTmgdRes.data as Record<string, any>[]) || [];
+
+      // Atanmış TMGD'nin adı roller kısmından (user_firms → profiles) gelir.
+      // firm_belgeleri ile user_firms arasında doğrudan FK olmadığı için
+      // AYRI bir sorgu yapılır ve firm_id üzerinden eşlenir.
+      const tmgdFirmIds = Array.from(
+        new Set(tmgdHam.map((r) => r.firm_id).filter(Boolean))
+      );
+      const tmgdAdlari = new Map<string, string>();
+      if (tmgdFirmIds.length > 0) {
+        const { data: atamalar } = await supabase
+          .from("user_firms")
+          .select("firm_id, profiles ( first_name, last_name )")
+          .in("firm_id", tmgdFirmIds);
+        for (const a of (atamalar as Record<string, any>[]) || []) {
+          const p = a.profiles;
+          const adSoyad = p
+            ? `${p.first_name || ""} ${p.last_name || ""}`.trim()
+            : "";
+          if (adSoyad) tmgdAdlari.set(a.firm_id, adSoyad);
+        }
+      }
+
+      const tmgdListesi: ExpiringItem[] = [];
+      for (const r of tmgdHam) {
+        const gun = daysLeft(String(r.valid_until));
+        if (gun > TMGD_UYARI_GUN) continue; // 120 günden uzaksa gösterme
+        const ad = tmgdAdlari.get(r.firm_id);
+        tmgdListesi.push({
+          id: `tmgd-${r.id}`,
+          label: ad ? `TMGD Sertifikası — ${ad}` : "TMGD Sertifikası",
+          docType: "TMGD Sertifikası",
+          valid_until: String(r.valid_until),
+          days_left: gun,
+          firm_name: String(r.firms?.name || ""),
+        });
+      }
+      setTmgdSertifikalari(tmgdListesi.sort((a, b) => a.days_left - b.days_left));
 
       setTasks((recentRes.data as unknown as RecentTask[]) || []);
       setLoading(false);
@@ -400,6 +421,34 @@ export default function DashboardPage() {
           </ul>
           <p className="text-[11px] text-gray-400 mt-3">
             TMFB için yenileme süresi uzun olduğundan uyarı 150 gün kala başlar; diğer belgeler 30 gün.
+          </p>
+        </div>
+
+        {/* TMGD Sertifikaları (S2) — Belge Takip'teki geçerlilik tarihinden
+            okunur. Yenileme/eğitim süreci uzun olduğundan uyarı 120 gün kala
+            başlar; bu yüzden kendi bölümünde gösterilir. */}
+        <div className="border rounded-xl p-4 lg:col-span-2">
+          <h3 className="font-medium text-gray-600 mb-3">TMGD Sertifikaları</h3>
+          {loading && <p className="text-sm text-gray-500">Yükleniyor...</p>}
+          {!loading && tmgdSertifikalari.length === 0 && (
+            <p className="text-sm text-gray-500">
+              120 gün içinde süresi dolan TMGD sertifikası yok. ✓
+            </p>
+          )}
+          <ul className="space-y-2">
+            {tmgdSertifikalari.map((t) => (
+              <li key={t.id} className="flex items-center justify-between gap-2 text-sm">
+                <span>
+                  {t.label}
+                  {t.firm_name && <span className="text-gray-400"> · {t.firm_name}</span>}
+                </span>
+                <DaysBadge date={t.valid_until} />
+              </li>
+            ))}
+          </ul>
+          <p className="text-[11px] text-gray-400 mt-3">
+            TMGD sertifikası uyarısı 120 gün kala başlar. Geçerlilik tarihi, firmanın
+            Belge Takip sekmesindeki &quot;TMGD Sertifikası&quot; satırından girilir.
           </p>
         </div>
       </div>
