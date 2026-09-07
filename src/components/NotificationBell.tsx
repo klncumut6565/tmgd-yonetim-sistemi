@@ -131,21 +131,43 @@ export default function NotificationBell() {
       .order("days_left");
 
     // TMGD SERTİFİKASI — genel eşik kapalı olsa bile her zaman kontrol edilir.
+    // S2 kodu firm_belgeleri.note alanında TMGD adını barındırıyor
     const { data: tmgdData } = await supabase
-      .from("expiring_documents")
-      .select("id, title, firm_name, days_left, expiry_date")
-      .ilike("title", "%TMGD Sertifika%")
+      .from("firm_belgeleri")
+      .select("id, firm_id, code, valid_until, note, firms ( name )")
+      .eq("code", "S2")
       .lte("days_left", TMGD_UYARI_GUN)
-      .order("days_left");
+      .not("valid_until", "is", null)
+      .order("valid_until");
 
-    // Genel sorgu TMFB/TMGD'yi zaten getirmiş olabilir (eşik yeterince büyükse)
+    // Genel sorgu TMFB'yi zaten getirmiş olabilir (eşik yeterince büyükse)
     // — id bazlı tekilleştirme ile aynı uyarının iki kez görünmesi önlenir.
     const gorulenIdler = new Set(belgeSonuclari.map((d) => d.id));
     for (const d of (tmfbData as ExpiringDoc[]) || []) {
       if (!gorulenIdler.has(d.id)) belgeSonuclari.push(d);
     }
-    for (const d of (tmgdData as ExpiringDoc[]) || []) {
-      if (!gorulenIdler.has(d.id)) belgeSonuclari.push(d);
+    
+    // TMGD Sertifikası (S2) — firm_belgeleri'nden doğrudan
+    // Note alanında TMGD'nin adı kaydediliyor
+    if (tmgdData) {
+      for (const record of (tmgdData as any[]) || []) {
+        if (!record.valid_until) continue;
+        const expiry = new Date(record.valid_until);
+        const now = new Date();
+        const daysLeft = Math.ceil((expiry.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+        
+        if (daysLeft > TMGD_UYARI_GUN) continue;
+        
+        const tmgdAdi = record.note?.trim() || "TMGD (İsim kaydedilmemiş)";
+        const belgeSonucu: ExpiringDoc = {
+          id: `s2_${record.firm_id}_${record.id}`,
+          title: `TMGD Sertifikası — ${tmgdAdi}`,
+          firm_name: record.firms?.name || "Firma (Bilinmiyor)",
+          days_left: daysLeft,
+          expiry_date: record.valid_until,
+        };
+        belgeSonuclari.push(belgeSonucu);
+      }
     }
 
     belgeSonuclari.sort((a, b) => a.days_left - b.days_left);
