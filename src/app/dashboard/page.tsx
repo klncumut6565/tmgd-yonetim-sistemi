@@ -167,8 +167,7 @@ export default function DashboardPage() {
           .select("id, firm_id, code, valid_until, firms ( name ), user_firms ( user_id, profiles ( first_name, last_name ) )")
           .eq("code", "S2")
           .not("valid_until", "is", null)
-          .order("valid_until")
-          .limit(8),
+          .order("valid_until"),
         supabase
           .from("tasks")
           .select("id, title, status, priority, due_date, firms ( name )")
