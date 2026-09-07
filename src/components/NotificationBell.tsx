@@ -25,6 +25,7 @@ type ExpiringDoc = {
   firm_name: string;
   days_left: number;
   expiry_date: string;
+  firm_id?: string;
 };
 
 type NotifSettings = {
@@ -131,27 +132,38 @@ export default function NotificationBell() {
       .order("days_left");
 
     // TMGD SERTİFİKASI — genel eşik kapalı olsa bile her zaman kontrol edilir.
-    // firm_belgeleri.code = S2 → user_firms → profiles (atanmış TMGD adı)
-    // NOT: Normal join (inner değil) — user olmasa bile S2 belgesi gösterilir
+    // expiring_documents view'ı (migration 067) firm_belgeleri.S2'yi zaten
+    // 'Belge Takip: TMGD Sertifikası' başlığıyla UNION ediyor — TMFB'de
+    // olduğu gibi doğrudan buradan okunur.
     const { data: tmgdData, error: tmgdError } = await supabase
-      .from("firm_belgeleri")
-      .select(
-        `id, firm_id, code, valid_until,
-         firms ( name ),
-         user_firms ( user_id, profiles ( first_name, last_name ) )`
-      )
-      .eq("code", "S2")
-      .not("valid_until", "is", null)
-      .order("valid_until");
-    
+      .from("expiring_documents")
+      .select("id, title, firm_id, firm_name, days_left, expiry_date")
+      .ilike("title", "%TMGD Sertifikası%")
+      .lte("days_left", TMGD_UYARI_GUN)
+      .order("days_left");
+
     if (tmgdError) {
       console.error("TMGD Sertifikası sorgu hatası:", tmgdError);
     }
-    
-    // DEBUG: S2 verileri kontrol et
-    console.log("S2 belgesi sayısı:", tmgdData?.length || 0);
-    if (tmgdData && tmgdData.length > 0) {
-      console.log("İlk S2 belgesi:", tmgdData[0]);
+
+    // Atanmış TMGD'nin adı — roller kısmındaki (user_firms → profiles)
+    // atamadan okunur, ayrı bir hafif sorgu ile (firm_belgeleri ile
+    // user_firms arasında doğrudan bir foreign key olmadığından tek
+    // sorguda embed edilemiyor).
+    const tmgdFirmIds = Array.from(
+      new Set(((tmgdData as ExpiringDoc[]) || []).map((d) => d.firm_id).filter((x): x is string => !!x))
+    );
+    const tmgdAdlariMap = new Map<string, string>();
+    if (tmgdFirmIds.length > 0) {
+      const { data: atamalar } = await supabase
+        .from("user_firms")
+        .select("firm_id, profiles ( first_name, last_name )")
+        .in("firm_id", tmgdFirmIds);
+      for (const a of (atamalar as any[]) || []) {
+        const p = a.profiles;
+        const adSoyad = p ? `${p.first_name || ""} ${p.last_name || ""}`.trim() : "";
+        if (adSoyad) tmgdAdlariMap.set(a.firm_id, adSoyad);
+      }
     }
 
     // Genel sorgu TMFB'yi zaten getirmiş olabilir (eşik yeterince büyükse)
@@ -161,46 +173,14 @@ export default function NotificationBell() {
       if (!gorulenIdler.has(d.id)) belgeSonuclari.push(d);
     }
     
-    // TMGD Sertifikası (S2) — firm_belgeleri'nden doğrudan
-    // Atanmış TMGD'nin adı user_firms → profiles'ten gelir
-    if (tmgdData) {
-      console.log("S2 işleme başlangıcı - toplam belgeler:", tmgdData.length);
-      for (const record of (tmgdData as any[]) || []) {
-        if (!record.valid_until) {
-          console.log("S2: valid_until boş, SKIP");
-          continue;
-        }
-        const expiry = new Date(record.valid_until);
-        const now = new Date();
-        const daysLeft = Math.ceil((expiry.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-        
-        console.log(`S2: ${record.firms?.name} - ${daysLeft} gün kaldı`);
-        
-        // 120 günlük eşiği kontrol et
-        if (daysLeft > TMGD_UYARI_GUN) {
-          console.log(`  → ${daysLeft} gün > ${TMGD_UYARI_GUN} gün EŞIK (HARİÇ TUTULDU)`);
-          continue;
-        }
-        console.log(`  → ${daysLeft} gün ≤ ${TMGD_UYARI_GUN} gün (DAHIL EDILDI)`);
-        
-        // user_firms[0].profiles'ten TMGD adı
-        const tmgdProfiles = record.user_firms?.[0]?.profiles;
-        const tmgdAdi = tmgdProfiles 
-          ? `${tmgdProfiles.first_name || ""} ${tmgdProfiles.last_name || ""}`.trim()
-          : "TMGD (Atanmamış)";
-        
-        console.log(`  → TMGD: ${tmgdAdi}`);
-        
-        const belgeSonucu: ExpiringDoc = {
-          id: `s2_${record.firm_id}_${record.id}`,
-          title: `TMGD Sertifikası — ${tmgdAdi}`,
-          firm_name: record.firms?.name || "Firma (Bilinmiyor)",
-          days_left: daysLeft,
-          expiry_date: record.valid_until,
-        };
-        belgeSonuclari.push(belgeSonucu);
-        console.log(`  → belgeSonuclari'na eklendi`);
-      }
+    // TMGD Sertifikası (S2) — expiring_documents'ten, başlığa atanmış
+    // TMGD'nin adı (varsa) eklenerek
+    for (const d of (tmgdData as ExpiringDoc[]) || []) {
+      const tmgdAdi = d.firm_id ? tmgdAdlariMap.get(d.firm_id) : undefined;
+      belgeSonuclari.push({
+        ...d,
+        title: tmgdAdi ? `TMGD Sertifikası — ${tmgdAdi}` : "TMGD Sertifikası",
+      });
     }
 
     belgeSonuclari.sort((a, b) => a.days_left - b.days_left);
