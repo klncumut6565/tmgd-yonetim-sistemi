@@ -1715,21 +1715,25 @@ function altTabloCiz(
   doc.line(M + kolonGenislik, y, M + kolonGenislik, y + yukseklik);
   doc.line(M + kolonGenislik * 2, y, M + kolonGenislik * 2, y + yukseklik);
 
-  // Kaşe, yazılardan ÖNCE basılır ki isim/unvan üstte kalsın ve okunabilirliği
-  // bozulmasın. Kutuya sığacak şekilde en-boy oranı korunarak ölçeklenir.
+  // Kaşe, HAZIRLAYAN sütununa basılır. Kaşenin kendisi zaten firma unvanı,
+  // TMGD adı ve belge numarasını içerdiği için bu sütunda ayrıca isim/unvan
+  // YAZILMAZ — aksi halde yazı kaşenin üzerine binip ikisi de okunmaz olur.
+  // Kaşe, "HAZIRLAYAN" başlığının ALTINDA kalan alana, çizgilere değmeyecek
+  // şekilde oranı korunarak sığdırılır.
+  const kaseVar = !!kase;
   if (kase) {
-    const kutuIcPay = 1.5;
-    const kullanilabilirG = kolonGenislik - kutuIcPay * 2;
-    const kullanilabilirY = yukseklik - kutuIcPay * 2;
+    const basligaPay = 6.5; // "HAZIRLAYAN" başlığının kapladığı üst şerit
+    const kenarPay = 2;
+    const kullanilabilirG = kolonGenislik - kenarPay * 2;
+    const kullanilabilirY = yukseklik - basligaPay - kenarPay;
     let kaseG = kullanilabilirG;
     let kaseY = kaseG / (kase.enBoyOrani || 1);
     if (kaseY > kullanilabilirY) {
       kaseY = kullanilabilirY;
       kaseG = kaseY * (kase.enBoyOrani || 1);
     }
-    // HAZIRLAYAN sütunu = ilk kolon; kutunun ortasına yerleştirilir.
     const kaseX = M + (kolonGenislik - kaseG) / 2;
-    const kaseYPos = y + (yukseklik - kaseY) / 2;
+    const kaseYPos = y + basligaPay + (kullanilabilirY - kaseY) / 2;
     try {
       doc.addImage(kase.data, kase.fmt, kaseX, kaseYPos, kaseG, kaseY);
     } catch {
@@ -1759,6 +1763,10 @@ function altTabloCiz(
     doc.setFontSize(7.5);
     doc.setFont(FONT, "bold");
     doc.text(b, x, y + 5, { align: "center" });
+
+    // HAZIRLAYAN sütununda kaşe basıldıysa isim/unvan yazılmaz — bilgi
+    // zaten kaşenin içinde yer alıyor.
+    if (i === 0 && kaseVar) return;
 
     if (isim) {
       // İsim varsa: kalın isim satırı ortada, hemen altında kişinin unvanı.
