@@ -68,6 +68,9 @@ export default function BelgeOlusturForm({ fixedFirmId, initialFirmId, compact =
   // belge üretmeden önce görebilmek.
   const [kaseFile, setKaseFile] = useState<File | null>(null);
   const [kasePreview, setKasePreview] = useState<string | null>(null);
+  // KONTROL EDEN (TMGD Koordinatörü) kaşesi — aynı mantık, ikinci sütun.
+  const [kontrolKaseFile, setKontrolKaseFile] = useState<File | null>(null);
+  const [kontrolKasePreview, setKontrolKasePreview] = useState<string | null>(null);
   const [hazirlayanAdi, setHazirlayanAdi] = useState("");
   const [hazirlayanDurum, setHazirlayanDurum] = useState<"yok" | "bulundu" | "yükleniyor">("yok");
   const [kapakUretiliyor, setKapakUretiliyor] = useState(false);
@@ -393,9 +396,12 @@ export default function BelgeOlusturForm({ fixedFirmId, initialFirmId, compact =
           : null;
       const bugun = new Date().toLocaleDateString("tr-TR");
 
-      // DENEME KAŞESİ — seçildiyse jsPDF'in kullanabileceği dataURL'e
+      // DENEME KAŞELERİ — seçildiyse jsPDF'in kullanabileceği dataURL'e
       // çevrilir. Kalıcı değildir; yalnızca bu üretimde geçerlidir.
-      const kaseData = kaseFile ? await fileToLogoData(kaseFile) : null;
+      const kaseler = {
+        hazirlayan: kaseFile ? await fileToLogoData(kaseFile) : undefined,
+        kontrol: kontrolKaseFile ? await fileToLogoData(kontrolKaseFile) : undefined,
+      };
 
       // Onaylayan (tesis sorumlusu) firma bazlı hatırlanır: bu üretimde
       // yazılan isim, önceki kayıttan farklıysa firmaya işlenir; böylece
@@ -526,7 +532,7 @@ export default function BelgeOlusturForm({ fixedFirmId, initialFirmId, compact =
             onaylayanAdi.trim(),
             faaliyetKapsami,
             yatayMi,
-            kaseData
+            kaseler
           );
         } else {
           await fontuKaydet(doc);
@@ -706,70 +712,95 @@ export default function BelgeOlusturForm({ fixedFirmId, initialFirmId, compact =
             </span>
           </label>
 
-          {/* DENEME KAŞESİ — HAZIRLAYAN (atanmış TMGD) kutusuna basılır.
-              Hiçbir yere kaydedilmez; sadece bu oturumda üretilen belgelerde
-              görünür. Amaç kaşenin kutuya nasıl oturduğunu test etmek. */}
+          {/* DENEME KAŞELERİ — HAZIRLAYAN ve KONTROL EDEN kutularına
+              basılır. Hiçbir yere kaydedilmez; sadece bu oturumda üretilen
+              belgelerde görünür. Amaç kaşelerin kutuya nasıl oturduğunu
+              belge üretmeden test etmek. */}
           <div className="mb-4 text-sm border rounded-lg p-3 bg-amber-50/40">
-            <div className="flex items-center justify-between">
-              <span className="text-gray-700 font-medium">
-                Kaşe Denemesi (TMGD)
-              </span>
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-gray-700 font-medium">Kaşe Denemesi</span>
               <span className="text-[10px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">
                 kaydedilmez
               </span>
             </div>
-
-            <input
-              type="file"
-              accept="image/png,image/jpeg"
-              className="mt-2 block w-full text-xs"
-              onChange={(e) => {
-                const f = e.target.files?.[0] || null;
-                setKaseFile(f);
-                if (kasePreview) URL.revokeObjectURL(kasePreview);
-                setKasePreview(f ? URL.createObjectURL(f) : null);
-              }}
-            />
-
-            {kasePreview && (
-              <div className="mt-3 flex items-start gap-3">
-                {/* Önizleme, PDF'teki HAZIRLAYAN kutusunun en-boy oranına
-                    yakın bir çerçevede gösterilir — kaşenin kutuya sığıp
-                    sığmadığı belge üretmeden görülebilsin. */}
-                <div className="border border-dashed border-gray-400 rounded w-[120px] h-[54px] flex items-center justify-center overflow-hidden bg-white shrink-0">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={kasePreview}
-                    alt="Kaşe önizleme"
-                    className="max-w-full max-h-full object-contain"
-                  />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-xs text-gray-500">
-                    Çerçeve, belgedeki HAZIRLAYAN kutusunu temsil eder. Kaşe
-                    oranı korunarak kutuya ortalanır; isim ve unvan kaşenin
-                    üzerine basılır.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (kasePreview) URL.revokeObjectURL(kasePreview);
-                      setKaseFile(null);
-                      setKasePreview(null);
-                    }}
-                    className="mt-2 text-xs px-2 py-1 rounded border hover:bg-white"
-                  >
-                    Kaşeyi kaldır
-                  </button>
-                </div>
-              </div>
-            )}
-
-            <p className="text-xs text-gray-400 mt-2">
-              Seçilen kaşe yalnızca bu oturumda üretilen/önizlenen belgelerde
-              kullanılır. Sonucu görmek için &quot;Önizle&quot; yeterlidir.
+            <p className="text-xs text-gray-400 mb-3">
+              Kaşeler, ilgili kutuda isim ve unvanın altındaki imza boşluğuna
+              basılır. Sonucu görmek için &quot;Önizle&quot; yeterlidir.
               Şeffaf zeminli PNG en iyi sonucu verir.
             </p>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              {[
+                {
+                  etiket: "HAZIRLAYAN — TMGD",
+                  altEtiket: hazirlayanAdi || "Firmaya atanmış TMGD",
+                  onizleme: kasePreview,
+                  ayarla: (f: File | null) => {
+                    setKaseFile(f);
+                    if (kasePreview) URL.revokeObjectURL(kasePreview);
+                    setKasePreview(f ? URL.createObjectURL(f) : null);
+                  },
+                  temizle: () => {
+                    if (kasePreview) URL.revokeObjectURL(kasePreview);
+                    setKaseFile(null);
+                    setKasePreview(null);
+                  },
+                },
+                {
+                  etiket: "KONTROL EDEN — Koordinatör",
+                  altEtiket: "YAKUP ATAŞ",
+                  onizleme: kontrolKasePreview,
+                  ayarla: (f: File | null) => {
+                    setKontrolKaseFile(f);
+                    if (kontrolKasePreview) URL.revokeObjectURL(kontrolKasePreview);
+                    setKontrolKasePreview(f ? URL.createObjectURL(f) : null);
+                  },
+                  temizle: () => {
+                    if (kontrolKasePreview) URL.revokeObjectURL(kontrolKasePreview);
+                    setKontrolKaseFile(null);
+                    setKontrolKasePreview(null);
+                  },
+                },
+              ].map((alan) => (
+                <div key={alan.etiket} className="border rounded-lg p-2.5 bg-white">
+                  <div className="text-xs font-medium text-gray-700">
+                    {alan.etiket}
+                  </div>
+                  <div className="text-[11px] text-gray-400 truncate">
+                    {alan.altEtiket}
+                  </div>
+
+                  <input
+                    type="file"
+                    accept="image/png,image/jpeg"
+                    className="mt-2 block w-full text-xs"
+                    onChange={(e) => alan.ayarla(e.target.files?.[0] || null)}
+                  />
+
+                  {alan.onizleme && (
+                    <div className="mt-2">
+                      {/* Çerçeve, PDF'teki imza boşluğunun en-boy oranına
+                          yakın tutulur — kaşenin sığıp sığmadığı görülsün. */}
+                      <div className="border border-dashed border-gray-400 rounded h-[52px] flex items-center justify-center overflow-hidden bg-white">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={alan.onizleme}
+                          alt={`${alan.etiket} kaşe önizleme`}
+                          className="max-w-full max-h-full object-contain"
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={alan.temizle}
+                        className="mt-2 text-xs px-2 py-1 rounded border hover:bg-gray-50 w-full"
+                      >
+                        Kaldır
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
 
           <div className="mb-4 text-sm">
@@ -1697,10 +1728,11 @@ function altTabloCiz(
   onaylayanAdi: string,
   ustY?: number,
   ozelYukseklik?: number,
-  // DENEME KAŞESİ — Belge Oluştur ekranından geçici olarak yüklenen kaşe
-  // görseli. Yalnızca HAZIRLAYAN (atanmış TMGD) sütununa basılır; kalıcı
-  // olarak hiçbir yere kaydedilmez.
-  kase?: LogoData
+  // DENEME KAŞELERİ — Belge Oluştur ekranından geçici olarak yüklenen kaşe
+  // görselleri. Sütun bazında basılır; kalıcı olarak hiçbir yere kaydedilmez.
+  //   hazirlayan → HAZIRLAYAN sütunu (firmaya atanmış TMGD)
+  //   kontrol    → KONTROL EDEN sütunu (TMGD Koordinatörü)
+  kaseler?: { hazirlayan?: LogoData; kontrol?: LogoData }
 ) {
   const y = ustY ?? ALT_TABLO_UST;
   const yukseklik = ozelYukseklik ?? ALT_TABLO_YUKSEKLIK;
@@ -1715,10 +1747,12 @@ function altTabloCiz(
   doc.line(M + kolonGenislik, y, M + kolonGenislik, y + yukseklik);
   doc.line(M + kolonGenislik * 2, y, M + kolonGenislik * 2, y + yukseklik);
 
-  // Kaşe, HAZIRLAYAN sütununda isim ve unvanın ALTINDA kalan imza boşluğuna
+  // Kaşeler, ilgili sütunda isim ve unvanın ALTINDA kalan imza boşluğuna
   // basılır. İsim/unvan yazısı silinmez; kaşe yazının üzerine binmeyecek
   // şekilde daha küçük ölçekle, çerçeve çizgilerine değmeden yerleştirilir.
-  if (kase) {
+  // Sütun indeksi: 0 = HAZIRLAYAN, 1 = KONTROL EDEN.
+  const kaseCiz = (kase: LogoData | undefined, kolonIndex: number) => {
+    if (!kase) return;
     // İsim (y+10.5) ve unvan (y+14.3) satırlarının bittiği nokta; altında
     // kalan bölüm elle imza/kaşe için ayrılmış boşluktur.
     const yaziAlti = 16.5;
@@ -1728,25 +1762,28 @@ function altTabloCiz(
 
     const kullanilabilirG = (kolonGenislik - kenarPay * 2) * kucultme;
     const kullanilabilirY = (yukseklik - yaziAlti - kenarPay) * kucultme;
+    if (kullanilabilirY <= 3) return;
 
-    if (kullanilabilirY > 3) {
-      let kaseG = kullanilabilirG;
-      let kaseY = kaseG / (kase.enBoyOrani || 1);
-      if (kaseY > kullanilabilirY) {
-        kaseY = kullanilabilirY;
-        kaseG = kaseY * (kase.enBoyOrani || 1);
-      }
-      // Yatayda kolon ortası, dikeyde yazı altındaki boşluğun ortası.
-      const kaseX = M + (kolonGenislik - kaseG) / 2;
-      const boslukYuksekligi = yukseklik - yaziAlti - kenarPay;
-      const kaseYPos = y + yaziAlti + (boslukYuksekligi - kaseY) / 2;
-      try {
-        doc.addImage(kase.data, kase.fmt, kaseX, kaseYPos, kaseG, kaseY);
-      } catch {
-        // Görsel bozuksa tablo yine de basılsın — kaşe atlanır.
-      }
+    let kaseG = kullanilabilirG;
+    let kaseY = kaseG / (kase.enBoyOrani || 1);
+    if (kaseY > kullanilabilirY) {
+      kaseY = kullanilabilirY;
+      kaseG = kaseY * (kase.enBoyOrani || 1);
     }
-  }
+    // Yatayda ilgili kolonun ortası, dikeyde yazı altındaki boşluğun ortası.
+    const kolonSol = M + kolonGenislik * kolonIndex;
+    const kaseX = kolonSol + (kolonGenislik - kaseG) / 2;
+    const boslukYuksekligi = yukseklik - yaziAlti - kenarPay;
+    const kaseYPos = y + yaziAlti + (boslukYuksekligi - kaseY) / 2;
+    try {
+      doc.addImage(kase.data, kase.fmt, kaseX, kaseYPos, kaseG, kaseY);
+    } catch {
+      // Görsel bozuksa tablo yine de basılsın — kaşe atlanır.
+    }
+  };
+
+  kaseCiz(kaseler?.hazirlayan, 0);
+  kaseCiz(kaseler?.kontrol, 1);
 
   const basliklar = ["HAZIRLAYAN", "KONTROL EDEN", "ONAYLAYAN"];
   // ONAYLAYAN sütununda unvan, isim girilip girilmediğine göre değişir:
@@ -1816,8 +1853,8 @@ function kapakSayfasiCiz(
   onaylayanAdi: string,
   baslikYukseklik: number,
   adLines: string[],
-  // Deneme kaşesi — HAZIRLAYAN (atanmış TMGD) kutusuna basılır.
-  kase?: LogoData
+  // Deneme kaşeleri — HAZIRLAYAN ve KONTROL EDEN kutularına basılır.
+  kaseler?: { hazirlayan?: LogoData; kontrol?: LogoData }
 ) {
   cerceveCiz(doc);
   baslikTablosuCiz(
@@ -1879,7 +1916,7 @@ function kapakSayfasiCiz(
   }
 
   // İmza tablosu (kapakta içerik sayfalarına göre daha yukarıda)
-  altTabloCiz(doc, hazirlayanAdi, onaylayanAdi, 218, 42.7, kase);
+  altTabloCiz(doc, hazirlayanAdi, onaylayanAdi, 218, 42.7, kaseler);
 
   // Sağ alt köşe: TMGDK kurumsal logosu + karekod
   const qrBoyut = 22;
@@ -1919,8 +1956,8 @@ async function renderYapilandirilmisBelge(
   onaylayanAdi: string,
   faaliyetKapsami: string,
   yatayMi: boolean,
-  // Deneme kaşesi — HAZIRLAYAN (atanmış TMGD) kutusuna basılır.
-  kase?: LogoData
+  // Deneme kaşeleri — HAZIRLAYAN ve KONTROL EDEN kutularına basılır.
+  kaseler?: { hazirlayan?: LogoData; kontrol?: LogoData }
 ) {
   await fontuKaydet(doc);
 
@@ -1967,7 +2004,7 @@ async function renderYapilandirilmisBelge(
       onaylayanAdi,
       baslikYukseklik,
       adLines,
-      kase
+      kaseler
     );
 
     const gorseller: string[] =
@@ -2049,7 +2086,7 @@ async function renderYapilandirilmisBelge(
     onaylayanAdi,
     baslikYukseklik,
     adLines,
-    kase
+    kaseler
   );
 
   sayfalar.forEach((sayfaSatirlari, idx) => {
@@ -2070,7 +2107,7 @@ async function renderYapilandirilmisBelge(
     // HAZIRLAYAN/ONAYLAYAN tablosu bu yüzden yalnızca kapak sayfasında
     // basılır, içerik sayfalarında tekrarlanmaz (çift imza alanı olmasın).
     if (sablon.docType !== "KONTROL FORMU") {
-      altTabloCiz(doc, hazirlayanAdi, onaylayanAdi, undefined, undefined, kase);
+      altTabloCiz(doc, hazirlayanAdi, onaylayanAdi, undefined, undefined, kaseler);
     }
 
     let y = headerAlt;
@@ -2132,7 +2169,7 @@ async function renderYapilandirilmisBelge(
     }
     baslikTablosuCiz(doc, firmAdi, code, belgeAdi, sablon, logo, bugun, toplamSayfa, toplamSayfa, baslikYukseklik, adLines);
     if (sablon.docType !== "KONTROL FORMU") {
-      altTabloCiz(doc, hazirlayanAdi, onaylayanAdi, undefined, undefined, kase);
+      altTabloCiz(doc, hazirlayanAdi, onaylayanAdi, undefined, undefined, kaseler);
     }
 
     const kutuG = genislik;
