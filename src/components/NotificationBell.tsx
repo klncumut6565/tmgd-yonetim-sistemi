@@ -132,16 +132,21 @@ export default function NotificationBell() {
 
     // TMGD SERTİFİKASI — genel eşik kapalı olsa bile her zaman kontrol edilir.
     // firm_belgeleri.code = S2 → user_firms → profiles (atanmış TMGD adı)
-    const { data: tmgdData } = await supabase
+    // NOT: Normal join (inner değil) — user olmasa bile S2 belgesi gösterilir
+    const { data: tmgdData, error: tmgdError } = await supabase
       .from("firm_belgeleri")
       .select(
         `id, firm_id, code, valid_until,
          firms ( name ),
-         user_firms!inner ( user_id, profiles ( first_name, last_name ) )`
+         user_firms ( user_id, profiles ( first_name, last_name ) )`
       )
       .eq("code", "S2")
       .not("valid_until", "is", null)
       .order("valid_until");
+    
+    if (tmgdError) {
+      console.error("TMGD Sertifikası sorgu hatası:", tmgdError);
+    }
 
     // Genel sorgu TMFB'yi zaten getirmiş olabilir (eşik yeterince büyükse)
     // — id bazlı tekilleştirme ile aynı uyarının iki kez görünmesi önlenir.
@@ -159,6 +164,7 @@ export default function NotificationBell() {
         const now = new Date();
         const daysLeft = Math.ceil((expiry.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
         
+        // 120 günlük eşiği kontrol et
         if (daysLeft > TMGD_UYARI_GUN) continue;
         
         // user_firms[0].profiles'ten TMGD adı

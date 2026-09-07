@@ -163,11 +163,11 @@ export default function DashboardPage() {
           .limit(8),
         // TMGD SERTİFİKASI (S2) — genel pencereden BAĞIMSIZ, 120 gün kala gösterilir
         supabase
-          .from("expiring_documents")
-          .select("id, title, expiry_date, firm_name, days_left")
-          .ilike("title", "%TMGD Sertifika%")
-          .lte("days_left", TMGD_UYARI_GUN)
-          .order("days_left")
+          .from("firm_belgeleri")
+          .select("id, firm_id, code, valid_until, firms ( name ), user_firms ( user_id, profiles ( first_name, last_name ) )")
+          .eq("code", "S2")
+          .not("valid_until", "is", null)
+          .order("valid_until")
           .limit(8),
         supabase
           .from("tasks")
@@ -240,7 +240,33 @@ export default function DashboardPage() {
       // Firma/Belge Takip belgeleri — genel pencere + TMFB'nin özel
       // (150 gün) sonuçları + TMGD Sertifikası'nın özel (120 gün) sonuçları
       // birleştirilir. id bazlı tekilleştirme yapılır.
-      const belgeHam = [...(expDocsRes.data || []), ...(expTmfbRes.data || []), ...(expTmgdRes.data || [])];
+      
+      // expTmgdRes'ten S2 belgelerini transform et (firm_belgeleri'nden geliyorlar)
+      const tmgdTransform = (expTmgdRes.data as any[] || [])
+        .map((record: any) => {
+          const expiry = new Date(record.valid_until);
+          const now = new Date();
+          const daysLeft = Math.ceil((expiry.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+          
+          // 120 günlük eşiği kontrol et
+          if (daysLeft > TMGD_UYARI_GUN) return null;
+          
+          const tmgdProfiles = record.user_firms?.[0]?.profiles;
+          const tmgdAdi = tmgdProfiles 
+            ? `${tmgdProfiles.first_name || ""} ${tmgdProfiles.last_name || ""}`.trim()
+            : "TMGD (Atanmamış)";
+          
+          return {
+            id: `s2_${record.id}`,
+            title: `TMGD Sertifikası — ${tmgdAdi}`,
+            expiry_date: record.valid_until,
+            firm_name: record.firms?.name || "Firma (Bilinmiyor)",
+            days_left: daysLeft,
+          };
+        })
+        .filter((x: any) => x !== null);
+      
+      const belgeHam = [...(expDocsRes.data || []), ...(expTmfbRes.data || []), ...tmgdTransform];
       const gorulen = new Set<string>();
       const belgeListesi: ExpiringItem[] = [];
       for (const b of belgeHam as Record<string, unknown>[]) {
