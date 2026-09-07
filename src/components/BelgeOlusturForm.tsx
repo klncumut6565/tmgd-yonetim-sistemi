@@ -536,15 +536,11 @@ export default function BelgeOlusturForm({ fixedFirmId, initialFirmId, compact =
 
         doc.save(`${firm.name}_${item.code}${yfrPeriod ? `_${yfrPeriod}` : ""}.pdf`);
 
-        // Belge Takip'te tamamlandı işaretle ve geçerlilik tarihi set et
-        // S2, S3, TMFB gibi belgeler için 1 yıllık geçerlilik
-        const bugun = new Date();
-        const birYilSonra = new Date(bugun);
-        birYilSonra.setFullYear(birYilSonra.getFullYear() + 1);
-        const validUntilDate = ["S2", "S3", "TMFB"].includes(item.code)
-          ? birYilSonra.toISOString().split('T')[0]
-          : null;
-        
+        // Belge Takip'te tamamlandı işaretle.
+        // NOT: valid_until'e burada DOKUNULMAZ — geçerlilik tarihi, firmanın
+        // Belge Takip sekmesindeki "📅 Geçerlilik" alanından elle girilir.
+        // Belge üretilirken otomatik tarih atamak, kullanıcının girdiği
+        // gerçek tarihi ezerdi.
         await supabase.from("firm_belgeleri").upsert(
           {
             firm_id: firm.id,
@@ -552,7 +548,6 @@ export default function BelgeOlusturForm({ fixedFirmId, initialFirmId, compact =
             period: yfrPeriod || "",
             done: true,
             note: notes.trim() || null,
-            valid_until: validUntilDate,
           },
           { onConflict: "firm_id,code,period" }
         );
