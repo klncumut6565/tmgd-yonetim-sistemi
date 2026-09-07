@@ -267,45 +267,62 @@ export default function DashboardPage() {
       setBelgeler(belgeListesi.sort((a, b) => a.days_left - b.days_left));
 
       // ---- TMGD Sertifikaları (S2) — kendi bölümü, 120 gün eşiği ----------
-      // Belge Takip'teki "📅 Geçerlilik" tarihinden hesaplanır.
+      // ÖNEMLİ: TMGD sertifikası KİŞİYE aittir, firmaya değil. Kayıt
+      // firm_belgeleri'nde firma bazlı tutulduğu için, bir TMGD birden çok
+      // firmaya atanmışsa AYNI sertifika her firma için tekrar eder. Burada
+      // TMGD (kişi) bazında tekilleştirilir: her TMGD için tek satır gösterilir,
+      // en erken geçerlilik tarihi esas alınır.
       const tmgdHam = (expTmgdRes.data as Record<string, any>[]) || [];
 
-      // Atanmış TMGD'nin adı roller kısmından (user_firms → profiles) gelir.
+      // Firma → atanmış TMGD eşlemesi, roller kısmından (user_firms → profiles).
       // firm_belgeleri ile user_firms arasında doğrudan FK olmadığı için
-      // AYRI bir sorgu yapılır ve firm_id üzerinden eşlenir.
+      // AYRI sorgulanır. NOT: profiles tablosunda ad alanı 'full_name'dir.
       const tmgdFirmIds = Array.from(
         new Set(tmgdHam.map((r) => r.firm_id).filter(Boolean))
       );
-      const tmgdAdlari = new Map<string, string>();
+      // firm_id → { userId, ad }
+      const firmaTmgd = new Map<string, { userId: string; ad: string }>();
       if (tmgdFirmIds.length > 0) {
         const { data: atamalar } = await supabase
           .from("user_firms")
-          .select("firm_id, profiles ( first_name, last_name )")
+          .select("firm_id, user_id, profiles ( full_name, role )")
           .in("firm_id", tmgdFirmIds);
         for (const a of (atamalar as Record<string, any>[]) || []) {
           const p = a.profiles;
-          const adSoyad = p
-            ? `${p.first_name || ""} ${p.last_name || ""}`.trim()
-            : "";
-          if (adSoyad) tmgdAdlari.set(a.firm_id, adSoyad);
+          if (!p) continue;
+          // Firmaya atanmış kişilerden TMGD rolünde olan(lar) alınır.
+          if (p.role && p.role !== "tmgd") continue;
+          const ad = String(p.full_name || "").trim();
+          if (!ad) continue;
+          if (!firmaTmgd.has(a.firm_id)) {
+            firmaTmgd.set(a.firm_id, { userId: String(a.user_id), ad });
+          }
         }
       }
 
-      const tmgdListesi: ExpiringItem[] = [];
+      // TMGD (kişi) bazında tekilleştir — anahtar: userId, atama yoksa firm_id.
+      const tmgdBenzersiz = new Map<string, ExpiringItem>();
       for (const r of tmgdHam) {
         const gun = daysLeft(String(r.valid_until));
         if (gun > TMGD_UYARI_GUN) continue; // 120 günden uzaksa gösterme
-        const ad = tmgdAdlari.get(r.firm_id);
-        tmgdListesi.push({
-          id: `tmgd-${r.id}`,
-          label: ad ? `TMGD Sertifikası — ${ad}` : "TMGD Sertifikası",
+        const atama = firmaTmgd.get(String(r.firm_id));
+        const anahtar = atama ? `u:${atama.userId}` : `f:${r.firm_id}`;
+        const mevcut = tmgdBenzersiz.get(anahtar);
+        // Aynı TMGD birden çok kayıtla gelirse en erken tarihli olan kalır.
+        if (mevcut && mevcut.days_left <= gun) continue;
+        tmgdBenzersiz.set(anahtar, {
+          id: `tmgd-${anahtar}`,
+          label: atama ? atama.ad : "TMGD Sertifikası (atama yapılmamış)",
           docType: "TMGD Sertifikası",
           valid_until: String(r.valid_until),
           days_left: gun,
-          firm_name: String(r.firms?.name || ""),
+          // TMGD'ye ait bir belge olduğundan firma adı gösterilmez.
+          firm_name: "",
         });
       }
-      setTmgdSertifikalari(tmgdListesi.sort((a, b) => a.days_left - b.days_left));
+      setTmgdSertifikalari(
+        Array.from(tmgdBenzersiz.values()).sort((a, b) => a.days_left - b.days_left)
+      );
 
       setTasks((recentRes.data as unknown as RecentTask[]) || []);
       setLoading(false);
@@ -440,15 +457,17 @@ export default function DashboardPage() {
               <li key={t.id} className="flex items-center justify-between gap-2 text-sm">
                 <span>
                   {t.label}
-                  {t.firm_name && <span className="text-gray-400"> · {t.firm_name}</span>}
+                  <span className="text-gray-400"> · TMGD Sertifikası</span>
                 </span>
                 <DaysBadge date={t.valid_until} />
               </li>
             ))}
           </ul>
           <p className="text-[11px] text-gray-400 mt-3">
-            TMGD sertifikası uyarısı 120 gün kala başlar. Geçerlilik tarihi, firmanın
-            Belge Takip sekmesindeki &quot;TMGD Sertifikası&quot; satırından girilir.
+            Sertifika TMGD&apos;nin kendisine aittir; birden çok firmaya atanmış olsa da
+            burada kişi başına tek satır gösterilir. Uyarı 120 gün kala başlar.
+            Geçerlilik tarihi, firmanın Belge Takip sekmesindeki &quot;TMGD Sertifikası&quot;
+            satırından girilir.
           </p>
         </div>
       </div>

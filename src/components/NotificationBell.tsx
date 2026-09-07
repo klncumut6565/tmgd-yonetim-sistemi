@@ -155,21 +155,26 @@ export default function NotificationBell() {
 
     const tmgdHam = (tmgdData as Record<string, any>[]) || [];
 
-    // Atanmış TMGD'nin adı — roller kısmındaki (user_firms → profiles)
-    // atamadan okunur.
+    // Firma → atanmış TMGD eşlemesi (roller kısmı: user_firms → profiles).
+    // NOT: profiles tablosunda ad alanı 'full_name'dir.
     const tmgdFirmIds = Array.from(
       new Set(tmgdHam.map((r) => r.firm_id).filter(Boolean))
     );
-    const tmgdAdlariMap = new Map<string, string>();
+    const firmaTmgd = new Map<string, { userId: string; ad: string }>();
     if (tmgdFirmIds.length > 0) {
       const { data: atamalar } = await supabase
         .from("user_firms")
-        .select("firm_id, profiles ( first_name, last_name )")
+        .select("firm_id, user_id, profiles ( full_name, role )")
         .in("firm_id", tmgdFirmIds);
       for (const a of (atamalar as Record<string, any>[]) || []) {
         const p = a.profiles;
-        const adSoyad = p ? `${p.first_name || ""} ${p.last_name || ""}`.trim() : "";
-        if (adSoyad) tmgdAdlariMap.set(a.firm_id, adSoyad);
+        if (!p) continue;
+        if (p.role && p.role !== "tmgd") continue;
+        const ad = String(p.full_name || "").trim();
+        if (!ad) continue;
+        if (!firmaTmgd.has(a.firm_id)) {
+          firmaTmgd.set(a.firm_id, { userId: String(a.user_id), ad });
+        }
       }
     }
 
@@ -180,8 +185,10 @@ export default function NotificationBell() {
       if (!gorulenIdler.has(d.id)) belgeSonuclari.push(d);
     }
     
-    // TMGD Sertifikası (S2) — geçerlilik tarihinden kalan gün hesaplanır,
-    // 120 gün eşiği uygulanır, başlığa atanmış TMGD'nin adı eklenir.
+    // TMGD Sertifikası (S2) — TMGD (kişi) bazında TEKİLLEŞTİRİLİR.
+    // Sertifika kişiye aittir; bir TMGD birden çok firmaya atanmışsa aynı
+    // sertifika için her firmada ayrı bildirim çıkması yanlış olurdu.
+    const tmgdBenzersiz = new Map<string, ExpiringDoc>();
     for (const r of tmgdHam) {
       const expiry = new Date(String(r.valid_until));
       const bugun = new Date();
@@ -189,15 +196,22 @@ export default function NotificationBell() {
         (expiry.getTime() - bugun.getTime()) / (1000 * 60 * 60 * 24)
       );
       if (gun > TMGD_UYARI_GUN) continue;
-      const ad = tmgdAdlariMap.get(r.firm_id);
-      belgeSonuclari.push({
-        id: `tmgd-${r.id}`,
-        title: ad ? `TMGD Sertifikası — ${ad}` : "TMGD Sertifikası",
-        firm_name: String(r.firms?.name || ""),
+      const atama = firmaTmgd.get(String(r.firm_id));
+      const anahtar = atama ? `u:${atama.userId}` : `f:${r.firm_id}`;
+      const mevcut = tmgdBenzersiz.get(anahtar);
+      if (mevcut && mevcut.days_left <= gun) continue;
+      tmgdBenzersiz.set(anahtar, {
+        id: `tmgd-${anahtar}`,
+        title: atama
+          ? `TMGD Sertifikası — ${atama.ad}`
+          : "TMGD Sertifikası (atama yapılmamış)",
+        // Sertifika kişiye ait olduğundan firma adı gösterilmez.
+        firm_name: "",
         days_left: gun,
         expiry_date: String(r.valid_until),
       });
     }
+    belgeSonuclari.push(...Array.from(tmgdBenzersiz.values()));
 
     belgeSonuclari.sort((a, b) => a.days_left - b.days_left);
     setExpiringDocs(belgeSonuclari);
@@ -372,7 +386,9 @@ export default function NotificationBell() {
                   <div key={`${d.id}-${i}`} className="px-3 py-2.5 border-b text-sm flex items-start justify-between gap-2">
                     <div className="min-w-0">
                       <div className="font-medium truncate">{d.title}</div>
-                      <div className="text-gray-400 text-xs">{d.firm_name}</div>
+                      {d.firm_name && (
+                        <div className="text-gray-400 text-xs">{d.firm_name}</div>
+                      )}
                     </div>
                     <span className={`text-[11px] px-2 py-0.5 rounded whitespace-nowrap mt-0.5 ${daysBadgeClass(d.days_left)}`}>
                       {daysLabel(d.days_left)}
