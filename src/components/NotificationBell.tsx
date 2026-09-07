@@ -131,12 +131,15 @@ export default function NotificationBell() {
       .order("days_left");
 
     // TMGD SERTİFİKASI — genel eşik kapalı olsa bile her zaman kontrol edilir.
-    // S2 kodu firm_belgeleri.note alanında TMGD adını barındırıyor
+    // firm_belgeleri.code = S2 → user_firms → profiles (atanmış TMGD adı)
     const { data: tmgdData } = await supabase
       .from("firm_belgeleri")
-      .select("id, firm_id, code, valid_until, note, firms ( name )")
+      .select(
+        `id, firm_id, code, valid_until,
+         firms ( name ),
+         user_firms!inner ( user_id, profiles ( first_name, last_name ) )`
+      )
       .eq("code", "S2")
-      .lte("days_left", TMGD_UYARI_GUN)
       .not("valid_until", "is", null)
       .order("valid_until");
 
@@ -148,7 +151,7 @@ export default function NotificationBell() {
     }
     
     // TMGD Sertifikası (S2) — firm_belgeleri'nden doğrudan
-    // Note alanında TMGD'nin adı kaydediliyor
+    // Atanmış TMGD'nin adı user_firms → profiles'ten gelir
     if (tmgdData) {
       for (const record of (tmgdData as any[]) || []) {
         if (!record.valid_until) continue;
@@ -158,7 +161,12 @@ export default function NotificationBell() {
         
         if (daysLeft > TMGD_UYARI_GUN) continue;
         
-        const tmgdAdi = record.note?.trim() || "TMGD (İsim kaydedilmemiş)";
+        // user_firms[0].profiles'ten TMGD adı
+        const tmgdProfiles = record.user_firms?.[0]?.profiles;
+        const tmgdAdi = tmgdProfiles 
+          ? `${tmgdProfiles.first_name || ""} ${tmgdProfiles.last_name || ""}`.trim()
+          : "TMGD (Atanmamış)";
+        
         const belgeSonucu: ExpiringDoc = {
           id: `s2_${record.firm_id}_${record.id}`,
           title: `TMGD Sertifikası — ${tmgdAdi}`,
