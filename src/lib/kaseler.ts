@@ -16,11 +16,23 @@ export type GomuluKase = {
   /** Genişlik / yükseklik — kutuya oranı bozulmadan sığdırmak için. */
   enBoyOrani: number;
   fmt: "PNG";
+  /**
+   * Kaşenin belgede basılacağı GERÇEK genişlik (mm). Kaşenin fiziksel
+   * boyutuyla aynı ölçüde çıkması için kullanılır. Verilmezse kaşe,
+   * imza boşluğuna sığdığı kadar büyük basılır.
+   */
+  hedefGenislikMm?: number;
 };
 
-/** HAZIRLAYAN sütunu — TMGD Umut KILINÇ. */
+/**
+ * HAZIRLAYAN sütunu — TMGD Umut KILINÇ.
+ * Kaşenin fiziksel plakası 40 x 20 mm. Plakanın yan kenarlarında ~2 mm
+ * boşluk olduğundan mürekkep bloğu 36 mm genişliğe denk gelir; oranı
+ * (2.61) korunduğunda yüksekliği ~13.8 mm olur.
+ */
 export const KASE_UMUT_KILINC: GomuluKase = {
   enBoyOrani: 2.6111,
+  hedefGenislikMm: 36,
   fmt: "PNG",
   data:
     "data:image/png;base64," +
@@ -981,9 +993,17 @@ export const KASE_UMUT_KILINC: GomuluKase = {
   "AElFTkSuQmCC",
 };
 
-/** KONTROL EDEN sütunu — TMGD Koordinatörü Yakup ATAŞ. */
+/**
+ * KONTROL EDEN sütunu — TMGD Koordinatörü Yakup ATAŞ.
+ * Bu kaşenin fiziksel plaka ölçüsü bildirilmedi. Hedef genişlik verilmezse
+ * kaşe, sayfaya göre değişen boşluğa sığdığı kadar basılıyor ve kapakta
+ * (46.7 mm) içerik sayfasından (32.8 mm) belirgin biçimde büyük çıkıyordu.
+ * Aynı kaşenin her sayfada aynı ölçüde görünmesi için 32 mm sabitlendi;
+ * gerçek plaka ölçüsü öğrenilince bu değer güncellenmelidir.
+ */
 export const KASE_YAKUP_ATAS: GomuluKase = {
   enBoyOrani: 2.1917,
+  hedefGenislikMm: 32,
   fmt: "PNG",
   data:
     "data:image/png;base64," +

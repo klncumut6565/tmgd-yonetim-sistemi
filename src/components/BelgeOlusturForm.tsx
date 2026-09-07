@@ -936,6 +936,15 @@ export default function BelgeOlusturForm({ fixedFirmId, initialFirmId, compact =
 
 type LogoData = { data: string; fmt: "PNG" | "JPEG"; enBoyOrani: number } | null;
 
+// İmza kutusuna basılacak kaşe. hedefGenislikMm verilirse kaşe belgede
+// gerçek fiziksel ölçüsünde basılır (bkz. src/lib/kaseler.ts).
+type KaseCizim = {
+  data: string;
+  fmt: "PNG" | "JPEG";
+  enBoyOrani: number;
+  hedefGenislikMm?: number;
+};
+
 // Bir logoyu, verilen kare kutuya en/boy oranını BOZMADAN sığdırır (contain)
 // ve kutu içinde ortalar — geniş/dar logoların ezilip/gerilmesini önler.
 function logoKutusuHesapla(enBoyOrani: number, kutuX: number, kutuY: number, kutuBoyut: number) {
@@ -1675,7 +1684,7 @@ function altTabloCiz(
   // görselleri. Sütun bazında basılır; kalıcı olarak hiçbir yere kaydedilmez.
   //   hazirlayan → HAZIRLAYAN sütunu (firmaya atanmış TMGD)
   //   kontrol    → KONTROL EDEN sütunu (TMGD Koordinatörü)
-  kaseler?: { hazirlayan?: LogoData; kontrol?: LogoData }
+  kaseler?: { hazirlayan?: KaseCizim; kontrol?: KaseCizim }
 ) {
   const y = ustY ?? ALT_TABLO_UST;
   const yukseklik = ozelYukseklik ?? ALT_TABLO_YUKSEKLIK;
@@ -1694,7 +1703,7 @@ function altTabloCiz(
   // basılır. İsim/unvan yazısı silinmez; kaşe yazının üzerine binmeyecek
   // şekilde daha küçük ölçekle, çerçeve çizgilerine değmeden yerleştirilir.
   // Sütun indeksi: 0 = HAZIRLAYAN, 1 = KONTROL EDEN.
-  const kaseCiz = (kase: LogoData | undefined, kolonIndex: number) => {
+  const kaseCiz = (kase: KaseCizim | undefined, kolonIndex: number) => {
     if (!kase) return;
     // İsim (y+10.5) ve unvan (y+14.3) satırlarının bittiği nokta; altında
     // kalan bölüm elle imza/kaşe için ayrılmış boşluktur.
@@ -1707,7 +1716,13 @@ function altTabloCiz(
     const kullanilabilirY = (yukseklik - yaziAlti - kenarPay) * kucultme;
     if (kullanilabilirY <= 3) return;
 
-    let kaseG = kullanilabilirG;
+    // Kaşenin gerçek fiziksel genişliği tanımlıysa (örn. 40x20 mm'lik
+    // plakanın mürekkep bloğu = 36 mm) o ölçü esas alınır; böylece kaşe
+    // belgede aslıyla aynı büyüklükte çıkar. Tanımlı değilse boşluğa
+    // sığdığı kadar basılır. Her iki durumda da kutu sınırları aşılmaz.
+    let kaseG = kase.hedefGenislikMm
+      ? Math.min(kase.hedefGenislikMm, kullanilabilirG)
+      : kullanilabilirG;
     let kaseY = kaseG / (kase.enBoyOrani || 1);
     if (kaseY > kullanilabilirY) {
       kaseY = kullanilabilirY;
@@ -1797,7 +1812,7 @@ function kapakSayfasiCiz(
   baslikYukseklik: number,
   adLines: string[],
   // Deneme kaşeleri — HAZIRLAYAN ve KONTROL EDEN kutularına basılır.
-  kaseler?: { hazirlayan?: LogoData; kontrol?: LogoData }
+  kaseler?: { hazirlayan?: KaseCizim; kontrol?: KaseCizim }
 ) {
   cerceveCiz(doc);
   baslikTablosuCiz(
@@ -1900,7 +1915,7 @@ async function renderYapilandirilmisBelge(
   faaliyetKapsami: string,
   yatayMi: boolean,
   // Deneme kaşeleri — HAZIRLAYAN ve KONTROL EDEN kutularına basılır.
-  kaseler?: { hazirlayan?: LogoData; kontrol?: LogoData }
+  kaseler?: { hazirlayan?: KaseCizim; kontrol?: KaseCizim }
 ) {
   await fontuKaydet(doc);
 
