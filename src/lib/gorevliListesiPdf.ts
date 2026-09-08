@@ -410,6 +410,28 @@ function tanimlarSayfasiCiz(
       ],
     ],
   });
+
+  // İmza tablosu — bu sayfada da bulunmalı (kapak ve tablo sayfasındaki
+  // ile AYNI blok). Sayfanın ALTINA sabitlenir; ancak tanımlar tablosu
+  // beklenmedik şekilde uzayıp oraya kadar inerse blok tablonun altına
+  // kaydırılır, sayfaya sığmıyorsa yeni sayfaya alınır — hiçbir durumda
+  // tabloyla çakışmaz.
+  const tanimSonY =
+    (doc as unknown as { lastAutoTable?: { finalY: number } }).lastAutoTable
+      ?.finalY ?? 0;
+  const altSinir = H - 12;                    // sayfa alt boşluğu
+  let tanimImzaY = altSinir - IMZA_BLOK_YUKSEKLIK;
+  if (tanimSonY + 6 > tanimImzaY) {
+    tanimImzaY = tanimSonY + 6;               // tablonun hemen altına
+  }
+  if (tanimImzaY + IMZA_BLOK_YUKSEKLIK > altSinir) {
+    doc.addPage("a4", "portrait");
+    fontuKaydet(doc);
+    kapakCercevesiCiz(doc);
+    baslikKutusuCiz(doc, veri);
+    tanimImzaY = altSinir - IMZA_BLOK_YUKSEKLIK;
+  }
+  imzaBlokuCiz(doc, veri, tanimImzaY);
 }
 
 /**
