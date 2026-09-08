@@ -995,15 +995,11 @@ export const KASE_UMUT_KILINC: GomuluKase = {
 
 /**
  * KONTROL EDEN sütunu — TMGD Koordinatörü Yakup ATAŞ.
- * Bu kaşenin fiziksel plaka ölçüsü bildirilmedi. Hedef genişlik verilmezse
- * kaşe, sayfaya göre değişen boşluğa sığdığı kadar basılıyor ve kapakta
- * (46.7 mm) içerik sayfasından (32.8 mm) belirgin biçimde büyük çıkıyordu.
- * Aynı kaşenin her sayfada aynı ölçüde görünmesi için 32 mm sabitlendi;
- * gerçek plaka ölçüsü öğrenilince bu değer güncellenmelidir.
+ * Bu kaşe için hedef genişlik TANIMLANMAMIŞTIR: imza boşluğuna sığdığı
+ * kadar basılır (önceki davranış korunmuştur).
  */
 export const KASE_YAKUP_ATAS: GomuluKase = {
   enBoyOrani: 2.1917,
-  hedefGenislikMm: 32,
   fmt: "PNG",
   data:
     "data:image/png;base64," +
