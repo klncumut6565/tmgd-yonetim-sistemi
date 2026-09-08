@@ -28,6 +28,42 @@ type Visit = {
   summary: string | null;
 };
 
+/** Bir firmaya atanmış TMGD (roller kısmından). */
+type Atama = { userId: string; ad: string };
+
+/**
+ * Takvimdeki firma etiketleri, firmanın atandığı TMGD'ye göre renklenir.
+ * Umut KILINÇ'ın firmaları turkuaz zeminde siyah yazı olarak istendi;
+ * diğer TMGD'lere paletten sırayla, kişi bazında sabit bir renk verilir
+ * (aynı TMGD her ay aynı rengi alır).
+ */
+const TMGD_RENKLERI = [
+  "#FDE68A", // amber
+  "#BBF7D0", // yeşil
+  "#DDD6FE", // mor
+  "#FBCFE8", // pembe
+  "#BFDBFE", // mavi
+  "#FED7AA", // turuncu
+];
+const UMUT_RENGI = "#40E0D0"; // turkuaz
+
+/** Ada göre Umut KILINÇ eşleşmesi (yazım/harf farklarına dayanıklı). */
+function umutMu(ad: string): boolean {
+  return ad
+    .toLocaleUpperCase("tr")
+    .replace(/[^A-ZÇĞİÖŞÜ]/g, "")
+    .includes("UMUTKILIN");
+}
+
+/** Kişi kimliğinden sabit bir renk üretir — sıralamadan bağımsız. */
+function tmgdRengi(atama: Atama | undefined): string | null {
+  if (!atama) return null;
+  if (umutMu(atama.ad)) return UMUT_RENGI;
+  let toplam = 0;
+  for (const ch of atama.userId) toplam = (toplam * 31 + ch.charCodeAt(0)) % 100000;
+  return TMGD_RENKLERI[toplam % TMGD_RENKLERI.length];
+}
+
 const AY_ADLARI = [
   "Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran",
   "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık",
@@ -68,6 +104,8 @@ export default function FirmaTakvimiPage() {
 
   const [firmalar, setFirmalar] = useState<Firm[]>([]);
   const [ziyaretler, setZiyaretler] = useState<Visit[]>([]);
+  // Firma id → atanmış TMGD. Takvimdeki renklendirme için.
+  const [firmaTmgd, setFirmaTmgd] = useState<Map<string, Atama>>(new Map());
   const [loading, setLoading] = useState(true);
   const [mesaj, setMesaj] = useState("");
   const [hata, setHata] = useState("");
@@ -86,7 +124,7 @@ export default function FirmaTakvimiPage() {
     setLoading(true);
     setHata("");
 
-    const [firmRes, visitRes] = await Promise.all([
+    const [firmRes, visitRes, atamaRes] = await Promise.all([
       supabase.from("firms").select("id, name").order("name"),
       supabase
         .from("visits")
@@ -94,6 +132,11 @@ export default function FirmaTakvimiPage() {
         .gte("visit_date", ayBasi)
         .lte("visit_date", aySonu)
         .order("visit_date"),
+      // Firma → atanmış TMGD (roller kısmı). Takvimdeki firma etiketleri
+      // TMGD'sine göre renklendirilir.
+      supabase
+        .from("user_firms")
+        .select("firm_id, user_id, profiles ( full_name, role )"),
     ]);
 
     if (firmRes.error) setHata("Firmalar yüklenemedi: " + hataCevir(firmRes.error));
@@ -101,6 +144,19 @@ export default function FirmaTakvimiPage() {
 
     if (visitRes.error) setHata("Ziyaretler yüklenemedi: " + hataCevir(visitRes.error));
     else setZiyaretler((visitRes.data as Visit[]) || []);
+
+    const eslesme = new Map<string, Atama>();
+    for (const a of (atamaRes.data as Record<string, any>[]) || []) {
+      const p = a.profiles;
+      if (!p) continue;
+      if (p.role && p.role !== "tmgd") continue;   // yalnızca TMGD atamaları
+      const ad = String(p.full_name || "").trim();
+      if (!ad) continue;
+      if (!eslesme.has(a.firm_id)) {
+        eslesme.set(a.firm_id, { userId: String(a.user_id), ad });
+      }
+    }
+    setFirmaTmgd(eslesme);
 
     setLoading(false);
   }, [ayBasi, aySonu]);
@@ -139,6 +195,18 @@ export default function FirmaTakvimiPage() {
     () => firmalar.filter((f) => !ziyaretEdilenFirmaIdleri.has(f.id)),
     [firmalar, ziyaretEdilenFirmaIdleri]
   );
+
+  // Takvimde o ay görünen firmaların TMGD'leri — renk lejantı için.
+  const tmgdLejanti = useMemo(() => {
+    const m = new Map<string, { userId: string; ad: string; renk: string }>();
+    for (const z of ziyaretler) {
+      const atama = firmaTmgd.get(z.firm_id);
+      const renk = tmgdRengi(atama);
+      if (!atama || !renk || m.has(atama.userId)) continue;
+      m.set(atama.userId, { userId: atama.userId, ad: atama.ad, renk });
+    }
+    return Array.from(m.values()).sort((a, b) => a.ad.localeCompare(b.ad, "tr"));
+  }, [ziyaretler, firmaTmgd]);
 
   // Ekleme panelinde gösterilecek firmalar: o gün zaten eklenmiş olanlar
   // listede görünmez (aynı gün aynı firma iki kez eklenmesin).
@@ -372,29 +440,50 @@ export default function FirmaTakvimiPage() {
                 </div>
 
                 <div className="space-y-1">
-                  {oGun.slice(0, 3).map((z) => (
-                    <div
-                      key={z.id}
-                      className="group flex items-center gap-1 bg-white border rounded px-1 py-0.5"
-                      title={firmaAdi.get(z.firm_id) || ""}
-                    >
-                      <span className="text-[10px] truncate flex-1 min-w-0">
-                        {firmaAdi.get(z.firm_id) || "—"}
-                      </span>
-                      {canWrite && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            ziyaretSil(z);
-                          }}
-                          className="text-[10px] text-gray-300 group-hover:text-red-500 shrink-0"
-                          title="Ziyaret kaydını sil"
+                  {oGun.slice(0, 3).map((z) => {
+                    // Firma etiketi, atandığı TMGD'nin rengiyle basılır.
+                    // Ataması olmayan firma beyaz zeminde kalır.
+                    const atama = firmaTmgd.get(z.firm_id);
+                    const renk = tmgdRengi(atama);
+                    return (
+                      <div
+                        key={z.id}
+                        className={
+                          "group flex items-center gap-1 border rounded px-1 py-0.5 " +
+                          (renk ? "" : "bg-white")
+                        }
+                        style={renk ? { backgroundColor: renk } : undefined}
+                        title={
+                          (firmaAdi.get(z.firm_id) || "") +
+                          (atama ? ` — TMGD: ${atama.ad}` : "")
+                        }
+                      >
+                        <span
+                          className={
+                            "text-[10px] truncate flex-1 min-w-0 " +
+                            (renk ? "text-black" : "")
+                          }
                         >
-                          ✕
-                        </button>
-                      )}
-                    </div>
-                  ))}
+                          {firmaAdi.get(z.firm_id) || "—"}
+                        </span>
+                        {canWrite && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              ziyaretSil(z);
+                            }}
+                            className={
+                              "text-[10px] shrink-0 group-hover:text-red-600 " +
+                              (renk ? "text-black/40" : "text-gray-300")
+                            }
+                            title="Ziyaret kaydını sil"
+                          >
+                            ✕
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
                   {oGun.length > 3 && (
                     <div className="text-[10px] text-gray-400 px-1">
                       +{oGun.length - 3} firma daha
@@ -406,6 +495,22 @@ export default function FirmaTakvimiPage() {
           })}
         </div>
       </div>
+
+      {/* RENK LEJANTI — takvimde görünen TMGD'ler */}
+      {tmgdLejanti.length > 0 && (
+        <div className="flex flex-wrap items-center gap-3 mb-6 text-xs text-gray-600">
+          <span className="text-gray-400">Firma renkleri (TMGD):</span>
+          {tmgdLejanti.map((t) => (
+            <span key={t.userId} className="flex items-center gap-1.5">
+              <span
+                className="inline-block w-3.5 h-3.5 rounded border"
+                style={{ backgroundColor: t.renk }}
+              />
+              {t.ad}
+            </span>
+          ))}
+        </div>
+      )}
 
       {/* SEÇİLİ GÜN — çoklu firma ekleme paneli */}
       {secilenGun && canWrite && (
@@ -502,16 +607,8 @@ export default function FirmaTakvimiPage() {
 
         <ul className="divide-y">
           {ziyaretEdilmeyenler.map((f) => (
-            <li
-              key={f.id}
-              className="flex items-center justify-between gap-2 py-2 text-sm"
-            >
-              <Link
-                href={`/firms/${f.id}`}
-                className="truncate hover:underline"
-              >
-                {f.name}
-              </Link>
+            <li key={f.id} className="flex items-center gap-2 py-2 text-sm">
+              {/* "Takvime ekle" firma adından ÖNCE gelir. */}
               {canWrite && (
                 <button
                   onClick={() => {
@@ -531,6 +628,12 @@ export default function FirmaTakvimiPage() {
                   Takvime ekle
                 </button>
               )}
+              <Link
+                href={`/firms/${f.id}`}
+                className="truncate hover:underline min-w-0"
+              >
+                {f.name}
+              </Link>
             </li>
           ))}
         </ul>
