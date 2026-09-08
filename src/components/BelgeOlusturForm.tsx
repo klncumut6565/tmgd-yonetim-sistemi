@@ -450,11 +450,86 @@ export default function BelgeOlusturForm({ fixedFirmId, initialFirmId, compact =
         // Orijinal form PDF'sini kullan (kapak sayfası olmadan — birebir aynı format)
         if (["K5", "K6", "K7"].includes(actualCode)) {
           try {
-            // Orijinal kontrol formunun PDF'sini fetch et
+            // Bu üç kontrol formunun İÇERİĞİ, Word aslından birebir
+            // dönüştürülmüş hazır PDF'ten gelir (public/kontrol-formlar).
+            // Ancak kapak sayfası diğer belgelerdeki gibi ÜRETİLİR: firma
+            // logosu, belge adı, faaliyet kapsamı ve imza tablosu içerir.
+            // İkisi pdf-lib ile birleştirilir: [kapak] + [orijinal form].
+            const kapakDoc = new jsPDF({
+              orientation: "portrait",
+              unit: "mm",
+              format: "a4",
+            });
+            sayfaYonunuAyarla(false);
+            await fontuKaydet(kapakDoc);
+
+            // Şablon her zaman tanımlıdır; yine de eksikse kapak, içeriği
+            // olmayan asgari bir şablonla üretilir (belge üretimi kapak
+            // yüzünden hiç yapılamamasın).
+            const kSablon: BelgeSablonu = belgeSablonu(actualCode) ?? {
+              docType: "KONTROL FORMU",
+              yayinTarihi: "",
+              blocks: [],
+            };
+            const firmaFaaliyetleri = firm.activities || [];
+            const belgeFaaliyetleri =
+              item.activities.length === 0
+                ? firmaFaaliyetleri
+                : item.activities.filter((a) => firmaFaaliyetleri.includes(a));
+            const kFaaliyetKapsami = (
+              belgeFaaliyetleri.length > 0 ? belgeFaaliyetleri : item.activities
+            )
+              .map((a) => ACTIVITY_LABELS[a] || a)
+              .join(" · ");
+
+            const { yukseklik: kBaslikYuksekligi, adLines: kAdLines } =
+              baslikYuksekligiHesapla(kapakDoc, item.name);
+
+            kapakSayfasiCiz(
+              kapakDoc,
+              firm.name,
+              actualCode,
+              item.name,
+              kSablon,
+              logo,
+              bugun,
+              kFaaliyetKapsami,
+              hazirlayanAdi,
+              onaylayanAdi.trim(),
+              kBaslikYuksekligi,
+              kAdLines,
+              kaseler
+            );
+
+            // Orijinal kontrol formunun PDF'sini al
             const pdfRes = await fetch(`/kontrol-formlar/${actualCode}.pdf`);
             if (!pdfRes.ok) throw new Error(`${actualCode}.pdf bulunamadı`);
-            const pdfBlob = await pdfRes.blob();
-            
+            const formBytes = await pdfRes.arrayBuffer();
+
+            // Kapak + form birleştirme
+            const { PDFDocument } = await import("pdf-lib");
+            const birlesik = await PDFDocument.create();
+            const kapakPdf = await PDFDocument.load(
+              kapakDoc.output("arraybuffer")
+            );
+            const formPdf = await PDFDocument.load(formBytes);
+            for (const sayfa of await birlesik.copyPages(
+              kapakPdf,
+              kapakPdf.getPageIndices()
+            )) {
+              birlesik.addPage(sayfa);
+            }
+            for (const sayfa of await birlesik.copyPages(
+              formPdf,
+              formPdf.getPageIndices()
+            )) {
+              birlesik.addPage(sayfa);
+            }
+            const birlesikBytes = await birlesik.save();
+            const pdfBlob = new Blob([birlesikBytes as unknown as BlobPart], {
+              type: "application/pdf",
+            });
+
             if (mod === "onizle") {
               const pencere = onizlemePencereleri[i];
               if (pencere) {
