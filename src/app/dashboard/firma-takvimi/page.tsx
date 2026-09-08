@@ -36,6 +36,15 @@ const AY_ADLARI = [
 // Takvim başlıkları — hafta Pazartesi başlar (TR kullanımı).
 const GUN_BASLIKLARI = ["Pzt", "Sal", "Çar", "Per", "Cum", "Cmt", "Paz"];
 
+/** Hafta sonu sütunları (Cmt, Paz) daha dar tutulur — hafta içi günlere
+ *  daha çok yer kalsın, hafta sonu bakışta ayırt edilsin. */
+const TAKVIM_SUTUNLARI = "repeat(5, 1fr) 0.62fr 0.62fr";
+
+/** Izgaradaki sütun sırasına göre hafta sonu mu (5 = Cmt, 6 = Paz). */
+function haftaSonuMu(hucreIndex: number): boolean {
+  return hucreIndex % 7 >= 5;
+}
+
 /** Yerel saate göre YYYY-MM-DD. toISOString() UTC'ye kaydırdığı için
  *  gün kaymalarına yol açıyordu; bu yüzden elle biçimlendiriliyor. */
 function tarihAnahtari(yil: number, ay: number, gun: number): string {
@@ -292,21 +301,36 @@ export default function FirmaTakvimiPage() {
 
       {/* TAKVİM */}
       <div className="border rounded-xl overflow-hidden mb-6">
-        <div className="grid grid-cols-7 bg-gray-50 border-b">
-          {GUN_BASLIKLARI.map((g) => (
+        <div
+          className="grid bg-gray-50 border-b"
+          style={{ gridTemplateColumns: TAKVIM_SUTUNLARI }}
+        >
+          {GUN_BASLIKLARI.map((g, i) => (
             <div
               key={g}
-              className="px-2 py-2 text-xs font-medium text-gray-500 text-center"
+              className={
+                "px-1 py-2 text-xs font-medium text-center " +
+                (haftaSonuMu(i) ? "text-red-500 bg-red-50" : "text-gray-500")
+              }
             >
               {g}
             </div>
           ))}
         </div>
 
-        <div className="grid grid-cols-7">
+        <div className="grid" style={{ gridTemplateColumns: TAKVIM_SUTUNLARI }}>
           {hucreler.map((gun, i) => {
+            const haftaSonu = haftaSonuMu(i);
             if (gun === null) {
-              return <div key={`bos-${i}`} className="min-h-[92px] border-b border-r bg-gray-50/50" />;
+              return (
+                <div
+                  key={`bos-${i}`}
+                  className={
+                    "min-h-[92px] border-b border-r " +
+                    (haftaSonu ? "bg-red-50/60" : "bg-gray-50/50")
+                  }
+                />
+              );
             }
             const tarih = tarihAnahtari(yil, ay, gun);
             const oGun = gunlukZiyaretler.get(tarih) || [];
@@ -319,8 +343,16 @@ export default function FirmaTakvimiPage() {
                 onClick={() => gunSec(tarih)}
                 className={
                   "min-h-[92px] border-b border-r p-1.5 align-top " +
-                  (canWrite ? "cursor-pointer hover:bg-gray-50 " : "") +
-                  (secili ? "bg-blue-50 ring-1 ring-inset ring-blue-400 " : "")
+                  (canWrite ? "cursor-pointer " : "") +
+                  // Seçili gün her zaman öne çıkar; değilse hafta sonu
+                  // hücreleri hafif kırmızı zeminle işaretlenir.
+                  (secili
+                    ? "bg-blue-50 ring-1 ring-inset ring-blue-400 "
+                    : haftaSonu
+                      ? "bg-red-50/60 " + (canWrite ? "hover:bg-red-100/60 " : "")
+                      : canWrite
+                        ? "hover:bg-gray-50 "
+                        : "")
                 }
               >
                 <div className="flex items-center justify-between mb-1">
