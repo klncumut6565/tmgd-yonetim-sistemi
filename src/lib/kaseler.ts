@@ -26,13 +26,14 @@ export type GomuluKase = {
 
 /**
  * HAZIRLAYAN sütunu — TMGD Umut KILINÇ.
- * Kaşenin fiziksel plakası 40 x 20 mm. Plakanın yan kenarlarında ~2 mm
- * boşluk olduğundan mürekkep bloğu 36 mm genişliğe denk gelir; oranı
- * (2.61) korunduğunda yüksekliği ~13.8 mm olur.
+ * Kaşenin fiziksel plakası 40 x 20 mm. Basılan mürekkep bloğu için önce
+ * 36 mm denendi, belgede küçük kaldığı için yarım santim genişletilerek
+ * 41 mm'ye çıkarıldı. En/boy oranı (2.6111) sabit tutulduğundan yükseklik
+ * ~15.7 mm olur ve imza boşluğuna çizgilere değmeden sığar.
  */
 export const KASE_UMUT_KILINC: GomuluKase = {
   enBoyOrani: 2.6111,
-  hedefGenislikMm: 36,
+  hedefGenislikMm: 41,
   fmt: "PNG",
   data:
     "data:image/png;base64," +

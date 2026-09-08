@@ -1710,16 +1710,22 @@ function altTabloCiz(
     const yaziAlti = 16.5;
     const kenarPay = 2;
     // Kaşe boşluğu doldurmasın, biraz nefes payı bıraksın diye küçültülür.
+    // NOT: Bu katsayı yalnızca gerçek ölçüsü BİLİNMEYEN kaşeler içindir.
+    // hedefGenislikMm tanımlıysa ölçü zaten fizikseldir; katsayı onu
+    // kırpmamalı, sadece kutu sınırları gözetilmelidir.
     const kucultme = 0.88;
+    const gercekOlcu = !!kase.hedefGenislikMm;
 
-    const kullanilabilirG = (kolonGenislik - kenarPay * 2) * kucultme;
-    const kullanilabilirY = (yukseklik - yaziAlti - kenarPay) * kucultme;
+    const kullanilabilirG =
+      (kolonGenislik - kenarPay * 2) * (gercekOlcu ? 1 : kucultme);
+    const kullanilabilirY =
+      (yukseklik - yaziAlti - kenarPay) * (gercekOlcu ? 1 : kucultme);
     if (kullanilabilirY <= 3) return;
 
-    // Kaşenin gerçek fiziksel genişliği tanımlıysa (örn. 40x20 mm'lik
-    // plakanın mürekkep bloğu = 36 mm) o ölçü esas alınır; böylece kaşe
-    // belgede aslıyla aynı büyüklükte çıkar. Tanımlı değilse boşluğa
-    // sığdığı kadar basılır. Her iki durumda da kutu sınırları aşılmaz.
+    // Kaşenin gerçek fiziksel genişliği tanımlıysa o ölçü esas alınır;
+    // böylece kaşe belgede aslıyla aynı büyüklükte çıkar. Tanımlı değilse
+    // boşluğa sığdığı kadar basılır. Her iki durumda da kutu sınırları
+    // aşılmaz.
     let kaseG = kase.hedefGenislikMm
       ? Math.min(kase.hedefGenislikMm, kullanilabilirG)
       : kullanilabilirG;
