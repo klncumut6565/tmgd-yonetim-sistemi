@@ -523,7 +523,11 @@ function baslikKutusuCiz(doc: JsPDFType, veri: GorevliListesiPdfVerisi) {
  * kurumsal desenle tutarlı olsun diye çerçeveli hâle getirildi).
  * "KONTROL EDEN" her zaman sabit TMGD Koordinatörü'dür.
  */
-const IMZA_BLOK_YUKSEKLIK = 20;
+// Belge Oluştur'daki imza tablosuyla AYNI yükseklik (BelgeOlusturForm.tsx →
+// ALT_TABLO_YUKSEKLIK). Önceden 20 mm idi: unvan satırı ~15.5 mm'de bittiği
+// için altında kaşeye yalnızca ~4.5 mm kalıyor, kaşe/imza sığmıyordu.
+// 35.5 mm ile yazıların altında ~17 mm'lik imza boşluğu kalır.
+const IMZA_BLOK_YUKSEKLIK = 35.5;
 
 function imzaBlokuCiz(doc: JsPDFType, veri: GorevliListesiPdfVerisi, y: number) {
   const kolonGenislik = (W - 2 * M) / 3;
