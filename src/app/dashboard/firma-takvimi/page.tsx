@@ -73,8 +73,13 @@ const AY_ADLARI = [
 const GUN_BASLIKLARI = ["Pzt", "Sal", "Çar", "Per", "Cum", "Cmt", "Paz"];
 
 /** Hafta sonu sütunları (Cmt, Paz) daha dar tutulur — hafta içi günlere
- *  daha çok yer kalsın, hafta sonu bakışta ayırt edilsin. */
-const TAKVIM_SUTUNLARI = "repeat(5, 1fr) 0.62fr 0.62fr";
+ *  daha çok yer kalsın, hafta sonu bakışta ayırt edilsin.
+ *  minmax(0, ...) şart: yalnızca "1fr" yazıldığında tarayıcı sütuna
+ *  içeriğin doğal genişliğini alt sınır olarak uygular ve uzun bir firma
+ *  adı o sütunu genişletir. minmax(0, ...) bu alt sınırı kaldırır, böylece
+ *  sütun genişlikleri içerikten bağımsız ve her ay aynı kalır. */
+const TAKVIM_SUTUNLARI =
+  "repeat(5, minmax(0, 1fr)) minmax(0, 0.62fr) minmax(0, 0.62fr)";
 
 /** Izgaradaki sütun sırasına göre hafta sonu mu (5 = Cmt, 6 = Paz). */
 function haftaSonuMu(hucreIndex: number): boolean {
@@ -377,7 +382,7 @@ export default function FirmaTakvimiPage() {
             <div
               key={g}
               className={
-                "px-1 py-2 text-xs font-medium text-center " +
+                "px-1 py-2 text-xs font-medium text-center min-w-0 " +
                 (haftaSonuMu(i) ? "text-red-500 bg-red-50" : "text-gray-500")
               }
             >
@@ -394,7 +399,7 @@ export default function FirmaTakvimiPage() {
                 <div
                   key={`bos-${i}`}
                   className={
-                    "min-h-[92px] border-b border-r " +
+                    "min-h-[92px] min-w-0 border-b border-r " +
                     (haftaSonu ? "bg-red-50/60" : "bg-gray-50/50")
                   }
                 />
@@ -410,7 +415,9 @@ export default function FirmaTakvimiPage() {
                 key={tarih}
                 onClick={() => gunSec(tarih)}
                 className={
-                  "min-h-[92px] border-b border-r p-1.5 align-top " +
+                  // min-w-0 + overflow-hidden: uzun firma adı hücreyi
+                  // (ve dolayısıyla sütunu) genişletemesin.
+                  "min-h-[92px] min-w-0 overflow-hidden border-b border-r p-1.5 align-top " +
                   (canWrite ? "cursor-pointer " : "") +
                   // Seçili gün her zaman öne çıkar; değilse hafta sonu
                   // hücreleri hafif kırmızı zeminle işaretlenir.
@@ -439,7 +446,7 @@ export default function FirmaTakvimiPage() {
                   )}
                 </div>
 
-                <div className="space-y-1">
+                <div className="space-y-1 min-w-0">
                   {oGun.slice(0, 3).map((z) => {
                     // Firma etiketi, atandığı TMGD'nin rengiyle basılır.
                     // Ataması olmayan firma beyaz zeminde kalır.
@@ -449,7 +456,7 @@ export default function FirmaTakvimiPage() {
                       <div
                         key={z.id}
                         className={
-                          "group flex items-center gap-1 border rounded px-1 py-0.5 " +
+                          "group flex items-center gap-1 border rounded px-1 py-0.5 min-w-0 " +
                           (renk ? "" : "bg-white")
                         }
                         style={renk ? { backgroundColor: renk } : undefined}
