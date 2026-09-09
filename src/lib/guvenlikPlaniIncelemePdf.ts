@@ -80,6 +80,8 @@ export type GuvenlikPlaniRaporVerisi = {
   onaylayanAdi?: string;
   /** true ise imza tablolarına gömülü kaşeler basılır (bkz. lib/kaseler.ts). */
   kaseEkle?: boolean;
+  /** true ise HAZIRLAYAN kaşesinin ıslak imzalı sürümü kullanılır (varsa). */
+  imzaliKase?: boolean;
   summary: ScopeSummary;
   logo?: LogoData;
 };
@@ -253,7 +255,7 @@ function imzaTablosuCiz(
   };
 
   if (veri.kaseEkle) {
-    kaseCiz(hazirlayanKasesi(veri.hazirlayanAdi || ""), 0);
+    kaseCiz(hazirlayanKasesi(veri.hazirlayanAdi || "", veri.imzaliKase), 0);
     kaseCiz(KASE_YAKUP_ATAS, 1);
   }
 

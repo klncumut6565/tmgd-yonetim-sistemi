@@ -50,6 +50,9 @@ export default function EmniyetKapsamTaramasi({ firmId, firmaAdi }: Props) {
   // KAŞE / İMZA — işaretlenirse imza tablolarına kodda gömülü kaşeler basılır
   // (Belge Oluştur ekranındaki kutuyla aynı davranış). Varsayılan KAPALI.
   const [kaseEkle, setKaseEkle] = useState(false);
+  // Kaşenin ıslak imzalı sürümü kullanılsın mı (kayıtlıysa). Varsayılan
+  // KAPALI: imzalı kaşe kişinin imzasını da her rapora kopyalar.
+  const [imzaliKase, setImzaliKase] = useState(false);
 
   // Taranan ham kalemler (orijinal L1 sırasıyla) + ilk taramada belirlenen
   // gösterim sırası (kapsamda > belirsiz > kapsam dışı) sabit tutulur —
@@ -343,6 +346,7 @@ export default function EmniyetKapsamTaramasi({ firmId, firmaAdi }: Props) {
         summary,
         logo: logo ?? undefined,
         kaseEkle,
+        imzaliKase,
       };
       const doc = await guvenlikPlaniIncelemeRaporuUret(veri);
       const blobUrl = URL.createObjectURL(doc.output("blob"));
@@ -371,6 +375,7 @@ export default function EmniyetKapsamTaramasi({ firmId, firmaAdi }: Props) {
         summary,
         logo: logo ?? undefined,
         kaseEkle,
+        imzaliKase,
       };
       const doc = await guvenlikPlaniIncelemeRaporuUret(veri);
       doc.save(`guvenlik_plani_inceleme_${bugun.replace(/\./g, "-")}.pdf`);
@@ -441,6 +446,24 @@ export default function EmniyetKapsamTaramasi({ firmId, firmaAdi }: Props) {
               </span>
             </span>
           </label>
+
+          {kaseEkle && (
+            <label className="-mt-1 ml-6 flex items-start gap-2 text-sm cursor-pointer">
+              <input
+                type="checkbox"
+                checked={imzaliKase}
+                onChange={(e) => setImzaliKase(e.target.checked)}
+                className="w-4 h-4 mt-0.5"
+              />
+              <span>
+                <span className="text-gray-700">İmzalı kaşeyi kullan</span>
+                <span className="block text-xs text-amber-700 mt-0.5">
+                  Kaşeyle birlikte ıslak imza görüntüsü de basılır — yalnızca
+                  imzalı sürümü kayıtlı olan TMGD&apos;ler için geçerlidir.
+                </span>
+              </span>
+            </label>
+          )}
 
           <div className="flex justify-end gap-2">
             <button

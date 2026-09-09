@@ -67,9 +67,16 @@ export default function BelgeOlusturForm({ fixedFirmId, initialFirmId, compact =
   // KAŞE / İMZA — işaretlenirse kodda gömülü kaşeler belgeye basılır.
   // Kaşe görselleri src/lib/kaseler.ts içinde saklanır; elle yükleme yok.
   const [kaseEkle, setKaseEkle] = useState(false);
+  // Kaşenin ıslak imzalı hali kullanılsın mı. Yalnızca imzalı sürümü kayıtlı
+  // olan TMGD'ler için anlamlıdır; varsayılan KAPALI, çünkü imzalı kaşe
+  // kişinin imzasını da her belgeye kopyalar.
+  const [imzaliKase, setImzaliKase] = useState(false);
   const [hazirlayanAdi, setHazirlayanAdi] = useState("");
   // Atanmış TMGD'nin kayıtlı bir kaşesi var mı — kutuda bilgilendirme için.
   const hazirlayanKaseVar = !!hazirlayanKasesi(hazirlayanAdi);
+  // İmzalı sürüm ayrı bir görsel olarak kayıtlıysa seçenek gösterilir.
+  const imzaliKaseVar =
+    hazirlayanKasesi(hazirlayanAdi, true) !== hazirlayanKasesi(hazirlayanAdi);
   const [hazirlayanDurum, setHazirlayanDurum] = useState<"yok" | "bulundu" | "yükleniyor">("yok");
   const [kapakUretiliyor, setKapakUretiliyor] = useState(false);
   const [kapakMesaj, setKapakMesaj] = useState("");
@@ -399,7 +406,7 @@ export default function BelgeOlusturForm({ fixedFirmId, initialFirmId, compact =
       // seçilir, KONTROL EDEN için koordinatörün kaşesi sabittir.
       const kaseler = kaseEkle
         ? {
-            hazirlayan: hazirlayanKasesi(hazirlayanAdi),
+            hazirlayan: hazirlayanKasesi(hazirlayanAdi, imzaliKase),
             kontrol: KASE_YAKUP_ATAS,
           }
         : undefined;
@@ -820,6 +827,29 @@ export default function BelgeOlusturForm({ fixedFirmId, initialFirmId, compact =
               )}
             </span>
           </label>
+
+          {/* İMZALI KAŞE — yalnızca ilgili TMGD'nin imzalı sürümü kayıtlıysa
+              gösterilir. Ayrı bir seçenek olmasının sebebi: imzalı kaşe,
+              kişinin ıslak imzasını da her belgeye kopyalar. */}
+          {kaseEkle && imzaliKaseVar && (
+            <label className="mb-4 -mt-2 ml-6 flex items-start gap-2 text-sm cursor-pointer">
+              <input
+                type="checkbox"
+                checked={imzaliKase}
+                onChange={(e) => setImzaliKase(e.target.checked)}
+                className="w-4 h-4 mt-0.5"
+              />
+              <span>
+                <span className="text-gray-700">
+                  {hazirlayanAdi} için imzalı kaşeyi kullan
+                </span>
+                <span className="block text-xs text-amber-700 mt-0.5">
+                  Kaşeyle birlikte ıslak imza görüntüsü de basılır. İmzanın
+                  belge belge çoğaltılmasını istemiyorsan bu kutuyu işaretleme.
+                </span>
+              </span>
+            </label>
+          )}
 
           <div className="mb-4 text-sm">
             <span className="text-gray-600">Logo</span>
