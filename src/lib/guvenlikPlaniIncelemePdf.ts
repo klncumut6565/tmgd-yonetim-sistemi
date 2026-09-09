@@ -84,6 +84,11 @@ export type GuvenlikPlaniRaporVerisi = {
   kaseEkle?: boolean;
   /** true ise HAZIRLAYAN kaşesinin ıslak imzalı sürümü kullanılır (varsa). */
   imzaliKase?: boolean;
+  /**
+   * true ise raporun SON sayfasına, firmanın alıcı/boşaltan sıfatıyla
+   * göndericinin Emniyet Planı'na uyacağına dair beyan metni eklenir.
+   */
+  aliciBosaltanBeyani?: boolean;
   summary: ScopeSummary;
   logo?: LogoData;
 };
@@ -554,6 +559,29 @@ function kapanisSayfasiCiz(doc: JsPDFType, veri: GuvenlikPlaniRaporVerisi, sayfa
   }
   doc.setTextColor(0, 0, 0);
   doc.setFont(FONT, "normal");
+
+  // ALICI / BOŞALTAN BEYANI — yalnızca istendiğinde basılır.
+  // Kutulu bir blok halinde, sonuç cümlesinin altına yerleştirilir.
+  if (veri.aliciBosaltanBeyani) {
+    y += 10;
+    doc.setFontSize(9.5);
+    doc.setFont(FONT, "normal");
+    const beyan = doc.splitTextToSize(
+      "Firma, belirtilen tehlikeli maddeler bakımından alıcı ve boşaltan konumunda olup, " +
+        "tehlikeli maddelerin tesise kabulü ve boşaltılması faaliyetlerinde, gönderici tarafından " +
+        "taşımaya ilişkin olarak oluşturulan Emniyet Planı'nda belirtilen güvenlik tedbirleri ve " +
+        "talimatlara uygun hareket edecektir. Gönderici tarafından iletilen Emniyet Planı ve ilgili " +
+        "güvenlik gereklilikleri firma tarafından incelenerek, kendi faaliyetleri kapsamında " +
+        "uygulanması gereken hususlar yerine getirilecektir.",
+      genislik - 8
+    );
+    const kutuY = beyan.length * 4.8 + 8;
+    doc.setDrawColor(150, 150, 150);
+    doc.setLineWidth(0.3);
+    doc.rect(M, y, genislik, kutuY);
+    doc.text(beyan, M + 4, y + 6);
+    y += kutuY;
+  }
 
   doc.setFontSize(7);
   doc.setTextColor(120, 120, 120);
