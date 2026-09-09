@@ -21,6 +21,7 @@ import {
   LIBERATION_SANS_BOLD_B64,
 } from "./pdfFonts";
 import { SIAM_LOGO_B64, SIAM_LOGO_EN_BOY, SIAM_QR_B64 } from "./kapakVarliklari";
+import { hazirlayanKasesi, KASE_YAKUP_ATAS, type GomuluKase } from "./kaseler";
 
 type JsPDFType = {
   addFileToVFS: (fileName: string, data: string) => void;
@@ -77,6 +78,8 @@ export type GuvenlikPlaniRaporVerisi = {
   gecerlilikSuresi?: string; // örn. "2 Yıl"
   hazirlayanAdi?: string;
   onaylayanAdi?: string;
+  /** true ise imza tablolarına gömülü kaşeler basılır (bkz. lib/kaseler.ts). */
+  kaseEkle?: boolean;
   summary: ScopeSummary;
   logo?: LogoData;
 };
@@ -212,6 +215,47 @@ function imzaTablosuCiz(
   doc.rect(M, ustY, W - 2 * M, yukseklik);
   doc.line(M + kolonGenislik, ustY, M + kolonGenislik, ustY + yukseklik);
   doc.line(M + kolonGenislik * 2, ustY, M + kolonGenislik * 2, ustY + yukseklik);
+
+  // KAŞELER — BelgeOlusturForm.tsx → altTabloCiz() ile BİREBİR AYNI
+  // hesaplama: isim/unvanın ALTINDA kalan imza boşluğuna, oranı bozulmadan,
+  // çerçeve çizgilerine değmeden basılır. Yazılar silinmez.
+  // Sütun indeksi: 0 = HAZIRLAYAN, 1 = KONTROL EDEN.
+  const kaseCiz = (kase: GomuluKase | undefined, kolonIndex: number) => {
+    if (!kase) return;
+    const yaziAlti = 16.5;   // isim (10.5) ve unvan (14.3) satırlarının altı
+    const kenarPay = 2;
+    const kucultme = 0.88;   // yalnızca gerçek ölçüsü bilinmeyen kaşeler için
+    const gercekOlcu = !!kase.hedefGenislikMm;
+
+    const kullanilabilirG =
+      (kolonGenislik - kenarPay * 2) * (gercekOlcu ? 1 : kucultme);
+    const kullanilabilirY =
+      (yukseklik - yaziAlti - kenarPay) * (gercekOlcu ? 1 : kucultme);
+    if (kullanilabilirY <= 3) return;
+
+    let kaseG = kase.hedefGenislikMm
+      ? Math.min(kase.hedefGenislikMm, kullanilabilirG)
+      : kullanilabilirG;
+    let kaseY = kaseG / (kase.enBoyOrani || 1);
+    if (kaseY > kullanilabilirY) {
+      kaseY = kullanilabilirY;
+      kaseG = kaseY * (kase.enBoyOrani || 1);
+    }
+    const kolonSol = M + kolonGenislik * kolonIndex;
+    const kaseX = kolonSol + (kolonGenislik - kaseG) / 2;
+    const boslukYuksekligi = yukseklik - yaziAlti - kenarPay;
+    const kaseYPos = ustY + yaziAlti + (boslukYuksekligi - kaseY) / 2;
+    try {
+      doc.addImage(kase.data, kase.fmt, kaseX, kaseYPos, kaseG, kaseY);
+    } catch {
+      // Görsel eklenemezse tablo yine basılsın — kaşe atlanır.
+    }
+  };
+
+  if (veri.kaseEkle) {
+    kaseCiz(hazirlayanKasesi(veri.hazirlayanAdi || ""), 0);
+    kaseCiz(KASE_YAKUP_ATAS, 1);
+  }
 
   basliklar.forEach((b, i) => {
     const x = M + kolonGenislik * i + kolonGenislik / 2;

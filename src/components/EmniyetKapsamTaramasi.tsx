@@ -47,6 +47,9 @@ export default function EmniyetKapsamTaramasi({ firmId, firmaAdi }: Props) {
   const [taraniyor, setTaraniyor] = useState(false);
   const [mesaj, setMesaj] = useState("");
   const [pdfUretiliyor, setPdfUretiliyor] = useState(false);
+  // KAŞE / İMZA — işaretlenirse imza tablolarına kodda gömülü kaşeler basılır
+  // (Belge Oluştur ekranındaki kutuyla aynı davranış). Varsayılan KAPALI.
+  const [kaseEkle, setKaseEkle] = useState(false);
 
   // Taranan ham kalemler (orijinal L1 sırasıyla) + ilk taramada belirlenen
   // gösterim sırası (kapsamda > belirsiz > kapsam dışı) sabit tutulur —
@@ -339,6 +342,7 @@ export default function EmniyetKapsamTaramasi({ firmId, firmaAdi }: Props) {
         onaylayanAdi,
         summary,
         logo: logo ?? undefined,
+        kaseEkle,
       };
       const doc = await guvenlikPlaniIncelemeRaporuUret(veri);
       const blobUrl = URL.createObjectURL(doc.output("blob"));
@@ -366,6 +370,7 @@ export default function EmniyetKapsamTaramasi({ firmId, firmaAdi }: Props) {
         onaylayanAdi,
         summary,
         logo: logo ?? undefined,
+        kaseEkle,
       };
       const doc = await guvenlikPlaniIncelemeRaporuUret(veri);
       doc.save(`guvenlik_plani_inceleme_${bugun.replace(/\./g, "-")}.pdf`);
@@ -414,6 +419,28 @@ export default function EmniyetKapsamTaramasi({ firmId, firmaAdi }: Props) {
               kapsam durumu kesinleştirilemedi — o taşımadaki fiili miktarla karşılaştırılmalı.
             </p>
           )}
+
+          {/* KAŞE / İMZA — Belge Oluştur'daki kutunun aynısı. İşaretlenirse
+              PDF'teki HAZIRLAYAN ve KONTROL EDEN kutularına, isim ve unvanın
+              altındaki imza boşluğuna gömülü kaşeler basılır. */}
+          <label className="flex items-start gap-2 text-sm border rounded-lg p-3 cursor-pointer hover:bg-gray-50">
+            <input
+              type="checkbox"
+              checked={kaseEkle}
+              onChange={(e) => setKaseEkle(e.target.checked)}
+              className="w-4 h-4 mt-0.5"
+            />
+            <span>
+              <span className="text-gray-700 font-medium">
+                Kaşe ve imzaları rapora ekle
+              </span>
+              <span className="block text-xs text-gray-500 mt-0.5">
+                İşaretlenirse raporun her sayfasındaki HAZIRLAYAN ve KONTROL
+                EDEN kutularına, isim ve unvanın altındaki imza boşluğuna
+                kaşeler basılır.
+              </span>
+            </span>
+          </label>
 
           <div className="flex justify-end gap-2">
             <button
