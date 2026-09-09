@@ -21,7 +21,7 @@ import {
   LIBERATION_SANS_BOLD_B64,
 } from "./pdfFonts";
 import { SIAM_LOGO_B64, SIAM_LOGO_EN_BOY, SIAM_QR_B64 } from "./kapakVarliklari";
-import { hazirlayanKasesi, KASE_YAKUP_ATAS, type GomuluKase } from "./kaseler";
+import { hazirlayanKasesi, kontrolEdenKasesi, type GomuluKase } from "./kaseler";
 
 const FONT = "LiberationSans";
 const RENK_VURGU: [number, number, number] = [30, 64, 175];
@@ -614,7 +614,7 @@ function imzaBlokuCiz(doc: JsPDFType, veri: GorevliListesiPdfVerisi, y: number) 
 
   if (veri.kaseEkle) {
     kaseCiz(hazirlayanKasesi(veri.hazirlayanAdi || "", veri.imzaliKase), 0);
-    kaseCiz(KASE_YAKUP_ATAS, 1);
+    kaseCiz(kontrolEdenKasesi(veri.imzaliKase), 1);
   }
 
   basliklar.forEach((b, i) => {

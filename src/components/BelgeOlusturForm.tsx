@@ -29,7 +29,7 @@ import {
 import { kapakSayfasiOlustur } from "@/lib/kapakSayfasi";
 import { belgeSablonu, BelgeSablonu } from "@/lib/belgeSablonlari";
 import { BELGE_GORSELLERI } from "@/lib/belgeGorselleri";
-import { hazirlayanKasesi, KASE_YAKUP_ATAS } from "@/lib/kaseler";
+import { hazirlayanKasesi, kontrolEdenKasesi } from "@/lib/kaseler";
 import {
   SIAM_LOGO_B64,
   SIAM_LOGO_EN_BOY,
@@ -407,7 +407,7 @@ export default function BelgeOlusturForm({ fixedFirmId, initialFirmId, compact =
       const kaseler = kaseEkle
         ? {
             hazirlayan: hazirlayanKasesi(hazirlayanAdi, imzaliKase),
-            kontrol: KASE_YAKUP_ATAS,
+            kontrol: kontrolEdenKasesi(imzaliKase),
           }
         : undefined;
 
@@ -831,7 +831,7 @@ export default function BelgeOlusturForm({ fixedFirmId, initialFirmId, compact =
           {/* İMZALI KAŞE — yalnızca ilgili TMGD'nin imzalı sürümü kayıtlıysa
               gösterilir. Ayrı bir seçenek olmasının sebebi: imzalı kaşe,
               kişinin ıslak imzasını da her belgeye kopyalar. */}
-          {kaseEkle && imzaliKaseVar && (
+          {kaseEkle && (
             <label className="mb-4 -mt-2 ml-6 flex items-start gap-2 text-sm cursor-pointer">
               <input
                 type="checkbox"
@@ -841,7 +841,10 @@ export default function BelgeOlusturForm({ fixedFirmId, initialFirmId, compact =
               />
               <span>
                 <span className="text-gray-700">
-                  {hazirlayanAdi} için imzalı kaşeyi kullan
+                  İmzalı kaşeleri kullan
+                  {hazirlayanKaseVar && !imzaliKaseVar
+                    ? ` (${hazirlayanAdi} için imzasız sürüm basılır)`
+                    : ""}
                 </span>
                 <span className="block text-xs text-amber-700 mt-0.5">
                   Kaşeyle birlikte ıslak imza görüntüsü de basılır. İmzanın
