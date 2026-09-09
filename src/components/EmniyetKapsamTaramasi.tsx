@@ -392,7 +392,7 @@ export default function EmniyetKapsamTaramasi({ firmId, firmaAdi }: Props) {
           disabled={taraniyor}
           className="px-4 py-2 rounded-lg bg-black text-white text-sm disabled:opacity-50"
         >
-          {taraniyor ? "Taranıyor..." : "L1'den Tara"}
+          {taraniyor ? "Taranıyor..." : "Kimyasal Envanterden Tara"}
         </button>
         {mesaj && <p className="text-xs text-gray-500 mt-2">{mesaj}</p>}
       </div>
