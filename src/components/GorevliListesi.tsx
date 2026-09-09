@@ -176,6 +176,9 @@ export default function GorevliListesi({
   const [error, setError] = useState("");
   const [mesaj, setMesaj] = useState("");
   const [busy, setBusy] = useState(false);
+  // KAŞE / İMZA — Belge Oluştur'daki kutularla aynı davranış.
+  const [kaseEkle, setKaseEkle] = useState(false);
+  const [imzaliKase, setImzaliKase] = useState(false);
   // Görevli Listesi salt görüntüleme + PDF/Excel çıktısı amaçlıdır; içerik
   // düzenleme ve satır silme yalnızca yazma yetkisi olan roller (super_admin,
   // admin, tmgd, assistant) içindir — firma kullanıcısı (company) dahil
@@ -397,6 +400,8 @@ export default function GorevliListesi({
         bugun: bugununTarihi(),
         satirlar: satirlariHazirla(),
         logo,
+        kaseEkle,
+        imzaliKase,
       });
       const url = URL.createObjectURL(blob);
       pencere.location.href = url;
@@ -420,6 +425,8 @@ export default function GorevliListesi({
         bugun: bugununTarihi(),
         satirlar: satirlariHazirla(),
         logo,
+        kaseEkle,
+        imzaliKase,
       });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -477,6 +484,44 @@ export default function GorevliListesi({
           </button>
         </div>
       </div>
+
+      {/* KAŞE / İMZA — PDF çıktısındaki imza tablolarına gömülü kaşeleri
+          basar (Belge Oluştur ekranındaki kutuların aynısı). */}
+      <label className="mb-2 flex items-start gap-2 text-sm border rounded-lg p-3 cursor-pointer hover:bg-gray-50">
+        <input
+          type="checkbox"
+          checked={kaseEkle}
+          onChange={(e) => setKaseEkle(e.target.checked)}
+          className="w-4 h-4 mt-0.5"
+        />
+        <span>
+          <span className="text-gray-700 font-medium">
+            Kaşe ve imzaları PDF&apos;e ekle
+          </span>
+          <span className="block text-xs text-gray-500 mt-0.5">
+            İşaretlenirse üç sayfadaki HAZIRLAYAN ve KONTROL EDEN kutularına,
+            isim ve unvanın altındaki imza boşluğuna kaşeler basılır.
+          </span>
+        </span>
+      </label>
+
+      {kaseEkle && (
+        <label className="mb-3 ml-6 flex items-start gap-2 text-sm cursor-pointer">
+          <input
+            type="checkbox"
+            checked={imzaliKase}
+            onChange={(e) => setImzaliKase(e.target.checked)}
+            className="w-4 h-4 mt-0.5"
+          />
+          <span>
+            <span className="text-gray-700">İmzalı kaşeyi kullan</span>
+            <span className="block text-xs text-amber-700 mt-0.5">
+              Kaşeyle birlikte ıslak imza görüntüsü de basılır — yalnızca
+              imzalı sürümü kayıtlı olan TMGD&apos;ler için geçerlidir.
+            </span>
+          </span>
+        </label>
+      )}
 
       {error && (
         <div className="mb-3 p-2 rounded-lg bg-red-50 text-red-700 text-sm">{error}</div>

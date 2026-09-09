@@ -21,6 +21,7 @@ import {
   LIBERATION_SANS_BOLD_B64,
 } from "./pdfFonts";
 import { SIAM_LOGO_B64, SIAM_LOGO_EN_BOY, SIAM_QR_B64 } from "./kapakVarliklari";
+import { hazirlayanKasesi, KASE_YAKUP_ATAS, type GomuluKase } from "./kaseler";
 
 const FONT = "LiberationSans";
 const RENK_VURGU: [number, number, number] = [30, 64, 175];
@@ -60,6 +61,10 @@ export type GorevliListesiPdfVerisi = {
   bugun: string; // gg.aa.yyyy
   satirlar: GorevliListesiPdfSatiri[];
   logo?: LogoData;
+  /** true ise imza tablolarına gömülü kaşeler basılır (bkz. lib/kaseler.ts). */
+  kaseEkle?: boolean;
+  /** true ise HAZIRLAYAN kaşesinin ıslak imzalı sürümü kullanılır (varsa). */
+  imzaliKase?: boolean;
 };
 
 function fontuKaydet(doc: JsPDFType) {
@@ -570,6 +575,46 @@ function imzaBlokuCiz(doc: JsPDFType, veri: GorevliListesiPdfVerisi, y: number) 
   doc.line(M + kolonGenislik, y, M + kolonGenislik, y + IMZA_BLOK_YUKSEKLIK);
   doc.line(M + kolonGenislik * 2, y, M + kolonGenislik * 2, y + IMZA_BLOK_YUKSEKLIK);
 
+  // KAŞELER — BelgeOlusturForm.tsx → altTabloCiz() ile BİREBİR AYNI hesap:
+  // kaşe, isim/unvanın ALTINDA kalan imza boşluğuna, oranı korunarak ve
+  // çerçeve çizgilerine değmeden basılır. Yazılar silinmez.
+  const kaseCiz = (kase: GomuluKase | undefined, kolonIndex: number) => {
+    if (!kase) return;
+    const yaziAlti = 16.5;
+    const kenarPay = 2;
+    const kucultme = 0.88;
+    const gercekOlcu = !!kase.hedefGenislikMm;
+
+    const kullanilabilirG =
+      (kolonGenislik - kenarPay * 2) * (gercekOlcu ? 1 : kucultme);
+    const kullanilabilirY =
+      (IMZA_BLOK_YUKSEKLIK - yaziAlti - kenarPay) * (gercekOlcu ? 1 : kucultme);
+    if (kullanilabilirY <= 3) return;
+
+    let kaseG = kase.hedefGenislikMm
+      ? Math.min(kase.hedefGenislikMm, kullanilabilirG)
+      : kullanilabilirG;
+    let kaseY = kaseG / (kase.enBoyOrani || 1);
+    if (kaseY > kullanilabilirY) {
+      kaseY = kullanilabilirY;
+      kaseG = kaseY * (kase.enBoyOrani || 1);
+    }
+    const kolonSol = M + kolonGenislik * kolonIndex;
+    const kaseX = kolonSol + (kolonGenislik - kaseG) / 2;
+    const bosluk = IMZA_BLOK_YUKSEKLIK - yaziAlti - kenarPay;
+    const kaseYPos = y + yaziAlti + (bosluk - kaseY) / 2;
+    try {
+      doc.addImage(kase.data, kase.fmt, kaseX, kaseYPos, kaseG, kaseY);
+    } catch {
+      // Görsel eklenemezse tablo yine basılsın — kaşe atlanır.
+    }
+  };
+
+  if (veri.kaseEkle) {
+    kaseCiz(hazirlayanKasesi(veri.hazirlayanAdi || "", veri.imzaliKase), 0);
+    kaseCiz(KASE_YAKUP_ATAS, 1);
+  }
+
   basliklar.forEach((b, i) => {
     const x = M + kolonGenislik * i + kolonGenislik / 2;
     const isim = isimler[i];
@@ -644,8 +689,16 @@ export async function gorevliListesiPdfOlustur(
       valign: "top",
       minCellHeight: 7,
     },
+    // VERİ satırları başlıktan daha küçük: hücrelerdeki uzun görev/birim
+    // metinleri daha az sarmalanıyor, satır sayısı ve sayfa sayısı düşüyor.
+    // Başlık satırı okunaklı kalsın diye kendi punto değerini korur.
+    bodyStyles: {
+      fontSize: 7,
+      cellPadding: { top: 1.4, right: 1.2, bottom: 1.4, left: 1.2 },
+    },
     headStyles: {
       font: FONT,
+      fontSize: 8.5,
       fontStyle: "bold",
       fillColor: RENK_VURGU,
       textColor: [255, 255, 255],
