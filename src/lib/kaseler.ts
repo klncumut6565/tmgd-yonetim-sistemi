@@ -996,11 +996,17 @@ export const KASE_UMUT_KILINC: GomuluKase = {
 
 /**
  * KONTROL EDEN sütunu — TMGD Koordinatörü Yakup ATAŞ.
- * Bu kaşe için hedef genişlik TANIMLANMAMIŞTIR: imza boşluğuna sığdığı
- * kadar basılır (önceki davranış korunmuştur).
+ *
+ * Hedef genişlik tanımlı DEĞİLKEN kaşe "boşluğa sığdığı kadar" basılıyordu:
+ * kapak tablosunda (42.7 mm) 46.7 mm, içerik tablosunda (35.5 mm) 32.8 mm
+ * çıkıyor, aynı kaşe sayfadan sayfaya farklı boyutta görünüyordu.
+ * Kapaktaki görünüm doğru kabul edildiği için o ölçü (46.7 mm) sabitlendi;
+ * içerik tablosu da bu boyu alacak şekilde yükseltildi
+ * (ALT_TABLO_YUKSEKLIK 35.5 -> 40).
  */
 export const KASE_YAKUP_ATAS: GomuluKase = {
   enBoyOrani: 2.1917,
+  hedefGenislikMm: 46.7,
   fmt: "PNG",
   data:
     "data:image/png;base64," +

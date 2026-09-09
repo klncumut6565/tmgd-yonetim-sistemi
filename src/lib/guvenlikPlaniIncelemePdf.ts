@@ -65,7 +65,9 @@ const CERCEVE_KENAR = 8.5;
 const CERCEVE_ALT = H - 9.5;
 const M = 12.4; // içerik kenar boşluğu = başlık kutusu sol kenarı
 const ALT_TABLO_UST = 244;
-const ALT_TABLO_YUKSEKLIK = 35.5;
+// BelgeOlusturForm.tsx ile aynı: KONTROL EDEN kaşesi (46.7x21.3 mm)
+// kırpılmadan sığsın diye 35.5 -> 40 mm.
+const ALT_TABLO_YUKSEKLIK = 40;
 
 // Bu raporun kendi doküman kodu — TMGDK'nin diğer belgeleriyle aynı
 // numaralandırma standardına uyar (TMGDK-<kod> formatı).

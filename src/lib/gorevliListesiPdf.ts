@@ -554,7 +554,9 @@ function baslikKutusuCiz(doc: JsPDFType, veri: GorevliListesiPdfVerisi) {
 // ALT_TABLO_YUKSEKLIK). Önceden 20 mm idi: unvan satırı ~15.5 mm'de bittiği
 // için altında kaşeye yalnızca ~4.5 mm kalıyor, kaşe/imza sığmıyordu.
 // 35.5 mm ile yazıların altında ~17 mm'lik imza boşluğu kalır.
-const IMZA_BLOK_YUKSEKLIK = 35.5;
+// Diğer belgelerdeki imza tablosuyla aynı: KONTROL EDEN kaşesi
+// (46.7x21.3 mm) kırpılmadan sığsın diye 35.5 -> 40 mm.
+const IMZA_BLOK_YUKSEKLIK = 40;
 
 function imzaBlokuCiz(doc: JsPDFType, veri: GorevliListesiPdfVerisi, y: number) {
   const kolonGenislik = (W - 2 * M) / 3;

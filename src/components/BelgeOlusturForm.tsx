@@ -1204,7 +1204,11 @@ function sayfaYonunuAyarla(yatay: boolean) {
   FOOTER_UST = ALT_TABLO_UST - 2;
 }
 let ALT_TABLO_UST = 244; // imza tablosu üst kenarı (içerik sayfaları)
-const ALT_TABLO_YUKSEKLIK = 35.5;
+// İmza tablosu yüksekliği (içerik sayfaları). Kapak tablosu 42.7 mm.
+// 35.5 mm iken KONTROL EDEN kaşesi (46.7x21.3 mm) sığmıyor, 32.8 mm'ye
+// kırpılıyordu; kaşenin kapaktakiyle aynı boyda basılabilmesi için
+// 16.5 (yazı altı) + 21.3 (kaşe) + 2 (kenar payı) = 39.8 -> 40 mm.
+const ALT_TABLO_YUKSEKLIK = 40;
 let FOOTER_UST = ALT_TABLO_UST - 2; // içerik bitişi (alt tablo öncesi)
 
 /** Her sayfaya orijinal belgedeki dış çerçeveyi çizer. */
