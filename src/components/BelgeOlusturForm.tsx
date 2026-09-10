@@ -56,6 +56,54 @@ type Props = {
   compact?: boolean;      // true ise başlık (h1) gizlenir — üst sayfa kendi başlığını gösteriyorsa kullan
 };
 
+/**
+ * Dosya adı için firma adını kısaltır.
+ *
+ * Firma unvanları ("... SANAYİ VE TİCARET LİMİTED ŞİRKETİ" gibi) dosya
+ * adlarını gereksiz uzatıyordu. Burada unvan ekleri atılır; kalan asıl
+ * addan en fazla ilk 3 sözcük kullanılır.
+ *
+ *   "DEMKİM TEKSTİL VE KİMYA SAN. TİC. LTD. ŞTİ." -> "DEMKIM_TEKSTIL_VE"
+ *   "AEROSEL FARMÜMERİ SAN. VE TİC. A.Ş."         -> "AEROSEL_FARMUMERI"
+ */
+function dosyaAdiIcinFirma(ad: string): string {
+  // Unvan eki sayılan sözcükler. Ad bunlardan İLKİNDE kesilir; böylece
+  // "... SAN. VE TİC. LTD. ŞTİ." kuyruğunun tamamı tek seferde düşer.
+  const unvanEkleri = new Set([
+    "SAN", "SANAYI", "SANAYİ",
+    "TIC", "TİC", "TICARET", "TİCARET",
+    "LTD", "LIMITED", "LİMİTED",
+    "STI", "ŞTI", "ŞTİ", "SIRKETI", "ŞIRKETI", "ŞİRKETİ",
+    "AS", "A.Ş", "AŞ", "ANONIM", "ANONİM",
+    "KOLL", "KOM", "İTH", "ITH", "IHR", "İHR",
+    "PAZ", "PAZARLAMA", "NAK", "NAKLIYAT", "NAKLİYAT",
+  ]);
+  const sadeleştir = (k: string) =>
+    k.replace(/[.,]/g, "").toLocaleUpperCase("tr");
+
+  const kelimeler = ad.trim().split(/\s+/).filter(Boolean);
+  let kesim = kelimeler.length;
+  for (let i = 0; i < kelimeler.length; i++) {
+    if (unvanEkleri.has(sadeleştir(kelimeler[i]))) {
+      kesim = i;
+      break;
+    }
+  }
+  // Unvan eki en başta çıkarsa (beklenmedik ad) tüm adı kullan.
+  let asil = kesim > 0 ? kelimeler.slice(0, kesim) : kelimeler;
+  asil = asil.slice(0, 3);
+  // Kırpma sonrası sonda bağlaç kalabiliyor ("DEMKİM TEKSTİL VE"); atılır.
+  while (asil.length > 1 && sadeleştir(asil[asil.length - 1]) === "VE") {
+    asil = asil.slice(0, -1);
+  }
+
+  const temiz = asil
+    .join("_")
+    .replace(/[^\w\sğüşıöçĞÜŞİÖÇ-]/g, "")
+    .replace(/\s+/g, "_");
+  return temiz || "Firma";
+}
+
 export default function BelgeOlusturForm({ fixedFirmId, initialFirmId, compact = false }: Props) {
   const { canWrite } = useUser();
 
@@ -263,7 +311,7 @@ export default function BelgeOlusturForm({ fixedFirmId, initialFirmId, compact =
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      const temizAd = firm.name.replace(/[^\w\sğüşıöçĞÜŞİÖÇ-]/g, "").trim().replace(/\s+/g, "_");
+      const temizAd = dosyaAdiIcinFirma(firm.name);
       a.download = `Icindekiler_TMGD_${temizAd}.xlsx`;
       document.body.appendChild(a);
       a.click();
@@ -550,7 +598,7 @@ export default function BelgeOlusturForm({ fixedFirmId, initialFirmId, compact =
             const url = URL.createObjectURL(pdfBlob);
             const a = document.createElement("a");
             a.href = url;
-            a.download = `${firm.name}_${actualCode}.pdf`;
+            a.download = `${dosyaAdiIcinFirma(firm.name)}_${actualCode}.pdf`;
             a.click();
             URL.revokeObjectURL(url);
 
@@ -633,7 +681,7 @@ export default function BelgeOlusturForm({ fixedFirmId, initialFirmId, compact =
           continue;
         }
 
-        doc.save(`${firm.name}_${item.code}${yfrPeriod ? `_${yfrPeriod}` : ""}.pdf`);
+        doc.save(`${dosyaAdiIcinFirma(firm.name)}_${item.code}${yfrPeriod ? `_${yfrPeriod}` : ""}.pdf`);
 
         // Belge Takip'te tamamlandı işaretle.
         // NOT: valid_until'e burada DOKUNULMAZ — geçerlilik tarihi, firmanın
