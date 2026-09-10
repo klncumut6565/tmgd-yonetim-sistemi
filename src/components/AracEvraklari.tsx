@@ -57,6 +57,18 @@ const ARAC_BELGE_SLOTLARI = [
   { anahtar: "src5_belgesi", ekNo: 9, baslik: "SRC5 Belgeli Şoför Sertifikası" },
   { anahtar: "tasima_evraklari", ekNo: 10, baslik: "Karayolu İle Atık Taşıma Aracı Uygunluk Belgesi" },
 ] as const;
+
+/**
+ * Ek-10'a hangi belgenin konulduğu firmadan firmaya değişiyor: kimi araçta
+ * atık taşıma uygunluk belgesi, kimi araçta ADR uygunluk/muayene belgesi
+ * yükleniyor. Başlık bu yüzden seçilebilir; seçim hem kapak sayfasındaki
+ * "Doküman İçeriği" listesine hem de Ek-10 sayfa başlığına yansır.
+ */
+const EK10_SECENEKLERI = [
+  { deger: "atik", baslik: "Karayolu İle Atık Taşıma Aracı Uygunluk Belgesi" },
+  { deger: "adr", baslik: "ADR Uygunluk - ADR Muayeneleri" },
+] as const;
+type Ek10Secenek = (typeof EK10_SECENEKLERI)[number]["deger"];
 type AracBelgeAnahtari = (typeof ARAC_BELGE_SLOTLARI)[number]["anahtar"];
 
 function bugununTarihi(): string {
@@ -97,6 +109,8 @@ export default function AracEvraklari({
 
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  // Ek-10 başlığı — kullanıcı seçimine göre PDF'e yansır.
+  const [ek10Secenek, setEk10Secenek] = useState<Ek10Secenek>("atik");
   const [error, setError] = useState("");
   const [mesaj, setMesaj] = useState("");
 
@@ -396,7 +410,12 @@ export default function AracEvraklari({
         const url = await belgeDataUrlHazirla(d.file_path);
         if (url) dataUrls.push(url);
       }
-      belgeler.push({ ekNo: slot.ekNo, baslik: slot.baslik, dataUrls });
+      // Ek-10'un başlığı sabit değil, seçime göre belirlenir.
+      const baslik =
+        slot.ekNo === 10
+          ? EK10_SECENEKLERI.find((o) => o.deger === ek10Secenek)!.baslik
+          : slot.baslik;
+      belgeler.push({ ekNo: slot.ekNo, baslik, dataUrls });
     }
 
     return belgeler;
@@ -658,7 +677,11 @@ export default function AracEvraklari({
             {ARAC_BELGE_SLOTLARI.map((slot) => (
               <BelgeSatiri
                 key={slot.anahtar}
-                baslik={`Ek-${slot.ekNo} — ${slot.baslik}`}
+                baslik={`Ek-${slot.ekNo} — ${
+                  slot.ekNo === 10
+                    ? EK10_SECENEKLERI.find((o) => o.deger === ek10Secenek)!.baslik
+                    : slot.baslik
+                }`}
                 dosyalar={aracDosyalar[slot.anahtar]}
                 onYukle={(files) => aracBelgeYukle(slot.anahtar, files)}
                 onSil={(dosya) => aracBelgeSil(slot.anahtar, dosya)}
@@ -666,6 +689,37 @@ export default function AracEvraklari({
               />
             ))}
           </div>
+          {/* EK-10 BAŞLIK SEÇİMİ — bu ek'e hangi belgenin konulduğu firmaya
+              göre değiştiğinden başlık seçilebilir. Seçim hem yukarıdaki
+              Ek-10 satırına hem de PDF'e (kapak listesi + sayfa başlığı)
+              anında yansır. */}
+          <div className="mt-3 border rounded-lg p-3 bg-gray-50">
+            <p className="text-sm font-medium text-gray-700 mb-2">
+              Ek-10 başlığı
+            </p>
+            <div className="space-y-1.5">
+              {EK10_SECENEKLERI.map((secenek) => (
+                <label
+                  key={secenek.deger}
+                  className="flex items-start gap-2 text-sm cursor-pointer"
+                >
+                  <input
+                    type="radio"
+                    name="ek10-baslik"
+                    checked={ek10Secenek === secenek.deger}
+                    onChange={() => setEk10Secenek(secenek.deger)}
+                    className="w-4 h-4 mt-0.5"
+                  />
+                  <span className="text-gray-700">{secenek.baslik}</span>
+                </label>
+              ))}
+            </div>
+            <p className="text-xs text-gray-400 mt-2">
+              Seçilen başlık PDF&apos;te hem kapak sayfasındaki içerik listesinde
+              hem de Ek-10 sayfasının üstünde kullanılır.
+            </p>
+          </div>
+
           <p className="text-xs text-gray-400 mt-2">
             Ek-6 (Yazılı Talimat) ve Ek-8 (ADR Çantası İçeriği) tüm araçlarda ortaktır, otomatik eklenir — yükleme gerekmez.
           </p>
