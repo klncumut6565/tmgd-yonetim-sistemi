@@ -4374,21 +4374,9 @@ export const KASE_MASALLAH_TEKINOK_IMZALI: GomuluKase = {
 };
 
 /**
- * HAZIRLAYAN sütunu — TMGD Aylin ZÜNBÜL UÇAR.
+ * HAZIRLAYAN sütunu — TMGD Aylin ZÜMBÜL UÇAR.
  * Kaynak fotoğrafta kaşenin üzerine ıslak imza atılmış; imza mürekkebi
- * (mavi) "SAN. VE TİC." ibaresinin bir kısmıyla ve "ZÜNBÜL" adının
- * üzerinden geçiyor. Diğer kaşelerdeki gibi harf harf onarım yapılmadı —
- * imza altında kalan kısımlar fotoğrafta göründüğü haliyle (gerçek
- * baskıdaki gibi, imzayla kısmen örtüşmüş olarak) bırakıldı. Kayıt
- * numarasının son hanesi de kaynak fotoğrafın kenarında kırpılmış
- * geliyordu (TMKTDGM/TMGD/2022/1083_), o haliyle korundu.
- * Ölçüsü bildirilmediğinden hedefGenislikMm verilmemiştir (diğer
- * kaşelerle aynı oranda, kutuya sığdığı kadar basılır).
- */
-/**
- * HAZIRLAYAN sütunu — TMGD Aylin ZÜNBÜL UÇAR.
- * Kaynak fotoğrafta kaşenin üzerine ıslak imza atılmış; imza mürekkebi
- * (mavi) "SAN. VE TİC." ibaresinin bir kısmıyla ve "ZÜNBÜL" adının
+ * (mavi) "SAN. VE TİC." ibaresinin bir kısmıyla ve "ZÜMBÜL" adının
  * üzerinden geçiyor. Diğer kaşelerdeki gibi harf harf onarım yapılmadı —
  * imza altında kalan kısımlar fotoğrafta göründüğü haliyle (gerçek
  * baskıdaki gibi, imzayla kısmen örtüşmüş olarak) bırakıldı.
@@ -4398,7 +4386,7 @@ export const KASE_MASALLAH_TEKINOK_IMZALI: GomuluKase = {
  * Ölçüsü bildirilmediğinden hedefGenislikMm verilmemiştir (diğer
  * kaşelerle aynı oranda, kutuya sığdığı kadar basılır).
  */
-export const KASE_AYLIN_ZUNBUL_UCAR: GomuluKase = {
+export const KASE_AYLIN_ZUMBUL_UCAR: GomuluKase = {
   enBoyOrani: 2.3183,
   fmt: "PNG",
   data:
@@ -5694,6 +5682,11 @@ export function hazirlayanKasesi(
   if (sade.includes("TEKINOK")) {
     return imzali ? KASE_MASALLAH_TEKINOK_IMZALI : KASE_MASALLAH_TEKINOK;
   }
-  if (sade.includes("ZUNBULUCAR")) return KASE_AYLIN_ZUNBUL_UCAR;
+  // "Zümbül" soyadı kaşe görselinde "Zünbül" gibi de okunabiliyordu (kalın
+  // baskı fontunda M/N karışabiliyor); veritabanındaki gerçek yazımdan
+  // bağımsız çalışsın diye ikisi de kontrol ediliyor.
+  if (sade.includes("ZUMBULUCAR") || sade.includes("ZUNBULUCAR")) {
+    return KASE_AYLIN_ZUMBUL_UCAR;
+  }
   return undefined;
 }
