@@ -1000,15 +1000,19 @@ export const KASE_UMUT_KILINC: GomuluKase = {
  * Kaşenin basımında ıslak imza, metin bloğunun ALTINA taşan bir kuyruk
  * bırakıyordu. Bu kuyruk görselin yüksekliğini dörtte bire yakın oranda
  * artırdığı için kaşe, içerik sayfalarındaki 17 mm'lik imza boşluğuna
- * sığmıyor ve küçültülerek basılıyordu (kapakta 46.7 mm, içerikte 37.3 mm —
- * aynı kaşe farklı boyda). İmza kuyruğu kırpıldığında en/boy oranı 2.19'dan
- * 2.94'e çıkıyor ve kaşe 46.7 mm genişlikte yalnızca 15.9 mm yükseklik
- * kaplıyor; böylece HEM kapağa HEM içerik sayfalarına aynı boyda sığıyor.
- * Kaşe metninin tamamı korundu, yalnızca imza kuyruğu çıkarıldı.
+ * sığmıyor ve küçültülerek basılıyordu. İmza kuyruğu kırpıldığında en/boy
+ * oranı 2.19'dan 2.94'e çıktı ve kaşe artık aynı yükseklikte daha geniş
+ * basılabiliyor.
+ *
+ * Hedef genişlik 46.7 mm'den 49 mm'ye çıkarıldı: içerik sayfalarındaki
+ * 17 mm'lik imza boşluğunda bu oranla ulaşılabilecek üst sınır ~49.9 mm
+ * (17 × 2.9375) olduğundan, 49 mm hem içerikte (≈16.7 mm yükseklik, ~0.3 mm
+ * pay bırakarak) hem kapakta (imza boşluğu 24.2 mm, çok daha rahat) TAŞMADAN
+ * basılıyor — ve İKİSİNDE DE ARTIK AYNI (mümkün olan en büyük) BOYDA çıkıyor.
  */
 export const KASE_YAKUP_ATAS: GomuluKase = {
   enBoyOrani: 2.9375,
-  hedefGenislikMm: 46.7,
+  hedefGenislikMm: 49,
   fmt: "PNG",
   data:
     "data:image/png;base64," +

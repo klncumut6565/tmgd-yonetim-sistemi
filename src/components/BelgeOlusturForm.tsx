@@ -1258,9 +1258,11 @@ let ALT_TABLO_UST = 244; // imza tablosu üst kenarı (içerik sayfaları)
 // İmza tablosu yüksekliği (içerik sayfaları). Kapak tablosu 42.7 mm.
 // NOT: Bir ara kaşenin kapaktakiyle aynı boyda basılabilmesi için 40 mm
 // yapılmıştı; satır yüksekliği istenmediği için 35.5'e geri alındı.
-// Bu yükseklikte imza boşluğu 17 mm olduğundan KONTROL EDEN kaşesi
-// (46.7x21.3 mm hedefli) içerik sayfalarında 32.8x15.0 mm'ye küçültülerek
-// basılır — kaşe görselinin ölçüsü değil, yalnızca sığdırma sonucu.
+// Bu yükseklikte imza boşluğu 17 mm'dir. KONTROL EDEN kaşesi (hedefi
+// 49x16.7 mm, bkz. kaseler.ts) bu boşluğa TAŞMADAN sığar ve kapak
+// sayfasındaki (imza boşluğu 24.2 mm, çok daha rahat) kaşeyle AYNI boyda
+// basılır — 49 mm, içerik sayfalarının 17 mm yüksekliğinde ulaşılabilecek
+// pratik üst sınıra (~49.9 mm) çok yakın seçildi.
 const ALT_TABLO_YUKSEKLIK = 35.5;
 let FOOTER_UST = ALT_TABLO_UST - 2; // içerik bitişi (alt tablo öncesi)
 
