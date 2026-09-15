@@ -582,7 +582,7 @@ function imzaBlokuCiz(doc: JsPDFType, veri: GorevliListesiPdfVerisi, y: number) 
   // çerçeve çizgilerine değmeden basılır. Yazılar silinmez.
   const kaseCiz = (kase: GomuluKase | undefined, kolonIndex: number) => {
     if (!kase) return;
-    const yaziAlti = 16.5;
+    const yaziAlti = 14.5;
     const kenarPay = 2;
     const kucultme = 0.88;
     const gercekOlcu = !!kase.hedefGenislikMm;
@@ -629,14 +629,14 @@ function imzaBlokuCiz(doc: JsPDFType, veri: GorevliListesiPdfVerisi, y: number) 
     if (isim) {
       doc.setFontSize(7.5);
       doc.setFont(FONT, "bold");
-      doc.text(isim.toLocaleUpperCase("tr-TR"), x, y + 10.5, { align: "center", maxWidth: kolonGenislik - 4 });
+      doc.text(isim.toLocaleUpperCase("tr-TR"), x, y + 9.3, { align: "center", maxWidth: kolonGenislik - 4 });
       doc.setFontSize(6);
       doc.setFont(FONT, "normal");
-      doc.text(isimliUnvanlar[i], x, y + 14.3, { align: "center", maxWidth: kolonGenislik - 4 });
+      doc.text(isimliUnvanlar[i], x, y + 12.3, { align: "center", maxWidth: kolonGenislik - 4 });
     } else {
       doc.setFontSize(6.5);
       doc.setFont(FONT, "normal");
-      doc.text(altBasliklar[i], x, y + 10.5, { align: "center", maxWidth: kolonGenislik - 4 });
+      doc.text(altBasliklar[i], x, y + 9.3, { align: "center", maxWidth: kolonGenislik - 4 });
     }
   });
 }

@@ -231,7 +231,7 @@ function imzaTablosuCiz(
   // Sütun indeksi: 0 = HAZIRLAYAN, 1 = KONTROL EDEN.
   const kaseCiz = (kase: GomuluKase | undefined, kolonIndex: number) => {
     if (!kase) return;
-    const yaziAlti = 16.5;   // isim (10.5) ve unvan (14.3) satırlarının altı
+    const yaziAlti = 14.5;   // isim (9.3) ve unvan (12.3) satırlarının altı
     const kenarPay = 2;
     const kucultme = 0.88;   // yalnızca gerçek ölçüsü bilinmeyen kaşeler için
     const gercekOlcu = !!kase.hedefGenislikMm;
@@ -277,17 +277,17 @@ function imzaTablosuCiz(
     if (isim) {
       doc.setFontSize(7.5);
       doc.setFont(FONT, "bold");
-      doc.text(isim.toLocaleUpperCase("tr-TR"), x, ustY + 10.5, {
+      doc.text(isim.toLocaleUpperCase("tr-TR"), x, ustY + 9.3, {
         align: "center",
         maxWidth: kolonGenislik - 4,
       });
       doc.setFontSize(6);
       doc.setFont(FONT, "normal");
-      doc.text(isimliUnvanlar[i], x, ustY + 14.3, { align: "center", maxWidth: kolonGenislik - 4 });
+      doc.text(isimliUnvanlar[i], x, ustY + 12.3, { align: "center", maxWidth: kolonGenislik - 4 });
     } else {
       doc.setFontSize(6.5);
       doc.setFont(FONT, "normal");
-      doc.text(altBasliklar[i], x, ustY + 10.5, { align: "center", maxWidth: kolonGenislik - 4 });
+      doc.text(altBasliklar[i], x, ustY + 9.3, { align: "center", maxWidth: kolonGenislik - 4 });
     }
   });
 }

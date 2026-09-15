@@ -999,20 +999,22 @@ export const KASE_UMUT_KILINC: GomuluKase = {
  *
  * Kaşenin basımında ıslak imza, metin bloğunun ALTINA taşan bir kuyruk
  * bırakıyordu. Bu kuyruk görselin yüksekliğini dörtte bire yakın oranda
- * artırdığı için kaşe, içerik sayfalarındaki 17 mm'lik imza boşluğuna
- * sığmıyor ve küçültülerek basılıyordu. İmza kuyruğu kırpıldığında en/boy
- * oranı 2.19'dan 2.94'e çıktı ve kaşe artık aynı yükseklikte daha geniş
- * basılabiliyor.
+ * artırdığı için kaşe, içerik sayfalarındaki imza boşluğuna sığmıyor ve
+ * küçültülerek basılıyordu. İmza kuyruğu kırpıldığında en/boy oranı
+ * 2.19'dan 2.94'e çıktı ve kaşe artık aynı yükseklikte daha geniş basılabiliyor.
  *
- * Hedef genişlik 46.7 mm'den 49 mm'ye çıkarıldı: içerik sayfalarındaki
- * 17 mm'lik imza boşluğunda bu oranla ulaşılabilecek üst sınır ~49.9 mm
- * (17 × 2.9375) olduğundan, 49 mm hem içerikte (≈16.7 mm yükseklik, ~0.3 mm
- * pay bırakarak) hem kapakta (imza boşluğu 24.2 mm, çok daha rahat) TAŞMADAN
- * basılıyor — ve İKİSİNDE DE ARTIK AYNI (mümkün olan en büyük) BOYDA çıkıyor.
+ * HAZIRLAYAN/KONTROL EDEN/ONAYLAYAN isim-unvan satır aralıkları (BelgeOlusturForm.tsx,
+ * guvenlikPlaniIncelemePdf.ts, gorevliListesiPdf.ts — üçünde birden) sıkıştırılarak
+ * kaşeye ayrılan dikey boşluk artırıldı. Bu yeni boşlukta, en dar bağlam olan
+ * içerik sayfalarında (imza boşluğu 19 mm) ulaşılabilecek üst sınır ~55.8 mm
+ * (19 × 2.9375); hedef genişlik buna küçük bir güvenlik payıyla 55 mm olarak
+ * ayarlandı. Kapak (26.2 mm boşluk) ve Görevli Listesi (23.5 mm boşluk)
+ * bağlamlarında bu ölçü genişlik tavanının (57.7 mm) altında kaldığından
+ * TAŞMADAN, üçünde de AYNI (mümkün olan en büyük) boyda basılıyor.
  */
 export const KASE_YAKUP_ATAS: GomuluKase = {
   enBoyOrani: 2.9375,
-  hedefGenislikMm: 49,
+  hedefGenislikMm: 55,
   fmt: "PNG",
   data:
     "data:image/png;base64," +

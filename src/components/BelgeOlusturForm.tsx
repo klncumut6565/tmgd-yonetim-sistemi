@@ -1869,9 +1869,11 @@ function altTabloCiz(
   // Sütun indeksi: 0 = HAZIRLAYAN, 1 = KONTROL EDEN.
   const kaseCiz = (kase: KaseCizim | undefined, kolonIndex: number) => {
     if (!kase) return;
-    // İsim (y+10.5) ve unvan (y+14.3) satırlarının bittiği nokta; altında
-    // kalan bölüm elle imza/kaşe için ayrılmış boşluktur.
-    const yaziAlti = 16.5;
+    // İsim (y+9.3) ve unvan (y+12.3) satırlarının bittiği nokta; altında
+    // kalan bölüm elle imza/kaşe için ayrılmış boşluktur. Satır aralıkları
+    // sıkıştırıldığı için bu değer önceki 16.5'ten 14.5'e indi — kaşeye
+    // ~2 mm daha fazla dikey alan kalıyor.
+    const yaziAlti = 14.5;
     const kenarPay = 2;
     // Kaşe boşluğu doldurmasın, biraz nefes payı bıraksın diye küçültülür.
     // NOT: Bu katsayı yalnızca gerçek ölçüsü BİLİNMEYEN kaşeler içindir.
@@ -1938,18 +1940,20 @@ function altTabloCiz(
 
     if (isim) {
       // İsim varsa: kalın isim satırı ortada, hemen altında kişinin unvanı.
+      // Satır aralıkları (5 → 9.3 → 12.3) kaşeye daha fazla dikey alan
+      // bırakmak için sıkıştırıldı (önceki: 5 → 10.5 → 14.3).
       doc.setFontSize(7.5);
       doc.setFont(FONT, "bold");
-      doc.text(isim.toLocaleUpperCase("tr-TR"), x, y + 10.5, { align: "center", maxWidth: kolonGenislik - 4 });
+      doc.text(isim.toLocaleUpperCase("tr-TR"), x, y + 9.3, { align: "center", maxWidth: kolonGenislik - 4 });
       doc.setFontSize(6);
       doc.setFont(FONT, "normal");
-      doc.text(isimliUnvanlar[i], x, y + 14.3, { align: "center", maxWidth: kolonGenislik - 4 });
+      doc.text(isimliUnvanlar[i], x, y + 12.3, { align: "center", maxWidth: kolonGenislik - 4 });
     } else {
       // İsim bilinmiyorsa (ör. firmaya TMGD ataması yapılmamış / onaylayan girilmemiş):
       // yalnızca rol adı gösterilir.
       doc.setFontSize(6.5);
       doc.setFont(FONT, "normal");
-      doc.text(altBasliklar[i], x, y + 10.5, { align: "center", maxWidth: kolonGenislik - 4 });
+      doc.text(altBasliklar[i], x, y + 9.3, { align: "center", maxWidth: kolonGenislik - 4 });
     }
   });
 }
