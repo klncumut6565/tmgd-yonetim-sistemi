@@ -287,15 +287,29 @@ export default function DashboardPage() {
           .from("user_firms")
           .select("firm_id, user_id, profiles ( full_name, role )")
           .in("firm_id", tmgdFirmIds);
+        // Yalnızca FİRMA TARAFI rolleri (company, viewer) dışlanır; geri
+        // kalan herkes danışman sayılır. Önceden sadece role === "tmgd"
+        // alınıyordu, bu yüzden rolü admin/assistant olan danışmanların
+        // firmaları "atama yapılmamış" görünüyordu.
+        const rolOnceligi: Record<string, number> = {
+          tmgd: 0,
+          assistant: 1,
+          admin: 2,
+          super_admin: 3,
+        };
+        const haricRoller = new Set(["company", "viewer"]);
+        const seciliOncelik = new Map<string, number>();
         for (const a of (atamalar as Record<string, any>[]) || []) {
           const p = a.profiles;
           if (!p) continue;
-          // Firmaya atanmış kişilerden TMGD rolünde olan(lar) alınır.
-          if (p.role && p.role !== "tmgd") continue;
-          const ad = String(p.full_name || "").trim();
-          if (!ad) continue;
-          if (!firmaTmgd.has(a.firm_id)) {
+          const rol = String(p.role || "");
+          if (haricRoller.has(rol)) continue;
+          const ad = String(p.full_name || "").trim() || "(isim girilmemiş)";
+          const oncelik = rolOnceligi[rol] ?? 4;
+          const mevcut = seciliOncelik.get(a.firm_id);
+          if (mevcut === undefined || oncelik < mevcut) {
             firmaTmgd.set(a.firm_id, { userId: String(a.user_id), ad });
+            seciliOncelik.set(a.firm_id, oncelik);
           }
         }
       }
@@ -310,14 +324,18 @@ export default function DashboardPage() {
         const mevcut = tmgdBenzersiz.get(anahtar);
         // Aynı TMGD birden çok kayıtla gelirse en erken tarihli olan kalır.
         if (mevcut && mevcut.days_left <= gun) continue;
+        const firmaAdi = String(r.firms?.name || "").trim();
         tmgdBenzersiz.set(anahtar, {
           id: `tmgd-${anahtar}`,
-          label: atama ? atama.ad : "TMGD Sertifikası (atama yapılmamış)",
+          label: atama ? atama.ad : "TMGD atanmamış",
           docType: "TMGD Sertifikası",
           valid_until: String(r.valid_until),
           days_left: gun,
-          // TMGD'ye ait bir belge olduğundan firma adı gösterilmez.
-          firm_name: "",
+          // Sertifika kişiye ait olduğundan normalde firma adı gösterilmez.
+          // ANCAK atama yoksa satırda hiçbir ayırt edici bilgi kalmıyor ve
+          // hangi firmanın kaydı olduğu anlaşılmıyordu — bu durumda firma
+          // adı gösterilir.
+          firm_name: atama ? "" : firmaAdi,
         });
       }
       setTmgdSertifikalari(
@@ -469,9 +487,16 @@ export default function DashboardPage() {
           <ul className="space-y-2">
             {tmgdSertifikalari.map((t) => (
               <li key={t.id} className="flex items-center justify-between gap-2 text-sm">
-                <span>
+                <span className="min-w-0">
                   {t.label}
                   <span className="text-gray-400"> · TMGD Sertifikası</span>
+                  {/* Atama yoksa hangi firmanın kaydı olduğu ancak firma
+                      adıyla anlaşılıyor; o yüzden alt satırda gösterilir. */}
+                  {t.firm_name && (
+                    <span className="block text-xs text-amber-700 truncate">
+                      {t.firm_name} — bu firmaya TMGD atanmamış
+                    </span>
+                  )}
                 </span>
                 <DaysBadge date={t.valid_until} />
               </li>
