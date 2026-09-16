@@ -16,6 +16,7 @@
 // kapsamına girip girmediği açısından AYRI AYRI değerlendirilir.
 
 import { useMemo, useState } from "react";
+import dynamic from "next/dynamic";
 import { supabase } from "@/lib/supabase/client";
 import {
   evaluateItemScope,
@@ -28,6 +29,22 @@ import {
   type GuvenlikPlaniRaporVerisi,
 } from "@/lib/guvenlikPlaniIncelemePdf";
 import type { LogoData } from "@/lib/aracEvraklariPdf";
+import { renderYapilandirilmisBelge, type KaseCizim } from "@/components/BelgeOlusturForm";
+import { BELGE_SABLONLARI, type TemplateBlock } from "@/lib/belgeSablonlari";
+import { hazirlayanKasesi, kontrolEdenKasesi } from "@/lib/kaseler";
+import { guzergahKrokisiUret } from "@/lib/rotaKrokisi";
+import type { RotaNoktasi } from "@/components/RotaHaritasi";
+
+// Leaflet (window/document'a ihtiyaç duyar) yalnızca istemcide, dinamik
+// olarak yüklenir — Next.js sunucu tarafı render'ında (SSR) çökmesin diye.
+const RotaHaritasi = dynamic(() => import("@/components/RotaHaritasi"), {
+  ssr: false,
+  loading: () => (
+    <div className="h-[420px] rounded-lg border bg-gray-50 flex items-center justify-center text-sm text-gray-400">
+      Harita yükleniyor…
+    </div>
+  ),
+});
 
 type UnRow = {
   id: string;
@@ -55,6 +72,14 @@ export default function EmniyetKapsamTaramasi({ firmId, firmaAdi }: Props) {
   const [imzaliKase, setImzaliKase] = useState(false);
   // Raporun son sayfasına alıcı/boşaltan beyanı eklensin mi.
   const [aliciBosaltanBeyani, setAliciBosaltanBeyani] = useState(false);
+
+  // EMNİYET PLANI (tam doküman, ADR 1.10.3.2) — kapsam taraması en az bir
+  // maddeyi "kapsamda" bulursa bu bölüm gösterilir. Kullanıcı haritada
+  // güzergah seçer; PDF üretilirken EK-1 taranan envanterle, EK-7 seçilen
+  // güzergahın krokisiyle doldurulur.
+  const [rotaNoktalari, setRotaNoktalari] = useState<RotaNoktasi[]>([]);
+  const [emniyetPlaniUretiliyor, setEmniyetPlaniUretiliyor] = useState(false);
+  const [emniyetPlaniMesaj, setEmniyetPlaniMesaj] = useState("");
 
   // Taranan ham kalemler (orijinal L1 sırasıyla) + ilk taramada belirlenen
   // gösterim sırası (kapsamda > belirsiz > kapsam dışı) sabit tutulur —
@@ -388,6 +413,151 @@ export default function EmniyetKapsamTaramasi({ firmId, firmaAdi }: Props) {
     }
   }
 
+  /** Taranan envanteri (summary.results), EMNİYET PLANI EK-1 tablosunun
+   *  satırlarına çevirir. Miktarı bilinmeyen kalemlerde "—" gösterilir. */
+  function ek1TabloBlogu(ozet: ScopeSummary): TemplateBlock {
+    const kapsamMetni: Record<ItemScopeResult["status"], string> = {
+      in_scope: "E",
+      out_of_scope: "H",
+      undetermined: "? (miktar doğrulanmalı)",
+    };
+    const rows = ozet.results.map((r) => [
+      r.un_number,
+      r.proper_shipping_name,
+      r.adr_class || "—",
+      r.packing_group || "—",
+      r.mode,
+      r.quantityKnown && r.quantity != null
+        ? `${r.quantity}${r.thresholdUnit ? " " + r.thresholdUnit : ""}`
+        : "—",
+      kapsamMetni[r.status],
+      r.conclusion,
+    ]);
+    return {
+      type: "table",
+      headers: [
+        "UN No", "Uygun Taşıma Adı", "Sınıf", "PG", "Taşıma Şekli",
+        "Miktar", "ADR 1.10.3 Kapsamı", "Not",
+      ],
+      rows,
+      note:
+        "Bu tablo, Emniyet Planı Kapsam Taraması'nda firmanın kimyasal envanterinden " +
+        "otomatik üretilmiştir. Yeni ürün/miktar değişikliğinde tarama tekrarlanmalı ve " +
+        "bu ek güncellenmelidir.",
+    };
+  }
+
+  /** Kullanıcının haritada seçtiği durak noktalarını EK-7'ye tablo +
+   *  kroki (şematik güzergah çizimi) olarak ekleyecek blokları üretir.
+   *  Nokta seçilmemişse (rotaNoktalari.length < 2) boş dizi döner — EK-7
+   *  bu durumda yalnızca başlığıyla (doldurulmamış) kalır. */
+  async function ek7Bloklari(): Promise<TemplateBlock[]> {
+    if (rotaNoktalari.length < 2) return [];
+    const bloklar: TemplateBlock[] = [
+      {
+        type: "table",
+        headers: ["Sıra", "Nokta", "Enlem", "Boylam"],
+        rows: rotaNoktalari.map((n, i) => [
+          String(i + 1),
+          i === 0 ? `${n.ad} (Başlangıç)` : i === rotaNoktalari.length - 1 ? `${n.ad} (Varış)` : n.ad,
+          n.lat.toFixed(5),
+          n.lng.toFixed(5),
+        ]),
+      },
+    ];
+    const kroki = await guzergahKrokisiUret(rotaNoktalari);
+    if (kroki) {
+      bloklar.push({
+        type: "dynamicImage",
+        dataUrl: kroki.dataUrl,
+        enBoyOrani: kroki.enBoyOrani,
+        yukseklikMm: 140,
+        note:
+          "Kroki, seçilen durak noktalarından üretilen şematik bir çizimdir; ölçekli " +
+          "harita değildir. Gerçek sürüş güzergahı yol ağına göre farklılık gösterebilir.",
+      });
+    }
+    return bloklar;
+  }
+
+  async function emniyetPlaniOlustur(mod: "onizle" | "indir") {
+    if (!summary) return;
+    setEmniyetPlaniUretiliyor(true);
+    setEmniyetPlaniMesaj("");
+    let pencere: Window | null = null;
+    if (mod === "onizle") {
+      pencere = window.open("", "_blank");
+      if (!pencere) {
+        setEmniyetPlaniMesaj(
+          "Yeni sekme açılamadı — tarayıcının açılır pencere engelleyicisini kontrol et."
+        );
+        setEmniyetPlaniUretiliyor(false);
+        return;
+      }
+    }
+    try {
+      const temelSablon = BELGE_SABLONLARI.EMNIYET_PLANI;
+      if (!temelSablon) throw new Error("EMNİYET PLANI şablonu bulunamadı.");
+
+      // EK-1 tablosunu taranan envanterle değiştir; EK-7'nin altına
+      // (varsa) güzergah tablosu + krokiyi ekle. Orijinal şablon
+      // DEĞİŞTİRİLMEZ — kopyası üzerinde çalışılır.
+      const yeniBlocks: TemplateBlock[] = [];
+      for (const b of temelSablon.blocks) {
+        if (b.type === "table" && b.headers?.[0] === "UN No" && b.headers?.[1] === "Uygun Taşıma Adı") {
+          yeniBlocks.push(ek1TabloBlogu(summary));
+        } else {
+          yeniBlocks.push(b);
+        }
+      }
+      yeniBlocks.push(...(await ek7Bloklari()));
+
+      const sablon = { ...temelSablon, blocks: yeniBlocks };
+
+      const logo = await logoDataUrl();
+      const { hazirlayanAdi, onaylayanAdi } = await imzaIsimleriGetir();
+      const kaseler: { hazirlayan?: KaseCizim; kontrol?: KaseCizim } | undefined = kaseEkle
+        ? {
+            hazirlayan: hazirlayanKasesi(hazirlayanAdi, imzaliKase),
+            kontrol: kontrolEdenKasesi(imzaliKase),
+          }
+        : undefined;
+
+      const { jsPDF } = await import("jspdf");
+      const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+
+      await renderYapilandirilmisBelge(
+        doc,
+        firmaAdi,
+        "EMNIYET_PLANI",
+        "EMNİYET PLANI",
+        sablon,
+        logo,
+        "",
+        hazirlayanAdi,
+        onaylayanAdi,
+        "",
+        false,
+        kaseler
+      );
+
+      if (mod === "onizle" && pencere) {
+        const blobUrl = URL.createObjectURL(doc.output("blob"));
+        pencere.location.href = blobUrl;
+      } else {
+        const bugun = new Date().toLocaleDateString("tr-TR");
+        doc.save(`emniyet_plani_${firmaAdi}_${bugun.replace(/\./g, "-")}.pdf`);
+      }
+    } catch (e) {
+      pencere?.close();
+      setEmniyetPlaniMesaj(
+        "Emniyet Planı oluşturulamadı: " + (e instanceof Error ? e.message : String(e))
+      );
+    } finally {
+      setEmniyetPlaniUretiliyor(false);
+    }
+  }
+
   return (
     <div className="space-y-5">
       <div className="border border-gray-200 rounded-xl bg-white p-5">
@@ -427,6 +597,54 @@ export default function EmniyetKapsamTaramasi({ firmId, firmaAdi }: Props) {
               ⚠ {summary.undetermined} kimyasalın sevkiyat başına miktar bilgisi L1 dosyasında bulunmadığından
               kapsam durumu kesinleştirilemedi — o taşımadaki fiili miktarla karşılaştırılmalı.
             </p>
+          )}
+
+          {/* EMNİYET PLANI (tam doküman) — en az bir madde kapsamda çıktıysa gösterilir. */}
+          {summary.inScope > 0 && (
+            <div className="border border-red-200 rounded-xl bg-red-50/40 p-5 space-y-4">
+              <div>
+                <h3 className="font-semibold text-sm text-red-800">
+                  ⚠ Emniyet Planı Gerekli (ADR 1.10.3.2)
+                </h3>
+                <p className="text-xs text-gray-600 mt-1">
+                  Firmanın envanterinde ADR Tablo 1.10.3.1.2 eşiklerini aşan {summary.inScope} madde
+                  bulunuyor — işletme için tam bir Emniyet Planı hazırlanması gerekiyor. Aşağıda,
+                  taranan envanterle (EK-1) otomatik doldurulmuş, kapak sayfası/kaşe alanları Belge
+                  Oluştur ile aynı biçimde üretilen tam metni indirebilirsin.
+                </p>
+              </div>
+
+              <div>
+                <span className="text-sm font-medium text-gray-700 block mb-1">
+                  EK-7 — Rota Bilgileri (opsiyonel)
+                </span>
+                <p className="text-xs text-gray-500 mb-2">
+                  Taşıma güzergahını haritada işaretlersen, belgede EK-7&apos;ye durak listesi ve
+                  şematik bir güzergah krokisi otomatik eklenir. Nokta seçmezsen EK-7 boş başlıkla kalır.
+                </p>
+                <RotaHaritasi noktalar={rotaNoktalari} onNoktalarDegisti={setRotaNoktalari} />
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  onClick={() => emniyetPlaniOlustur("onizle")}
+                  disabled={emniyetPlaniUretiliyor}
+                  className="px-4 py-2 rounded-lg border border-gray-300 text-sm disabled:opacity-50 hover:bg-white"
+                >
+                  {emniyetPlaniUretiliyor ? "Oluşturuluyor…" : "👁 Önizle"}
+                </button>
+                <button
+                  onClick={() => emniyetPlaniOlustur("indir")}
+                  disabled={emniyetPlaniUretiliyor}
+                  className="px-4 py-2 rounded-lg bg-red-700 text-white text-sm disabled:opacity-50"
+                >
+                  {emniyetPlaniUretiliyor ? "Oluşturuluyor…" : "📄 Emniyet Planını Oluştur (PDF)"}
+                </button>
+                {emniyetPlaniMesaj && (
+                  <p className="text-xs text-red-600 w-full">{emniyetPlaniMesaj}</p>
+                )}
+              </div>
+            </div>
           )}
 
           {/* ALICI / BOŞALTAN BEYANI — raporun son sayfasına eklenir. */}

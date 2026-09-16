@@ -19,13 +19,18 @@ export type TemplateBlock =
   // görselleri vb.). `ids` içindeki anahtarlar belgeGorselleri.ts'te
   // tanımlıdır; `sutun` bir satırda kaç görsel yan yana dizileceğini,
   // `yukseklik` ise mm cinsinden görsel yüksekliğini belirtir.
-  | { type: "images"; ids: string[]; sutun?: number; yukseklik?: number; note?: string };
+  | { type: "images"; ids: string[]; sutun?: number; yukseklik?: number; note?: string }
+  // Kayıt anında dışarıdan üretilen tek bir görsel (örn. Emniyet Planı
+  // Ek-7'deki, kullanıcının haritada çizdiği güzergahtan üretilen kroki).
+  // BELGE_GORSELLERI kaydına ihtiyaç duymaz; içerik belgeyi ÜRETEN kod
+  // tarafından blocks dizisine EKLENMEDEN ÖNCE doldurulur.
+  | { type: "dynamicImage"; dataUrl: string; enBoyOrani: number; yukseklikMm?: number; note?: string };
 
 export type BelgeSablonu = {
   /** true ise belge YATAY (landscape) A4 üretilir — çok sütunlu matris
    *  tabloları dikey sayfaya sığmadığı için (örn. T20 karışık yükleme). */
   yatay?: boolean;
-  docType: "PROSEDÜR" | "TALİMAT" | "KONTROL FORMU" | "LİSTE";
+  docType: "PROSEDÜR" | "TALİMAT" | "KONTROL FORMU" | "LİSTE" | "PLAN";
   yayinTarihi: string; // sabit ilk yayın tarihi (revizyon tarihi = belge oluşturma tarihi olarak basılır)
   amac?: string;
   kapsam?: string;
@@ -39,6 +44,242 @@ export type BelgeSablonu = {
 };
 
 export const BELGE_SABLONLARI: Record<string, BelgeSablonu> = {
+  // ============================= EMNİYET PLANI (ADR 1.10.3) =============================
+  // Kullanıcının yüklediği örnek şablon esas alınarak oluşturuldu. EK-1
+  // (madde envanteri) ve EK-7 (rota bilgileri) bölümleri, belgeyi üreten kod
+  // (EmniyetKapsamTaramasi.tsx) tarafından kayıt anında DOLDURULUR/EKLENİR:
+  // EK-1'in şablon satırları taranan envanterle DEĞİŞTİRİLİR, EK-7'nin
+  // altına kullanıcının haritada seçtiği güzergahın krokisi EKLENİR. Bu
+  // dosyadaki hal, statik/temel (doldurulmamış) şablondur.
+  EMNIYET_PLANI: {
+    docType: "PLAN",
+    yayinTarihi: "16.09.2026",
+    blocks: [
+      { type: "subheading", text: "1. Amaç ve Kapsam" },
+      { type: "paragraph", text: "Bu Emniyet Planı; ADR Bölüm 1.10 hükümleri, özellikle 1.10.3.2’de düzenlenen güvenlik planı yaklaşımı ve Türkiye’de tehlikeli maddelerin karayoluyla taşınmasına ilişkin yürürlükteki mevzuat çerçevesinde hazırlanmıştır. Planın temel amacı, tehlikeli maddelerin kötüye kullanılması, çalınması, sabotaj, yetkisiz erişim ve benzeri kasıtlı güvenlik tehditlerinden kaynaklanabilecek riskleri önlemek veya azaltmaktır." },
+      { type: "paragraph", text: "Plan; işletmenin gönderen, paketleyen, yükleyen, dolduran, taşımacı ve/veya boşaltan olarak üstlendiği ADR sorumlulukları ölçüsünde; tesis, depo, geçici depolama, yükleme-boşaltma sahası, araç park alanı, araç/kargo, personel, taşeronlar, taşıma bilgileri ve taşıma operasyonlarını kapsar." },
+      { type: "paragraph", text: "Kaza, yangın, döküntü ve sızıntı gibi emniyet dışı acil durumların ayrıntılı müdahalesi işletmenin Acil Durum Eylem Planı ve ilgili prosedürleriyle birlikte ele alınır. Bununla birlikte güvenlik olayı ile kaza/olayın aynı anda meydana geldiği durumlarda bu plan ile acil durum planı koordineli uygulanır." },
+      { type: "paragraph", text: "ADR 1.10.3.2 kapsamındaki zorunluluk, Tablo 1.10.3.1.2/1.10.3.1.3 kapsamındaki ciddi sonuçlara neden olabilecek tehlikeli malların ilgili eşiklerin üzerinde taşınması halinde uygulanır. İşletme, zorunlu kapsamda olmasa dahi güvenlik seviyesini artırmak amacıyla bu planı bütün tehlikeli madde faaliyetlerine uygulayabilir." },
+      { type: "subheading", text: "2. Mevzuat ve Referanslar" },
+      { type: "table", headers: ["Kaynak", "Plan Açısından Temel Konu"], rows: [
+        ["ADR 2025 Bölüm 1.10", "Güvenlik hükümleri; 1.10.1 genel hükümler, 1.10.2 güvenlik eğitimi, 1.10.3 ciddi sonuçlara neden olabilecek tehlikeli mallar ve güvenlik planı."],
+        ["ADR 1.10.3.2", "Güvenlik planında bulunması gereken asgari unsurlar: sorumluluklar, madde kayıtları, operasyon/risk değerlendirmesi, tedbirler, olay yönetimi, test-gözden geçirme ve bilgi güvenliği."],
+        ["ADR 1.10.3.3", "Yüksek sonuç doğurabilecek tehlikeli madde taşıyan araç ve kargonun hırsızlığa karşı korunması; uygun güvenlik cihazı/düzenlemeleri."],
+        ["Tehlikeli Maddelerin Karayoluyla Taşınması Hakkında Yönetmelik", "Taşımacılık faaliyetlerinin ADR ve ulusal kurallara uygun yürütülmesi, tarafların riskleri dikkate alarak tedbir alması ve taşıma şartları."],
+        ["Tehlikeli Madde Güvenlik Danışmanlığı Hakkında Tebliğ", "TMGD’nin görevleri; mevzuata uyumun izlenmesi, öneriler, eğitim/denetim/kayıt ve ADR 1.10.3.2 kapsamındaki işletme güvenlik planının hazırlanması ve uygulanmasının sağlanması."],
+        ["4925 sayılı Karayolu Taşıma Kanunu ve ilgili ikincil mevzuat", "Karayolu taşımacılığına ilişkin yetki, faaliyet ve sorumluluk hükümleri."],
+        ["KVKK ve ilgili bilgi güvenliği hükümleri", "CCTV, personel, müşteri, araç ve taşıma bilgilerinin yetkili kişilerle sınırlı işlenmesi ve saklanması."],
+        ["İşletmenin Acil Durum Planı / İSG dokümanları", "Kaza, yangın, döküntü, tahliye ve ilk müdahale ile bu planın koordinasyonu."],
+      ] },
+      { type: "subheading", text: "3. İşletme ve Faaliyet Bilgileri" },
+      { type: "table", headers: ["Bilgi", "Doldurulacak Alan"], rows: [
+        ["Ticaret Unvanı", "[ ]"],
+        ["TMFB No / Geçerlilik", "[ ]"],
+        ["Faaliyet Konuları", "[Gönderen / Taşımacı / Paketleyen / Yükleyen / Dolduran / Boşaltan / vb.]"],
+        ["Tesisler / Şubeler", "[ ]"],
+        ["Araç Sayısı ve Tipleri", "[ ]"],
+        ["Taşınan Tehlike Sınıfları", "[ ]"],
+        ["Yüksek Sonuç Doğurabilecek Madde Var mı?", "[Evet/Hayır – Ek-1 değerlendirmesi]"],
+        ["TMGD / TMGDK", "[ ]"],
+        ["Acil Durum Sorumlusu", "[ ]"],
+        ["Güvenlik Sorumlusu", "[ ]"],
+      ] },
+      { type: "subheading", text: "4. ADR Taraf Rollerinin ve Sorumlulukların Belirlenmesi" },
+      { type: "paragraph", text: "Her sevkiyat ve faaliyet için işletmenin ADR’deki rolü belirlenir. Sorumluluklar, yalnızca sözleşme veya görev tanımına değil, fiilen yapılan işe göre de değerlendirilir." },
+      { type: "table", headers: ["Rol", "Başlıca Emniyet Sorumlulukları"], rows: [
+        ["İşletme Yönetimi", "Planı onaylamak, kaynak sağlamak, yetki ve sorumlulukları belirlemek, güvenlik tedbirlerinin uygulanmasını takip etmek."],
+        ["TMGD", "ADR ve mevzuat uygunluğunu izlemek; güvenlik planını hazırlamak/güncellemek; riskleri değerlendirmek; eğitim, denetim ve kayıtları koordine etmek."],
+        ["Gönderen", "Maddenin doğru tanımlanması, uygun taşıyıcının seçimi, gerekli bilgilerin güvenli aktarılması ve sevkiyatın uygun şekilde hazırlanması."],
+        ["Taşımacı", "Uygun taşıt/sürücü, güvenli operasyon, taşıma belgeleri, güzergâh ve park/mola tedbirleri; güvenlik olaylarının bildirilmesi."],
+        ["Yükleyen/Dolduran", "Araç/ambalaj uygunluğu, doğru ürün-miktar, yük emniyeti, erişim kontrolü ve operasyon sırasında gözetim."],
+        ["Boşaltan/Alıcı", "Yetkili teslim alma, boşaltma alanı güvenliği ve teslim sonrası kontrol."],
+        ["Sürücü", "Araç ve yükün güvenliği, belirlenen operasyon kurallarına uyum, şüpheli durumların derhal bildirilmesi."],
+        ["Alt Yüklenici", "İşletmenin güvenlik şartlarını kabul etmek, eğitim/uygunluk belgelerini sağlamak ve plan hükümlerine uymak."],
+      ] },
+      { type: "subheading", text: "5. Tehlikeli Madde Envanteri ve Yüksek Sonuç Doğurabilecek Maddelerin Belirlenmesi" },
+      { type: "paragraph", text: "İşletme tarafından taşınan, yüklenen, boşaltılan, doldurulan veya faaliyet kapsamında geçici olarak tutulan tehlikeli maddeler Ek-1’de güncel tutulur. Her madde için UN numarası, uygun taşıma adı, sınıf, ambalaj grubu, taşıma şekli ve ilgili miktar bilgileri bulunur." },
+      { type: "paragraph", text: "Ek-1 ayrıca ADR 1.10.3.1.2’deki Tabloya göre ciddi sonuçlara neden olabilecek tehlikeli madde değerlendirmesini içermelidir. Değerlendirme yalnızca maddenin sınıfına bakılarak değil, ilgili UN numarası ve ADR’de belirtilen eşik/miktar kriterleri esas alınarak yapılır." },
+      { type: "bullet", items: [
+        "Yüksek sonuç doğurabilecek madde tespitinde ADR Tablo 1.10.3.1.2 ve ilgili özel hükümler kontrol edilir.",
+        "Taşıma kategorisi veya başka bir muafiyet nedeniyle güvenlik hükümlerinin uygulanabilirliği ayrıca değerlendirilir.",
+        "Madde listesi; yeni ürün, ürün sınıflandırması değişikliği, yeni müşteri/rota veya faaliyet değişikliğinde güncellenir.",
+      ] },
+      { type: "subheading", text: "6. Güvenlik Risk Değerlendirmesi" },
+      { type: "paragraph", text: "Risk değerlendirmesi; taşıma öncesi, taşıma sırasında ve taşıma sonrasında tehlikeli maddenin bulunduğu tüm aşamaları kapsar. ADR 1.10.3.2.2(c) doğrultusunda duraklamalar, araç/tank/konteynerde bekletme ve uygun olduğu durumlarda aktarma/geçici depolama süreçleri değerlendirilir." },
+      { type: "table", headers: ["Risk Alanı", "Değerlendirme Kriterleri", "Kontrol Tedbiri"], rows: [
+        ["Tesis erişimi", "Yetkisiz kişi/araç, gece erişimi, kritik alanlar", "Kartlı giriş, ziyaretçi kaydı, çevre güvenliği, kamera/aydınlatma"],
+        ["Depolama", "Çalınma, sabotaj, stok bilgisinin kötüye kullanılması", "Kilitli alan, stok takibi, erişim yetkisi, yüksek riskli ürünler için ilave kontrol"],
+        ["Yükleme/doldurma", "Ürün değişimi, yetkisiz müdahale, gözetimsiz araç", "Yetkili personel, kimlik/yetki doğrulama, operasyon kontrol listesi"],
+        ["Taşıma", "Araç/kargo hırsızlığı, rota sapması, saldırı", "Güvenli rota, güvenli park, takip sistemi; gerekli durumda ilave güvenlik"],
+        ["Mola/bekleme", "Issız veya kontrolsüz alanlarda hedef olma", "Önceden belirlenen güvenli alanlar, gereksiz duruşların önlenmesi"],
+        ["Bilgi güvenliği", "Rota, yük, müşteri ve araç bilgilerinin sızması", "Yetki bazlı erişim, parola/erişim kontrolü, kontrollü paylaşım"],
+        ["İç tehdit", "Personel veya taşeron kaynaklı kötüye kullanım", "Yetkilendirme, eğitim, görev ayrılığı, olay bildirim mekanizması"],
+        ["Siber risk", "GPS/filo yazılımı, dijital evrak ve hesaplara saldırı", "MFA mümkünse uygulanması, erişim yetkileri, yedekleme, olay bildirimi"],
+      ] },
+      { type: "subheading", text: "7. Tesis ve Erişim Güvenliği" },
+      { type: "bullet", items: [
+        "Giriş-çıkış noktaları belirlenir ve mümkün olan ölçüde kontrol altında tutulur.",
+        "Ziyaretçiler kimlik/yetki kontrolünden geçirilir; kritik alanlara refakatsiz erişimleri engellenir.",
+        "Tehlikeli madde depoları, dolum/yükleme sahaları, araç park alanları ve kritik ekipmanlara erişim görev bazlı yetkilendirilir.",
+        "İşten ayrılan veya görevi değişen personelin erişim yetkileri gecikmeksizin gözden geçirilir.",
+        "Kamera, aydınlatma, çevre çiti, kilit, alarm ve benzeri tedbirler risk seviyesine göre uygulanır.",
+        "CCTV ve diğer kişisel veriler KVKK ve işletmenin saklama/erişim politikalarına uygun yönetilir.",
+        "Anahtarlar, kartlar, mühürler ve kritik güvenlik ekipmanları kayıtlı şekilde teslim edilir.",
+      ] },
+      { type: "subheading", text: "8. Depolama ve Geçici Bekletme Güvenliği" },
+      { type: "bullet", items: [
+        "Tehlikeli maddeler yalnızca yetkilendirilmiş alanlarda tutulur.",
+        "Yüksek sonuç doğurabilecek tehlikeli maddeler için erişim ve stok kontrolü artırılır.",
+        "Stok giriş-çıkışları izlenebilir şekilde kayıt altına alınır.",
+        "Hasarlı, açılmış veya şüpheli ambalajlar karantina alanına alınır ve ilgili sorumluya bildirilir.",
+        "Geçici depolama/aktarma noktaları için erişim, aydınlatma, gözetim ve bekleme süresi değerlendirilir.",
+        "Araç üzerinde yükün bekletilmesi zorunluysa güvenli park ve gözetim tedbirleri uygulanır.",
+      ] },
+      { type: "subheading", text: "9. Yükleme, Doldurma ve Boşaltma Güvenliği" },
+      { type: "bullet", items: [
+        "İşlem öncesinde araç, tank, konteyner, IBC veya ambalajın bütünlüğü ve uygunluğu kontrol edilir.",
+        "Ürün adı, UN numarası, sınıf, ambalaj grubu, miktar ve sevk bilgileri karşılaştırılır.",
+        "Yükleme/doldurma/boşaltma alanına yalnızca yetkili kişiler alınır.",
+        "İşlem devam ederken araç veya yük gereksiz şekilde gözetimsiz bırakılmaz.",
+        "Teslim alma yetkisi doğrulanmadan tehlikeli madde teslim edilmez.",
+        "Mühür/kilit kullanılan taşımalarda mühür numarası kayıt altına alınır ve varışta kontrol edilir.",
+        "Uyuşmazlık, şüpheli talimat veya beklenmeyen güzergâh/teslimat değişikliği doğrulanmadan işlem yapılmaz.",
+      ] },
+      { type: "subheading", text: "10. Taşıma, Güzergâh, Mola ve Park Güvenliği" },
+      { type: "bullet", items: [
+        "Taşıma operasyonu için mümkün olduğu ölçüde önceden değerlendirilmiş güzergâhlar kullanılır.",
+        "Yüksek riskli taşımalar için rota, duraklama ve park noktaları güvenlik açısından değerlendirilir.",
+        "Gereksiz duruşlardan ve kontrolsüz/ıssız alanlarda uzun süreli beklemelerden kaçınılır.",
+        "Aracın park edilmesi sırasında mevzuatın öngördüğü park kuralları ayrıca uygulanır; özellikle yüklü veya temizlenmemiş tankerlerin işletme sahası ve yerleşim yeri içindeki özel park şartları kontrol edilir.",
+        "Yüksek sonuç doğurabilecek tehlikeli madde taşımalarında araç ve kargonun hırsızlığa karşı korunması için uygun kilit/alarm/takip/izleme tedbirleri kullanılır.",
+        "Rota sapması veya olağandışı duruş tespit edildiğinde işletmenin belirlediği bildirim prosedürü uygulanır.",
+      ] },
+      { type: "subheading", text: "11. Araç, Tank, Ambalaj ve Güvenlik Ekipmanları" },
+      { type: "bullet", items: [
+        "Taşıt ve taşıma birimlerinin ADR ve ulusal mevzuata göre gerekli uygunluk, muayene ve teknik kontrolleri takip edilir.",
+        "Ambalaj, IBC, tank ve diğer taşıma birimlerinin ürün ve taşıma şekline uygunluğu kontrol edilir.",
+        "Araç anahtarları ve erişim yetkileri kontrollü tutulur.",
+        "Yüksek riskli taşımalarda araç takip/telemetri sistemi, risk değerlendirmesinde gerekli görülmesi halinde kullanılır.",
+        "Kilit, mühür, alarm ve benzeri güvenlik ekipmanlarının çalışır durumda olması sefer öncesi kontrol edilir.",
+        "ADR kapsamında araçta bulunması gereken güvenlik ekipmanları ve belgeler ayrıca taşıma öncesi kontrol listesiyle doğrulanır.",
+      ] },
+      { type: "subheading", text: "12. Personel Güvenliği, Yetkilendirme ve Eğitim" },
+      { type: "bullet", items: [
+        "Tehlikeli madde taşımacılığında görev alan personelin görevine uygun ADR farkındalık ve güvenlik eğitimi sağlanır.",
+        "Özel görevi bulunan personel, yaptığı işe ilişkin operasyonel ve mevzuatsal eğitimi alır.",
+        "Yeni göreve başlayan personelin güvenlik sorumlulukları işe başlamadan önce açıklanır.",
+        "Şüpheli kişi, araç, davranış, talep, rota değişikliği veya yük müdahalesini tanıma ve bildirme eğitimi verilir.",
+        "Eğitim kayıtları tarih, konu, eğitmen ve katılımcı bilgileriyle tutulur.",
+        "TMGD’nin eğitim, denetim ve kayıt faaliyetleri işletme prosedürleriyle izlenebilir hale getirilir.",
+      ] },
+      { type: "subheading", text: "13. Bilgi ve Doküman Güvenliği" },
+      { type: "bullet", items: [
+        "Taşıma planları, müşteri bilgileri, UN numarası/miktar bilgileri, güzergâhlar, araç bilgileri ve güvenlik planı yalnızca ihtiyacı olan kişilerle paylaşılır.",
+        "Basılı taşıma belgeleri ve güvenlik planı yetkisiz kişilerin erişemeyeceği şekilde muhafaza edilir.",
+        "Dijital sistemlerde görev bazlı kullanıcı yetkisi uygulanır.",
+        "Personel ayrılışında kullanıcı hesapları ve erişimler kapatılır.",
+        "Elektronik kayıtların yedeklenmesi ve erişim loglarının tutulması işletmenin bilgi güvenliği prosedürlerine göre yapılır.",
+        "Güvenlik planının tamamı, yüksek riskli rota ve kargo bilgilerinin gereksiz şekilde çoğaltılmasını önleyecek biçimde kontrollü dağıtılır.",
+      ] },
+      { type: "subheading", text: "14. Hırsızlık, Sabotaj, Yetkisiz Müdahale ve Şüpheli Durumlar" },
+      { type: "bullet", items: [
+        "Personel öncelikle kendi ve çevresindekilerin güvenliğini sağlar; şüpheli kişiye doğrudan müdahale etmez.",
+        "Şüpheli durum; yer, zaman, araç/plaka, kişi tanımı, olayın niteliği ve mümkünse güvenli şekilde elde edilen diğer bilgilerle kayıt altına alınır.",
+        "Araç/kargo çalınması veya hırsızlık girişiminde kolluk kuvvetleri ve işletmenin acil iletişim zinciri derhal bilgilendirilir.",
+        "Şüpheli paket, mühür veya ambalaj açılmaz ve gereksiz temas kurulmaz.",
+        "Delillerin korunması sağlanır; olay yeri gereksiz şekilde değiştirilmez.",
+        "Rota, yük veya teslimat değişikliği gibi olağandışı talepler ikinci bir yetkili tarafından doğrulanmadan uygulanmaz.",
+      ] },
+      { type: "subheading", text: "15. Acil Durum ve Güvenlik Olayı Müdahalesi" },
+      { type: "paragraph", text: "Güvenlik olayı meydana geldiğinde aşağıdaki genel sıra izlenir: İnsan güvenliği → olayın büyümesini önleme → yetkili kurumlara bildirim → işletme/TMGD bilgilendirmesi → delillerin korunması → kayıt ve kök neden analizi → düzeltici/önleyici faaliyet." },
+      { type: "bullet", items: [
+        "Hayati tehlike veya saldırı söz konusuysa güvenli bölgeye geçilir ve 112 Acil Çağrı Merkezi üzerinden ilgili birimler haberdar edilir.",
+        "Tehlikeli maddeye temas, sızıntı veya yangın varsa işletmenin Acil Durum Planı ve maddenin ADR/SDS kaynaklı müdahale bilgileri uygulanır.",
+        "Çalınan veya kaybolan araç/yük için mümkünse son bilinen konum ve ilgili taşıma bilgileri yetkili makamlara iletilir.",
+        "TMGD ve işletme yetkilisi olaydan haberdar edilir.",
+        "Olay sonrasında olay raporu hazırlanır ve gerekli düzeltici/önleyici faaliyetler belirlenir.",
+      ] },
+      { type: "subheading", text: "16. Olay Bildirimi, Kayıt ve Kök Neden Analizi" },
+      { type: "table", headers: ["Kayıt", "Asgari İçerik"], rows: [
+        ["Güvenlik Olayı Formu", "Tarih-saat, yer, olay türü, araç/yük, UN No, miktar, ilgili personel, alınan tedbirler, bildirimler."],
+        ["Şüpheli Durum Kaydı", "Gözlem, kişi/araç, davranış, alınan aksiyon, sonuç."],
+        ["Sefer/Güvenlik Kontrol Listesi", "Araç, kilit/mühür, belge, ekipman, rota ve park kontrolü."],
+        ["Eğitim Kaydı", "Personel, eğitim konusu, tarih, eğitmen, katılım."],
+        ["Düzeltici/Önleyici Faaliyet", "Kök neden, aksiyon, sorumlu, termin, kapanış doğrulaması."],
+      ] },
+      { type: "paragraph", text: "TMGD tarafından hazırlanan kayıtlar ve danışmanlık faaliyetleri, yürürlükteki TMGD mevzuatında öngörülen saklama süreleri ve işletmenin doküman kontrol prosedürü doğrultusunda muhafaza edilir." },
+      { type: "subheading", text: "17. Test, Tatbikat, Denetim ve Performans İzleme" },
+      { type: "bullet", items: [
+        "Emniyet Planının uygulanabilirliği periyodik olarak test edilir.",
+        "En az yılda bir kez masa başı senaryo/tatbikat yapılması; yüksek riskli faaliyetlerde risk değerlendirmesine göre daha sık tatbikat planlanması önerilir.",
+        "Örnek senaryolar: araç/kargo hırsızlığı, yetkisiz tesis girişi, mühür bozulması, şüpheli kişi, rota sapması, GPS/iletişim kaybı, sabotaj girişimi.",
+        "Denetimlerde uygunsuzluk, sorumlu kişi ve termin belirlenir.",
+        "Performans göstergeleri; eğitim tamamlama oranı, güvenlik olayı sayısı, kapatılan aksiyonlar, erişim ihlalleri ve sefer öncesi kontrol uyumu gibi göstergelerden seçilebilir.",
+      ] },
+      { type: "subheading", text: "18. Gözden Geçirme, Revizyon ve Yürürlük" },
+      { type: "bullet", items: [
+        "Plan TMGD koordinasyonunda en az yılda bir kez gözden geçirilir.",
+        "Yeni UN numarası, yeni taşıma şekli, yeni tesis/şube, yeni güzergâh, araç filosunda önemli değişiklik, güvenlik olayı, tehdit seviyesinde değişiklik veya mevzuat değişikliği halinde plan derhal yeniden değerlendirilir.",
+        "Her revizyon kapak sayfasında revizyon numarası, tarih ve değişiklik özetiyle izlenir.",
+        "Güncel plan, ilgili personel ve alt yüklenicilere görevleri ölçüsünde duyurulur.",
+        "Eski revizyonların kontrolsüz kullanımını önlemek için doküman dağıtımı ve geri çekme sistemi uygulanır.",
+      ] },
+      { type: "subheading", text: "EK-1 – Tehlikeli Madde ve Yüksek Sonuç Doğurabilecek Madde Listesi" },
+      { type: "table", headers: ["UN No", "Uygun Taşıma Adı", "Sınıf", "PG", "Taşıma Şekli", "Miktar", "ADR 1.10.3 Kapsamı", "Not"], rows: [
+        ["", "", "", "", "", "", "[E/H]", ""],
+        ["", "", "", "", "", "", "[E/H]", ""],
+        ["", "", "", "", "", "", "[E/H]", ""],
+      ] },
+      { type: "subheading", text: "EK-2 – Görevli Personel ve Yetki Matrisi" },
+      { type: "table", headers: ["Ad Soyad", "Görev", "ADR Rolü", "Emniyet Sorumluluğu", "Yetki Seviyesi", "İletişim"], rows: [
+        ["", "", "", "", "", ""],
+        ["", "", "", "", "", ""],
+        ["", "", "", "", "", ""],
+      ] },
+      { type: "subheading", text: "EK-3 – Acil ve Güvenlik İletişim Listesi" },
+      { type: "table", headers: ["Kurum/Kişi", "Görev", "Telefon", "Ne Zaman Aranır?"], rows: [
+        ["112 Acil Çağrı Merkezi", "Acil durum / kolluk / itfaiye / sağlık koordinasyonu", "112", "Hayati tehlike, saldırı, kaza vb."],
+        ["TMGD", "Tehlikeli madde güvenlik danışmanı", "[ ]", "Güvenlik olayı / mevzuat değerlendirmesi"],
+        ["İşletme Yetkilisi", "Yönetim / olay koordinasyonu", "[ ]", "Tüm kritik olaylar"],
+        ["Taşıma Operasyon Sorumlusu", "Sevkiyat / araç / rota", "[ ]", "Araç-kargo güvenliği"],
+      ] },
+      { type: "subheading", text: "EK-4 – Eğitim Kayıtları" },
+      { type: "table", headers: ["Personel", "Eğitim Konusu", "Tarih", "Sertifika No", "Tazeleme / Yenileme"], rows: [
+        ["", "", "", "", ""],
+        ["", "", "", "", ""],
+        ["", "", "", "", ""],
+      ] },
+      { type: "subheading", text: "EK-5 – Sefer Öncesi Emniyet Kontrol Listesi" },
+      { type: "bullet", items: [
+        "☐ Araç ve sürücü belgeleri kontrol edildi.",
+        "☐ Araç/kargo güvenlik ekipmanı kontrol edildi.",
+        "☐ Kilit/mühür kontrol edildi; gerekiyorsa numarası kaydedildi.",
+        "☐ Taşıma evrakı ve yük bilgileri doğrulandı.",
+        "☐ Güzergâh ve güvenli mola/park noktaları değerlendirildi.",
+        "☐ İletişim cihazı çalışır durumda.",
+        "☐ Şüpheli veya olağandışı talimat bulunmuyor.",
+        "☐ Sürücü güvenlik ve acil durum prosedürlerini biliyor.",
+        "☐ Yükleme tamamlandı; araç gereksiz şekilde gözetimsiz bırakılmayacak.",
+      ] },
+      { type: "subheading", text: "EK-6 – Güvenlik Olayı Bildirim Formu" },
+      { type: "table", headers: ["Alan", "Bilgi"], rows: [
+        ["Olay Tarihi/Saati", ""],
+        ["Olay Yeri", ""],
+        ["Olay Türü", "[Hırsızlık / Sabotaj / Yetkisiz Giriş / Şüpheli Durum / Diğer]"],
+        ["Araç / Plaka", ""],
+        ["UN No / Madde / Miktar", ""],
+        ["Olayın Açıklaması", ""],
+        ["Alınan İlk Tedbirler", ""],
+        ["Bildirim Yapılan Kurum/Kişiler", ""],
+        ["Kök Neden", ""],
+        ["Düzeltici/Önleyici Faaliyet", ""],
+        ["Sorumlu / Termin", ""],
+      ] },
+      { type: "subheading", text: "EK-7 Rota Bilgileri" },
+    ],
+  },
+
+
   // ============================= P1 — ALICI PROSEDÜRÜ =============================
   P1: {
     docType: "PROSEDÜR",

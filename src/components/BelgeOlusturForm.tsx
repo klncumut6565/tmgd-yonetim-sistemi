@@ -1094,7 +1094,7 @@ type LogoData = { data: string; fmt: "PNG" | "JPEG"; enBoyOrani: number } | null
 
 // İmza kutusuna basılacak kaşe. hedefGenislikMm verilirse kaşe belgede
 // gerçek fiziksel ölçüsünde basılır (bkz. src/lib/kaseler.ts).
-type KaseCizim = {
+export type KaseCizim = {
   data: string;
   fmt: "PNG" | "JPEG";
   enBoyOrani: number;
@@ -1230,7 +1230,11 @@ type Satir =
   | { tur: "paragraf"; metin: string }
   | { tur: "madde"; metin: string; numara?: number }
   | { tur: "tablo"; headers?: string[]; rows: string[][]; note?: string; colWidths?: number[] }
-  | { tur: "gorseller"; ids: string[]; sutun: number; yukseklik: number; note?: string };
+  | { tur: "gorseller"; ids: string[]; sutun: number; yukseklik: number; note?: string }
+  // Dinamik olarak (kayıt anında, örn. Emniyet Planı Ek-7 güzergah krokisi)
+  // üretilen, statik BELGE_GORSELLERI kaydına ihtiyaç duymayan tek bir
+  // görsel. dataUrl doğrudan doc.addImage'e verilir.
+  | { tur: "dinamikGorsel"; dataUrl: string; enBoyOrani: number; yukseklikMm?: number; note?: string };
 
 // Sayfa geometrisi — orijinal TMGDK belgelerinden ölçülerek alınmıştır:
 // dış çerçeve 8,5 mm, başlık kutusu 12,4 mm'den başlar, içerik alanı
@@ -1364,6 +1368,14 @@ function duzMetneCevir(doc: JsPDFType, sablon: BelgeSablonu, belgeAdi: string): 
         ids: b.ids.filter((id) => BELGE_GORSELLERI[id]),
         sutun: b.sutun ?? 4,
         yukseklik: b.yukseklik ?? 22,
+        note: b.note,
+      });
+    } else if (b.type === "dynamicImage") {
+      satirlar.push({
+        tur: "dinamikGorsel",
+        dataUrl: b.dataUrl,
+        enBoyOrani: b.enBoyOrani,
+        yukseklikMm: b.yukseklikMm,
         note: b.note,
       });
     }
@@ -1554,8 +1566,23 @@ function gorsellerCiz(
 
 function satirYuksekligi(doc: JsPDFType, satir: Satir, genislik: number): number {
   if (satir.tur === "gorseller") return gorsellerYuksekligiHesapla(doc, satir, genislik);
+  if (satir.tur === "dinamikGorsel") return dinamikGorselYuksekligiHesapla(satir, genislik);
   if (satir.tur === "tablo") return tabloYuksekligiHesapla(doc, satir, genislik);
   return SATIR_YUKSEKLIGI[satir.tur] + (satir.tur === "altbaslik" ? 2 + ALTBASLIK_ON_BOSLUK : 0);
+}
+
+/** Dinamik görselin genişlik sınırına göre (oranı bozmadan) kaplayacağı
+ *  yüksekliği hesaplar; satir.yukseklikMm verilmişse ve daha küçükse o
+ *  kullanılır (taşma olmaz, sadece küçültme yönünde etkili olur). */
+function dinamikGorselYuksekligiHesapla(
+  satir: Extract<Satir, { tur: "dinamikGorsel" }>,
+  genislik: number
+): number {
+  const genislikSiniriyleYukseklik = genislik / satir.enBoyOrani;
+  const yukseklik = satir.yukseklikMm
+    ? Math.min(satir.yukseklikMm, genislikSiniriyleYukseklik)
+    : genislikSiniriyleYukseklik;
+  return yukseklik + (satir.note ? 9 : 0);
 }
 
 /** Bir tablo satırını, mevcut sayfada kalan boşluğa göre ikiye böler:
@@ -2076,7 +2103,7 @@ function kapakSayfasiCiz(
   }
 }
 
-async function renderYapilandirilmisBelge(
+export async function renderYapilandirilmisBelge(
   doc: JsPDFType,
   firmAdi: string,
   code: string,
@@ -2275,6 +2302,24 @@ async function renderYapilandirilmisBelge(
       } else if (satir.tur === "gorseller") {
         gorsellerCiz(doc, satir, M, y, genislik);
         y += gorsellerYuksekligiHesapla(doc, satir, genislik);
+      } else if (satir.tur === "dinamikGorsel") {
+        const gy = y;
+        const gYukseklik = dinamikGorselYuksekligiHesapla(satir, genislik) - (satir.note ? 9 : 0);
+        const gGenislik = gYukseklik * satir.enBoyOrani;
+        const gx = M + (genislik - gGenislik) / 2; // ortalanmış
+        try {
+          doc.addImage(satir.dataUrl, "PNG", gx, gy, gGenislik, gYukseklik);
+        } catch {
+          /* görsel eklenemezse belge yine üretilsin */
+        }
+        if (satir.note) {
+          doc.setFontSize(7.5);
+          doc.setFont(FONT, "normal");
+          doc.setTextColor(110, 110, 110);
+          doc.text(doc.splitTextToSize(satir.note, genislik), M, gy + gYukseklik + 4);
+          doc.setTextColor(0, 0, 0);
+        }
+        y += dinamikGorselYuksekligiHesapla(satir, genislik);
       } else {
         doc.setFontSize(9.5);
         doc.setFont(FONT, "normal");
