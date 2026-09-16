@@ -44,6 +44,12 @@ const TMGD_RENKLERI = [
   "#FBCFE8", // pembe
   "#BFDBFE", // mavi
   "#FED7AA", // turuncu
+  "#A7F3D0", // nane
+  "#FECACA", // somon
+  "#E9D5FF", // lila
+  "#FEF08A", // sarı
+  "#C7D2FE", // indigo
+  "#D9F99D", // fıstık
 ];
 const UMUT_RENGI = "#40E0D0"; // turkuaz
 
@@ -55,13 +61,35 @@ function umutMu(ad: string): boolean {
     .includes("UMUTKILIN");
 }
 
-/** Kişi kimliğinden sabit bir renk üretir — sıralamadan bağımsız. */
-function tmgdRengi(atama: Atama | undefined): string | null {
-  if (!atama) return null;
-  if (umutMu(atama.ad)) return UMUT_RENGI;
-  let toplam = 0;
-  for (const ch of atama.userId) toplam = (toplam * 31 + ch.charCodeAt(0)) % 100000;
-  return TMGD_RENKLERI[toplam % TMGD_RENKLERI.length];
+/**
+ * Atanmış TMGD'lere renk dağıtır.
+ *
+ * Önceden renk, user_id'den hash ile üretiliyordu; bu iki farklı TMGD'nin
+ * AYNI rengi almasına yol açabiliyordu (hash çakışması) — takvimde iki
+ * danışmanın firmaları ayırt edilemez hale geliyordu. Artık kişiler
+ * user_id'ye göre sıralanıp paletten SIRAYLA renk alıyor: palet dolmadığı
+ * sürece hiçbir iki kişi aynı rengi almıyor ve sıralama sabit olduğu için
+ * renkler sayfa yenilendiğinde değişmiyor.
+ */
+function tmgdRenkHaritasi(atamalar: Atama[]): Map<string, string> {
+  const harita = new Map<string, string>();
+  const benzersiz = new Map<string, Atama>();
+  for (const a of atamalar) if (!benzersiz.has(a.userId)) benzersiz.set(a.userId, a);
+
+  const sirali = Array.from(benzersiz.values()).sort((a, b) =>
+    a.userId.localeCompare(b.userId)
+  );
+  let i = 0;
+  for (const a of sirali) {
+    // Umut KILINÇ'ın firmaları turkuaz olarak istendi — paletten bağımsız.
+    if (umutMu(a.ad)) {
+      harita.set(a.userId, UMUT_RENGI);
+      continue;
+    }
+    harita.set(a.userId, TMGD_RENKLERI[i % TMGD_RENKLERI.length]);
+    i++;
+  }
+  return harita;
 }
 
 const AY_ADLARI = [
@@ -150,15 +178,34 @@ export default function FirmaTakvimiPage() {
     if (visitRes.error) setHata("Ziyaretler yüklenemedi: " + hataCevir(visitRes.error));
     else setZiyaretler((visitRes.data as Visit[]) || []);
 
+    // Firma -> danışman eşlemesi.
+    // ÖNCEKİ HATA: yalnızca role === "tmgd" olan atamalar alınıyordu; bu
+    // yüzden rolü admin/super_admin/assistant olan danışmanların firmaları
+    // renksiz kalıyordu. Artık firma tarafı kullanıcıları (company, viewer)
+    // DIŞLANIYOR, geri kalan herkes danışman sayılıyor. Bir firmaya birden
+    // çok kişi atanmışsa rol önceliğine göre biri seçilir.
+    const rolOnceligi: Record<string, number> = {
+      tmgd: 0,
+      assistant: 1,
+      admin: 2,
+      super_admin: 3,
+    };
+    const haricRoller = new Set(["company", "viewer"]);
+
     const eslesme = new Map<string, Atama>();
+    const seciliOncelik = new Map<string, number>();
     for (const a of (atamaRes.data as Record<string, any>[]) || []) {
       const p = a.profiles;
       if (!p) continue;
-      if (p.role && p.role !== "tmgd") continue;   // yalnızca TMGD atamaları
-      const ad = String(p.full_name || "").trim();
-      if (!ad) continue;
-      if (!eslesme.has(a.firm_id)) {
+      const rol = String(p.role || "");
+      if (haricRoller.has(rol)) continue;
+      // Adı boş olsa bile firma renksiz kalmasın; renk user_id'den üretiliyor.
+      const ad = String(p.full_name || "").trim() || "(isim girilmemiş)";
+      const oncelik = rolOnceligi[rol] ?? 4;
+      const mevcut = seciliOncelik.get(a.firm_id);
+      if (mevcut === undefined || oncelik < mevcut) {
         eslesme.set(a.firm_id, { userId: String(a.user_id), ad });
+        seciliOncelik.set(a.firm_id, oncelik);
       }
     }
     setFirmaTmgd(eslesme);
@@ -196,22 +243,51 @@ export default function FirmaTakvimiPage() {
 
   // O ay HENÜZ ziyaret edilmemiş firmalar — takvime eklenen firma
   // buradan otomatik düşer.
-  const ziyaretEdilmeyenler = useMemo(
-    () => firmalar.filter((f) => !ziyaretEdilenFirmaIdleri.has(f.id)),
-    [firmalar, ziyaretEdilenFirmaIdleri]
-  );
+  // Ziyaret edilmeyen firmalar — atandıkları TMGD'ye göre GRUPLANIR:
+  // önce TMGD adına, sonra firma adına göre sıralanır. Böylece aynı
+  // danışmanın firmaları listede yan yana ve aynı renkte görünür.
+  // Ataması olmayan firmalar en sona alınır.
+  const ziyaretEdilmeyenler = useMemo(() => {
+    return firmalar
+      .filter((f) => !ziyaretEdilenFirmaIdleri.has(f.id))
+      .sort((a, b) => {
+        const aa = firmaTmgd.get(a.id);
+        const bb = firmaTmgd.get(b.id);
+        if (!aa && bb) return 1;
+        if (aa && !bb) return -1;
+        if (aa && bb && aa.userId !== bb.userId) {
+          return aa.ad.localeCompare(bb.ad, "tr");
+        }
+        return a.name.localeCompare(b.name, "tr");
+      });
+  }, [firmalar, ziyaretEdilenFirmaIdleri, firmaTmgd]);
 
-  // Takvimde o ay görünen firmaların TMGD'leri — renk lejantı için.
+  // TMGD -> renk eşlemesi. Tüm atamalardan tek seferde üretilir ki
+  // takvim, alt liste ve lejant AYNI rengi kullansın.
+  const renkHaritasi = useMemo(
+    () => tmgdRenkHaritasi(Array.from(firmaTmgd.values())),
+    [firmaTmgd]
+  );
+  const firmaRengi = (firmId: string): string | null => {
+    const a = firmaTmgd.get(firmId);
+    return a ? renkHaritasi.get(a.userId) ?? null : null;
+  };
+
+  // Renk lejantı — sayfadaki TÜM firmaların TMGD'leri.
+  // Önceden yalnızca o ay ziyareti olan firmalara bakıyordu; ziyaret
+  // edilmeyen firmalar listesi de renklendiği için artık tüm atamalar
+  // üzerinden kuruluyor, aksi halde alttaki renklerin karşılığı
+  // lejantta görünmüyordu.
   const tmgdLejanti = useMemo(() => {
     const m = new Map<string, { userId: string; ad: string; renk: string }>();
-    for (const z of ziyaretler) {
-      const atama = firmaTmgd.get(z.firm_id);
-      const renk = tmgdRengi(atama);
+    for (const f of firmalar) {
+      const atama = firmaTmgd.get(f.id);
+      const renk = atama ? renkHaritasi.get(atama.userId) : undefined;
       if (!atama || !renk || m.has(atama.userId)) continue;
       m.set(atama.userId, { userId: atama.userId, ad: atama.ad, renk });
     }
     return Array.from(m.values()).sort((a, b) => a.ad.localeCompare(b.ad, "tr"));
-  }, [ziyaretler, firmaTmgd]);
+  }, [firmalar, firmaTmgd, renkHaritasi]);
 
   // Ekleme panelinde gösterilecek firmalar: o gün zaten eklenmiş olanlar
   // listede görünmez (aynı gün aynı firma iki kez eklenmesin).
@@ -451,7 +527,7 @@ export default function FirmaTakvimiPage() {
                     // Firma etiketi, atandığı TMGD'nin rengiyle basılır.
                     // Ataması olmayan firma beyaz zeminde kalır.
                     const atama = firmaTmgd.get(z.firm_id);
-                    const renk = tmgdRengi(atama);
+                    const renk = firmaRengi(z.firm_id);
                     return (
                       <div
                         key={z.id}
@@ -614,7 +690,15 @@ export default function FirmaTakvimiPage() {
 
         <ul className="divide-y">
           {ziyaretEdilmeyenler.map((f) => (
-            <li key={f.id} className="flex items-center gap-2 py-2 text-sm">
+            <li
+              key={f.id}
+              className="flex items-center gap-2 py-2 px-2 text-sm rounded"
+              style={
+                firmaRengi(f.id)
+                  ? { backgroundColor: firmaRengi(f.id)! }
+                  : undefined
+              }
+            >
               {/* "Takvime ekle" firma adından ÖNCE gelir. */}
               {canWrite && (
                 <button
@@ -637,10 +721,21 @@ export default function FirmaTakvimiPage() {
               )}
               <Link
                 href={`/firms/${f.id}`}
-                className="truncate hover:underline min-w-0"
+                className={
+                  "truncate hover:underline min-w-0 " +
+                  (firmaRengi(f.id) ? "text-black" : "")
+                }
+                title={
+                  firmaTmgd.get(f.id)
+                    ? `${f.name} — TMGD: ${firmaTmgd.get(f.id)!.ad}`
+                    : `${f.name} — TMGD atanmamış`
+                }
               >
                 {f.name}
               </Link>
+              <span className="ml-auto text-[11px] shrink-0 text-black/60">
+                {firmaTmgd.get(f.id)?.ad ?? "atanmamış"}
+              </span>
             </li>
           ))}
         </ul>
