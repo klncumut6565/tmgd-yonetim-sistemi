@@ -1,5 +1,6 @@
 "use client";
 
+import DateInput from "@/components/DateInput";
 // src/components/AracEvraklari.tsx
 //
 // ARAÇ EVRAKI OLUŞTUR — Araçlar menüsü altındaki alt sekme.
@@ -99,6 +100,120 @@ function GecerlilikRozeti({ tarih }: { tarih: string }) {
         : "bg-gray-100 text-gray-500";
   return (
     <span className={`px-1.5 py-0.5 rounded whitespace-nowrap ${sinif}`}>{metin}</span>
+  );
+}
+
+/**
+ * Tek bir belge türünün satırı: başlık, yükleme/tarama düğmeleri ve
+ * yüklenmiş dosyaların listesi.
+ *
+ * ÖNEMLİ: Bu bileşen MODÜL seviyesinde tanımlıdır. Önceden AracEvraklari'nin
+ * İÇİNDE tanımlıydı; her render'da yeni bir bileşen türü üretildiği için
+ * React alt ağacı söküp yeniden kuruyordu. Bunun görünen sonucu, tarih
+ * alanının takvimi açılır açılmaz kapanmasıydı. Dışarı alınınca bileşen
+ * kimliği sabitlendi ve sorun ortadan kalktı.
+ */
+function BelgeSatiri({
+  baslik,
+  dosyalar,
+  onYukle,
+  onSil,
+  onMobilTara,
+  canWrite,
+  tarayiciYapilandirilmis,
+  belgeGoruntule,
+  gecerlilikGuncelle,
+}: {
+  baslik: string;
+  dosyalar: BelgeDosyasi[];
+  onYukle: (files: FileList) => void;
+  onSil: (dosya: BelgeDosyasi) => void;
+  /** Verilirse ve tarayici_ios yapılandırılmışsa "📷 Mobilden Tara" butonu gösterilir. */
+  onMobilTara?: () => void;
+  canWrite: boolean;
+  tarayiciYapilandirilmis: boolean;
+  belgeGoruntule: (yol: string) => void;
+  gecerlilikGuncelle: (dosya: BelgeDosyasi, yeniTarih: string) => void;
+}) {
+  return (
+    <div className="py-2 px-3 border rounded-lg bg-white">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-sm font-medium">{baslik}</span>
+        <div className="flex items-center gap-2 text-xs shrink-0">
+          {canWrite && (
+            <label className="inline-flex items-center gap-1 text-blue-600 hover:underline cursor-pointer">
+              📎 {dosyalar.length > 0 ? "Dosya Ekle" : "Yükle"}
+              <input
+                type="file"
+                accept="image/*,.pdf"
+                multiple
+                className="hidden"
+                onChange={(e) => {
+                  const files = e.target.files;
+                  if (files && files.length > 0) onYukle(files);
+                  e.target.value = "";
+                }}
+              />
+            </label>
+          )}
+          {onMobilTara && tarayiciYapilandirilmis && canWrite && (
+            <button
+              type="button"
+              onClick={onMobilTara}
+              title="Telefon kamerasıyla tara — belge otomatik PDF olarak buraya eklenir"
+              className="text-gray-500 hover:underline"
+            >
+              📷 Mobilden Tara
+            </button>
+          )}
+        </div>
+      </div>
+
+      {dosyalar.length > 0 && (
+        <div className="mt-2 space-y-1">
+          {dosyalar.map((d) => (
+            <div key={d.id} className="text-xs bg-gray-50 rounded px-2 py-1">
+              <div className="flex items-center justify-between">
+                <button
+                  type="button"
+                  onClick={() => belgeGoruntule(d.file_path)}
+                  className="text-blue-600 hover:underline truncate max-w-[220px] text-left"
+                  title={d.file_name}
+                >
+                  📄 {d.file_name}
+                </button>
+                {canWrite && (
+                  <button
+                    type="button"
+                    onClick={() => onSil(d)}
+                    className="text-red-500 hover:text-red-700 ml-2 shrink-0"
+                    title="Kaldır"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+
+              {/* GEÇERLİLİK TARİHİ — dolu olduğunda bu belge, gösterge
+                  paneli ve bildirim zilindeki süre uyarılarına firma
+                  adıyla birlikte girer. Boş bırakılırsa takip edilmez. */}
+              <div className="mt-1 flex items-center gap-2">
+                <span className="text-gray-500 shrink-0">Geçerlilik:</span>
+                <DateInput
+                  value={d.gecerlilik_tarihi ?? ""}
+                  disabled={!canWrite}
+                  onChange={(deger) => gecerlilikGuncelle(d, deger)}
+                  className="text-xs"
+                />
+                {d.gecerlilik_tarihi && (
+                  <GecerlilikRozeti tarih={d.gecerlilik_tarihi} />
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -585,7 +700,7 @@ export default function AracEvraklari({
    * Boş bırakılırsa NULL yazılır (takip edilmez). Kayıt sonrası listeler
    * tazelenir ki rozet ve uyarılar anında güncellensin.
    */
-  async function gecerlilikGuncelle(dosya: BelgeDosyasi, yeniTarih: string) {
+  const gecerlilikGuncelle = useCallback(async (dosya: BelgeDosyasi, yeniTarih: string) => {
     const deger = yeniTarih.trim() === "" ? null : yeniTarih;
     setError("");
     const { error: err } = await supabase
@@ -598,104 +713,9 @@ export default function AracEvraklari({
     }
     await ortakDosyalariYukle();
     if (secilenAracId) await aracDosyalariYukle(secilenAracId);
-  }
+  }, [ortakDosyalariYukle, aracDosyalariYukle, secilenAracId]);
 
-  function BelgeSatiri({
-    baslik,
-    dosyalar,
-    onYukle,
-    onSil,
-    onMobilTara,
-  }: {
-    baslik: string;
-    dosyalar: BelgeDosyasi[];
-    onYukle: (files: FileList) => void;
-    onSil: (dosya: BelgeDosyasi) => void;
-    /** Verilirse ve tarayici_ios yapılandırılmışsa "📷 Mobilden Tara" butonu gösterilir. */
-    onMobilTara?: () => void;
-  }) {
-    return (
-      <div className="py-2 px-3 border rounded-lg bg-white">
-        <div className="flex items-center justify-between gap-2">
-          <span className="text-sm font-medium">{baslik}</span>
-          <div className="flex items-center gap-2 text-xs shrink-0">
-            {canWrite && (
-              <label className="inline-flex items-center gap-1 text-blue-600 hover:underline cursor-pointer">
-                📎 {dosyalar.length > 0 ? "Dosya Ekle" : "Yükle"}
-                <input
-                  type="file"
-                  accept="image/*,.pdf"
-                  multiple
-                  className="hidden"
-                  onChange={(e) => {
-                    const files = e.target.files;
-                    if (files && files.length > 0) onYukle(files);
-                    e.target.value = "";
-                  }}
-                />
-              </label>
-            )}
-            {onMobilTara && tarayiciYapilandirilmis && canWrite && (
-              <button
-                type="button"
-                onClick={onMobilTara}
-                title="Telefon kamerasıyla tara — belge otomatik PDF olarak buraya eklenir"
-                className="text-gray-500 hover:underline"
-              >
-                📷 Mobilden Tara
-              </button>
-            )}
-          </div>
-        </div>
 
-        {dosyalar.length > 0 && (
-          <div className="mt-2 space-y-1">
-            {dosyalar.map((d) => (
-              <div key={d.id} className="text-xs bg-gray-50 rounded px-2 py-1">
-                <div className="flex items-center justify-between">
-                  <button
-                    type="button"
-                    onClick={() => belgeGoruntule(d.file_path)}
-                    className="text-blue-600 hover:underline truncate max-w-[220px] text-left"
-                    title={d.file_name}
-                  >
-                    📄 {d.file_name}
-                  </button>
-                  {canWrite && (
-                    <button
-                      type="button"
-                      onClick={() => onSil(d)}
-                      className="text-red-500 hover:text-red-700 ml-2 shrink-0"
-                      title="Kaldır"
-                    >
-                      ✕
-                    </button>
-                  )}
-                </div>
-
-                {/* GEÇERLİLİK TARİHİ — dolu olduğunda bu belge, gösterge
-                    paneli ve bildirim zilindeki süre uyarılarına firma
-                    adıyla birlikte girer. Boş bırakılırsa takip edilmez. */}
-                <div className="mt-1 flex items-center gap-2">
-                  <span className="text-gray-500 shrink-0">Geçerlilik:</span>
-                  <input
-                    type="date"
-                    value={d.gecerlilik_tarihi ?? ""}
-                    disabled={!canWrite}
-                    onChange={(e) => gecerlilikGuncelle(d, e.target.value)}
-                    className="border rounded px-1.5 py-0.5 text-xs disabled:bg-gray-100"
-                  />
-                  {d.gecerlilik_tarihi && (
-                    <GecerlilikRozeti tarih={d.gecerlilik_tarihi} />
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    );
-  }
 
   return (
     <div className="max-w-2xl">
@@ -722,6 +742,10 @@ export default function AracEvraklari({
               onYukle={(files) => ortakBelgeYukle(ortak.anahtar, files)}
               onSil={(dosya) => ortakBelgeSil(ortak.anahtar, dosya)}
               onMobilTara={() => mobildenTara("arac_ortak", { tur: ortak.anahtar })}
+              canWrite={canWrite}
+              tarayiciYapilandirilmis={tarayiciYapilandirilmis}
+              belgeGoruntule={belgeGoruntule}
+              gecerlilikGuncelle={gecerlilikGuncelle}
             />
           ))}
         </div>
@@ -766,6 +790,10 @@ export default function AracEvraklari({
                 onYukle={(files) => aracBelgeYukle(slot.anahtar, files)}
                 onSil={(dosya) => aracBelgeSil(slot.anahtar, dosya)}
                 onMobilTara={() => mobildenTara("arac_ozel", { vehicleId: secilenAracId, anahtar: slot.anahtar })}
+                canWrite={canWrite}
+                tarayiciYapilandirilmis={tarayiciYapilandirilmis}
+                belgeGoruntule={belgeGoruntule}
+                gecerlilikGuncelle={gecerlilikGuncelle}
               />
             ))}
           </div>
