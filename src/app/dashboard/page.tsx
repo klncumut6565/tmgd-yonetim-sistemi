@@ -154,7 +154,10 @@ export default function DashboardPage() {
           .select("id, title, expiry_date, firm_name, days_left")
           .lte("days_left", GENEL_UYARI_GUN)
           .order("days_left")
-          .limit(8),
+          // Araç Evrakı belgeleri de bu listeye aktığı için limit 8'den
+          // 20'ye çıkarıldı; aksi halde araç belgeleri firma belgelerini
+          // listeden dışarı itebiliyordu.
+          .limit(20),
         // TMFB — genel pencereden BAĞIMSIZ, 150 gün kala gösterilir
         supabase
           .from("expiring_documents")

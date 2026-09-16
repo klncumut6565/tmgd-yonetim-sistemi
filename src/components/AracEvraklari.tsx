@@ -41,6 +41,17 @@ type BelgeDosyasi = {
   id: string;
   file_path: string;
   file_name: string;
+  /** Belgenin son geçerlilik tarihi (YYYY-MM-DD). null = takip edilmiyor. */
+  gecerlilik_tarihi: string | null;
+};
+
+/** Veritabanından okunan ham dosya satırı. */
+type DosyaSatiri = {
+  id: string;
+  belge_turu: string;
+  file_path: string;
+  file_name: string;
+  gecerlilik_tarihi: string | null;
 };
 
 const ORTAK_BELGE_TURLERI = [
@@ -70,6 +81,26 @@ const EK10_SECENEKLERI = [
 ] as const;
 type Ek10Secenek = (typeof EK10_SECENEKLERI)[number]["deger"];
 type AracBelgeAnahtari = (typeof ARAC_BELGE_SLOTLARI)[number]["anahtar"];
+
+/** Kalan gün rozetini gösterir (kırmızı: geçmiş, amber: 45 güne kadar). */
+function GecerlilikRozeti({ tarih }: { tarih: string }) {
+  const bugun = new Date();
+  bugun.setHours(0, 0, 0, 0);
+  const son = new Date(tarih + "T00:00:00");
+  const gun = Math.round((son.getTime() - bugun.getTime()) / 86400000);
+
+  const metin =
+    gun < 0 ? `${Math.abs(gun)} gün geçti` : gun === 0 ? "Bugün doluyor" : `${gun} gün kaldı`;
+  const sinif =
+    gun < 0
+      ? "bg-red-100 text-red-700"
+      : gun <= 45
+        ? "bg-amber-100 text-amber-700"
+        : "bg-gray-100 text-gray-500";
+  return (
+    <span className={`px-1.5 py-0.5 rounded whitespace-nowrap ${sinif}`}>{metin}</span>
+  );
+}
 
 function bugununTarihi(): string {
   const d = new Date();
@@ -117,15 +148,20 @@ export default function AracEvraklari({
   const ortakDosyalariYukle = useCallback(async () => {
     const { data, error: err } = await supabase
       .from("firm_arac_evrak_dosyalari")
-      .select("id, belge_turu, file_path, file_name")
+      .select("id, belge_turu, file_path, file_name, gecerlilik_tarihi")
       .eq("firm_id", firmId)
       .is("vehicle_id", null)
       .order("created_at");
     if (err) return;
     const gruplu: Record<OrtakBelgeTuru, BelgeDosyasi[]> = { tmfb: [], k1: [] };
-    for (const row of (data as { id: string; belge_turu: string; file_path: string; file_name: string }[]) || []) {
+    for (const row of (data as DosyaSatiri[]) || []) {
       if (row.belge_turu === "tmfb" || row.belge_turu === "k1") {
-        gruplu[row.belge_turu].push({ id: row.id, file_path: row.file_path, file_name: row.file_name });
+        gruplu[row.belge_turu].push({
+          id: row.id,
+          file_path: row.file_path,
+          file_name: row.file_name,
+          gecerlilik_tarihi: row.gecerlilik_tarihi ?? null,
+        });
       }
     }
     setOrtakDosyalar(gruplu);
@@ -134,7 +170,7 @@ export default function AracEvraklari({
   const aracDosyalariYukle = useCallback(async (vehicleId: string) => {
     const { data, error: err } = await supabase
       .from("firm_arac_evrak_dosyalari")
-      .select("id, belge_turu, file_path, file_name")
+      .select("id, belge_turu, file_path, file_name, gecerlilik_tarihi")
       .eq("vehicle_id", vehicleId)
       .order("created_at");
     if (err) return;
@@ -142,9 +178,14 @@ export default function AracEvraklari({
       tasit_karti: [], arac_muayene: [], arac_ruhsat: [],
       sigorta_kasko: [], src5_belgesi: [], tasima_evraklari: [],
     };
-    for (const row of (data as { id: string; belge_turu: string; file_path: string; file_name: string }[]) || []) {
+    for (const row of (data as DosyaSatiri[]) || []) {
       if (row.belge_turu in gruplu) {
-        gruplu[row.belge_turu as AracBelgeAnahtari].push({ id: row.id, file_path: row.file_path, file_name: row.file_name });
+        gruplu[row.belge_turu as AracBelgeAnahtari].push({
+          id: row.id,
+          file_path: row.file_path,
+          file_name: row.file_name,
+          gecerlilik_tarihi: row.gecerlilik_tarihi ?? null,
+        });
       }
     }
     setAracDosyalar(gruplu);
@@ -539,6 +580,26 @@ export default function AracEvraklari({
    *  ALTINDA her zaman "📎 Dosya Ekle" alanı durur (multiple attribute
    *  ile tek seferde birden fazla dosya seçilebilir; ayrıca istenildiği
    *  kadar tekrar tekrar dosya eklenebilir — üzerine yazma yok). */
+  /**
+   * Bir araç evrakı dosyasının geçerlilik tarihini kaydeder.
+   * Boş bırakılırsa NULL yazılır (takip edilmez). Kayıt sonrası listeler
+   * tazelenir ki rozet ve uyarılar anında güncellensin.
+   */
+  async function gecerlilikGuncelle(dosya: BelgeDosyasi, yeniTarih: string) {
+    const deger = yeniTarih.trim() === "" ? null : yeniTarih;
+    setError("");
+    const { error: err } = await supabase
+      .from("firm_arac_evrak_dosyalari")
+      .update({ gecerlilik_tarihi: deger })
+      .eq("id", dosya.id);
+    if (err) {
+      setError("Geçerlilik tarihi kaydedilemedi: " + hataCevir(err));
+      return;
+    }
+    await ortakDosyalariYukle();
+    if (secilenAracId) await aracDosyalariYukle(secilenAracId);
+  }
+
   function BelgeSatiri({
     baslik,
     dosyalar,
@@ -590,25 +651,44 @@ export default function AracEvraklari({
         {dosyalar.length > 0 && (
           <div className="mt-2 space-y-1">
             {dosyalar.map((d) => (
-              <div key={d.id} className="flex items-center justify-between text-xs bg-gray-50 rounded px-2 py-1">
-                <button
-                  type="button"
-                  onClick={() => belgeGoruntule(d.file_path)}
-                  className="text-blue-600 hover:underline truncate max-w-[220px] text-left"
-                  title={d.file_name}
-                >
-                  📄 {d.file_name}
-                </button>
-                {canWrite && (
+              <div key={d.id} className="text-xs bg-gray-50 rounded px-2 py-1">
+                <div className="flex items-center justify-between">
                   <button
                     type="button"
-                    onClick={() => onSil(d)}
-                    className="text-red-500 hover:text-red-700 ml-2 shrink-0"
-                    title="Kaldır"
+                    onClick={() => belgeGoruntule(d.file_path)}
+                    className="text-blue-600 hover:underline truncate max-w-[220px] text-left"
+                    title={d.file_name}
                   >
-                    ✕
+                    📄 {d.file_name}
                   </button>
-                )}
+                  {canWrite && (
+                    <button
+                      type="button"
+                      onClick={() => onSil(d)}
+                      className="text-red-500 hover:text-red-700 ml-2 shrink-0"
+                      title="Kaldır"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+
+                {/* GEÇERLİLİK TARİHİ — dolu olduğunda bu belge, gösterge
+                    paneli ve bildirim zilindeki süre uyarılarına firma
+                    adıyla birlikte girer. Boş bırakılırsa takip edilmez. */}
+                <div className="mt-1 flex items-center gap-2">
+                  <span className="text-gray-500 shrink-0">Geçerlilik:</span>
+                  <input
+                    type="date"
+                    value={d.gecerlilik_tarihi ?? ""}
+                    disabled={!canWrite}
+                    onChange={(e) => gecerlilikGuncelle(d, e.target.value)}
+                    className="border rounded px-1.5 py-0.5 text-xs disabled:bg-gray-100"
+                  />
+                  {d.gecerlilik_tarihi && (
+                    <GecerlilikRozeti tarih={d.gecerlilik_tarihi} />
+                  )}
+                </div>
               </div>
             ))}
           </div>
