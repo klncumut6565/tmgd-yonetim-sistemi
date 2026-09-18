@@ -48,6 +48,13 @@ const TMFB_UYARI_GUN = 150;
  *  son 120 gün kala uyarı verilir. */
 const TMGD_UYARI_GUN = 120;
 
+/** Bildirim kaldırma doğrulama kodu — firma silmedeki (firms/page.tsx,
+ *  SILME_KODU) ile AYNI desen: yanlışlıkla kapatmayı önlemek için, güvenlik
+ *  önlemi olarak değil. Bildirim kaldırmak, altta yatan sorunu ÇÖZMEZ —
+ *  yalnızca zilden gizler; bu yüzden yönetici tamamlanmamış bir işi
+ *  yanlışlıkla kapatmasın diye aynı önlem burada da uygulanır. */
+const KALDIRMA_KODU = "0000";
+
 function daysLabel(d: number): string {
   if (d < 0) return `${Math.abs(d)} gün geçti`;
   if (d === 0) return "Bugün doluyor";
@@ -69,11 +76,26 @@ export default function NotificationBell() {
   const [pendingUsers, setPendingUsers] = useState<PendingUser[]>([]);
   const [expiringDocs, setExpiringDocs] = useState<ExpiringDoc[]>([]);
   const [expiringAdrs, setExpiringAdrs] = useState<ExpiringDoc[]>([]);
+  const [dismissedIds, setDismissedIds] = useState<Set<string>>(new Set());
+  const [kaldirilacak, setKaldirilacak] = useState<ExpiringDoc | null>(null);
+  const [kaldirmaKodu, setKaldirmaKodu] = useState("");
+  const [kaldirmaHatasi, setKaldirmaHatasi] = useState("");
+  const [kaldiriliyor, setKaldiriliyor] = useState(false);
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
   const load = useCallback(async () => {
     if (!profile) return;
+
+    // 0) Bu kullanıcının zilden kaldırdığı (dismiss ettiği) bildirimler —
+    // aşağıda hesaplanan listeden bu anahtarlar elenir.
+    const { data: dismissedData } = await supabase
+      .from("dismissed_notifications")
+      .select("notification_key")
+      .eq("user_id", profile.id);
+    setDismissedIds(
+      new Set(((dismissedData as { notification_key: string }[]) || []).map((r) => r.notification_key))
+    );
 
     // 1) Kişisel bildirim ayarları
     const { data: sData } = await supabase
@@ -333,10 +355,43 @@ export default function NotificationBell() {
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  const total =
-    pendingUsers.length + expiringDocs.length + expiringAdrs.length;
+  function kaldirmayiAc(d: ExpiringDoc) {
+    setKaldirilacak(d);
+    setKaldirmaKodu("");
+    setKaldirmaHatasi("");
+  }
+  function kaldirmayiKapat() {
+    setKaldirilacak(null);
+    setKaldirmaKodu("");
+    setKaldirmaHatasi("");
+  }
+  async function kaldirmayiOnayla() {
+    if (!kaldirilacak || !profile) return;
+    if (kaldirmaKodu !== KALDIRMA_KODU) {
+      setKaldirmaHatasi("Kod hatalı — 4 adet sıfır (0000) girin.");
+      return;
+    }
+    setKaldiriliyor(true);
+    const { error: err } = await supabase.from("dismissed_notifications").insert({
+      user_id: profile.id,
+      notification_key: kaldirilacak.id,
+    });
+    setKaldiriliyor(false);
+    if (err) {
+      setKaldirmaHatasi("Kaldırılamadı: " + err.message);
+      return;
+    }
+    setDismissedIds((prev) => new Set(prev).add(kaldirilacak.id));
+    kaldirmayiKapat();
+  }
 
-  const allDocs = [...expiringDocs, ...expiringAdrs].sort(
+  const expiringDocsGorunur = expiringDocs.filter((d) => !dismissedIds.has(d.id));
+  const expiringAdrsGorunur = expiringAdrs.filter((d) => !dismissedIds.has(d.id));
+
+  const total =
+    pendingUsers.length + expiringDocsGorunur.length + expiringAdrsGorunur.length;
+
+  const allDocs = [...expiringDocsGorunur, ...expiringAdrsGorunur].sort(
     (a, b) => a.days_left - b.days_left
   );
 
@@ -413,13 +468,85 @@ export default function NotificationBell() {
                         <div className="text-gray-400 text-xs">{d.firm_name}</div>
                       )}
                     </div>
-                    <span className={`text-[11px] px-2 py-0.5 rounded whitespace-nowrap mt-0.5 ${daysBadgeClass(d.days_left)}`}>
-                      {daysLabel(d.days_left)}
-                    </span>
+                    <div className="flex items-center gap-1.5 mt-0.5">
+                      <span className={`text-[11px] px-2 py-0.5 rounded whitespace-nowrap ${daysBadgeClass(d.days_left)}`}>
+                        {daysLabel(d.days_left)}
+                      </span>
+                      <button
+                        onClick={() => kaldirmayiAc(d)}
+                        title="Bildirimi kaldır"
+                        className="text-gray-300 hover:text-red-600 text-sm leading-none px-1"
+                      >
+                        ✕
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* BİLDİRİM KALDIRMA ONAYI — firma silmedeki ile aynı "4 adet sıfır"
+          deseni: yönetici tamamlanmamış bir işi yanlışlıkla kapatmasın. */}
+      {kaldirilacak && (
+        <div className="fixed inset-0 bg-black/40 z-[60] flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-sm w-full p-5">
+            <h2 className="text-lg font-bold text-red-700 mb-1">⚠ Bildirimi Kaldır</h2>
+            <p className="text-sm mb-3 truncate">
+              <strong>{kaldirilacak.title}</strong>
+            </p>
+
+            <div className="bg-red-50 border border-red-200 rounded p-3 text-sm text-red-900 mb-4">
+              Bu, yalnızca uyarıyı zilinden gizler — belgenin/tarihin kendisi
+              değişmez, sorun hâlâ çözülmemiş olabilir.
+            </div>
+
+            <label className="block mb-3">
+              <span className="text-sm font-medium">
+                Onaylamak için <strong>4 adet sıfır</strong> tuşlayın
+              </span>
+              <input
+                autoFocus
+                inputMode="numeric"
+                maxLength={4}
+                placeholder="0000"
+                className="border-2 p-3 w-full rounded mt-1 text-center text-2xl tracking-[0.5em] font-mono"
+                value={kaldirmaKodu}
+                onChange={(e) => {
+                  setKaldirmaKodu(e.target.value.replace(/\D/g, "").slice(0, 4));
+                  setKaldirmaHatasi("");
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && kaldirmaKodu === KALDIRMA_KODU) kaldirmayiOnayla();
+                  if (e.key === "Escape") kaldirmayiKapat();
+                }}
+              />
+            </label>
+
+            {kaldirmaHatasi && (
+              <p className="text-sm text-red-700 bg-red-50 border border-red-200 rounded p-2 mb-3">
+                {kaldirmaHatasi}
+              </p>
+            )}
+
+            <div className="flex gap-2 justify-end">
+              <button
+                onClick={kaldirmayiKapat}
+                disabled={kaldiriliyor}
+                className="px-4 py-2 border rounded text-sm"
+              >
+                Vazgeç
+              </button>
+              <button
+                onClick={kaldirmayiOnayla}
+                disabled={kaldiriliyor || kaldirmaKodu !== KALDIRMA_KODU}
+                className="px-4 py-2 bg-red-600 text-white rounded text-sm disabled:opacity-40"
+              >
+                {kaldiriliyor ? "Kaldırılıyor..." : "Bildirimi Kaldır"}
+              </button>
+            </div>
           </div>
         </div>
       )}
