@@ -118,10 +118,13 @@ export default function NotificationBell() {
         .order("days_left");
       // TMGD Sertifikası aşağıda kendi (120 günlük) kuralıyla ve atanmış
       // TMGD'nin adıyla ekleniyor — burada elenerek çift gösterim önlenir.
+      // Başlıktaki "Belge Takip: " ön eki kaldırılır — zil menüsünde belge
+      // zaten bağlamdan (Belge Takip uyarısı olduğu) belli (bkz. dashboard/
+      // page.tsx'teki aynı düzeltme).
       belgeSonuclari.push(
-        ...(((data as ExpiringDoc[]) || []).filter(
-          (d) => !/TMGD Sertifika/i.test(d.title)
-        ))
+        ...(((data as ExpiringDoc[]) || [])
+          .filter((d) => !/TMGD Sertifika/i.test(d.title))
+          .map((d) => ({ ...d, title: d.title.replace(/^Belge Takip:\s*/, "") })))
       );
     }
 
@@ -198,7 +201,9 @@ export default function NotificationBell() {
     // — id bazlı tekilleştirme ile aynı uyarının iki kez görünmesi önlenir.
     const gorulenIdler = new Set(belgeSonuclari.map((d) => d.id));
     for (const d of (tmfbData as ExpiringDoc[]) || []) {
-      if (!gorulenIdler.has(d.id)) belgeSonuclari.push(d);
+      if (!gorulenIdler.has(d.id)) {
+        belgeSonuclari.push({ ...d, title: d.title.replace(/^Belge Takip:\s*/, "") });
+      }
     }
     
     // TMGD Sertifikası (S2) — TMGD (kişi) bazında TEKİLLEŞTİRİLİR.
