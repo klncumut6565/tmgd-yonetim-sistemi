@@ -166,14 +166,30 @@ export default function NotificationBell() {
         .from("user_firms")
         .select("firm_id, user_id, profiles ( full_name, role )")
         .in("firm_id", tmgdFirmIds);
+      // Yalnızca FİRMA TARAFI rolleri (company, viewer) dışlanır; geri kalan
+      // herkes danışman sayılır. Önceden sadece role === "tmgd" alınıyordu,
+      // bu yüzden rolü admin/assistant/super_admin olan danışmanların
+      // firmaları "atama yapılmamış" görünüyordu — dashboard/page.tsx'te
+      // düzeltilen aynı hata burada da vardı (bkz. commit 6c4ae7f).
+      const rolOnceligi: Record<string, number> = {
+        tmgd: 0,
+        assistant: 1,
+        admin: 2,
+        super_admin: 3,
+      };
+      const haricRoller = new Set(["company", "viewer"]);
+      const seciliOncelik = new Map<string, number>();
       for (const a of (atamalar as Record<string, any>[]) || []) {
         const p = a.profiles;
         if (!p) continue;
-        if (p.role && p.role !== "tmgd") continue;
-        const ad = String(p.full_name || "").trim();
-        if (!ad) continue;
-        if (!firmaTmgd.has(a.firm_id)) {
+        const rol = String(p.role || "");
+        if (haricRoller.has(rol)) continue;
+        const ad = String(p.full_name || "").trim() || "(isim girilmemiş)";
+        const oncelik = rolOnceligi[rol] ?? 4;
+        const mevcut = seciliOncelik.get(a.firm_id);
+        if (mevcut === undefined || oncelik < mevcut) {
           firmaTmgd.set(a.firm_id, { userId: String(a.user_id), ad });
+          seciliOncelik.set(a.firm_id, oncelik);
         }
       }
     }
@@ -200,13 +216,15 @@ export default function NotificationBell() {
       const anahtar = atama ? `u:${atama.userId}` : `f:${r.firm_id}`;
       const mevcut = tmgdBenzersiz.get(anahtar);
       if (mevcut && mevcut.days_left <= gun) continue;
+      const firmaAdi = String(r.firms?.name || "").trim();
       tmgdBenzersiz.set(anahtar, {
         id: `tmgd-${anahtar}`,
-        title: atama
-          ? `TMGD Sertifikası — ${atama.ad}`
-          : "TMGD Sertifikası (atama yapılmamış)",
-        // Sertifika kişiye ait olduğundan firma adı gösterilmez.
-        firm_name: "",
+        title: atama ? `TMGD Sertifikası — ${atama.ad}` : "TMGD atanmamış",
+        // Sertifika kişiye ait olduğundan normalde firma adı gösterilmez.
+        // ANCAK atama yoksa hangi firmanın kaydı olduğu ancak firma adıyla
+        // anlaşılıyor — bu durumda firma adı gösterilir (bkz. commit 6c4ae7f,
+        // dashboard/page.tsx'teki eşdeğer düzeltme).
+        firm_name: atama ? "" : firmaAdi ? `${firmaAdi} — bu firmaya TMGD atanmamış` : "",
         days_left: gun,
         expiry_date: String(r.valid_until),
       });
