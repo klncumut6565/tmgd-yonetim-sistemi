@@ -686,19 +686,17 @@ export default function AracEvraklari({
     }
   }
 
-  if (loading) {
-    return <div className="p-4 text-sm text-gray-500">Yükleniyor…</div>;
-  }
-
-  /** Bir belge türü için dosya listesini + "birden fazla dosya" yükleme
-   *  alanını gösteren satır. Zaten yüklenmiş dosyalar üstte listelenir,
-   *  ALTINDA her zaman "📎 Dosya Ekle" alanı durur (multiple attribute
-   *  ile tek seferde birden fazla dosya seçilebilir; ayrıca istenildiği
-   *  kadar tekrar tekrar dosya eklenebilir — üzerine yazma yok). */
   /**
    * Bir araç evrakı dosyasının geçerlilik tarihini kaydeder.
    * Boş bırakılırsa NULL yazılır (takip edilmez). Kayıt sonrası listeler
    * tazelenir ki rozet ve uyarılar anında güncellensin.
+   *
+   * ÖNEMLİ: Bu useCallback, aşağıdaki "if (loading) return" satırından
+   * ÖNCE tanımlı olmak ZORUNDA. React, her render'da AYNI SAYIDA ve AYNI
+   * SIRADA hook çağrılmasını şart koşar; loading=true iken erken return
+   * bu hook'un atlanmasına, loading=false olunca çağrılmasına (render
+   * arası farklı hook sayısına) yol açıyordu — sonucu "Minified React
+   * error #310" ile client-side çökme idi.
    */
   const gecerlilikGuncelle = useCallback(async (dosya: BelgeDosyasi, yeniTarih: string) => {
     const deger = yeniTarih.trim() === "" ? null : yeniTarih;
@@ -715,7 +713,15 @@ export default function AracEvraklari({
     if (secilenAracId) await aracDosyalariYukle(secilenAracId);
   }, [ortakDosyalariYukle, aracDosyalariYukle, secilenAracId]);
 
+  if (loading) {
+    return <div className="p-4 text-sm text-gray-500">Yükleniyor…</div>;
+  }
 
+  /** Bir belge türü için dosya listesini + "birden fazla dosya" yükleme
+   *  alanını gösteren satır. Zaten yüklenmiş dosyalar üstte listelenir,
+   *  ALTINDA her zaman "📎 Dosya Ekle" alanı durur (multiple attribute
+   *  ile tek seferde birden fazla dosya seçilebilir; ayrıca istenildiği
+   *  kadar tekrar tekrar dosya eklenebilir — üzerine yazma yok). */
 
   return (
     <div className="max-w-2xl">
