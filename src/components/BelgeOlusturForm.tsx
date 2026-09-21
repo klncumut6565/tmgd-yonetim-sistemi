@@ -112,6 +112,7 @@ export default function BelgeOlusturForm({ fixedFirmId, initialFirmId, compact =
   const [selected, setSelected] = useState<string[]>([]);
   const [notes, setNotes] = useState("");
   const [onaylayanAdi, setOnaylayanAdi] = useState("");
+  const [onaylayanSiliniyor, setOnaylayanSiliniyor] = useState(false);
   // KAŞE / İMZA — işaretlenirse kodda gömülü kaşeler belgeye basılır.
   // Kaşe görselleri src/lib/kaseler.ts içinde saklanır; elle yükleme yok.
   const [kaseEkle, setKaseEkle] = useState(false);
@@ -341,6 +342,27 @@ export default function BelgeOlusturForm({ fixedFirmId, initialFirmId, compact =
     // en son kaydedilmiş isim alana otomatik gelir.
     const yeniFirma = firms.find((f) => f.id === id);
     setOnaylayanAdi(yeniFirma?.approver_name || "");
+  }
+
+  /** Firmaya kayıtlı "Onaylayan — Tesis Sorumlusu" ismini siler (approver_name
+   *  = NULL). Bir sonraki belge üretiminde alan boş gelir; "Sorumlu Kişi"
+   *  ile devam edilir ya da yeni bir isim yazılıp tekrar kaydedilebilir. */
+  async function onaylayanKaydiSil() {
+    if (!firm) return;
+    if (!window.confirm(`"${firm.name}" için kayıtlı onaylayan ismi silinsin mi?`)) return;
+    setOnaylayanSiliniyor(true);
+    setError("");
+    const { error: silmeHatasi } = await supabase
+      .from("firms")
+      .update({ approver_name: null })
+      .eq("id", firm.id);
+    setOnaylayanSiliniyor(false);
+    if (silmeHatasi) {
+      setError("Onaylayan kaydı silinemedi: " + silmeHatasi.message);
+      return;
+    }
+    setFirms((prev) => prev.map((f) => (f.id === firm.id ? { ...f, approver_name: null } : f)));
+    setOnaylayanAdi("");
   }
 
   // Seçili firmanın KAYITLI logosu için küçük önizleme (imzalı URL) —
@@ -823,13 +845,26 @@ export default function BelgeOlusturForm({ fixedFirmId, initialFirmId, compact =
             <span className="text-sm text-gray-600">
               Onaylayan — Tesis Sorumlusu (opsiyonel)
             </span>
-            <input
-              type="text"
-              className="border p-2 w-full rounded mt-1"
-              placeholder="Boş bırakılırsa 'Sorumlu Kişi' yazılır"
-              value={onaylayanAdi}
-              onChange={(e) => setOnaylayanAdi(e.target.value)}
-            />
+            <div className="flex gap-2 mt-1">
+              <input
+                type="text"
+                className="border p-2 flex-1 rounded"
+                placeholder="Boş bırakılırsa 'Sorumlu Kişi' yazılır"
+                value={onaylayanAdi}
+                onChange={(e) => setOnaylayanAdi(e.target.value)}
+              />
+              {canWrite && firm?.approver_name && (
+                <button
+                  type="button"
+                  onClick={onaylayanKaydiSil}
+                  disabled={onaylayanSiliniyor}
+                  title="Bu firma için kayıtlı ismi sil"
+                  className="px-3 rounded border border-red-200 text-red-600 text-sm hover:bg-red-50 disabled:opacity-40"
+                >
+                  {onaylayanSiliniyor ? "…" : "🗑 Sil"}
+                </button>
+              )}
+            </div>
             <span className="text-xs text-gray-400">
               Belge alt tablosundaki &quot;ONAYLAYAN&quot; kutusuna yazılacak isim.
               Bir kez yazıldığında bu firmaya kaydedilir; firma tekrar
