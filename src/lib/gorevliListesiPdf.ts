@@ -425,18 +425,18 @@ function tanimlarSayfasiCiz(
     (doc as unknown as { lastAutoTable?: { finalY: number } }).lastAutoTable
       ?.finalY ?? 0;
   const altSinir = H - 12;                    // sayfa alt boşluğu
-  let tanimImzaY = altSinir - IMZA_BLOK_YUKSEKLIK;
+  let tanimImzaY = altSinir - IMZA_BLOK_YUKSEKLIK_ICERIK;
   if (tanimSonY + 6 > tanimImzaY) {
     tanimImzaY = tanimSonY + 6;               // tablonun hemen altına
   }
-  if (tanimImzaY + IMZA_BLOK_YUKSEKLIK > altSinir) {
+  if (tanimImzaY + IMZA_BLOK_YUKSEKLIK_ICERIK > altSinir) {
     doc.addPage("a4", "portrait");
     fontuKaydet(doc);
     kapakCercevesiCiz(doc);
     baslikKutusuCiz(doc, veri);
-    tanimImzaY = altSinir - IMZA_BLOK_YUKSEKLIK;
+    tanimImzaY = altSinir - IMZA_BLOK_YUKSEKLIK_ICERIK;
   }
-  imzaBlokuCiz(doc, veri, tanimImzaY);
+  imzaBlokuCiz(doc, veri, tanimImzaY, IMZA_BLOK_YUKSEKLIK_ICERIK);
 }
 
 /**
@@ -557,8 +557,20 @@ function baslikKutusuCiz(doc: JsPDFType, veri: GorevliListesiPdfVerisi) {
 // Diğer belgelerdeki imza tablosuyla aynı: KONTROL EDEN kaşesi
 // (46.7x21.3 mm) kırpılmadan sığsın diye 35.5 -> 40 mm.
 const IMZA_BLOK_YUKSEKLIK = 40;
+// Kapak sayfası HARİÇ (tanım sayfası + yatay tablo sayfası) imza bloğu,
+// kullanıcının isteği üzerine yarım santim (5 mm) kısaltıldı. Kapak
+// sayfasındaki KONTROL EDEN kaşesinin (46.7x21.3 mm) kırpılmadan sığması
+// için 40 mm'de bırakıldı; diğer sayfalarda bu kısıt olmadığından daha
+// kısa yeterli.
+const IMZA_BLOK_YUKSEKLIK_ICERIK = IMZA_BLOK_YUKSEKLIK - 5;
 
-function imzaBlokuCiz(doc: JsPDFType, veri: GorevliListesiPdfVerisi, y: number) {
+function imzaBlokuCiz(
+  doc: JsPDFType,
+  veri: GorevliListesiPdfVerisi,
+  y: number,
+  ozelYukseklik?: number
+) {
+  const yukseklik = ozelYukseklik ?? IMZA_BLOK_YUKSEKLIK;
   const kolonGenislik = (W - 2 * M) / 3;
 
   const isimler = [veri.hazirlayanAdi.trim(), "YAKUP ATAŞ", veri.onaylayanAdi.trim()];
@@ -573,9 +585,9 @@ function imzaBlokuCiz(doc: JsPDFType, veri: GorevliListesiPdfVerisi, y: number) 
   // Çerçeve + dikey ayırıcılar (Belge Oluştur ile aynı)
   doc.setDrawColor(0, 0, 0);
   doc.setLineWidth(0.3);
-  doc.rect(M, y, W - 2 * M, IMZA_BLOK_YUKSEKLIK);
-  doc.line(M + kolonGenislik, y, M + kolonGenislik, y + IMZA_BLOK_YUKSEKLIK);
-  doc.line(M + kolonGenislik * 2, y, M + kolonGenislik * 2, y + IMZA_BLOK_YUKSEKLIK);
+  doc.rect(M, y, W - 2 * M, yukseklik);
+  doc.line(M + kolonGenislik, y, M + kolonGenislik, y + yukseklik);
+  doc.line(M + kolonGenislik * 2, y, M + kolonGenislik * 2, y + yukseklik);
 
   // KAŞELER — BelgeOlusturForm.tsx → altTabloCiz() ile BİREBİR AYNI hesap:
   // kaşe, isim/unvanın ALTINDA kalan imza boşluğuna, oranı korunarak ve
@@ -590,7 +602,7 @@ function imzaBlokuCiz(doc: JsPDFType, veri: GorevliListesiPdfVerisi, y: number) 
     const kullanilabilirG =
       (kolonGenislik - kenarPay * 2) * (gercekOlcu ? 1 : kucultme);
     const kullanilabilirY =
-      (IMZA_BLOK_YUKSEKLIK - yaziAlti - kenarPay) * (gercekOlcu ? 1 : kucultme);
+      (yukseklik - yaziAlti - kenarPay) * (gercekOlcu ? 1 : kucultme);
     if (kullanilabilirY <= 3) return;
 
     let kaseG = kase.hedefGenislikMm
@@ -603,7 +615,7 @@ function imzaBlokuCiz(doc: JsPDFType, veri: GorevliListesiPdfVerisi, y: number) 
     }
     const kolonSol = M + kolonGenislik * kolonIndex;
     const kaseX = kolonSol + (kolonGenislik - kaseG) / 2;
-    const bosluk = IMZA_BLOK_YUKSEKLIK - yaziAlti - kenarPay;
+    const bosluk = yukseklik - yaziAlti - kenarPay;
     const kaseYPos = y + yaziAlti + (bosluk - kaseY) / 2;
     try {
       doc.addImage(kase.data, kase.fmt, kaseX, kaseYPos, kaseG, kaseY);
@@ -767,7 +779,7 @@ export async function gorevliListesiPdfOlustur(
     "Yukarıda Belirtilen Formda kişi/kişiler değişmesi halinde en geç 7 gün içerisinde yazılı olarak Tehlikeli Madde Güvenlik Danışmanına Haber verilmesi gerekmektedir.";
   const dipnotSatirlari = doc.splitTextToSize(dipnotMetni, W - 2 * M);
   const dipnotYukseklik = dipnotSatirlari.length * 3.6;
-  const gerekliYukseklik = dipnotYukseklik + 8 + IMZA_BLOK_YUKSEKLIK; // dipnot + boşluk + imza tablosu
+  const gerekliYukseklik = dipnotYukseklik + 8 + IMZA_BLOK_YUKSEKLIK_ICERIK; // dipnot + boşluk + imza tablosu
 
   // ÖNEMLİ: Tablo sayfa sonuna çok yakın bittiyse (dipnot+imza için yer
   // kalmadıysa), dipnotu tabloya sığdırmaya ZORLAMAK yerine (bu, metni
@@ -790,7 +802,7 @@ export async function gorevliListesiPdfOlustur(
   doc.text(dipnotSatirlari, M, dipnotY);
 
   const imzaY = dipnotY + dipnotYukseklik + 8;
-  imzaBlokuCiz(doc, veri, imzaY);
+  imzaBlokuCiz(doc, veri, imzaY, IMZA_BLOK_YUKSEKLIK_ICERIK);
 
   return doc.output("blob");
 }
