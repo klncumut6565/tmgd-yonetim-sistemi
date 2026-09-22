@@ -202,7 +202,15 @@ export default function EmniyetKapsamTaramasi({ firmId, firmaAdi }: Props) {
       const basliklar = (grid[basIdx] || []).map(norm);
       const kolBul = (...adaylar: string[]) =>
         basliklar.findIndex((h) => adaylar.some((a) => h.includes(a)));
-      const adKol = kolBul("ürün", "urun", "madde adı", "kimyasal", "ticari", "product", "ad");
+      // NOT: "ad" adayı BİLEREK YOK — çok kısa/genel olduğu için "UYGUN
+      // SEVKİYAT ADI" gibi Tablo A sütun başlıklarını da yanlışlıkla
+      // eşleştiriyordu (o sütun ADR sevkiyat adıdır, ürünün ticari adı
+      // DEĞİLDİR). "Satır Etiketleri" — Excel Pivot Table dışa aktarımlarında
+      // ürün/madde adı sütununun tipik başlığı — adaylara eklendi.
+      const adKol = kolBul(
+        "ürün", "urun", "madde adı", "madde adi", "kimyasal", "ticari",
+        "product", "satır etiketleri", "satir etiketleri", "row labels"
+      );
       // NOT: L1 envanter dosyalarında sevkiyat/taşıma başına miktar bilgisi
       // TUTULMUYOR — bu, kullanıcı tarafından teyit edildi. ADR Tablo
       // 1.10.3.1.2 eşikleri YILLIK TOPLAMA değil, TEK SEVKİYATTA taşınan
