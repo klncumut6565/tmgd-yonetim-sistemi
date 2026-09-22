@@ -68,6 +68,13 @@ const ALT_TABLO_UST = 244;
 // BelgeOlusturForm.tsx ile aynı: KONTROL EDEN kaşesi (46.7x21.3 mm)
 // kırpılmadan sığsın diye 35.5 -> 40 mm.
 const ALT_TABLO_YUKSEKLIK = 40;
+// Kapak sayfası HARİÇ (rapor içeriği + kapanış sayfalarındaki her imza
+// tablosu) kullanıcının isteği üzerine yarım santim (5 mm) kısaltıldı.
+// Kapak sayfası zaten bu varsayılanı kullanmıyor — kendi çağrısında
+// (kapakSayfasiCiz → imzaTablosuCiz) sabit 42.7 mm geçiyor, o hiç
+// değişmedi; burada yalnızca içerik sayfalarının kullandığı 40 mm'lik
+// varsayılan 35 mm'ye indirildi.
+const ALT_TABLO_YUKSEKLIK_ICERIK = ALT_TABLO_YUKSEKLIK - 5;
 
 // Bu raporun kendi doküman kodu — TMGDK'nin diğer belgeleriyle aynı
 // numaralandırma standardına uyar (TMGDK-<kod> formatı).
@@ -207,7 +214,7 @@ function imzaTablosuCiz(
   doc: JsPDFType,
   veri: GuvenlikPlaniRaporVerisi,
   ustY: number = ALT_TABLO_UST,
-  yukseklik: number = ALT_TABLO_YUKSEKLIK
+  yukseklik: number = ALT_TABLO_YUKSEKLIK_ICERIK
 ) {
   const kolonGenislik = (W - 2 * M) / 3;
   const isimler = [veri.hazirlayanAdi?.trim() || "", "YAKUP ATAŞ", veri.onaylayanAdi?.trim() || ""];
