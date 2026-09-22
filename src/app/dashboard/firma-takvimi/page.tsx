@@ -597,7 +597,13 @@ export default function FirmaTakvimiPage() {
                     );
                   })}
                   {oGun.length > 3 && (
-                    <div className="text-[10px] text-gray-400 px-1">
+                    <div
+                      className="text-[10px] text-gray-400 px-1 cursor-help hover:text-gray-600 hover:underline underline-offset-2"
+                      title={oGun
+                        .slice(3)
+                        .map((z) => firmaAdi.get(z.firm_id) || "—")
+                        .join("\n")}
+                    >
                       +{oGun.length - 3} firma daha
                     </div>
                   )}
