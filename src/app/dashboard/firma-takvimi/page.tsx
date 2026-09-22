@@ -148,6 +148,7 @@ export default function FirmaTakvimiPage() {
   const [secilenFirmalar, setSecilenFirmalar] = useState<string[]>([]);
   const [firmaArama, setFirmaArama] = useState("");
   const [kaydediliyor, setKaydediliyor] = useState(false);
+  const [hizliEkleniyorId, setHizliEkleniyorId] = useState<string | null>(null);
 
   const ayBasi = tarihAnahtari(yil, ay, 1);
   const ayGunSayisi = new Date(yil, ay + 1, 0).getDate();
@@ -363,6 +364,34 @@ export default function FirmaTakvimiPage() {
     }
     setMesaj(`✓ ${secilenFirmalar.length} firma ${secilenGun} tarihine eklendi.`);
     panelKapat();
+    veriYukle();
+  }
+
+  /** "Ziyaret Edilmeyen Firmalar" listesindeki "Takvime ekle" butonu —
+   *  ÖNCEDEN yalnızca yukarıdaki paneli o firma seçiliyken açıyordu; gerçek
+   *  kaydı yapmak için panelin KENDİ "Takvime Ekle" butonuna ikinci kez
+   *  tıklamak gerekiyordu. Buton adı doğrudan bir eylem vaat ettiğinden bu
+   *  kafa karıştırıcıydı ("tıklıyorum ama eklemiyor"). Artık varsayılan gün
+   *  (bu ay içindeysek bugün, değilsek ayın 1'i) için DOĞRUDAN ekler; farklı
+   *  bir gün seçmek isteyenler hâlâ takvimden bir güne tıklayarak paneli
+   *  açabilir. */
+  async function hizliEkle(firmId: string) {
+    const gun =
+      yil === bugun.getFullYear() && ay === bugun.getMonth() ? bugunAnahtari : ayBasi;
+    setHizliEkleniyorId(firmId);
+    setHata("");
+    setMesaj("");
+
+    const { error } = await supabase
+      .from("visits")
+      .insert([{ firm_id: firmId, visit_date: gun }]);
+    setHizliEkleniyorId(null);
+
+    if (error) {
+      setHata("Ziyaret eklenemedi: " + hataCevir(error));
+      return;
+    }
+    setMesaj(`✓ ${gun} tarihine eklendi.`);
     veriYukle();
   }
 
@@ -702,21 +731,12 @@ export default function FirmaTakvimiPage() {
               {/* "Takvime ekle" firma adından ÖNCE gelir. */}
               {canWrite && (
                 <button
-                  onClick={() => {
-                    // Varsayılan olarak bugünün tarihi (seçili ay dışındaysa
-                    // ayın 1'i) açılır ve firma önceden işaretlenir.
-                    const varsayilan =
-                      yil === bugun.getFullYear() && ay === bugun.getMonth()
-                        ? bugunAnahtari
-                        : ayBasi;
-                    setSecilenGun(varsayilan);
-                    setSecilenFirmalar([f.id]);
-                    setFirmaArama("");
-                    window.scrollTo({ top: 0, behavior: "smooth" });
-                  }}
-                  className="text-xs px-2 py-1 rounded border hover:bg-gray-50 shrink-0"
+                  onClick={() => hizliEkle(f.id)}
+                  disabled={hizliEkleniyorId === f.id}
+                  title="Bugünün tarihiyle ekler. Farklı bir gün seçmek için takvimde o güne tıklayın."
+                  className="text-xs px-2 py-1 rounded border hover:bg-gray-50 shrink-0 disabled:opacity-40"
                 >
-                  Takvime ekle
+                  {hizliEkleniyorId === f.id ? "Ekleniyor..." : "Takvime ekle"}
                 </button>
               )}
               <Link
