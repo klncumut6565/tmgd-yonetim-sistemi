@@ -429,18 +429,26 @@ export default function EmniyetKapsamTaramasi({ firmId, firmaAdi }: Props) {
       out_of_scope: "H",
       undetermined: "? (miktar doğrulanmalı)",
     };
-    const rows = ozet.results.map((r) => [
-      r.un_number,
-      r.proper_shipping_name,
-      r.adr_class || "—",
-      r.packing_group || "—",
-      r.mode,
-      r.quantityKnown && r.quantity != null
-        ? `${r.quantity}${r.thresholdUnit ? " " + r.thresholdUnit : ""}`
-        : "—",
-      kapsamMetni[r.status],
-      r.conclusion,
-    ]);
+    // EK-1'de yalnızca KAPSAMDA ve BELİRSİZ maddeler listelenir. Kapsam
+    // dışı (out_of_scope) ürünler Emniyet Planı'nın konusu değildir —
+    // listede yer almaları kapsamı gereksiz genişletip belgeyi
+    // okunaksızlaştırır; bu yüzden burada elenir (tarama ekranındaki genel
+    // özet tablosu bunları göstermeye devam eder, yalnızca bu belge çıktısı
+    // etkilenir).
+    const rows = ozet.results
+      .filter((r) => r.status !== "out_of_scope")
+      .map((r) => [
+        r.un_number,
+        r.proper_shipping_name,
+        r.adr_class || "—",
+        r.packing_group || "—",
+        r.mode,
+        r.quantityKnown && r.quantity != null
+          ? `${r.quantity}${r.thresholdUnit ? " " + r.thresholdUnit : ""}`
+          : "—",
+        kapsamMetni[r.status],
+        r.conclusion,
+      ]);
     return {
       type: "table",
       headers: [
@@ -450,8 +458,9 @@ export default function EmniyetKapsamTaramasi({ firmId, firmaAdi }: Props) {
       rows,
       note:
         "Bu tablo, Emniyet Planı Kapsam Taraması'nda firmanın kimyasal envanterinden " +
-        "otomatik üretilmiştir. Yeni ürün/miktar değişikliğinde tarama tekrarlanmalı ve " +
-        "bu ek güncellenmelidir.",
+        "otomatik üretilmiştir (yalnızca kapsamda ve belirsiz maddeler listelenir; " +
+        "kapsam dışı olanlar bu belgeye dahil edilmez). Yeni ürün/miktar değişikliğinde " +
+        "tarama tekrarlanmalı ve bu ek güncellenmelidir.",
     };
   }
 
