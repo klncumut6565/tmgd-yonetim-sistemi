@@ -716,13 +716,17 @@ export async function gorevliListesiPdfOlustur(
     //   (Yapılacak Görevler, Doldurulacak Döküman No, Sorumlu Kişi/ler)
     //   dağıtıldı; dar/sabit içerikli sütunlar (Sıra No, Eğitim Tarihi)
     //   biraz kısıldı. Toplam yine 267mm.
+    // - Yapılacak Görevler'den Doldurulacak Döküman No'ya 15mm aktarıldı
+    //   (80 → 65 / 55 → 70): döküman no hücresi dar olunca çok satıra
+    //   bölünüyor, bu da tablo satırlarını uzatıp son (imza) satırının
+    //   bir sonraki sayfaya taşmasına yol açıyordu.
     columnStyles: {
       0: { cellWidth: 12.0, halign: "center" },
       1: { cellWidth: 28.0, overflow: "linebreak" },
-      2: { cellWidth: 80.0, overflow: "linebreak" },
+      2: { cellWidth: 65.0, overflow: "linebreak" },
       3: { cellWidth: 34.0, overflow: "linebreak" },
       4: { cellWidth: 32.0, overflow: "linebreak" },
-      5: { cellWidth: 55.0, overflow: "linebreak" },
+      5: { cellWidth: 70.0, overflow: "linebreak" },
       6: { cellWidth: 26.0, halign: "center" },
     },
     head: [
