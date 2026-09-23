@@ -9,6 +9,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
 import { useUser } from "@/hooks/useUser";
 import { hataCevir } from "@/lib/hataCevir";
+import { BELGE_UYARI_GUN } from "@/lib/uyariEsikleri";
 
 const ROLE_TR: Record<string, string> = {
   super_admin: "Süper Yönetici",
@@ -283,24 +284,14 @@ export default function SettingsPage() {
       {/* ── BİLDİRİMLER ── */}
       {tab === "bildirimler" && (
         <div className="space-y-4">
-          <p className="text-sm text-gray-500">
-            Kaydırıcıyı <strong>0</strong>'a getirirsen o uyarı türü tamamen kapanır.
-            Bildirim zili sadece bu ayarlarda belirlediğin eşiği aşan belgeleri gösterir.
-          </p>
-
-          <DaySlider
-            label="Belge geçerlilik uyarısı"
-            hint="MSDS, faaliyet raporu gibi belgeler için kaç gün öncesinden uyarı alsın?"
-            value={docDays}
-            onChange={setDocDays}
-          />
-
-          <DaySlider
-            label="ADR sertifika / araç belgesi uyarısı"
-            hint="Sürücü ADR sertifikaları ve araç ADR belgeleri için uyarı eşiği"
-            value={adrDays}
-            onChange={setAdrDays}
-          />
+          {/* Belge ve ADR/araç belgesi uyarı eşikleri artık kişisel değil:
+              gösterge paneli ve bildirim zili ORTAK sabit sınırı kullanır
+              (src/lib/uyariEsikleri.ts). O yüzden bu iki kaydırıcı kaldırıldı. */}
+          <div className="border rounded-xl p-4 bg-gray-50 text-sm text-gray-600">
+            <strong>Belge ve araç/sürücü belgesi uyarıları</strong> tüm kullanıcılar
+            için ortak olarak geçerlilik bitimine <strong>{BELGE_UYARI_GUN} gün</strong> kala
+            gösterilir (TMFB 150 gün, TMGD Sertifikası 120 gün özel eşiklidir).
+          </div>
 
           <DaySlider
             label="Görev termin uyarısı"

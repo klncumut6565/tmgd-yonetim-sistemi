@@ -12,6 +12,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
 import { useUser } from "@/hooks/useUser";
+import { BELGE_UYARI_GUN } from "@/lib/uyariEsikleri";
 
 type PendingUser = {
   id: string;
@@ -34,8 +35,8 @@ type NotifSettings = {
 };
 
 const DEFAULT_SETTINGS: NotifSettings = {
-  doc_expiry_days: 45,
-  adr_expiry_days: 45,
+  doc_expiry_days: BELGE_UYARI_GUN,
+  adr_expiry_days: BELGE_UYARI_GUN,
 };
 
 /** TMFB (Tehlikeli Madde Faaliyet Belgesi) için ÖZEL uyarı eşiği.
@@ -97,19 +98,12 @@ export default function NotificationBell() {
       new Set(((dismissedData as { notification_key: string }[]) || []).map((r) => r.notification_key))
     );
 
-    // 1) Kişisel bildirim ayarları
-    const { data: sData } = await supabase
-      .from("user_notification_settings")
-      .select("doc_expiry_days, adr_expiry_days")
-      .eq("user_id", profile.id)
-      .maybeSingle();
-
-    const s: NotifSettings = sData
-      ? {
-          doc_expiry_days: sData.doc_expiry_days ?? 45,
-          adr_expiry_days: sData.adr_expiry_days ?? 45,
-        }
-      : DEFAULT_SETTINGS;
+    // 1) Uyarı eşikleri — gösterge paneliyle ORTAK sabit sınır
+    // (src/lib/uyariEsikleri.ts). Kişisel ayar artık okunmuyor.
+    const s: NotifSettings = {
+      doc_expiry_days: BELGE_UYARI_GUN,
+      adr_expiry_days: BELGE_UYARI_GUN,
+    };
     setSettings(s);
 
     // 2) Onay bekleyenler (yalnızca super_admin)
@@ -457,7 +451,7 @@ export default function NotificationBell() {
                 <div className="px-3 py-1.5 bg-gray-50 text-xs font-medium text-gray-500 border-b">
                   Süre uyarıları
                   <span className="ml-1 text-gray-400">
-                    (belge: {settings.doc_expiry_days} gün · ADR: {settings.adr_expiry_days} gün)
+                    (son {settings.doc_expiry_days} gün)
                   </span>
                 </div>
                 {allDocs.map((d, i) => (

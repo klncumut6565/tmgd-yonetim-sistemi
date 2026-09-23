@@ -14,6 +14,7 @@ import Link from "next/link";
 import { supabase } from "@/lib/supabase/client";
 import AuditLogWidget from "@/components/audit/AuditLogWidget";
 import { useUser } from "@/hooks/useUser";
+import { BELGE_UYARI_GUN } from "@/lib/uyariEsikleri";
 
 type Counts = {
   firms: number;
@@ -63,14 +64,15 @@ function daysLeft(dateStr: string): number {
 }
 
 /** Panelde "Yaklaşan Belge Süreleri" için genel pencere (gün). */
-const GENEL_UYARI_GUN = 30;
+// Bildirim ziliyle ortak sınır — tek yerden (uyariEsikleri.ts) yönetilir.
+const GENEL_UYARI_GUN = BELGE_UYARI_GUN;
 
 /** TMFB (Tehlikeli Madde Faaliyet Belgesi) ÖZEL eşiği — yenileme süreci
- *  uzun sürdüğü için genel 30 günlük pencereden bağımsız olarak son 150
+ *  uzun sürdüğü için genel 45 günlük pencereden bağımsız olarak son 150
  *  gün kala gösterilir (NotificationBell ile aynı kural). */
 const TMFB_UYARI_GUN = 150;
 
-/** TMGD SERTIFIKASI (S2) ÖZEL eşiği — genel 30 günlük pencereden bağımsız
+/** TMGD SERTIFIKASI (S2) ÖZEL eşiği — genel 45 günlük pencereden bağımsız
  *  olarak son 120 gün kala gösterilir. */
 const TMGD_UYARI_GUN = 120;
 
@@ -100,32 +102,13 @@ export default function DashboardPage() {
   const [tasks, setTasks] = useState<RecentTask[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  // Bildirim ziliyle aynı (kullanıcının kendi ayarları) eşikler — metinlerde
-  // sabit "30 gün" yerine gerçek değer gösterilsin diye state'te tutulur.
-  const [docGunGosterim, setDocGunGosterim] = useState(GENEL_UYARI_GUN);
-  const [adrGunGosterim, setAdrGunGosterim] = useState(GENEL_UYARI_GUN);
+
 
   useEffect(() => {
     async function load() {
-      // Bildirim zili (NotificationBell.tsx) ile AYNI eşikleri kullan: o,
-      // kullanıcının kendi ayarlarını (user_notification_settings) okuyor,
-      // bu panel ise ÖNCEDEN sabit 30 günlük GENEL_UYARI_GUN kullanıyordu.
-      // Kullanıcı eşiğini 30'dan yüksek ayarlamışsa (varsayılan 45), zilde
-      // görünen bir uyarı bu panelde hiç görünmüyordu — aynı ayar burada da
-      // okunup sorgularda kullanılır.
-      let docGun = GENEL_UYARI_GUN;
-      let adrGun = GENEL_UYARI_GUN;
-      if (profile?.id) {
-        const { data: sData } = await supabase
-          .from("user_notification_settings")
-          .select("doc_expiry_days, adr_expiry_days")
-          .eq("user_id", profile.id)
-          .maybeSingle();
-        docGun = sData?.doc_expiry_days ?? 45;
-        adrGun = sData?.adr_expiry_days ?? 45;
-      }
-      setDocGunGosterim(docGun);
-      setAdrGunGosterim(adrGun);
+      // Bildirim ziliyle ORTAK sabit eşik (src/lib/uyariEsikleri.ts).
+      const docGun = GENEL_UYARI_GUN;
+      const adrGun = GENEL_UYARI_GUN;
 
       const [
         firmRes,
@@ -386,10 +369,7 @@ export default function DashboardPage() {
     };
     window.addEventListener("focus", onFocus);
     return () => window.removeEventListener("focus", onFocus);
-    // profile.id eklendi: kullanıcı ayarları (adrGun/docGun) profile
-    // henüz yüklenmemişken çekilmiş olabilir — profile hazır olduğunda
-    // etki yeniden çalışıp gerçek eşiklerle tazeler.
-  }, [profile?.id]);
+  }, []);
 
   const kpis = [
     { label: "Firmalar", value: counts.firms, href: "/firms" },
@@ -443,7 +423,7 @@ export default function DashboardPage() {
           <h3 className="font-medium text-gray-600 mb-3">Sürücü Belgeleri (SRC-5 · Ehliyet)</h3>
           {loading && <p className="text-sm text-gray-500">Yükleniyor...</p>}
           {!loading && drivers.length === 0 && (
-            <p className="text-sm text-gray-500">{adrGunGosterim} gün içinde süresi dolan sürücü belgesi yok. ✓</p>
+            <p className="text-sm text-gray-500">{GENEL_UYARI_GUN} gün içinde süresi dolan sürücü belgesi yok. ✓</p>
           )}
           <ul className="space-y-2">
             {drivers.map((d) => (
@@ -462,7 +442,7 @@ export default function DashboardPage() {
           <h3 className="font-medium text-gray-600 mb-3">Araç Belgeleri (ADR · Muayene)</h3>
           {loading && <p className="text-sm text-gray-500">Yükleniyor...</p>}
           {!loading && vehicles.length === 0 && (
-            <p className="text-sm text-gray-500">{adrGunGosterim} gün içinde süresi dolan araç belgesi yok. ✓</p>
+            <p className="text-sm text-gray-500">{GENEL_UYARI_GUN} gün içinde süresi dolan araç belgesi yok. ✓</p>
           )}
           <ul className="space-y-2">
             {vehicles.map((v) => (
@@ -478,7 +458,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Firma belgeleri (Belge Takip) — TMFB, yetki belgesi, sigorta vb.
-            TMFB burada 150 gün kala görünür (özel eşik), diğerleri kullanıcının doc_expiry_days ayarına göre. */}
+            TMFB burada 150 gün kala görünür (özel eşik), diğerleri ortak 45 günlük eşiğe göre. */}
         <div className="border rounded-xl p-4 lg:col-span-2">
           <h3 className="font-medium text-gray-600 mb-3">
             Firma Belgeleri (TMFB · Yetki · Sigorta · Diğer)
@@ -499,7 +479,7 @@ export default function DashboardPage() {
             ))}
           </ul>
           <p className="text-[11px] text-gray-400 mt-3">
-            TMFB için yenileme süresi uzun olduğundan uyarı 150 gün kala başlar; diğer belgeler {docGunGosterim} gün.
+            TMFB için yenileme süresi uzun olduğundan uyarı 150 gün kala başlar; diğer belgeler {GENEL_UYARI_GUN} gün.
           </p>
         </div>
 
