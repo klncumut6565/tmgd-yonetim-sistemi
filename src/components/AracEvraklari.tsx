@@ -57,7 +57,7 @@ type DosyaSatiri = {
 
 const ORTAK_BELGE_TURLERI = [
   { anahtar: "tmfb", ekNo: 1, baslik: "Tehlikeli Madde Faaliyet Belgesi (TMFB)" },
-  { anahtar: "k1", ekNo: 2, baslik: "K1 Taşıma Yetki Belgesi" },
+  { anahtar: "k1", ekNo: 2, baslik: "K1/K2 Taşıma Yetki Belgesi" },
 ] as const;
 type OrtakBelgeTuru = (typeof ORTAK_BELGE_TURLERI)[number]["anahtar"];
 

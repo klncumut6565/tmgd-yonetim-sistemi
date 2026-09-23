@@ -100,9 +100,33 @@ export default function DashboardPage() {
   const [tasks, setTasks] = useState<RecentTask[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  // Bildirim ziliyle aynı (kullanıcının kendi ayarları) eşikler — metinlerde
+  // sabit "30 gün" yerine gerçek değer gösterilsin diye state'te tutulur.
+  const [docGunGosterim, setDocGunGosterim] = useState(GENEL_UYARI_GUN);
+  const [adrGunGosterim, setAdrGunGosterim] = useState(GENEL_UYARI_GUN);
 
   useEffect(() => {
     async function load() {
+      // Bildirim zili (NotificationBell.tsx) ile AYNI eşikleri kullan: o,
+      // kullanıcının kendi ayarlarını (user_notification_settings) okuyor,
+      // bu panel ise ÖNCEDEN sabit 30 günlük GENEL_UYARI_GUN kullanıyordu.
+      // Kullanıcı eşiğini 30'dan yüksek ayarlamışsa (varsayılan 45), zilde
+      // görünen bir uyarı bu panelde hiç görünmüyordu — aynı ayar burada da
+      // okunup sorgularda kullanılır.
+      let docGun = GENEL_UYARI_GUN;
+      let adrGun = GENEL_UYARI_GUN;
+      if (profile?.id) {
+        const { data: sData } = await supabase
+          .from("user_notification_settings")
+          .select("doc_expiry_days, adr_expiry_days")
+          .eq("user_id", profile.id)
+          .maybeSingle();
+        docGun = sData?.doc_expiry_days ?? 45;
+        adrGun = sData?.adr_expiry_days ?? 45;
+      }
+      setDocGunGosterim(docGun);
+      setAdrGunGosterim(adrGun);
+
       const [
         firmRes,
         taskRes,
@@ -127,32 +151,32 @@ export default function DashboardPage() {
         supabase
           .from("adr_expiring_drivers")
           .select("id, first_name, last_name, adr_valid_until, firm_name, days_left")
-          .lte("days_left", GENEL_UYARI_GUN)
+          .lte("days_left", adrGun)
           .order("days_left")
           .limit(8),
         supabase
           .from("adr_expiring_vehicles")
           .select("id, plate_number, adr_valid_until, firm_name, days_left")
-          .lte("days_left", GENEL_UYARI_GUN)
+          .lte("days_left", adrGun)
           .order("days_left")
           .limit(8),
         supabase
           .from("expiring_vehicle_inspections")
           .select("id, plate_number, inspection_valid_until, firm_name, days_left")
-          .lte("days_left", GENEL_UYARI_GUN)
+          .lte("days_left", adrGun)
           .order("days_left")
           .limit(8),
         supabase
           .from("expiring_driver_licenses")
           .select("id, first_name, last_name, driving_license_valid_until, firm_name, days_left")
-          .lte("days_left", GENEL_UYARI_GUN)
+          .lte("days_left", adrGun)
           .order("days_left")
           .limit(8),
-        // Firma/Belge Takip belgeleri — genel 30 günlük pencere
+        // Firma/Belge Takip belgeleri — kullanıcının kendi (doc_expiry_days) eşiği
         supabase
           .from("expiring_documents")
           .select("id, title, expiry_date, firm_name, days_left")
-          .lte("days_left", GENEL_UYARI_GUN)
+          .lte("days_left", docGun)
           .order("days_left")
           // Araç Evrakı belgeleri de bu listeye aktığı için limit 8'den
           // 20'ye çıkarıldı; aksi halde araç belgeleri firma belgelerini
@@ -362,7 +386,10 @@ export default function DashboardPage() {
     };
     window.addEventListener("focus", onFocus);
     return () => window.removeEventListener("focus", onFocus);
-  }, []);
+    // profile.id eklendi: kullanıcı ayarları (adrGun/docGun) profile
+    // henüz yüklenmemişken çekilmiş olabilir — profile hazır olduğunda
+    // etki yeniden çalışıp gerçek eşiklerle tazeler.
+  }, [profile?.id]);
 
   const kpis = [
     { label: "Firmalar", value: counts.firms, href: "/firms" },
@@ -416,7 +443,7 @@ export default function DashboardPage() {
           <h3 className="font-medium text-gray-600 mb-3">Sürücü Belgeleri (SRC-5 · Ehliyet)</h3>
           {loading && <p className="text-sm text-gray-500">Yükleniyor...</p>}
           {!loading && drivers.length === 0 && (
-            <p className="text-sm text-gray-500">30 gün içinde süresi dolan sürücü belgesi yok. ✓</p>
+            <p className="text-sm text-gray-500">{adrGunGosterim} gün içinde süresi dolan sürücü belgesi yok. ✓</p>
           )}
           <ul className="space-y-2">
             {drivers.map((d) => (
@@ -435,7 +462,7 @@ export default function DashboardPage() {
           <h3 className="font-medium text-gray-600 mb-3">Araç Belgeleri (ADR · Muayene)</h3>
           {loading && <p className="text-sm text-gray-500">Yükleniyor...</p>}
           {!loading && vehicles.length === 0 && (
-            <p className="text-sm text-gray-500">30 gün içinde süresi dolan araç belgesi yok. ✓</p>
+            <p className="text-sm text-gray-500">{adrGunGosterim} gün içinde süresi dolan araç belgesi yok. ✓</p>
           )}
           <ul className="space-y-2">
             {vehicles.map((v) => (
@@ -451,7 +478,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Firma belgeleri (Belge Takip) — TMFB, yetki belgesi, sigorta vb.
-            TMFB burada 150 gün kala görünür (özel eşik), diğerleri 30 gün. */}
+            TMFB burada 150 gün kala görünür (özel eşik), diğerleri kullanıcının doc_expiry_days ayarına göre. */}
         <div className="border rounded-xl p-4 lg:col-span-2">
           <h3 className="font-medium text-gray-600 mb-3">
             Firma Belgeleri (TMFB · Yetki · Sigorta · Diğer)
@@ -472,7 +499,7 @@ export default function DashboardPage() {
             ))}
           </ul>
           <p className="text-[11px] text-gray-400 mt-3">
-            TMFB için yenileme süresi uzun olduğundan uyarı 150 gün kala başlar; diğer belgeler 30 gün.
+            TMFB için yenileme süresi uzun olduğundan uyarı 150 gün kala başlar; diğer belgeler {docGunGosterim} gün.
           </p>
         </div>
 
