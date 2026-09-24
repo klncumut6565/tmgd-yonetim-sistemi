@@ -7,6 +7,7 @@
 import { usePathname, useRouter } from "next/navigation";
 import AuthGuard from "@/components/AuthGuard";
 import Sidebar from "@/components/layout/Sidebar";
+import GeriIleriButonlari from "@/components/layout/GeriIleriButonlari";
 import NotificationBell from "@/components/NotificationBell";
 import ADRAssistantWidget from "@/components/adr-assistant/ADRAssistantWidget";
 import { useUser } from "@/hooks/useUser";
@@ -42,7 +43,11 @@ export default function AppShell({
         <div className="flex-1 min-h-screen">
           {isApproved && (
             <header className="border-b p-4 flex items-center justify-between">
-              <span className="font-medium">TMGD Yönetim Sistemi</span>
+              {/* Sol üst köşe: geri / ileri gezinme + başlık */}
+              <div className="flex items-center gap-3">
+                <GeriIleriButonlari />
+                <span className="font-medium">TMGD Yönetim Sistemi</span>
+              </div>
               <div className="flex items-center gap-3 text-sm">
                 <NotificationBell />
                 <span className="text-gray-600">
