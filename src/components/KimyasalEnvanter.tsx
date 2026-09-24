@@ -217,6 +217,9 @@ export default function KimyasalEnvanter({
         .select("file_path, file_name, uploaded_at")
         .eq("firm_id", firmId)
         .eq("code", "L1")
+        // Yalnızca asıl L1 (ADR Envanter Listesi, period ""). K/L/SA
+        // bölümündeki L1 ŞABLON satırı (period "SABLON") veri kaynağı değildir.
+        .eq("period", "")
         .order("uploaded_at", { ascending: false })
         .limit(1);
       if (dErr || !dosyalar || dosyalar.length === 0) {

@@ -128,6 +128,10 @@ export const CATALOG: CatalogItem[] = [
   { code: "SA3", name: "ADR Belge Kaydı", category: "SA", activities: [], pasif: true },
 ];
 
+/** K/L/SA bölümündeki L1 ŞABLON satırının period değeri. Asıl L1 (veri
+ *  kaynağı) period "" kullanır; ikisi farklı kayıt/dosya anahtarına sahiptir. */
+export const L1_SABLON_PERIOD = "SABLON";
+
 // Faaliyete göre katalog filtresi
 // NOT: L1 (Kimyasal/Tehlikeli Madde Envanter Listesi) özel durum — firma
 // faaliyeti yalnızca Taşımacı ve/veya Tank İşletmecisi ise gizlenir,
@@ -192,6 +196,9 @@ export function codeLabel(code: string, period?: string): string {
   }
   if (code === "YFR" && period) {
     return `Yıllık Faaliyet Raporu ${period} (ADR 1.8.3.3)`;
+  }
+  if (code === "L1" && period === L1_SABLON_PERIOD) {
+    return "L1 — Tehlikeli Madde Envanter Listesi (Şablon)";
   }
   if (SPECIAL_ITEMS[code]) return SPECIAL_ITEMS[code].label;
   const item = catalogItem(code);
@@ -407,8 +414,16 @@ export function buildChecklist(
       title: "Kontrol · Liste · Takip Formları (K/L/SA)",
       items: [
         ...katalogMaddeleri(activities, ["K"]),
-        // L1 kendi bölümünde olduğundan burada L2-L4 kalır
-        ...katalogMaddeleri(activities, ["L"]).filter((i) => i.code !== "L1"),
+        // L1 burada ŞABLON olarak ayrıca listelenir (period: L1_SABLON_PERIOD).
+        // Asıl veri kaynağı "ADR Envanter Listesi" bölümündeki L1'dir
+        // (period ""); kimyasal envanter içe aktarma, taşıma evrakı ve emniyet
+        // planı kapsam taraması YALNIZCA onu okur — bu şablon satırına yüklenen
+        // dosyalar hiçbir veri çekiminde kullanılmaz.
+        ...katalogMaddeleri(activities, ["L"]).map((i) =>
+          i.code === "L1"
+            ? { code: "L1", period: L1_SABLON_PERIOD, label: "L1 — Tehlikeli Madde Envanter Listesi (Şablon)" }
+            : i
+        ),
         ...katalogMaddeleri(activities, ["SA"]),
       ],
     },
