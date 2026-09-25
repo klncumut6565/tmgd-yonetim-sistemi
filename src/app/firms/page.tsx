@@ -219,6 +219,13 @@ export default function FirmsPage() {
 
   async function createFirm() {
     if (!name.trim()) return;
+    // Sözleşme tarihi ZORUNLU: ziyaret raporu ayları ve Yıllık Faaliyet
+    // Raporu yılları bu tarihe göre hesaplanır; tarihsiz firmada yanlış
+    // (varsayılana dayalı) liste üretilirdi.
+    if (!contractStart) {
+      setError("Sözleşme / Başlangıç Tarihi zorunludur.");
+      return;
+    }
     setSaving(true);
     setError("");
 
@@ -230,7 +237,7 @@ export default function FirmsPage() {
         city: city.trim() || null,
         district: district.trim() || null,
         activities,
-        contract_start: contractStart || null, // boş = yıl başından
+        contract_start: contractStart, // zorunlu (yukarıda doğrulandı)
         status: "active",
       })
       .select("id")
@@ -547,14 +554,18 @@ export default function FirmsPage() {
             {/* Sözleşme / başlangıç tarihi */}
             <label className="block mb-3">
               <span className="text-sm text-gray-600">
-                Sözleşme / Başlangıç Tarihi
+                Sözleşme / Başlangıç Tarihi <span className="text-red-600">*</span>
               </span>
               <input
                 type="date"
-                className="border p-2 w-full rounded mt-1"
+                required
+                className={`border p-2 w-full rounded mt-1 ${!contractStart ? "border-red-300" : ""}`}
                 value={contractStart}
                 onChange={(e) => setContractStart(e.target.value)}
               />
+              <span className="text-xs text-gray-400">
+                Zorunlu — ziyaret raporları ve Yıllık Faaliyet Raporu yılları bu tarihe göre hesaplanır.
+              </span>
             </label>
 
             {/* Logo */}
@@ -573,7 +584,7 @@ export default function FirmsPage() {
 
             <button
               onClick={createFirm}
-              disabled={saving || !name.trim()}
+              disabled={saving || !name.trim() || !contractStart}
               className="w-full px-4 py-2 rounded bg-blue-600 text-white disabled:opacity-50"
             >
               {saving ? "Kaydediliyor..." : "✓ Ekle"}

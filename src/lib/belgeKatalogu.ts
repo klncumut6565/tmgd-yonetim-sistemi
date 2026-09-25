@@ -277,20 +277,21 @@ function ziyaretAylari(contractStart: string | null): ChecklistItem[] {
 //
 // İÇİNDE BULUNULAN YIL asla listede görünmez — henüz tamamlanmadığı için
 // raporu hazırlanamaz (bkz. sonRaporYili = currentYear - 1).
-// Sözleşme tarihi girilmemişse yalnızca geçen yılın raporu gösterilir.
+// Sözleşme tarihi girilmemişse liste boş döner (tahmin yapılmaz).
 function yillikFaaliyetRaporlari(contractStart: string | null): ChecklistItem[] {
   const now = new Date();
   const currentYear = now.getFullYear();
   const sonRaporYili = currentYear - 1; // her zaman: en son gösterilecek yıl
 
-  let startYear = sonRaporYili;
+  // Sözleşme tarihi yoksa TAHMİN YAPILMAZ (varsayılan yıl üretmek yanlış
+  // sonuç verebilirdi) — liste boş döner, firma sayfası tarih girilmesi
+  // için uyarı gösterir. Yeni firmalarda tarih zaten zorunlu.
+  if (!contractStart) return [];
 
-  if (contractStart) {
-    const cs = new Date(contractStart);
-    const sozlesmeYili = cs.getFullYear();
-    const haziranOncesi = cs.getMonth() < 5; // 0-indeksli: Haziran = 5
-    startYear = haziranOncesi ? sozlesmeYili - 1 : sozlesmeYili;
-  }
+  const cs = new Date(contractStart);
+  const sozlesmeYili = cs.getFullYear();
+  const haziranOncesi = cs.getMonth() < 5; // 0-indeksli: Haziran = 5
+  const startYear = haziranOncesi ? sozlesmeYili - 1 : sozlesmeYili;
 
   const items: ChecklistItem[] = [];
   for (let y = startYear; y <= sonRaporYili; y++) {

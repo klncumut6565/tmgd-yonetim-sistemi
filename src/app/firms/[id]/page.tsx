@@ -512,9 +512,15 @@ function FirmDetailInner({
    */
   async function updateContractStart(date: string) {
     if (!canWrite) return;
+    // Sözleşme tarihi zorunlu — silinemez (boşaltılırsa Yıllık Faaliyet
+    // Raporu / ziyaret listeleri hesaplanamaz).
+    if (!date) {
+      setFileMsg("Sözleşme başlangıç tarihi zorunludur, boş bırakılamaz.");
+      return;
+    }
     const { error } = await supabase
       .from("firms")
-      .update({ contract_start: date || null })
+      .update({ contract_start: date })
       .eq("id", id);
     if (error) {
       setFileMsg("Sözleşme başlangıç tarihi kaydedilemedi: " + hataCevir(error));
@@ -1239,6 +1245,15 @@ function FirmDetailInner({
           {fileMsg && (
             <p className="text-sm text-gray-700 bg-amber-50 border border-amber-200 rounded p-3 mb-4">
               {fileMsg}
+            </p>
+          )}
+
+          {!firm.contract_start && (
+            <p className="text-sm text-red-800 bg-red-50 border border-red-200 rounded p-3 mb-4">
+              ⚠ Bu firmanın <strong>TMGD Hizmet Sözleşmesi başlangıç tarihi</strong> girilmemiş.
+              Yıllık Faaliyet Raporu yılları ve ziyaret raporu ayları bu tarihe göre
+              hesaplandığı için liste eksik/boş görünür — lütfen &quot;TMGD Sözleşme ·
+              Sertifika · Yetki&quot; bölümündeki S1 satırından tarihi girin.
             </p>
           )}
 
