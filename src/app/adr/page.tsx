@@ -229,7 +229,7 @@ function AdrPageInner() {
   async function downloadPdf() {
     if(calcItems.length===0) return; setPdfLoading(true);
     const {jsPDF}=await import("jspdf"); const autoTable=(await import("jspdf-autotable")).default;
-    const doc=new jsPDF({orientation:"portrait",unit:"mm",format:"a4"});
+    const doc=new jsPDF({ compress: true, orientation:"portrait",unit:"mm",format:"a4"});
     const W=210,M=15;
     doc.setFillColor(15,15,15); doc.rect(0,0,W,28,"F");
     doc.setTextColor(255,255,255); doc.setFontSize(14); doc.setFont("helvetica","bold");

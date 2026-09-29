@@ -28,6 +28,7 @@ import {
 } from "@/lib/belgeKatalogu";
 import { kapakSayfasiOlustur } from "@/lib/kapakSayfasi";
 import { belgeSablonu, BelgeSablonu } from "@/lib/belgeSablonlari";
+import { logoyuKucult } from "@/lib/pdfGorsel";
 import { BELGE_GORSELLERI } from "@/lib/belgeGorselleri";
 import { hazirlayanKasesi, kontrolEdenKasesi } from "@/lib/kaseler";
 import {
@@ -420,8 +421,9 @@ export default function BelgeOlusturForm({ fixedFirmId, initialFirmId, compact =
       r.onerror = reject;
       r.readAsDataURL(file);
     });
-    const enBoyOrani = await gorselEnBoyOrani(data);
-    return { data, fmt, enBoyOrani };
+    const kucuk = await logoyuKucult(data, fmt);
+    const enBoyOrani = await gorselEnBoyOrani(kucuk.data);
+    return { data: kucuk.data, fmt: kucuk.fmt, enBoyOrani };
   }
 
   // Logo'yu imzalı URL üzerinden dataURL'e çevir (jsPDF için)
@@ -441,8 +443,9 @@ export default function BelgeOlusturForm({ fixedFirmId, initialFirmId, compact =
         r.onerror = reject;
         r.readAsDataURL(blob);
       });
-      const enBoyOrani = await gorselEnBoyOrani(dataUrl);
-      return { data: dataUrl, fmt, enBoyOrani };
+      const kucuk = await logoyuKucult(dataUrl, fmt);
+      const enBoyOrani = await gorselEnBoyOrani(kucuk.data);
+      return { data: kucuk.data, fmt: kucuk.fmt, enBoyOrani };
     } catch {
       return null;
     }
@@ -532,7 +535,7 @@ export default function BelgeOlusturForm({ fixedFirmId, initialFirmId, compact =
             // Ancak kapak sayfası diğer belgelerdeki gibi ÜRETİLİR: firma
             // logosu, belge adı, faaliyet kapsamı ve imza tablosu içerir.
             // İkisi pdf-lib ile birleştirilir: [kapak] + [orijinal form].
-            const kapakDoc = new jsPDF({
+            const kapakDoc = new jsPDF({ compress: true,
               orientation: "portrait",
               unit: "mm",
               format: "a4",
@@ -649,7 +652,7 @@ export default function BelgeOlusturForm({ fixedFirmId, initialFirmId, compact =
         // içerik yatay ise renderYapilandirilmisBelge kapaktan SONRA
         // ilk içerik sayfasını manuel olarak landscape'e çevirir.
         const yatayMi = !!belgeSablonu(item.code)?.yatay;
-        const doc = new jsPDF({
+        const doc = new jsPDF({ compress: true,
           orientation: "portrait",
           unit: "mm",
           format: "a4",
@@ -1196,7 +1199,7 @@ function renderBasitBelge(
   if (logo) {
     try {
       const box = logoKutusuHesapla(logo.enBoyOrani, 15, 12, 24);
-      doc.addImage(logo.data, logo.fmt, box.x, box.y, box.w, box.h);
+      doc.addImage(logo.data, logo.fmt, box.x, box.y, box.w, box.h, undefined, "FAST");
     } catch {
       /* logo eklenemezse belge yine üretilsin */
     }
@@ -1841,7 +1844,7 @@ function baslikTablosuCiz(
         alanG,
         alanY
       );
-      doc.addImage(logo.data, logo.fmt, box.x, box.y, box.w, box.h);
+      doc.addImage(logo.data, logo.fmt, box.x, box.y, box.w, box.h, undefined, "FAST");
     } catch {
       /* yoksay */
     }
@@ -1968,7 +1971,7 @@ function altTabloCiz(
     const boslukYuksekligi = yukseklik - yaziAlti - kenarPay;
     const kaseYPos = y + yaziAlti + (boslukYuksekligi - kaseY) / 2;
     try {
-      doc.addImage(kase.data, kase.fmt, kaseX, kaseYPos, kaseG, kaseY);
+      doc.addImage(kase.data, kase.fmt, kaseX, kaseYPos, kaseG, kaseY, undefined, "FAST");
     } catch {
       // Görsel bozuksa tablo yine de basılsın — kaşe atlanır.
     }
@@ -2117,7 +2120,7 @@ function kapakSayfasiCiz(
   const qrX = W - M - qrBoyut;
   const qrY = 263;
   try {
-    doc.addImage(SIAM_QR_B64, "PNG", qrX, qrY, qrBoyut, qrBoyut);
+    doc.addImage(SIAM_QR_B64, "PNG", qrX, qrY, qrBoyut, qrBoyut, undefined, "FAST");
   } catch {
     /* karekod eklenemezse belge yine üretilsin */
   }
@@ -2231,7 +2234,7 @@ export async function renderYapilandirilmisBelge(
     gorseller.forEach((gorsel, i) => {
       doc.addPage();
       baslikTablosuCiz(doc, firmAdi, code, belgeAdi, sablon, logo, bugun, i + 2, toplamSayfa, baslikYukseklik, adLines);
-      doc.addImage(gorsel, "PNG", pngX, pngY, pngGenislik, pngYukseklik);
+      doc.addImage(gorsel, "PNG", pngX, pngY, pngGenislik, pngYukseklik, undefined, "FAST");
     });
     return;
   }
@@ -2343,7 +2346,7 @@ export async function renderYapilandirilmisBelge(
         const gGenislik = gYukseklik * satir.enBoyOrani;
         const gx = M + (genislik - gGenislik) / 2; // ortalanmış
         try {
-          doc.addImage(satir.dataUrl, "PNG", gx, gy, gGenislik, gYukseklik);
+          doc.addImage(satir.dataUrl, "PNG", gx, gy, gGenislik, gYukseklik, undefined, "FAST");
         } catch {
           /* görsel eklenemezse belge yine üretilsin */
         }

@@ -264,7 +264,7 @@ async function k3FormuCiz(
 
   // ── Sayfa 1: arka plan ───────────────────────────────────────────────
   doc.addPage();
-  doc.addImage(K3_FORM_SAYFA1, "PNG", 0, 0, W, H);
+  doc.addImage(K3_FORM_SAYFA1, "PNG", 0, 0, W, H, undefined, "FAST");
 
   // "1. Tehlike İkaz İşaretleri ve Turuncu Plaka Kontrolü" — evraktaki
   // gerçek taşıma moduna göre otomatik işaretlenir: seçili moda uyan
@@ -316,7 +316,7 @@ async function k3FormuCiz(
 
   // ── Sayfa 2: arka plan ────────────────────────────────────────────────
   doc.addPage();
-  doc.addImage(K3_FORM_SAYFA2, "PNG", 0, 0, W, H);
+  doc.addImage(K3_FORM_SAYFA2, "PNG", 0, 0, W, H, undefined, "FAST");
 
   // "4. Dolduran Kontrolleri" — firmanın kayıtlı faaliyet konuları
   // arasında "dolduran" YOKSA, bu form fiilen doldurma işlemi yapmayan
@@ -388,7 +388,7 @@ async function evrakPdfUret(args: {
   const { default: jsPDF } = (await import("jspdf")) as unknown as {
     default: new (o?: object) => JsPDFType;
   };
-  const doc = new jsPDF({ unit: "mm", format: "a4" });
+  const doc = new jsPDF({ compress: true, unit: "mm", format: "a4" });
   doc.addFileToVFS("LiberationSans-Regular.ttf", LIBERATION_SANS_REGULAR_B64);
   doc.addFont("LiberationSans-Regular.ttf", FONT, "normal");
   doc.addFileToVFS("LiberationSans-Bold.ttf", LIBERATION_SANS_BOLD_B64);
@@ -421,7 +421,7 @@ async function evrakPdfUret(args: {
         const oran = args.logo.enBoyOrani > 0 ? args.logo.enBoyOrani : 1;
         const fw = hedefGenislik;
         const fh = fw / oran;
-        doc.addImage(args.logo.data, args.logo.fmt, W / 2 - fw / 2, H / 2 - fh / 2, fw, fh);
+        doc.addImage(args.logo.data, args.logo.fmt, W / 2 - fw / 2, H / 2 - fh / 2, fw, fh, undefined, "FAST");
         gs.setGState(gs.GState({ opacity: 1 }));
       } catch {
         /* GState desteklenmiyorsa filigran atlanır, belge yine üretilir */
@@ -441,7 +441,7 @@ async function evrakPdfUret(args: {
         const logoW = 25;
         const oran = args.logo.enBoyOrani > 0 ? args.logo.enBoyOrani : 1;
         logoH = logoW / oran;
-        doc.addImage(args.logo.data, args.logo.fmt, M, y, logoW, logoH);
+        doc.addImage(args.logo.data, args.logo.fmt, M, y, logoW, logoH, undefined, "FAST");
       } catch {
         /* Logo eklenmezse devam et */
       }

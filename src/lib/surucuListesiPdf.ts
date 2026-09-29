@@ -205,7 +205,7 @@ function kapakBaslikTablosuCiz(
         solKenar + kenar + (alanG - box.w) / 2,
         ustY + kenar + (alanY - box.h) / 2,
         box.w,
-        box.h
+        box.h, undefined, "FAST"
       );
     } catch {
       /* logo eklenemezse kutu yine çizilsin */
@@ -291,7 +291,7 @@ function kapakSayfasiCiz(doc: JsPDFType, veri: SurucuListesiPdfVerisi) {
   const qrX = W - M - qrBoyut;
   const qrY = H - qrBoyut - 12;
   try {
-    doc.addImage(SIAM_QR_B64, "PNG", qrX, qrY, qrBoyut, qrBoyut);
+    doc.addImage(SIAM_QR_B64, "PNG", qrX, qrY, qrBoyut, qrBoyut, undefined, "FAST");
   } catch {
     /* karekod eklenemezse belge yine üretilsin */
   }
@@ -343,7 +343,7 @@ function baslikKutusuCiz(doc: JsPDFType, veri: SurucuListesiPdfVerisi, sayfaNo =
   if (veri.logo) {
     try {
       const box = logoKutusuHesapla(veri.logo.enBoyOrani, BASLIK_KUTUSU_YUKSEKLIK - 4);
-      doc.addImage(veri.logo.data, veri.logo.fmt, M + 2, kutuTop + 2, box.w, box.h);
+      doc.addImage(veri.logo.data, veri.logo.fmt, M + 2, kutuTop + 2, box.w, box.h, undefined, "FAST");
     } catch {
       /* logo eklenemezse başlık kutusu yine çizilsin */
     }
@@ -428,7 +428,7 @@ export async function surucuListesiPdfOlustur(veri: SurucuListesiPdfVerisi): Pro
   const { jsPDF } = await import("jspdf");
   const autoTable = (await import("jspdf-autotable")).default;
 
-  const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" }) as unknown as JsPDFType;
+  const doc = new jsPDF({ compress: true, orientation: "portrait", unit: "mm", format: "a4" }) as unknown as JsPDFType;
   fontuKaydet(doc);
 
   // Sayfa 1 — kapak (DİKEY, çerçeveli)

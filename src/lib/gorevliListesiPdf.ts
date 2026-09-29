@@ -161,7 +161,7 @@ function kapakBaslikTablosuCiz(
         solKenar + kenar + (alanG - box.w) / 2,
         ustY + kenar + (alanY - box.h) / 2,
         box.w,
-        box.h
+        box.h, undefined, "FAST"
       );
     } catch {
       /* logo eklenemezse kutu yine çizilsin */
@@ -275,7 +275,7 @@ async function kapakSayfasiCiz(
   const kapakImzaY = qrY - 3 - IMZA_BLOK_YUKSEKLIK;
   imzaBlokuCiz(doc, veri, kapakImzaY);
   try {
-    doc.addImage(SIAM_QR_B64, "PNG", qrX, qrY, qrBoyut, qrBoyut);
+    doc.addImage(SIAM_QR_B64, "PNG", qrX, qrY, qrBoyut, qrBoyut, undefined, "FAST");
   } catch {
     /* karekod eklenemezse belge yine üretilsin */
   }
@@ -496,7 +496,7 @@ function baslikKutusuCiz(doc: JsPDFType, veri: GorevliListesiPdfVerisi) {
       // Hücre içinde ortala
       const lx = M + (LOGO_HUCRE_GENISLIK - lw) / 2;
       const ly = kutuTop + (BASLIK_KUTUSU_YUKSEKLIK - lh) / 2;
-      doc.addImage(veri.logo.data, veri.logo.fmt, lx, ly, lw, lh);
+      doc.addImage(veri.logo.data, veri.logo.fmt, lx, ly, lw, lh, undefined, "FAST");
     } catch {
       /* logo eklenemezse başlık kutusu yine çizilsin */
     }
@@ -618,7 +618,7 @@ function imzaBlokuCiz(
     const bosluk = yukseklik - yaziAlti - kenarPay;
     const kaseYPos = y + yaziAlti + (bosluk - kaseY) / 2;
     try {
-      doc.addImage(kase.data, kase.fmt, kaseX, kaseYPos, kaseG, kaseY);
+      doc.addImage(kase.data, kase.fmt, kaseX, kaseYPos, kaseG, kaseY, undefined, "FAST");
     } catch {
       // Görsel eklenemezse tablo yine basılsın — kaşe atlanır.
     }
@@ -659,7 +659,7 @@ export async function gorevliListesiPdfOlustur(
   const { jsPDF } = await import("jspdf");
   const autoTable = (await import("jspdf-autotable")).default;
 
-  const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" }) as unknown as JsPDFType;
+  const doc = new jsPDF({ compress: true, orientation: "portrait", unit: "mm", format: "a4" }) as unknown as JsPDFType;
   fontuKaydet(doc);
 
   // Sayfa 1 — kapak (dikey)

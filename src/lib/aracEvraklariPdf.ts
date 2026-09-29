@@ -128,7 +128,7 @@ function kapakSayfasiCiz(doc: JsPDFType, veri: AracEvraklariPdfVerisi, ekBaslikl
   if (veri.logo) {
     try {
       const box = logoKutusuHesapla(veri.logo.enBoyOrani, 22);
-      doc.addImage(veri.logo.data, veri.logo.fmt, M, 10, box.w, box.h);
+      doc.addImage(veri.logo.data, veri.logo.fmt, M, 10, box.w, box.h, undefined, "FAST");
     } catch {
       /* logo eklenemezse kapak yine üretilsin */
     }
@@ -174,7 +174,7 @@ function ekSayfaBasligiCiz(doc: JsPDFType, ekNo: number, baslik: string, logo?: 
   if (logo) {
     try {
       const box = logoKutusuHesapla(logo.enBoyOrani, 14);
-      doc.addImage(logo.data, logo.fmt, M, 10, box.w, box.h);
+      doc.addImage(logo.data, logo.fmt, M, 10, box.w, box.h, undefined, "FAST");
     } catch {
       /* logo eklenemezse sayfa yine üretilsin */
     }
@@ -228,7 +228,7 @@ async function yaziliTalimatEkleriEkle(doc: JsPDFType, ekNo: number, logo?: Logo
   if (logo) {
     try {
       const box = logoKutusuHesapla(logo.enBoyOrani, 14);
-      doc.addImage(logo.data, logo.fmt, M, 10, box.w, box.h);
+      doc.addImage(logo.data, logo.fmt, M, 10, box.w, box.h, undefined, "FAST");
     } catch {
       /* logo eklenemezse sayfa yine üretilsin */
     }
@@ -278,7 +278,7 @@ async function yaziliTalimatEkleriEkle(doc: JsPDFType, ekNo: number, logo?: Logo
 
 export async function aracEvraklariPdfOlustur(veri: AracEvraklariPdfVerisi): Promise<Blob> {
   const { jsPDF } = await import("jspdf");
-  const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" }) as unknown as JsPDFType;
+  const doc = new jsPDF({ compress: true, orientation: "portrait", unit: "mm", format: "a4" }) as unknown as JsPDFType;
   fontuKaydet(doc);
 
   // Ek sırası sabit: 1-2 firma ortak, 3-5 araca özel, 6 yazılı talimat

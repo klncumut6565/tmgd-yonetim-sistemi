@@ -48,7 +48,9 @@ type JsPDFType = {
     x: number,
     y: number,
     w: number,
-    h: number
+    h: number,
+    alias?: string,
+    compression?: string
   ) => void;
   addPage: () => void;
   save: (fileName: string) => void;
@@ -104,7 +106,7 @@ async function newDoc(): Promise<JsPDFType> {
   const { default: jsPDF } = (await import("jspdf")) as unknown as {
     default: new (o?: object) => JsPDFType;
   };
-  const doc = new jsPDF({ unit: "mm", format: "a4" });
+  const doc = new jsPDF({ compress: true, unit: "mm", format: "a4" });
   doc.addFileToVFS("LiberationSans-Regular.ttf", LIBERATION_SANS_REGULAR_B64);
   doc.addFont("LiberationSans-Regular.ttf", FONT, "normal");
   doc.addFileToVFS("LiberationSans-Bold.ttf", LIBERATION_SANS_BOLD_B64);
@@ -174,7 +176,7 @@ function baslikKutusuCiz(
       const alanG = 38 - 2 * kenar;
       const alanY = Math.min(yukseklik - 2 * kenar, 22);
       const box = logoAlanaSigdir(veri.logo.enBoyOrani, solKenar + kenar, ustY + kenar, alanG, alanY);
-      doc.addImage(veri.logo.data, veri.logo.fmt, box.x, box.y, box.w, box.h);
+      doc.addImage(veri.logo.data, veri.logo.fmt, box.x, box.y, box.w, box.h, undefined, "FAST");
     } catch {
       /* yoksay */
     }
@@ -262,7 +264,7 @@ function imzaTablosuCiz(
     const boslukYuksekligi = yukseklik - yaziAlti - kenarPay;
     const kaseYPos = ustY + yaziAlti + (boslukYuksekligi - kaseY) / 2;
     try {
-      doc.addImage(kase.data, kase.fmt, kaseX, kaseYPos, kaseG, kaseY);
+      doc.addImage(kase.data, kase.fmt, kaseX, kaseYPos, kaseG, kaseY, undefined, "FAST");
     } catch {
       // Görsel eklenemezse tablo yine basılsın — kaşe atlanır.
     }
@@ -336,7 +338,7 @@ function kapakSayfasiCiz(doc: JsPDFType, veri: GuvenlikPlaniRaporVerisi) {
   const qrX = W - CERCEVE_KENAR - 12 - qrBoyut;
   const qrY = 263;
   try {
-    doc.addImage(SIAM_QR_B64, "PNG", qrX, qrY, qrBoyut, qrBoyut);
+    doc.addImage(SIAM_QR_B64, "PNG", qrX, qrY, qrBoyut, qrBoyut, undefined, "FAST");
   } catch {
     /* karekod eklenemezse belge yine üretilsin */
   }

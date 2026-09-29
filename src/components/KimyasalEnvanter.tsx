@@ -407,7 +407,7 @@ export default function KimyasalEnvanter({
       const { jsPDF } = await import("jspdf");
       const { LIBERATION_SANS_REGULAR_B64, LIBERATION_SANS_BOLD_B64 } =
         await import("@/lib/pdfFonts");
-      const doc: JsPDFType = new jsPDF({ unit: "mm", format: "a4" });
+      const doc: JsPDFType = new jsPDF({ compress: true, unit: "mm", format: "a4" });
       const FONT = "LiberationSans";
       doc.addFileToVFS("LiberationSans-Regular.ttf", LIBERATION_SANS_REGULAR_B64);
       doc.addFont("LiberationSans-Regular.ttf", FONT, "normal");

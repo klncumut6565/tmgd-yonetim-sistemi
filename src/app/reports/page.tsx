@@ -79,7 +79,7 @@ export default function ReportsPage() {
 
       const { jsPDF } = await import("jspdf");
       const autoTable = (await import("jspdf-autotable")).default;
-      const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+      const doc = new jsPDF({ compress: true, orientation: "portrait", unit: "mm", format: "a4" });
 
       const W = 210, MARGIN = 15;
       let y = MARGIN;

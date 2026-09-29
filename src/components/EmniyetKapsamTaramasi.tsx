@@ -544,7 +544,7 @@ export default function EmniyetKapsamTaramasi({ firmId, firmaAdi }: Props) {
         : undefined;
 
       const { jsPDF } = await import("jspdf");
-      const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+      const doc = new jsPDF({ compress: true, orientation: "portrait", unit: "mm", format: "a4" });
 
       await renderYapilandirilmisBelge(
         doc,
