@@ -503,6 +503,9 @@ function AssignmentsTab() {
   const [users, setUsers] = useState<Profile[]>([]);
   const [firms, setFirms] = useState<Firm[]>([]);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
+  // Tüm kullanıcıların rolü (atanmamış firma hesabında firma kullanıcılarını
+  // — role "company" — TMGD ataması saymamak için).
+  const [roller, setRoller] = useState<Record<string, string>>({});
   const [selectedUser, setSelectedUser] = useState("");
   const [selectedFirm, setSelectedFirm] = useState("");
   const [error, setError] = useState("");
@@ -510,7 +513,7 @@ function AssignmentsTab() {
 
   async function load() {
     setLoading(true);
-    const [u, f, a] = await Promise.all([
+    const [u, f, a, r] = await Promise.all([
       supabase
         .from("profiles")
         .select("*")
@@ -519,10 +522,16 @@ function AssignmentsTab() {
         .order("full_name"),
       supabase.from("firms").select("id, name").order("name"),
       supabase.from("user_firms").select("*"),
+      supabase.from("profiles").select("id, role"),
     ]);
     setUsers((u.data as Profile[]) || []);
     setFirms((f.data as Firm[]) || []);
     setAssignments((a.data as Assignment[]) || []);
+    const rolHaritasi: Record<string, string> = {};
+    ((r.data as { id: string; role: string }[]) || []).forEach((p) => {
+      rolHaritasi[p.id] = p.role;
+    });
+    setRoller(rolHaritasi);
     if (u.data && u.data.length > 0) setSelectedUser((p) => p || u.data[0].id);
     setLoading(false);
   }
@@ -549,6 +558,22 @@ function AssignmentsTab() {
     }
   }
 
+  // Listeden tek tıkla: seçili kullanıcıya doğrudan ata
+  async function hizliAta(firmId: string) {
+    setError("");
+    if (!selectedUser) {
+      setError("Önce yukarıdan kullanıcı seç.");
+      return;
+    }
+    const { error } = await supabase.from("user_firms").insert({
+      user_id: selectedUser,
+      firm_id: firmId,
+      permission: "owner",
+    });
+    if (error) setError(hataCevir(error));
+    else load();
+  }
+
   async function removeAssignment(id: string) {
     setError("");
     const { error } = await supabase.from("user_firms").delete().eq("id", id);
@@ -559,6 +584,16 @@ function AssignmentsTab() {
   function firmName(id: string) {
     return firms.find((f) => f.id === id)?.name || "—";
   }
+
+  // Atanmamış firmalar: firma kullanıcısı (company) dışında hiçbir
+  // kullanıcıya (TMGD / yönetici) bağlanmamış firmalar.
+  const atanmamisFirmalar = firms.filter(
+    (f) => !assignments.some((a) => a.firm_id === f.id && roller[a.user_id] !== "company")
+  );
+  const seciliKullaniciAdi = (() => {
+    const k = users.find((u) => u.id === selectedUser);
+    return k ? k.full_name || k.email || "" : "";
+  })();
 
   const userAssignments = assignments.filter(
     (a) => a.user_id === selectedUser
@@ -615,6 +650,52 @@ function AssignmentsTab() {
         >
           Ata
         </button>
+      </div>
+
+      <h3 className="font-medium mb-2">
+        Atanmamış firmalar{" "}
+        <span
+          className={
+            "ml-1 text-xs px-2 py-0.5 rounded " +
+            (atanmamisFirmalar.length ? "bg-red-50 text-red-700" : "bg-green-50 text-green-700")
+          }
+        >
+          {atanmamisFirmalar.length}
+        </span>
+      </h3>
+      <div className="border rounded-xl overflow-hidden mb-6">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b bg-gray-50">
+              <th className="text-left p-3">Firma</th>
+              <th className="text-right p-3">İşlem</th>
+            </tr>
+          </thead>
+          <tbody>
+            {atanmamisFirmalar.map((f) => (
+              <tr key={f.id} className="border-b last:border-0">
+                <td className="p-3">{f.name}</td>
+                <td className="p-3 text-right">
+                  <button
+                    onClick={() => hizliAta(f.id)}
+                    disabled={!selectedUser}
+                    title={seciliKullaniciAdi ? `${seciliKullaniciAdi} kullanıcısına ata` : "Önce kullanıcı seç"}
+                    className="text-blue-600 hover:underline disabled:text-gray-400"
+                  >
+                    Seçili kullanıcıya ata
+                  </button>
+                </td>
+              </tr>
+            ))}
+            {atanmamisFirmalar.length === 0 && (
+              <tr>
+                <td colSpan={2} className="p-4 text-gray-500">
+                  Tüm firmalar bir kullanıcıya atanmış. ✓
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
       </div>
 
       <h3 className="font-medium mb-2">Bu kullanıcıya atalı firmalar</h3>
