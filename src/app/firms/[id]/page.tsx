@@ -203,7 +203,7 @@ function FirmDetailInner({
 }) {
   const { id } = use(params);
   const searchParams = useSearchParams();
-  const { canWrite, profile } = useUser();
+  const { canWrite, profile, isSuperAdmin } = useUser();
   // TMFB Kapsamdışı firmalar yalnızca atanmış kullanıcıya açılır.
   const [atananIdler, setAtananIdler] = useState<Set<string> | null>(null);
   useEffect(() => {
@@ -884,11 +884,11 @@ function FirmDetailInner({
     return <div className="p-8 text-gray-500">Yükleniyor...</div>;
   }
 
-  if (firm && firm.status === TMFB_KAPSAMDISI && atananIdler === null) {
+  if (firm && firm.status === TMFB_KAPSAMDISI && !isSuperAdmin && atananIdler === null) {
     return <div className="p-8 text-gray-500">Yükleniyor...</div>;
   }
 
-  if (!firm || (firm.status === TMFB_KAPSAMDISI && !atananIdler?.has(firm.id))) {
+  if (!firm || (firm.status === TMFB_KAPSAMDISI && !isSuperAdmin && !atananIdler?.has(firm.id))) {
     return (
       <div className="p-8">
         <p className="text-gray-600 mb-4">

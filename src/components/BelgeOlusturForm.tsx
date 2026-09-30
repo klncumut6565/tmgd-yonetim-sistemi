@@ -177,11 +177,18 @@ export default function BelgeOlusturForm({ fixedFirmId, initialFirmId, compact =
       }
       // TMFB Kapsamdışı firmalar yalnızca atanmış kullanıcının seçicisinde görünür
       const tumGelen = (data as (Firm & { status?: string })[]) || [];
-      const atanan = tumGelen.some((f) => f.status === TMFB_KAPSAMDISI)
-        ? await atananFirmaIdleri((await supabase.auth.getUser()).data.user?.id)
-        : new Set<string>();
+      let atanan = new Set<string>();
+      let superAdmin = false;
+      if (tumGelen.some((f) => f.status === TMFB_KAPSAMDISI)) {
+        const uid = (await supabase.auth.getUser()).data.user?.id;
+        atanan = await atananFirmaIdleri(uid);
+        if (uid) {
+          const { data: p } = await supabase.from("profiles").select("role").eq("id", uid).single();
+          superAdmin = (p as { role?: string } | null)?.role === "super_admin";
+        }
+      }
       const gelenFirmalar: Firm[] = tumGelen.filter(
-        (f) => f.status !== TMFB_KAPSAMDISI || atanan.has(f.id)
+        (f) => f.status !== TMFB_KAPSAMDISI || superAdmin || atanan.has(f.id)
       );
       setFirms(gelenFirmalar);
       if (fixedFirmId) setFirmId(fixedFirmId);

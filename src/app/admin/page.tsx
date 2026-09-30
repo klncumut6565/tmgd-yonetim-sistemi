@@ -25,7 +25,7 @@ type Profile = {
   created_at: string;
 };
 
-type Firm = { id: string; name: string };
+type Firm = { id: string; name: string; status?: string };
 type Assignment = {
   id: string;
   user_id: string;
@@ -520,7 +520,7 @@ function AssignmentsTab() {
         .eq("approval_status", "approved")
         .neq("role", "super_admin")
         .order("full_name"),
-      supabase.from("firms").select("id, name").order("name"),
+      supabase.from("firms").select("id, name, status").order("name"),
       supabase.from("user_firms").select("*"),
       supabase.from("profiles").select("id, role"),
     ]);
@@ -587,9 +587,23 @@ function AssignmentsTab() {
 
   // Atanmamış firmalar: firma kullanıcısı (company) dışında hiçbir
   // kullanıcıya (TMGD / yönetici) bağlanmamış firmalar.
+  // TMFB Kapsamdışı firmalar kendi bölümünde gösterildiği için burada tekrar edilmez.
   const atanmamisFirmalar = firms.filter(
-    (f) => !assignments.some((a) => a.firm_id === f.id && roller[a.user_id] !== "company")
+    (f) => f.status !== "tmfb_kapsamdisi" && !assignments.some((a) => a.firm_id === f.id && roller[a.user_id] !== "company")
   );
+  // TMFB Kapsamdışı firmalar Firmalar listesinde yalnızca atanmış kullanıcıya
+  // görünür. Burada ise (Yönetim) HER ZAMAN listelenir — böylece kimseye
+  // atanmadan kapsamdışı yapılan bir firma da sonradan atanabilir, kaybolmaz.
+  const tmfbFirmalar = firms.filter((f) => f.status === "tmfb_kapsamdisi");
+  function atananlar(firmId: string) {
+    return assignments
+      .filter((a) => a.firm_id === firmId)
+      .map((a) => {
+        const k = users.find((u) => u.id === a.user_id);
+        return k ? k.full_name || k.email || "—" : "Yönetici";
+      });
+  }
+
   const seciliKullaniciAdi = (() => {
     const k = users.find((u) => u.id === selectedUser);
     return k ? k.full_name || k.email || "" : "";
@@ -640,6 +654,7 @@ function AssignmentsTab() {
             {firms.map((f) => (
               <option key={f.id} value={f.id}>
                 {f.name}
+                {f.status === "tmfb_kapsamdisi" ? " (TMFB Kapsamdışı)" : ""}
               </option>
             ))}
           </select>
@@ -651,6 +666,64 @@ function AssignmentsTab() {
           Ata
         </button>
       </div>
+
+      {tmfbFirmalar.length > 0 && (
+        <>
+          <h3 className="font-medium mb-2">
+            TMFB Kapsamdışı firmalar{" "}
+            <span className="ml-1 text-xs px-2 py-0.5 rounded bg-purple-100 text-purple-800">
+              {tmfbFirmalar.length}
+            </span>
+          </h3>
+          <p className="text-xs text-gray-500 mb-2">
+            Bu firmalar Firmalar menüsünde yalnızca atanan kullanıcıya görünür. Atama burada her zaman yapılabilir.
+          </p>
+          <div className="border border-purple-200 rounded-xl overflow-hidden mb-6">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b bg-purple-50">
+                  <th className="text-left p-3">Firma</th>
+                  <th className="text-left p-3">Atanan kullanıcılar</th>
+                  <th className="text-right p-3">İşlem</th>
+                </tr>
+              </thead>
+              <tbody>
+                {tmfbFirmalar.map((f) => {
+                  const kisiler = atananlar(f.id);
+                  const seciliyeAtali = assignments.some(
+                    (a) => a.firm_id === f.id && a.user_id === selectedUser
+                  );
+                  return (
+                    <tr key={f.id} className="border-b last:border-0 bg-purple-50/40">
+                      <td className="p-3">{f.name}</td>
+                      <td className="p-3">
+                        {kisiler.length ? (
+                          kisiler.join(", ")
+                        ) : (
+                          <span className="text-red-600">Kimseye atanmamış</span>
+                        )}
+                      </td>
+                      <td className="p-3 text-right">
+                        {seciliyeAtali ? (
+                          <span className="text-gray-400">Seçili kullanıcıya atalı</span>
+                        ) : (
+                          <button
+                            onClick={() => hizliAta(f.id)}
+                            disabled={!selectedUser}
+                            className="text-blue-600 hover:underline disabled:text-gray-400"
+                          >
+                            Seçili kullanıcıya ata
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
 
       <h3 className="font-medium mb-2">
         Atanmamış firmalar{" "}

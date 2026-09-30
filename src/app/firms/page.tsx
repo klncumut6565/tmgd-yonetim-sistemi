@@ -342,14 +342,14 @@ export default function FirmsPage() {
   }, [firms, search]);
 
   // TMFB Kapsamdışı firmalar normal listeye karışmaz; yalnızca o firmaya
-  // atanmış kullanıcı görür (yönetici dahil — atanmamışsa görmez).
+  // atanmış kullanıcı ve süper yönetici görür.
   const normalFirmalar = useMemo(
     () => filtered.filter((f) => f.status !== TMFB_KAPSAMDISI),
     [filtered]
   );
   const tmfbFirmalar = useMemo(
-    () => filtered.filter((f) => f.status === TMFB_KAPSAMDISI && atananIdler.has(f.id)),
-    [filtered, atananIdler]
+    () => filtered.filter((f) => f.status === TMFB_KAPSAMDISI && (isSuperAdmin || atananIdler.has(f.id))),
+    [filtered, atananIdler, isSuperAdmin]
   );
 
   // Tablo satırı — normal liste ve "TMFB Kapsamdışı" bölümü aynı satırı kullanır
