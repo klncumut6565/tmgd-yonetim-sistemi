@@ -129,7 +129,9 @@ export default function DashboardPage() {
           .from("tasks")
           .select("*", { count: "exact", head: true })
           .in("status", ["todo", "in_progress", "review"]),
-        supabase.from("documents").select("*", { count: "exact", head: true }),
+        // "Belgeler" = Belge Takip'e yüklenmiş dosyalar (firm_belge_dosyalari).
+        // Eski "documents" tablosu artık kullanılmıyor (boş) — sayaç hep 0'dı.
+        supabase.from("firm_belge_dosyalari").select("*", { count: "exact", head: true }),
         supabase.from("vehicles").select("*", { count: "exact", head: true }),
         supabase
           .from("adr_expiring_drivers")
@@ -374,7 +376,7 @@ export default function DashboardPage() {
   const kpis = [
     { label: "Firmalar", value: counts.firms, href: "/firms" },
     { label: "Açık Görevler", value: counts.openTasks, href: "/tasks" },
-    { label: "Belgeler", value: counts.documents, href: "/documents" },
+    { label: "Belgeler", value: counts.documents, href: "/firms" },
     { label: "Araçlar", value: counts.vehicles, href: "/vehicles" },
   ];
 
