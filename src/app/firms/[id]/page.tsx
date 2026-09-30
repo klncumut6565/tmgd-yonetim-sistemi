@@ -804,7 +804,8 @@ function FirmDetailInner({
         //  - D4 "Diğer": zorunlu olmayan, serbest ek belgeler.
         //  - AS1-AS7 "Araç ve Sürücü Belgeleri": ADR/TMGD kapsamı dışında,
         //    taşımacılık faaliyetinin kendi mevzuat belgeleri.
-        if (it.code === "D4" || it.code.startsWith("AS")) return;
+        //  - D5 "Dilekçe": zorunlu olmayan, ilerlemeye sayılmaz.
+        if (it.code === "D4" || it.code === "D5" || it.code.startsWith("AS")) return;
         total++;
         if (doneSet.has(`${it.code}|${it.period}`)) done++;
       })
@@ -1309,7 +1310,7 @@ function FirmDetailInner({
                         // belgelerdir, bir bitiş tarihi taşımazlar. Bu maddelerde
                         // geçerlilik girişi/rozeti hiç gösterilmez.
                         const gecerlilikYok =
-                          /^[PTKL]\d/.test(it.code) || it.code === "YFR" || it.code === "D3" || it.code === "D4";
+                          /^[PTKL]\d/.test(it.code) || it.code === "YFR" || it.code === "D3" || it.code === "D4" || it.code === "D5";
 
                         return (
                           <div key={itemKey} className="px-4 py-2 text-sm hover:bg-gray-50">

@@ -202,6 +202,9 @@ export default function FirmsPage() {
       let done = 0;
       sections.forEach((sec) =>
         sec.items.forEach((it) => {
+          // Firma detayındaki genel ilerleme ile aynı kural: D4 "Diğer",
+          // D5 "Dilekçe" ve AS (Araç/Sürücü) maddeleri yüzdeye sayılmaz.
+          if (it.code === "D4" || it.code === "D5" || it.code.startsWith("AS")) return;
           total++;
           if (doneSet.has(`${it.code}|${it.period}`)) done++;
         })
