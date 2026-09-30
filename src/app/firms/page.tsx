@@ -11,6 +11,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
 import { useUser } from "@/hooks/useUser";
+import { TMFB_KAPSAMDISI, atananFirmaIdleri } from "@/lib/firmaGorunurluk";
 import { hataCevir } from "@/lib/hataCevir";
 import { ACTIVITIES, ACTIVITY_LABELS, buildChecklist } from "@/lib/belgeKatalogu";
 
@@ -32,6 +33,7 @@ const STATUS_TR: Record<string, string> = {
   active: "Aktif",
   passive: "Pasif",
   archived: "Arşiv",
+  tmfb_kapsamdisi: "TMFB Kapsamdışı",
 };
 
 /** Firma silme doğrulama kodu — bilerek basit tutuldu (yanlışlıkla
@@ -46,6 +48,8 @@ export default function FirmsPage() {
   const [firms, setFirms] = useState<Firm[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [atananIdler, setAtananIdler] = useState<Set<string>>(new Set());
+  const [tmfbAcik, setTmfbAcik] = useState(false);
   const [error, setError] = useState("");
 
   // Firma silme onayı
@@ -323,6 +327,10 @@ export default function FirmsPage() {
     loadFirms();
   }, []);
 
+  useEffect(() => {
+    atananFirmaIdleri(profile?.id).then(setAtananIdler);
+  }, [profile?.id]);
+
   const filtered = useMemo(() => {
     const q = search.trim().toLocaleLowerCase("tr");
     if (!q) return firms;
@@ -332,6 +340,118 @@ export default function FirmsPage() {
         .some((v) => String(v).toLocaleLowerCase("tr").includes(q))
     );
   }, [firms, search]);
+
+  // TMFB Kapsamdışı firmalar normal listeye karışmaz; yalnızca o firmaya
+  // atanmış kullanıcı görür (yönetici dahil — atanmamışsa görmez).
+  const normalFirmalar = useMemo(
+    () => filtered.filter((f) => f.status !== TMFB_KAPSAMDISI),
+    [filtered]
+  );
+  const tmfbFirmalar = useMemo(
+    () => filtered.filter((f) => f.status === TMFB_KAPSAMDISI && atananIdler.has(f.id)),
+    [filtered, atananIdler]
+  );
+
+  // Tablo satırı — normal liste ve "TMFB Kapsamdışı" bölümü aynı satırı kullanır
+  const satirCiz = (firm: Firm, index: number, tmfb: boolean) => (
+                  <tr
+                    key={firm.id}
+                    onClick={() => router.push(`/firms/${firm.id}`)}
+                    className={
+                      "border-t cursor-pointer " +
+                      (tmfb ? "bg-purple-50 hover:bg-purple-100" : "hover:bg-gray-50")
+                    }
+                  >
+                    <td className="p-3 text-gray-400 tabular-nums">{index + 1}.</td>
+                    <td className="p-3 font-medium">
+                      <div className="flex items-center gap-3">
+                        {logoUrlByFirm[firm.id] ? (
+                          <img
+                            src={logoUrlByFirm[firm.id]}
+                            alt=""
+                            className="h-10 w-10 object-contain rounded border bg-white flex-shrink-0"
+                          />
+                        ) : (
+                          <span className="h-10 w-10 flex-shrink-0" aria-hidden="true" />
+                        )}
+                        <span>{firm.name}</span>
+                      </div>
+                    </td>
+                    <td className="p-3">
+                      <div className="flex flex-wrap gap-1">
+                        {(firm.activities || []).length === 0 && (
+                          <span className="text-gray-400 text-xs">—</span>
+                        )}
+                        {(firm.activities || []).map((a) => (
+                          <span
+                            key={a}
+                            className="text-xs bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded"
+                          >
+                            {ACTIVITY_LABELS[a] || a}
+                          </span>
+                        ))}
+                      </div>
+                    </td>
+                    <td className="p-3 text-gray-500">
+                      {[firm.city, firm.district].filter(Boolean).join(" / ") || "—"}
+                    </td>
+                    <td className="p-3">
+                      {tmfb ? (
+                        <span className="text-xs px-2 py-0.5 rounded bg-purple-200 text-purple-800 whitespace-nowrap">
+                          TMFB Kapsamdışı
+                        </span>
+                      ) : (
+                        STATUS_TR[firm.status] || firm.status
+                      )}
+                    </td>
+                    <td className="p-3">
+                      {(() => {
+                        const v = visitBadge(lastVisitByFirm[firm.id]);
+                        return (
+                          <span className={"text-xs px-2 py-0.5 rounded whitespace-nowrap " + v.className}>
+                            {v.label}
+                          </span>
+                        );
+                      })()}
+                    </td>
+                    <td className="p-3">
+                      {(() => {
+                        const p = progressByFirm[firm.id];
+                        if (!p || p.total === 0) {
+                          return <span className="text-gray-300 text-xs">—</span>;
+                        }
+                        const eksik = p.total - p.done;
+                        const cls =
+                          p.pct >= 100
+                            ? "bg-green-50 text-green-700"
+                            : p.pct >= 60
+                              ? "bg-amber-50 text-amber-700"
+                              : "bg-red-50 text-red-700";
+                        return (
+                          <span
+                            title={`${p.done} / ${p.total} madde tamamlandı`}
+                            className={"text-xs px-2 py-0.5 rounded whitespace-nowrap " + cls}
+                          >
+                            {p.done}/{p.total} (%{p.pct}){eksik > 0 && ` · ${eksik} eksik`}
+                          </span>
+                        );
+                      })()}
+                    </td>
+                    {(isSuperAdmin || isAdmin) && (
+                      <td className="p-3 text-right">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            silmeOnayiAc(firm);
+                          }}
+                          className="px-2 py-1 rounded border text-xs hover:bg-gray-100"
+                        >
+                          Sil
+                        </button>
+                      </td>
+                    )}
+                  </tr>
+  );
 
   return (
     <div className="p-8">
@@ -383,101 +503,14 @@ export default function FirmsPage() {
                     <td colSpan={8} className="p-4 text-gray-500">Yükleniyor...</td>
                   </tr>
                 )}
-                {!loading && filtered.length === 0 && (
+                {!loading && normalFirmalar.length === 0 && (
                   <tr>
                     <td colSpan={8} className="p-4 text-gray-500">
                       {search ? "Aramaya uyan firma yok." : "Henüz firma eklenmemiş."}
                     </td>
                   </tr>
                 )}
-                {filtered.map((firm, index) => (
-                  <tr
-                    key={firm.id}
-                    onClick={() => router.push(`/firms/${firm.id}`)}
-                    className="border-t hover:bg-gray-50 cursor-pointer"
-                  >
-                    <td className="p-3 text-gray-400 tabular-nums">{index + 1}.</td>
-                    <td className="p-3 font-medium">
-                      <div className="flex items-center gap-3">
-                        {logoUrlByFirm[firm.id] ? (
-                          <img
-                            src={logoUrlByFirm[firm.id]}
-                            alt=""
-                            className="h-10 w-10 object-contain rounded border bg-white flex-shrink-0"
-                          />
-                        ) : (
-                          <span className="h-10 w-10 flex-shrink-0" aria-hidden="true" />
-                        )}
-                        <span>{firm.name}</span>
-                      </div>
-                    </td>
-                    <td className="p-3">
-                      <div className="flex flex-wrap gap-1">
-                        {(firm.activities || []).length === 0 && (
-                          <span className="text-gray-400 text-xs">—</span>
-                        )}
-                        {(firm.activities || []).map((a) => (
-                          <span
-                            key={a}
-                            className="text-xs bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded"
-                          >
-                            {ACTIVITY_LABELS[a] || a}
-                          </span>
-                        ))}
-                      </div>
-                    </td>
-                    <td className="p-3 text-gray-500">
-                      {[firm.city, firm.district].filter(Boolean).join(" / ") || "—"}
-                    </td>
-                    <td className="p-3">{STATUS_TR[firm.status] || firm.status}</td>
-                    <td className="p-3">
-                      {(() => {
-                        const v = visitBadge(lastVisitByFirm[firm.id]);
-                        return (
-                          <span className={"text-xs px-2 py-0.5 rounded whitespace-nowrap " + v.className}>
-                            {v.label}
-                          </span>
-                        );
-                      })()}
-                    </td>
-                    <td className="p-3">
-                      {(() => {
-                        const p = progressByFirm[firm.id];
-                        if (!p || p.total === 0) {
-                          return <span className="text-gray-300 text-xs">—</span>;
-                        }
-                        const eksik = p.total - p.done;
-                        const cls =
-                          p.pct >= 100
-                            ? "bg-green-50 text-green-700"
-                            : p.pct >= 60
-                              ? "bg-amber-50 text-amber-700"
-                              : "bg-red-50 text-red-700";
-                        return (
-                          <span
-                            title={`${p.done} / ${p.total} madde tamamlandı`}
-                            className={"text-xs px-2 py-0.5 rounded whitespace-nowrap " + cls}
-                          >
-                            {p.done}/{p.total} (%{p.pct}){eksik > 0 && ` · ${eksik} eksik`}
-                          </span>
-                        );
-                      })()}
-                    </td>
-                    {(isSuperAdmin || isAdmin) && (
-                      <td className="p-3 text-right">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            silmeOnayiAc(firm);
-                          }}
-                          className="px-2 py-1 rounded border text-xs hover:bg-gray-100"
-                        >
-                          Sil
-                        </button>
-                      </td>
-                    )}
-                  </tr>
-                ))}
+                {normalFirmalar.map((firm, index) => satirCiz(firm, index, false))}
               </tbody>
             </table>
           </div>
@@ -485,6 +518,24 @@ export default function FirmsPage() {
           <p className="text-xs text-gray-400 mt-2">
             Detay ve düzenleme için firmaya tıkla.
           </p>
+
+          {tmfbFirmalar.length > 0 && (
+            <div className="mt-6 border border-purple-200 rounded-xl overflow-hidden">
+              <button
+                type="button"
+                onClick={() => setTmfbAcik((v) => !v)}
+                className="w-full flex items-center justify-between px-4 py-3 bg-purple-100 text-purple-900 text-sm font-medium"
+              >
+                <span>TMFB Kapsamdışı Firmalar ({tmfbFirmalar.length})</span>
+                <span>{tmfbAcik ? "▲ Gizle" : "▼ Göster"}</span>
+              </button>
+              {tmfbAcik && (
+                <table className="w-full text-sm">
+                  <tbody>{tmfbFirmalar.map((firm, index) => satirCiz(firm, index, true))}</tbody>
+                </table>
+              )}
+            </div>
+          )}
         </div>
 
         {canWrite && showAddForm && (

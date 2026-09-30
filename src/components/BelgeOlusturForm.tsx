@@ -29,6 +29,7 @@ import {
 import { kapakSayfasiOlustur } from "@/lib/kapakSayfasi";
 import { belgeSablonu, BelgeSablonu } from "@/lib/belgeSablonlari";
 import { logoyuKucult } from "@/lib/pdfGorsel";
+import { TMFB_KAPSAMDISI, atananFirmaIdleri } from "@/lib/firmaGorunurluk";
 import { BELGE_GORSELLERI } from "@/lib/belgeGorselleri";
 import { hazirlayanKasesi, kontrolEdenKasesi } from "@/lib/kaseler";
 import {
@@ -145,11 +146,11 @@ export default function BelgeOlusturForm({ fixedFirmId, initialFirmId, compact =
       // yoksa aktif firmaların tamamını çekip seçiciye doldur.
       let query = supabase
         .from("firms")
-        .select("id, name, activities, contract_start, logo_url, approver_name");
+        .select("id, name, activities, contract_start, logo_url, approver_name, status");
 
       query = fixedFirmId
         ? query.eq("id", fixedFirmId)
-        : query.eq("status", "active").order("name");
+        : query.in("status", ["active", TMFB_KAPSAMDISI]).order("name");
 
       let { data, error } = await query;
 
@@ -174,7 +175,14 @@ export default function BelgeOlusturForm({ fixedFirmId, initialFirmId, compact =
       } else if (error) {
         setError("Firmalar yüklenemedi: " + hataCevir(error));
       }
-      const gelenFirmalar = (data as Firm[]) || [];
+      // TMFB Kapsamdışı firmalar yalnızca atanmış kullanıcının seçicisinde görünür
+      const tumGelen = (data as (Firm & { status?: string })[]) || [];
+      const atanan = tumGelen.some((f) => f.status === TMFB_KAPSAMDISI)
+        ? await atananFirmaIdleri((await supabase.auth.getUser()).data.user?.id)
+        : new Set<string>();
+      const gelenFirmalar: Firm[] = tumGelen.filter(
+        (f) => f.status !== TMFB_KAPSAMDISI || atanan.has(f.id)
+      );
       setFirms(gelenFirmalar);
       if (fixedFirmId) setFirmId(fixedFirmId);
 

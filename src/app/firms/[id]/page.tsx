@@ -12,6 +12,7 @@ import Link from "next/link";
 import { supabase } from "@/lib/supabase/client";
 import { authFetch } from "@/lib/supabase/authFetch";
 import { useUser } from "@/hooks/useUser";
+import { TMFB_KAPSAMDISI, atananFirmaIdleri } from "@/lib/firmaGorunurluk";
 import { hataCevir } from "@/lib/hataCevir";
 import {
   ACTIVITIES,
@@ -151,6 +152,7 @@ const TR_VALUES: Record<string, string> = {
   inactive: "Pasif",
   passive: "Pasif",
   archived: "Arşiv",
+  tmfb_kapsamdisi: "TMFB Kapsamdışı",
   sold: "Satıldı",
 };
 
@@ -202,6 +204,12 @@ function FirmDetailInner({
   const { id } = use(params);
   const searchParams = useSearchParams();
   const { canWrite, profile } = useUser();
+  // TMFB Kapsamdışı firmalar yalnızca atanmış kullanıcıya açılır.
+  const [atananIdler, setAtananIdler] = useState<Set<string> | null>(null);
+  useEffect(() => {
+    if (!profile?.id) return;
+    atananFirmaIdleri(profile.id).then(setAtananIdler);
+  }, [profile?.id]);
   const isSuperAdminOnly = profile?.role === "super_admin";
   const isCompany = profile?.role === "company";
   // Firma (company) rolünden gizlenen sekmeler: Görevler, Belgeler,
@@ -876,7 +884,11 @@ function FirmDetailInner({
     return <div className="p-8 text-gray-500">Yükleniyor...</div>;
   }
 
-  if (!firm) {
+  if (firm && firm.status === TMFB_KAPSAMDISI && atananIdler === null) {
+    return <div className="p-8 text-gray-500">Yükleniyor...</div>;
+  }
+
+  if (!firm || (firm.status === TMFB_KAPSAMDISI && !atananIdler?.has(firm.id))) {
     return (
       <div className="p-8">
         <p className="text-gray-600 mb-4">
@@ -1177,6 +1189,7 @@ function FirmDetailInner({
                 <option value="active">Aktif</option>
                 <option value="passive">Pasif</option>
                 <option value="archived">Arşiv</option>
+                <option value="tmfb_kapsamdisi">TMFB Kapsamdışı</option>
               </select>
             </label>
           </div>
