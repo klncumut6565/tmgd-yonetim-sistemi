@@ -37,6 +37,7 @@ export class GeminiLiveProvider implements RealtimeProvider {
   private audioHandler: ((chunk: ArrayBuffer) => void) | null = null;
   private errorHandler: ((message: string) => void) | null = null;
   private interruptedHandler: (() => void) | null = null;
+  private turnCompleteHandler: (() => void) | null = null;
   private toolCallHandler: ToolCallHandler | null = null;
   private setupDone = false;
   private setupResolve: (() => void) | null = null;
@@ -140,15 +141,16 @@ export class GeminiLiveProvider implements RealtimeProvider {
       );
     }
 
-    if (msg.inputTranscription) {
-      const t = (msg.inputTranscription as { text?: string }).text ?? "";
-      if (t) this.transcriptHandler?.({ type: "partial", text: t });
-    }
-
-    if (msg.outputTranscription) {
-      const t = (msg.outputTranscription as { text?: string }).text ?? "";
-      if (t) this.transcriptHandler?.({ type: "final", text: t });
-    }
+    // Transkriptler protokolde serverContent İÇİNDE gelir; eski/alternatif
+    // sürümler için üst seviyedeki alanlar da kabul edilir.
+    const sc = (msg.serverContent ?? {}) as {
+      inputTranscription?: { text?: string };
+      outputTranscription?: { text?: string };
+    };
+    const inT = (sc.inputTranscription ?? (msg.inputTranscription as { text?: string } | undefined))?.text ?? "";
+    if (inT) this.transcriptHandler?.({ type: "partial", speaker: "user", text: inT });
+    const outT = (sc.outputTranscription ?? (msg.outputTranscription as { text?: string } | undefined))?.text ?? "";
+    if (outT) this.transcriptHandler?.({ type: "partial", speaker: "assistant", text: outT });
 
     if (msg.goAway) {
       this.errorHandler?.("Oturum süresi doluyor, yeniden bağlanılması gerekecek.");
@@ -165,6 +167,11 @@ export class GeminiLiveProvider implements RealtimeProvider {
     if (content.interrupted) {
       this.interruptedHandler?.();
       return;
+    }
+
+    if (content.turnComplete) {
+      this.transcriptHandler?.({ type: "final", speaker: "assistant", text: "" });
+      this.turnCompleteHandler?.();
     }
 
     const parts = content.modelTurn?.parts ?? [];
@@ -236,6 +243,10 @@ export class GeminiLiveProvider implements RealtimeProvider {
 
   onError(handler: (message: string) => void): void {
     this.errorHandler = handler;
+  }
+
+  onTurnComplete(handler: () => void): void {
+    this.turnCompleteHandler = handler;
   }
 
   onInterrupted(handler: () => void): void {

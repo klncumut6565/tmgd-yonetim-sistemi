@@ -41,9 +41,14 @@ export interface VoiceSession {
 // STT (Speech-to-Text) — streaming
 // ---------------------------------------------------------------------------
 
+export type TranscriptSpeaker = "user" | "assistant";
+
+/** Konuşmacı bilgili transkript olayı. Gemini Live metni PARÇA PARÇA
+ *  (artımlı) gönderir: "partial" = yeni gelen parça (hook birleştirir),
+ *  "final" = o konuşmacının bu turdaki metni tamamlandı. */
 export type TranscriptEvent =
-  | { type: "partial"; text: string }
-  | { type: "final"; text: string }
+  | { type: "partial"; speaker: TranscriptSpeaker; text: string }
+  | { type: "final"; speaker: TranscriptSpeaker; text: string }
   | { type: "error"; message: string };
 
 export interface STTProvider {
@@ -95,6 +100,10 @@ export interface RealtimeProvider {
    *  tetiklenir. Hook bu sinyali alınca çalma kuyruğundaki henüz seslendirilmemiş
    *  ses parçalarını ANINDA temizlemelidir. */
   onInterrupted(handler: () => void): void;
+  /** Modelin bu turu tamamladığını (üretimi bitirdiğini) bildirir. Bu,
+   *  tarayıcıdaki ses çalmanın bittiği anlamına GELMEZ — kuyrukta hâlâ
+   *  çalınmamış ses olabilir. */
+  onTurnComplete(handler: () => void): void;
   /** Sağlayıcı bir tool/fonksiyon çağırmak istediğinde tetiklenir. Handler
    *  gerçek veriyi getirip Promise ile döner; sağlayıcı sonucu uygun
    *  protokol mesajıyla sağlayıcıya geri iletir. */

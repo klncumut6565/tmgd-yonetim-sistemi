@@ -805,7 +805,12 @@ export default function ADRAssistantWidget() {
             </p>
             {(canli.session.partialTranscript || canli.session.transcript) && (
               <p className="text-xs text-purple-500 mt-0.5 italic">
-                {canli.session.partialTranscript || canli.session.transcript}
+                🧑 {canli.session.partialTranscript || canli.session.transcript}
+              </p>
+            )}
+            {canli.session.assistantTranscript && (
+              <p className="text-xs text-purple-700 mt-0.5">
+                🤖 {canli.session.assistantTranscript}
               </p>
             )}
           </div>

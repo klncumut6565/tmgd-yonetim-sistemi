@@ -15,9 +15,7 @@
 //             (navigasyon ise router.push, veri sorgusuysa /api/assistant/tools)
 //   Kullanıcı konuşarak keserse -> onInterrupted -> ses kuyruğu temizlenir
 //
-// Bu hook HENÜZ hiçbir UI bileşenine bağlanmadı — bkz. oturum özeti: canlı
-// mikrofon/ses testi gerektirdiği için UI entegrasyonu ayrı, birlikte test
-// edilecek bir adım olarak bırakıldı.
+// Bu hook ADRAssistantWidget içinde "Canlı Konuşma (Beta)" butonuna bağlıdır.
 
 import { useCallback, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -50,6 +48,9 @@ export function useRealtimeVoice() {
   const micRef = useRef<MicCapture | null>(null);
   const playbackRef = useRef<AudioPlaybackQueue | null>(null);
   const mutedRef = useRef(false);
+  // Gemini transkripti parça parça gönderir; konuşmacı başına biriktirilir.
+  const kullaniciMetinRef = useRef("");
+  const asistanMetinRef = useRef("");
 
   const guncelle = useCallback((patch: Partial<VoiceSession>) => {
     setSession((prev) => ({ ...prev, ...patch }));
@@ -83,8 +84,36 @@ export function useRealtimeVoice() {
     [router]
   );
 
+  /** Açık ne varsa (mikrofon, ses kuyruğu, WebSocket) kapatır; birden çok
+   *  kez çağrılması güvenlidir. */
+  const kaynaklariKapat = useCallback(async () => {
+    micRef.current?.stop();
+    micRef.current = null;
+    playbackRef.current?.close();
+    playbackRef.current = null;
+    const p = providerRef.current;
+    providerRef.current = null;
+    try {
+      await p?.disconnect();
+    } catch {
+      /* zaten kapalı */
+    }
+  }, []);
+
   const connect = useCallback(async () => {
-    guncelle({ state: "connecting", error: undefined });
+    // Önceki (hatalı/yarım kalmış) bağlantıdan artık kaynak bırakma.
+    await kaynaklariKapat();
+    kullaniciMetinRef.current = "";
+    asistanMetinRef.current = "";
+    guncelle({
+      state: "connecting",
+      error: undefined,
+      transcript: "",
+      partialTranscript: "",
+      assistantTranscript: "",
+    });
+    const provider = new GeminiLiveProvider();
+    const playback = new AudioPlaybackQueue();
     try {
       const res = await authFetch("/api/assistant/realtime/session", { method: "POST" });
       const sessionData = (await res.json()) as RealtimeSessionResponse & { error?: string; details?: string };
@@ -93,14 +122,36 @@ export function useRealtimeVoice() {
         throw new Error(mesaj || "Oturum başlatılamadı.");
       }
 
-      const provider = new GeminiLiveProvider();
-      const playback = new AudioPlaybackQueue();
       playback.onSpeaking((speaking) => guncelle({ isSpeaking: speaking, state: speaking ? "speaking" : "listening" }));
 
       provider.onTranscript((event) => {
-        if (event.type === "partial") guncelle({ partialTranscript: event.text });
-        if (event.type === "final") {
-          guncelle({ transcript: event.text, partialTranscript: "" });
+        if (event.type === "error") return;
+        if (event.speaker === "user") {
+          if (event.type === "partial") {
+            // Yeni kullanıcı konuşması başladıysa önceki asistan turu kapanmıştır.
+            if (asistanMetinRef.current) {
+              asistanMetinRef.current = "";
+              kullaniciMetinRef.current = "";
+              guncelle({ assistantTranscript: "" });
+            }
+            kullaniciMetinRef.current += event.text;
+            guncelle({ partialTranscript: kullaniciMetinRef.current });
+          }
+        } else if (event.type === "partial") {
+          // Asistan cevap vermeye başladı → kullanıcının cümlesi tamamlandı.
+          if (kullaniciMetinRef.current) {
+            guncelle({ transcript: kullaniciMetinRef.current, partialTranscript: "" });
+            kullaniciMetinRef.current = "";
+          }
+          asistanMetinRef.current += event.text;
+          guncelle({ assistantTranscript: asistanMetinRef.current });
+        }
+      });
+      provider.onTurnComplete(() => {
+        // Model üretimi bitirdi; kullanıcı henüz konuşmadıysa bekleyen metni sabitle.
+        if (kullaniciMetinRef.current) {
+          guncelle({ transcript: kullaniciMetinRef.current, partialTranscript: "" });
+          kullaniciMetinRef.current = "";
         }
       });
       provider.onAudio((chunk) => {
@@ -124,19 +175,21 @@ export function useRealtimeVoice() {
 
       guncelle({ state: "listening" });
     } catch (e) {
+      // Bağlantı kurulduktan sonra mikrofon izni reddedilirse vb. durumlarda
+      // WebSocket/ses kuyruğu açık kalmasın.
+      providerRef.current = providerRef.current ?? provider;
+      playbackRef.current = playbackRef.current ?? playback;
+      await kaynaklariKapat();
       guncelle({ state: "error", error: e instanceof Error ? e.message : String(e) });
     }
-  }, [araciCalistir, guncelle]);
+  }, [araciCalistir, guncelle, kaynaklariKapat]);
 
   const disconnect = useCallback(async () => {
-    micRef.current?.stop();
-    micRef.current = null;
-    playbackRef.current?.close();
-    playbackRef.current = null;
-    await providerRef.current?.disconnect();
-    providerRef.current = null;
+    await kaynaklariKapat();
+    kullaniciMetinRef.current = "";
+    asistanMetinRef.current = "";
     setSession(BOS_SESSION);
-  }, []);
+  }, [kaynaklariKapat]);
 
   const interrupt = useCallback(() => {
     providerRef.current?.interrupt();
