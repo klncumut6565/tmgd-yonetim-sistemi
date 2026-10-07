@@ -512,7 +512,7 @@ export default function FirmaTakvimiPage() {
                 <div
                   key={`bos-${i}`}
                   className={
-                    "min-h-[92px] min-w-0 border-b border-r " +
+                    "min-h-[100px] min-w-0 border-b border-r " +
                     (haftaSonu ? "bg-red-50/60" : "bg-gray-50/50")
                   }
                 />
@@ -530,7 +530,7 @@ export default function FirmaTakvimiPage() {
                 className={
                   // min-w-0 + overflow-hidden: uzun firma adı hücreyi
                   // (ve dolayısıyla sütunu) genişletemesin.
-                  "min-h-[92px] min-w-0 overflow-hidden border-b border-r p-1.5 align-top " +
+                  "min-h-[100px] min-w-0 overflow-hidden border-b border-r p-1.5 align-top " +
                   (canWrite ? "cursor-pointer " : "") +
                   // Seçili gün her zaman öne çıkar; değilse hafta sonu
                   // hücreleri hafif kırmızı zeminle işaretlenir.
@@ -559,8 +559,8 @@ export default function FirmaTakvimiPage() {
                   )}
                 </div>
 
-                <div className="space-y-1 min-w-0">
-                  {oGun.slice(0, 3).map((z) => {
+                <div className="space-y-0.5 min-w-0">
+                  {oGun.slice(0, 5).map((z) => {
                     // Firma etiketi, atandığı TMGD'nin rengiyle basılır.
                     // Ataması olmayan firma beyaz zeminde kalır.
                     const atama = firmaTmgd.get(z.firm_id);
@@ -569,7 +569,7 @@ export default function FirmaTakvimiPage() {
                       <div
                         key={z.id}
                         className={
-                          "group flex items-center gap-1 border rounded px-1 py-0.5 min-w-0 " +
+                          "group flex items-center gap-0.5 border rounded px-1 py-px min-w-0 " +
                           (renk ? "" : "bg-white")
                         }
                         style={renk ? { backgroundColor: renk } : undefined}
@@ -580,7 +580,7 @@ export default function FirmaTakvimiPage() {
                       >
                         <span
                           className={
-                            "text-[10px] truncate flex-1 min-w-0 " +
+                            "text-[9px] leading-tight truncate flex-1 min-w-0 " +
                             (renk ? "text-black" : "")
                           }
                         >
@@ -593,7 +593,7 @@ export default function FirmaTakvimiPage() {
                               ziyaretSil(z);
                             }}
                             className={
-                              "text-[10px] shrink-0 group-hover:text-red-600 " +
+                              "text-[9px] shrink-0 group-hover:text-red-600 " +
                               (renk ? "text-black/40" : "text-gray-300")
                             }
                             title="Ziyaret kaydını sil"
@@ -604,15 +604,15 @@ export default function FirmaTakvimiPage() {
                       </div>
                     );
                   })}
-                  {oGun.length > 3 && (
+                  {oGun.length > 5 && (
                     <div
-                      className="text-[10px] text-gray-400 px-1 cursor-help hover:text-gray-600 hover:underline underline-offset-2"
+                      className="text-[9px] text-gray-400 px-1 cursor-help hover:text-gray-600 hover:underline underline-offset-2"
                       title={oGun
-                        .slice(3)
+                        .slice(5)
                         .map((z) => firmaAdi.get(z.firm_id) || "—")
                         .join("\n")}
                     >
-                      +{oGun.length - 3} firma daha
+                      +{oGun.length - 5} firma daha
                     </div>
                   )}
                 </div>
