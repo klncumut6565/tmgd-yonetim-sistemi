@@ -4,6 +4,7 @@
 // - /login → sadece içerik (sidebar/header yok), AuthGuard yine de login'i serbest bırakır
 // - Diğer sayfalar → AuthGuard + Sidebar + Header + içerik
 
+import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import AuthGuard from "@/components/AuthGuard";
 import Sidebar from "@/components/layout/Sidebar";
@@ -22,6 +23,9 @@ export default function AppShell({
   const router = useRouter();
   const { profile, isApproved, isSuperAdmin } = useUser();
 
+  const [menuAcik, setMenuAcik] = useState(false);
+  useEffect(() => setMenuAcik(false), [pathname]);
+
   const isLoginPage = pathname === "/login";
 
   if (isLoginPage) {
@@ -38,19 +42,43 @@ export default function AppShell({
       <div className="flex">
         {/* Sidebar yalnızca onaylı kullanıcıya gösterilir;
             onaysızken AuthGuard zaten kilit ekranı basar. */}
-        {isApproved && <Sidebar />}
+        {isApproved && (
+          <>
+            {/* Mobilde menü gizli, hamburger ile çekmece olarak açılır */}
+            {menuAcik && (
+              <div
+                className="fixed inset-0 bg-black/40 z-40 md:hidden"
+                onClick={() => setMenuAcik(false)}
+              />
+            )}
+            <div
+              className={`${
+                menuAcik ? "fixed inset-y-0 left-0 z-50 bg-white overflow-y-auto" : "hidden"
+              } md:block md:static md:z-auto`}
+            >
+              <Sidebar />
+            </div>
+          </>
+        )}
 
-        <div className="flex-1 min-h-screen">
+        <div className="flex-1 min-h-screen min-w-0">
           {isApproved && (
-            <header className="border-b p-4 flex items-center justify-between">
+            <header className="border-b p-3 sm:p-4 flex items-center justify-between gap-2">
               {/* Sol üst köşe: geri / ileri gezinme + başlık */}
               <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setMenuAcik(true)}
+                  className="md:hidden px-2 py-1 rounded border"
+                  aria-label="Menü"
+                >
+                  ☰
+                </button>
                 <GeriIleriButonlari />
-                <span className="font-medium">TMGD Yönetim Sistemi</span>
+                <span className="font-medium hidden sm:inline">TMGD Yönetim Sistemi</span>
               </div>
               <div className="flex items-center gap-3 text-sm">
                 <NotificationBell />
-                <span className="text-gray-600">
+                <span className="text-gray-600 hidden sm:inline">
                   {profile?.full_name || profile?.email}
                   {profile?.role === "super_admin" && (
                     <span className="ml-2 px-2 py-0.5 rounded bg-black text-white text-xs">

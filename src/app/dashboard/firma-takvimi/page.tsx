@@ -424,7 +424,7 @@ export default function FirmaTakvimiPage() {
   );
 
   return (
-    <div className="p-6">
+    <div className="p-3 sm:p-6">
       <div className="flex items-center gap-2 text-sm text-gray-500 mb-1">
         <Link href="/dashboard" className="hover:underline">
           Gösterge Paneli
@@ -477,8 +477,16 @@ export default function FirmaTakvimiPage() {
       )}
       {loading && <p className="text-sm text-gray-500 mb-3">Yükleniyor...</p>}
 
-      {/* TAKVİM */}
-      <div className="border rounded-xl overflow-hidden mb-6">
+      {/* TAKVİM
+          Telefonda 7 sütun ekrana sıkıştırılınca her sütun ~50px kalıyor ve
+          firma adları okunmuyordu. (Önceden "ziyaret edilmeyen firmalar"
+          listesi sayfayı ekrandan geniş yaptığı için tarayıcı sayfayı
+          küçültüp takvimi geniş gösteriyordu; liste boşalınca bu etki
+          kayboluyor ve takvim daralıyordu.) Artık takvim, küçük ekranlarda
+          sabit minimum genişliğe sahip ve yatay kaydırılabilir; liste
+          durumundan bağımsız aynı görünür. */}
+      <div className="border rounded-xl overflow-x-auto mb-6">
+        <div className="min-w-[340px]">
         <div
           className="grid bg-gray-50 border-b"
           style={{ gridTemplateColumns: TAKVIM_SUTUNLARI }}
@@ -612,6 +620,7 @@ export default function FirmaTakvimiPage() {
             );
           })}
         </div>
+        </div>
       </div>
 
       {/* RENK LEJANTI — takvimde görünen TMGD'ler */}
@@ -727,7 +736,7 @@ export default function FirmaTakvimiPage() {
           {ziyaretEdilmeyenler.map((f) => (
             <li
               key={f.id}
-              className="flex items-center gap-2 py-2 px-2 text-sm rounded"
+              className="flex flex-wrap items-center gap-x-2 gap-y-1 py-2 px-2 text-sm rounded"
               style={
                 firmaRengi(f.id)
                   ? { backgroundColor: firmaRengi(f.id)! }
@@ -748,7 +757,7 @@ export default function FirmaTakvimiPage() {
               <Link
                 href={`/firms/${f.id}`}
                 className={
-                  "truncate hover:underline min-w-0 " +
+                  "truncate hover:underline min-w-0 max-w-full " +
                   (firmaRengi(f.id) ? "text-black" : "")
                 }
                 title={
