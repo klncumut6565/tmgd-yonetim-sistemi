@@ -22,6 +22,7 @@ import { useRouter } from "next/navigation";
 import { authFetch } from "@/lib/supabase/authFetch";
 import { GeminiLiveProvider } from "@/lib/voice/providers/geminiLive";
 import { startMicCapture, AudioPlaybackQueue, type MicCapture } from "@/lib/voice/audioStream";
+import { hataTurkce } from "@/lib/voice/hatalar";
 import { buildLiveInstruction, type LiveContext } from "@/lib/voice/geminiTools";
 import type { VoiceSession, VoiceState, LiveMetrics, RealtimeSessionResponse } from "@/lib/voice/types";
 
@@ -251,7 +252,7 @@ export function useRealtimeVoice(options: RealtimeVoiceOptions = {}) {
         guncelle({ isSpeaking: false });
         gec("listening");
       });
-      provider.onError((message) => guncelle({ state: "error", error: message }));
+      provider.onError((message) => guncelle({ state: "error", error: hataTurkce(message) }));
       provider.onToolCall(araciCalistir);
       // Oturum süresi doluyor → tutamaç varsa HEMEN kesintisiz yeniden bağlan.
       provider.onGoAway(() => {
@@ -369,7 +370,7 @@ export function useRealtimeVoice(options: RealtimeVoiceOptions = {}) {
       providerRef.current = providerRef.current ?? provider;
       playbackRef.current = playbackRef.current ?? playback;
       await kaynaklariKapat();
-      guncelle({ state: "error", error: e instanceof Error ? e.message : String(e) });
+      guncelle({ state: "error", error: hataTurkce(e) });
       return false;
     }
   }, [guncelle, kaynaklariKapat, saglayiciKur]);
