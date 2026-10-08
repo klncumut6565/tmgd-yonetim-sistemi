@@ -22,8 +22,8 @@ export async function pdfIlkSayfayiGorselYap(pdfBuffer: ArrayBuffer): Promise<st
   const belge = await pdfjsLib.getDocument({ data: pdfBuffer }).promise;
   const sayfa = await belge.getPage(1);
 
-  // ~150 DPI civarı: kimlik belgesi metni okunaklı kalır, dosya boyutu makul.
-  const viewport = sayfa.getViewport({ scale: 2.0 });
+  // ~110 DPI civarı: kimlik belgesi metni okunaklı kalır, dosya boyutu makul.
+  const viewport = sayfa.getViewport({ scale: 1.5 });
   const canvas = document.createElement("canvas");
   canvas.width = viewport.width;
   canvas.height = viewport.height;
@@ -31,5 +31,5 @@ export async function pdfIlkSayfayiGorselYap(pdfBuffer: ArrayBuffer): Promise<st
   if (!context) throw new Error("Canvas bağlamı oluşturulamadı.");
 
   await sayfa.render({ canvasContext: context, viewport }).promise;
-  return canvas.toDataURL("image/jpeg", 0.92);
+  return canvas.toDataURL("image/jpeg", 0.85);
 }

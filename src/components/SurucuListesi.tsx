@@ -461,6 +461,39 @@ export default function SurucuListesi({
     }
   }
 
+  /** Telefon fotoğrafları birkaç MB olabilir; PDF'e gömmeden önce en fazla 1600 px'e
+   *  küçültüp JPEG'e çevirir (PDF üretimi ve önizleme çok daha hızlı olur). */
+  async function gorseliKucult(blob: Blob): Promise<string> {
+    const ham = await new Promise<string>((resolve, reject) => {
+      const r = new FileReader();
+      r.onload = () => resolve(r.result as string);
+      r.onerror = reject;
+      r.readAsDataURL(blob);
+    });
+    try {
+      const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+        const i = new Image();
+        i.onload = () => resolve(i);
+        i.onerror = reject;
+        i.src = ham;
+      });
+      const enBuyuk = Math.max(img.naturalWidth, img.naturalHeight);
+      if (!enBuyuk) return ham;
+      const oran = Math.min(1, 1600 / enBuyuk);
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.round(img.naturalWidth * oran);
+      canvas.height = Math.round(img.naturalHeight * oran);
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return ham;
+      ctx.fillStyle = "#fff";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      return canvas.toDataURL("image/jpeg", 0.85);
+    } catch {
+      return ham;
+    }
+  }
+
   /** Bir dosyayı (image veya PDF) fetch edip SurucuBelgeEki için hazır bir
    *  JPEG dataURL'e çevirir. PDF ise ilk sayfası rastere edilir. */
   async function belgeEkiHazirla(
@@ -478,12 +511,7 @@ export default function SurucuListesi({
       if (blob.type === "application/pdf" || yol.toLowerCase().endsWith(".pdf")) {
         dataUrl = await pdfIlkSayfayiGorselYap(await blob.arrayBuffer());
       } else {
-        dataUrl = await new Promise<string>((resolve, reject) => {
-          const r = new FileReader();
-          r.onload = () => resolve(r.result as string);
-          r.onerror = reject;
-          r.readAsDataURL(blob);
-        });
+        dataUrl = await gorseliKucult(blob);
       }
       return { adSoyad, tur, dataUrl };
     } catch {
@@ -542,8 +570,7 @@ export default function SurucuListesi({
     setBusy(true);
     setError("");
     try {
-      const logo = await logoDataUrl();
-      const ekler = await eklerHazirla();
+      const [logo, ekler] = await Promise.all([logoDataUrl(), eklerHazirla()]);
       const blob = await surucuListesiPdfOlustur({
         firmaAdi,
         hazirlayanAdi,
@@ -573,8 +600,7 @@ export default function SurucuListesi({
     setBusy(true);
     setError("");
     try {
-      const logo = await logoDataUrl();
-      const ekler = await eklerHazirla();
+      const [logo, ekler] = await Promise.all([logoDataUrl(), eklerHazirla()]);
 
       const blob = await surucuListesiPdfOlustur({
         firmaAdi,

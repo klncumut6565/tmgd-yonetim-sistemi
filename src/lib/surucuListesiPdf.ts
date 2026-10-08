@@ -62,6 +62,14 @@ export type SurucuListesiPdfVerisi = {
 };
 
 function fontuKaydet(doc: JsPDFType) {
+  // Fontlar belge genelindedir: her sayfada yeniden kaydetmek ~1 MB'lık TTF'leri
+  // tekrar tekrar işletiyor (özellikle çok sayıda ek sayfasında önizlemeyi yavaşlatıyordu).
+  const isaretli = doc as unknown as { __fontKayitli?: boolean };
+  if (isaretli.__fontKayitli) {
+    doc.setFont(FONT, "normal");
+    return;
+  }
+  isaretli.__fontKayitli = true;
   doc.addFileToVFS("LiberationSans-Regular.ttf", LIBERATION_SANS_REGULAR_B64);
   doc.addFont("LiberationSans-Regular.ttf", FONT, "normal");
   doc.addFileToVFS("LiberationSans-Bold.ttf", LIBERATION_SANS_BOLD_B64);
@@ -276,8 +284,8 @@ function kapakSayfasiCiz(doc: JsPDFType, veri: SurucuListesiPdfVerisi) {
   doc.text("Hazırlayan (TMGD)", W / 2 - 42, imzaY, { align: "center" });
   doc.text("Sorumlu Kişi", W / 2 + 42, imzaY, { align: "center" });
   doc.setFont(FONT, "normal");
-  doc.text(veri.hazirlayanAdi || "—", W / 2 - 42, imzaY + 6, { align: "center" });
-  doc.text(veri.onaylayanAdi || "—", W / 2 + 42, imzaY + 6, { align: "center" });
+  doc.text(veri.hazirlayanAdi || "", W / 2 - 42, imzaY + 6, { align: "center" });
+  doc.text(veri.onaylayanAdi || "", W / 2 + 42, imzaY + 6, { align: "center" });
 
   doc.setFontSize(9.5);
   doc.setFont(FONT, "normal");
