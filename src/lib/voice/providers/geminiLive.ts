@@ -74,11 +74,37 @@ export class GeminiLiveProvider implements RealtimeProvider {
     resumeHandle?: string | null,
     systemInstruction?: string
   ): Promise<void> {
-    // API sürümü: Google'ın resmi dokümantasyonu ephemeral token'lar için
-    // açıkça "only works for the live API, and ONLY with the v1beta version
-    // of the API" diyor — bu yüzden varsayılan v1beta.
-    const surum = session.apiVersion || "v1beta";
-    const wsPath = `/ws/google.ai.generativelanguage.${surum}.GenerativeService.BidiGenerateContent`;
+    // Ephemeral token'lar NORMAL BidiGenerateContent uç noktasında kabul
+    // EDİLMEZ ("Method doesn't allow unregistered callers" / 1008). Token ile
+    // bağlanmak için BidiGenerateContentConstrained uç noktası kullanılır
+    // (resmi SDK de böyle yapar; SDK v1alpha kullanır). Sürümler sırayla denenir.
+    const surumler = Array.from(new Set(["v1alpha", session.apiVersion || "v1beta", "v1beta"]));
+    let sonHata: Error | null = null;
+    for (const surum of surumler) {
+      try {
+        await this.baglan(session, surum, resumeHandle, systemInstruction);
+        return;
+      } catch (e) {
+        sonHata = e instanceof Error ? e : new Error(String(e));
+        try {
+          this.ws?.close();
+        } catch {
+          /* yok say */
+        }
+        this.ws = null;
+        this.setupDone = false;
+      }
+    }
+    throw sonHata ?? new Error("Gemini Live bağlantısı kurulamadı.");
+  }
+
+  private async baglan(
+    session: RealtimeSessionResponse,
+    surum: string,
+    resumeHandle?: string | null,
+    systemInstruction?: string
+  ): Promise<void> {
+    const wsPath = `/ws/google.ai.generativelanguage.${surum}.GenerativeService.BidiGenerateContentConstrained`;
     // ÖNEMLİ: Ephemeral token NORMAL bir API anahtarı gibi "?key=" ile
     // GÖNDERİLEMEZ. Resmi dokümantasyon (ephemeral-tokens sayfası, "Connect
     // to Live API with an ephemeral token" bölümündeki not): "If not using
@@ -111,6 +137,15 @@ export class GeminiLiveProvider implements RealtimeProvider {
               inputAudioTranscription: {},
               outputAudioTranscription: {},
               tools: [{ functionDeclarations: GEMINI_FUNCTION_DECLARATIONS }],
+              // Konuşma algılama: hoparlör yankısı/gürültü modeli yanlışlıkla
+              // "kullanıcı konuşuyor" diye kesmesin → başlangıç hassasiyeti düşük,
+              // bitişte biraz daha uzun sessizlik beklenir.
+              realtimeInputConfig: {
+                automaticActivityDetection: {
+                  startOfSpeechSensitivity: "START_SENSITIVITY_LOW",
+                  silenceDurationMs: 800,
+                },
+              },
               // Oturum devamı: sunucu sessionResumptionUpdate ile tutamaç
               // yollar; bağlantı kopunca/goAway'de bununla kaldığı yerden
               // devam edilir.
@@ -128,6 +163,7 @@ export class GeminiLiveProvider implements RealtimeProvider {
       };
 
       ws.onclose = (ev) => {
+        if (this.ws !== ws && this.setupDone) return; // eski/başarısız denemenin gecikmiş kapanışı
         if (!this.setupDone) {
           reject(new Error(`Bağlantı kapandı (${ev.code})${ev.reason ? `: ${ev.reason}` : "."}`));
           return;
@@ -137,7 +173,9 @@ export class GeminiLiveProvider implements RealtimeProvider {
         else this.errorHandler?.(`Bağlantı kapandı${ev.reason ? `: ${ev.reason}` : "."}`);
       };
 
-      ws.onmessage = (ev) => this.handleMessage(ev);
+      ws.onmessage = (ev) => {
+        if (this.ws === ws) this.handleMessage(ev);
+      };
     });
   }
 

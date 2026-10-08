@@ -333,8 +333,8 @@ export default function ADRAssistantWidget() {
               // eşik 5 katı VE sesin kesintisiz 600ms sürmesi şartı. Rüzgâr,
               // araç, kapı gibi anlık sesler artık sözünü kesemiyor;
               // gerçek bir cümle ise rahatlıkla yakalanıyor.
-              esikCarpani: 5,
-              minSesSuresiMs: 600,
+              esikCarpani: 7,
+              minSesSuresiMs: 900,
               onKonusmaBasladi: () => {
                 // Asistanı sustur ve bu (kirli) kaydı sonlandır — üstteki
                 // geri çağırma temiz bir kayıt başlatacak.
