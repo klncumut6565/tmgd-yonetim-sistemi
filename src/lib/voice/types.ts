@@ -89,7 +89,12 @@ export interface RealtimeSessionResponse {
 }
 
 export interface RealtimeProvider {
-  connect(session: RealtimeSessionResponse, resumeHandle?: string | null): Promise<void>;
+  connect(
+    session: RealtimeSessionResponse,
+    resumeHandle?: string | null,
+    /** Dinamik bağlamla zenginleştirilmiş sistem talimatı (opsiyonel). */
+    systemInstruction?: string
+  ): Promise<void>;
   /** Oturum devam tutamacı (yoksa null) — yeniden bağlanmada kullanılır. */
   getResumeHandle(): string | null;
   /** Sunucu oturumun yakında kapanacağını bildirdiğinde (goAway). */

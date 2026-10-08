@@ -22,6 +22,7 @@ import { useRouter } from "next/navigation";
 import { authFetch } from "@/lib/supabase/authFetch";
 import { GeminiLiveProvider } from "@/lib/voice/providers/geminiLive";
 import { startMicCapture, AudioPlaybackQueue, type MicCapture } from "@/lib/voice/audioStream";
+import { buildLiveInstruction, type LiveContext } from "@/lib/voice/geminiTools";
 import type { VoiceSession, VoiceState, RealtimeSessionResponse } from "@/lib/voice/types";
 
 const BOS_SESSION: VoiceSession = {
@@ -40,7 +41,18 @@ async function firmTabUrl(firmId: string, tab?: string): Promise<string> {
   return `/firms/${firmId}${params}`;
 }
 
-export function useRealtimeVoice() {
+export interface RealtimeVoiceOptions {
+  /** Oturum her açıldığında/yenilendiğinde GÜNCEL bağlamı (firma + geçmiş) verir. */
+  getContext?: () => LiveContext;
+  /** Bir konuşma turu bittiğinde (kullanıcı + asistan metni) çağrılır;
+   *  widget bunu panel sohbet geçmişine ekler. */
+  onTurn?: (turn: { user: string; assistant: string }) => void;
+}
+
+export function useRealtimeVoice(options: RealtimeVoiceOptions = {}) {
+  const optionsRef = useRef(options);
+  optionsRef.current = options;
+  const turKullaniciRef = useRef("");
   const router = useRouter();
   const [session, setSession] = useState<VoiceSession>(BOS_SESSION);
 
@@ -102,6 +114,15 @@ export function useRealtimeVoice() {
     }
   }, []);
 
+  /** Tamamlanan (veya kesilen) turu panel geçmişine bildirir ve tamponları sıfırlar. */
+  const turuIsle = useCallback(() => {
+    const asistan = asistanMetinRef.current.trim();
+    const kullanici = turKullaniciRef.current.trim();
+    if (asistan || kullanici) optionsRef.current.onTurn?.({ user: kullanici, assistant: asistan });
+    asistanMetinRef.current = "";
+    turKullaniciRef.current = "";
+  }, []);
+
   /** Yeni bir provider'ı kurar: tüm olay dinleyicilerini bağlar. Hem ilk
    *  bağlantıda hem yeniden bağlanmada aynı şekilde kullanılır. */
   const saglayiciKur = useCallback(
@@ -110,10 +131,9 @@ export function useRealtimeVoice() {
         if (event.type === "error") return;
         if (event.speaker === "user") {
           if (event.type === "partial") {
-            // Yeni kullanıcı konuşması başladıysa önceki asistan turu kapanmıştır.
-            if (asistanMetinRef.current) {
+            // Yeni kullanıcı konuşması başlıyor: önceki asistan cevabını ekrandan temizle.
+            if (!kullaniciMetinRef.current) {
               asistanMetinRef.current = "";
-              kullaniciMetinRef.current = "";
               guncelle({ assistantTranscript: "" });
             }
             kullaniciMetinRef.current += event.text;
@@ -123,6 +143,7 @@ export function useRealtimeVoice() {
           // Asistan cevap vermeye başladı → kullanıcının cümlesi tamamlandı.
           if (kullaniciMetinRef.current) {
             guncelle({ transcript: kullaniciMetinRef.current, partialTranscript: "" });
+            turKullaniciRef.current = kullaniciMetinRef.current;
             kullaniciMetinRef.current = "";
           }
           asistanMetinRef.current += event.text;
@@ -133,13 +154,16 @@ export function useRealtimeVoice() {
         // Model üretimi bitirdi; kullanıcı henüz konuşmadıysa bekleyen metni sabitle.
         if (kullaniciMetinRef.current) {
           guncelle({ transcript: kullaniciMetinRef.current, partialTranscript: "" });
+          turKullaniciRef.current = kullaniciMetinRef.current;
           kullaniciMetinRef.current = "";
         }
+        turuIsle();
       });
       provider.onAudio((chunk) => {
         if (!mutedRef.current) playback.enqueue(chunk);
       });
       provider.onInterrupted(() => {
+        turuIsle(); // kesilen turda söylenen kısım da geçmişe girsin
         playback.clear();
         guncelle({ isSpeaking: false, state: "listening" });
       });
@@ -152,7 +176,7 @@ export function useRealtimeVoice() {
       // Beklenmeyen kopma → (varsa tutamaçla) yeniden bağlan.
       provider.onClose(() => void yenidenBaglanRef.current?.());
     },
-    [araciCalistir, guncelle]
+    [araciCalistir, guncelle, turuIsle]
   );
 
   /** Mikrofon kesilmeden yeni bir WebSocket oturumu açar; tutamaç varsa
@@ -172,7 +196,7 @@ export function useRealtimeVoice() {
           const playback = playbackRef.current;
           if (!playback) return; // kullanıcı bu sırada kapattı
           saglayiciKur(yeni, playback);
-          await yeni.connect(sessionData, tutamac);
+          await yeni.connect(sessionData, tutamac, buildLiveInstruction(optionsRef.current.getContext?.()));
           providerRef.current = yeni; // mikrofon artık buna yazar
           await eski.disconnect().catch(() => {});
           guncelle({ state: "listening", error: undefined });
@@ -195,6 +219,7 @@ export function useRealtimeVoice() {
     await kaynaklariKapat();
     kullaniciMetinRef.current = "";
     asistanMetinRef.current = "";
+    turKullaniciRef.current = "";
     guncelle({
       state: "connecting",
       error: undefined,
@@ -215,7 +240,7 @@ export function useRealtimeVoice() {
       playback.onSpeaking((speaking) => guncelle({ isSpeaking: speaking, state: speaking ? "speaking" : "listening" }));
       saglayiciKur(provider, playback);
 
-      await provider.connect(sessionData);
+      await provider.connect(sessionData, null, buildLiveInstruction(optionsRef.current.getContext?.()));
       providerRef.current = provider;
       playbackRef.current = playback;
 

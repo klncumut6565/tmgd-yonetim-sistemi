@@ -69,7 +69,11 @@ export class GeminiLiveProvider implements RealtimeProvider {
     this.closeHandler = handler;
   }
 
-  async connect(session: RealtimeSessionResponse, resumeHandle?: string | null): Promise<void> {
+  async connect(
+    session: RealtimeSessionResponse,
+    resumeHandle?: string | null,
+    systemInstruction?: string
+  ): Promise<void> {
     // API sürümü: Google'ın resmi dokümantasyonu ephemeral token'lar için
     // açıkça "only works for the live API, and ONLY with the v1beta version
     // of the API" diyor — bu yüzden varsayılan v1beta.
@@ -103,7 +107,7 @@ export class GeminiLiveProvider implements RealtimeProvider {
               // generationConfig İÇİNDE; transcription alanları setup'ın
               // ÜST seviyesinde.
               generationConfig: { responseModalities: ["AUDIO"] },
-              systemInstruction: { parts: [{ text: GEMINI_LIVE_SYSTEM_INSTRUCTION }] },
+              systemInstruction: { parts: [{ text: systemInstruction || GEMINI_LIVE_SYSTEM_INSTRUCTION }] },
               inputAudioTranscription: {},
               outputAudioTranscription: {},
               tools: [{ functionDeclarations: GEMINI_FUNCTION_DECLARATIONS }],

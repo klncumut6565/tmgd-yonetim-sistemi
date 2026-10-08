@@ -111,7 +111,25 @@ export default function ADRAssistantWidget() {
   // turn-based "Sesli Görüşme"den TAMAMEN AYRI ve BAĞIMSIZ bir hook
   // (bkz. useRealtimeVoice.ts) — ikisi aynı anda mikrofonu paylaşamaz,
   // bu yüzden biri aktifken diğerinin butonu devre dışı bırakılır.
-  const canli = useRealtimeVoice();
+  const canli = useRealtimeVoice({
+    // Live oturumu açılırken/yenilenirken: şu anki firma + panel sohbet geçmişi.
+    getContext: () => ({
+      firmId,
+      firmName,
+      history: messagesRef.current
+        .filter((m) => !m.pending && !m.error && m.content)
+        .map((m) => ({ role: m.role, content: m.content })),
+    }),
+    // Canlı konuşmada biten her tur panel sohbetine de yazılır; böylece
+    // metin asistanı ve sonraki Live oturumları konuşmayı bilir.
+    onTurn: ({ user, assistant }) => {
+      setMessages((prev) => [
+        ...prev,
+        ...(user ? [{ id: crypto.randomUUID(), role: "user" as const, content: user }] : []),
+        ...(assistant ? [{ id: crypto.randomUUID(), role: "assistant" as const, content: assistant }] : []),
+      ]);
+    },
+  });
   const canliAktif = canli.session.state !== "idle" && canli.session.state !== "error";
 
   const {

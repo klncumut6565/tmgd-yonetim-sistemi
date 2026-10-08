@@ -99,3 +99,40 @@ KESİN KURALLAR:
 - Hiçbir veriyi SİLEMEZSİN. Kullanıcı silme isterse nazikçe reddet ve bunun uygulama üzerinden manuel yapılması gerektiğini söyle.
 - Emin olmadığın mevzuat/ADR bilgisinde belirsizliğini belirt.
 `.trim();
+
+
+/** Canlı oturum açılırken sistem talimatına eklenen DİNAMİK bağlam:
+ *  kullanıcının o an baktığı firma ve son konuşma geçmişi. Böylece Live
+ *  asistan "şu anki firma" ve "az önce ne konuştuk" bilgisini bilir. */
+export interface LiveContext {
+  firmId: string | null;
+  firmName: string | null;
+  /** Panel sohbetinden son mesajlar (eskiden yeniye). */
+  history: { role: 'user' | 'assistant'; content: string }[];
+}
+
+const GECMIS_MAKS_MESAJ = 8;
+const MESAJ_MAKS_KARAKTER = 300;
+
+export function buildLiveInstruction(ctx?: LiveContext | null): string {
+  if (!ctx) return GEMINI_LIVE_SYSTEM_INSTRUCTION;
+  const parcalar: string[] = [GEMINI_LIVE_SYSTEM_INSTRUCTION, '', 'MEVCUT BAĞLAM (uygulamadan alındı):'];
+  if (ctx.firmId && ctx.firmName) {
+    parcalar.push(
+      `- Kullanıcı şu an "${ctx.firmName}" firmasının sayfasında (firma ID: ${ctx.firmId}). ` +
+        'Kullanıcı firma adı söylemeden "bu firma", "buradaki görevler" gibi konuşursa bu firmayı kastediyordur; ' +
+        'bu ID ile doğrudan araç çağırabilirsin (search_firm gerekmez).'
+    );
+  } else {
+    parcalar.push('- Kullanıcı şu an belirli bir firma sayfasında değil.');
+  }
+  const gecmis = ctx.history.slice(-GECMIS_MAKS_MESAJ);
+  if (gecmis.length > 0) {
+    parcalar.push('', 'ÖNCEKİ SOHBET (panelden, eskiden yeniye) — konuşmaya buradan devam et, tekrar sorma:');
+    for (const m of gecmis) {
+      const metin = m.content.replace(/\s+/g, ' ').trim().slice(0, MESAJ_MAKS_KARAKTER);
+      parcalar.push(`${m.role === 'user' ? 'Kullanıcı' : 'Asistan'}: ${metin}`);
+    }
+  }
+  return parcalar.join('\n');
+}
