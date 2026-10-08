@@ -74,14 +74,79 @@ export const GEMINI_FUNCTION_DECLARATIONS = [
   {
     name: 'get_missing_documents',
     description:
-      'Bir firmanın GERÇEK eksik/tamamlanmamış belge listesini döndürür. ' +
-      'Belge durumu hakkında bu araç çağrılmadan KESİNLİKLE konuşulmaz.',
+      'Bir firmanın Belge Takip ekranındaki GERÇEK eksik belgelerini (belge adı + bölüm), eksik sayısını, ' +
+      'toplam/tamamlanan sayısını ve ilerleme yüzdesini döndürür. Eksik belge veya belge durumu sorularında ' +
+      'bu araç çağrılmadan KESİNLİKLE konuşulmaz. Çok sayıda eksik varsa önce sayıyı ve bölüm dağılımını (by_section) söyle, ' +
+      'tek tek saymayı kullanıcı isterse yap.',
     parameters: {
       type: 'object',
       properties: {
         firm_id: { type: 'string', description: 'search_firm sonucundaki gerçek firma ID\'si' },
       },
       required: ['firm_id'],
+    },
+  },
+  {
+    name: 'list_firms',
+    description:
+      'Sistemdeki GERÇEK firma sayısını ve isimlerini döndürür (toplam, duruma göre dağılım ve liste). ' +
+      '"Kaç firmam var", "firmalarımı say/listele", "kaç aktif firma" gibi sorularda çağrılır.',
+    parameters: {
+      type: 'object',
+      properties: {
+        status: {
+          type: 'string',
+          enum: ['all', 'active', 'passive', 'archived', 'tmfb_kapsamdisi'],
+          description: 'Durum filtresi (opsiyonel, varsayılan all). active=aktif, passive=pasif, archived=arşiv, tmfb_kapsamdisi=TMFB kapsamdışı',
+        },
+      },
+    },
+  },
+  {
+    name: 'get_visit_overview',
+    description:
+      'Firma Takvimi ile aynı kuralla, bir ayda ziyaret edilen ve ziyaret EDİLMEYEN firma sayısını ve ziyaret edilmeyen ' +
+      'firma isimlerini döndürür. "Ziyaret edilmeyen firma sayım kaç", "bu ay kimleri ziyaret etmedim" sorularında çağrılır.',
+    parameters: {
+      type: 'object',
+      properties: {
+        month: { type: 'string', description: 'YYYY-AA biçiminde ay (opsiyonel; boşsa içinde bulunulan ay)' },
+      },
+    },
+  },
+  {
+    name: 'get_firm_progress',
+    description:
+      'Belge Takip ilerleme yüzdesini döndürür. firm_id verilirse o firmanın yüzdesi (örn. %86) ve tamamlanan/toplam sayısı; ' +
+      'verilmezse tüm firmaların ortalaması ve en düşük ilerlemeli firmalar. "X firmasının ilerlemesi ne durumda" sorusunda ' +
+      'önce search_firm ile firma ID\'sini bul, sonra bunu çağır ve yüzdeyi aynen söyle ("yüzde 86").',
+    parameters: {
+      type: 'object',
+      properties: {
+        firm_id: { type: 'string', description: 'search_firm sonucundaki gerçek firma ID\'si (opsiyonel)' },
+      },
+    },
+  },
+  {
+    name: 'go_to_page',
+    description:
+      'Uygulamanın ana menü sayfalarından birine gider (navigasyon). Belirli bir firmanın sayfası için open_firm kullanılır.',
+    parameters: {
+      type: 'object',
+      properties: {
+        page: {
+          type: 'string',
+          enum: [
+            'dashboard', 'firma_takvimi', 'firmalar', 'gorevler', 'araclar', 'suruculer',
+            'personeller', 'ziyaretler', 'raporlar', 'adr_bilgi_motoru', 'ayarlar',
+          ],
+          description:
+            'dashboard=Gösterge Paneli, firma_takvimi=Firma Takvimi, firmalar=Firmalar, gorevler=Görevler, araclar=Araçlar, ' +
+            'suruculer=Sürücüler, personeller=Personeller, ziyaretler=Ziyaretler, raporlar=Raporlar, ' +
+            'adr_bilgi_motoru=ADR Bilgi Motoru, ayarlar=Ayarlar',
+        },
+      },
+      required: ['page'],
     },
   },
   {
@@ -145,6 +210,8 @@ KESİN KURALLAR:
 - Firma ismi belirsizse (birden fazla eşleşme) kullanıcıya hangisini kastettiğini sor, rastgele seçme.
 - Bir aracı çağıramadıysan veya sonuç alamadıysan "bu bilgiye şu anda ulaşamıyorum" de — sayı uydurma.
 - Hiçbir veriyi SİLEMEZSİN. Kullanıcı silme isterse nazikçe reddet ve bunun uygulama üzerinden manuel yapılması gerektiğini söyle.
+- Sayı soruları (kaç firma, kaç ziyaret edilmeyen, ilerleme yüzdesi, kaç eksik belge) için MUTLAKA ilgili aracı çağır; sayıyı aynen aktar, yuvarlama veya tahmin yapma. Yüzdeyi "yüzde 86" diye söyle.
+- "Şu sayfaya git / aç" isteklerinde go_to_page (ana menü) veya open_firm (firma) kullan; gittikten sonra kısaca "açtım" de.
 - Mevzuat/madde sorularında önce search_regulation çağır ve cevabı dönen metne dayandır, kaynağı (belge adı, sayfa) söyle. Sonuç yoksa "yüklü mevzuatta bulamadım" de.
 - UN numarası geçen sorularda önce get_un_info çağır; Tablo A'da yoksa "doğrulayamadım" de.
 - Birlikte taşıma / karışık yükleme sorularında HÜKÜM VERME, check_mixed_loading sonucunu aktar (yasak/şartlı/uyumlu ve ADR referansı).

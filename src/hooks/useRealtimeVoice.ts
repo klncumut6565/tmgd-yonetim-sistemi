@@ -49,6 +49,21 @@ const BOS_SESSION: VoiceSession = {
   assistantTranscript: "",
 };
 
+/** go_to_page aracının ana menü sayfa eşlemesi (Sidebar ile aynı yollar). */
+const SAYFA_YOLLARI: Record<string, string> = {
+  dashboard: "/dashboard",
+  firma_takvimi: "/dashboard/firma-takvimi",
+  firmalar: "/firms",
+  gorevler: "/tasks",
+  araclar: "/vehicles",
+  suruculer: "/drivers",
+  personeller: "/employees",
+  ziyaretler: "/visits",
+  raporlar: "/reports",
+  adr_bilgi_motoru: "/adr",
+  ayarlar: "/settings",
+};
+
 /** Gemini function-call adı -> uygulama içi firma sekmesi eşleşmesi
  *  gerekmiyor; open_firm zaten tam "tab" parametresini iletir. */
 async function firmTabUrl(firmId: string, tab?: string): Promise<string> {
@@ -114,6 +129,13 @@ export function useRealtimeVoice(options: RealtimeVoiceOptions = {}) {
    *  hiçbir sayı/isim burada uydurulmaz (bkz. dataTools.ts). */
   const araciCalistirIc = useCallback(
     async (name: string, args: Record<string, unknown>): Promise<unknown> => {
+      if (name === "go_to_page") {
+        const hedef = typeof args.page === "string" ? SAYFA_YOLLARI[args.page] : undefined;
+        if (!hedef) return { error: "Geçersiz sayfa." };
+        router.push(hedef);
+        return { ok: true, navigated: true, page: args.page };
+      }
+
       if (name === "open_firm") {
         const firmId = typeof args.firm_id === "string" ? args.firm_id : "";
         if (!firmId) return { error: "firm_id eksik." };

@@ -22,6 +22,7 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { checkPair, type UnRow } from '@/lib/adrMix'
+import { buildChecklist, codeLabel, codeSection } from '@/lib/belgeKatalogu'
 
 // ---------------------------------------------------------------------------
 // search_firm — firma adını gerçek firm_id'ye çözer.
@@ -119,45 +120,193 @@ export async function getFirmTaskSummary(
 }
 
 // ---------------------------------------------------------------------------
-// get_firm_missing_documents — eksik/tamamlanmamış belge kontrol kalemleri.
+// Belge Takip — ilerleme ve eksik belgeler.
+// Firmalar sayfasındaki / firma detayındaki hesapla BİREBİR aynı kural:
+// kontrol listesi buildChecklist(faaliyetler, sözleşme tarihi) ile kurulur,
+// tamamlananlar firm_belgeleri(done=true)'dan gelir; D4 "Diğer", D5
+// "Dilekçe" ve AS (Araç/Sürücü) maddeleri yüzdeye ve eksik listesine SAYILMAZ.
 // ---------------------------------------------------------------------------
 
-export type MissingDocumentItem = {
-  code: string
-  period: string
-  note: string | null
+type FirmaBelgeSatiri = {
+  id: string
+  name: string
+  status: string
+  activities: string[] | null
+  contract_start: string | null
+}
+
+function takipteSayilirMi(code: string): boolean {
+  return !(code === 'D4' || code === 'D5' || code.startsWith('AS'))
+}
+
+/** Tamamlanmış (done=true) belge anahtarlarını firmaya göre toplar (sayfalı okuma). */
+async function tamamlananBelgeler(
+  supabase: SupabaseClient,
+  firmIds?: string[]
+): Promise<Map<string, Set<string>>> {
+  const harita = new Map<string, Set<string>>()
+  const SAYFA = 1000
+  for (let bas = 0; ; bas += SAYFA) {
+    let q = supabase.from('firm_belgeleri').select('firm_id, code, period').eq('done', true).range(bas, bas + SAYFA - 1)
+    if (firmIds && firmIds.length === 1) q = q.eq('firm_id', firmIds[0])
+    const { data, error } = await q
+    if (error || !data) break
+    for (const r of data as { firm_id: string; code: string; period: string | null }[]) {
+      const set = harita.get(r.firm_id) ?? new Set<string>()
+      set.add(`${r.code}|${r.period ?? ''}`)
+      harita.set(r.firm_id, set)
+    }
+    if (data.length < SAYFA) break
+  }
+  return harita
+}
+
+function firmaIlerlemesi(firma: FirmaBelgeSatiri, tamam: Set<string>) {
+  const bolumler = buildChecklist(firma.activities ?? [], firma.contract_start)
+  let toplam = 0
+  let yapilan = 0
+  const eksikler: { code: string; period: string; belge: string; bolum: string }[] = []
+  for (const sec of bolumler) {
+    for (const it of sec.items) {
+      if (!takipteSayilirMi(it.code)) continue
+      toplam++
+      if (tamam.has(`${it.code}|${it.period}`)) yapilan++
+      else eksikler.push({ code: it.code, period: it.period, belge: codeLabel(it.code, it.period), bolum: codeSection(it.code) })
+    }
+  }
+  return { toplam, yapilan, yuzde: toplam ? Math.round((yapilan / toplam) * 100) : 0, eksikler }
 }
 
 export type MissingDocumentsResult = {
   ok: true
   grounded: true
   firm_id: string
+  firm_name: string
   count: number
-  documents: MissingDocumentItem[]
+  total: number
+  done: number
+  percent: number
+  by_section: Record<string, number>
+  documents: { code: string; period: string; belge: string; bolum: string }[]
 }
 
 export async function getFirmMissingDocuments(
   supabase: SupabaseClient,
   firmId: string
-): Promise<MissingDocumentsResult> {
-  const { data } = await supabase
-    .from('firm_belgeleri')
-    .select('code, period, note')
-    .eq('firm_id', firmId)
-    .eq('done', false)
-    .order('code', { ascending: true })
-
-  const eksikler = (data ?? []) as MissingDocumentItem[]
-
+): Promise<MissingDocumentsResult | { ok: false; error: string }> {
+  const { data: firma } = await supabase
+    .from('firms')
+    .select('id, name, status, activities, contract_start')
+    .eq('id', firmId)
+    .maybeSingle()
+  if (!firma) return { ok: false, error: 'Firma bulunamadı.' }
+  const tamam = (await tamamlananBelgeler(supabase, [firmId])).get(firmId) ?? new Set<string>()
+  const ilerleme = firmaIlerlemesi(firma as FirmaBelgeSatiri, tamam)
+  const bySection: Record<string, number> = {}
+  for (const e of ilerleme.eksikler) bySection[e.bolum] = (bySection[e.bolum] ?? 0) + 1
   return {
     ok: true,
     grounded: true,
     firm_id: firmId,
-    count: eksikler.length,
-    documents: eksikler.slice(0, 30),
+    firm_name: (firma as FirmaBelgeSatiri).name,
+    count: ilerleme.eksikler.length,
+    total: ilerleme.toplam,
+    done: ilerleme.yapilan,
+    percent: ilerleme.yuzde,
+    by_section: bySection,
+    documents: ilerleme.eksikler.slice(0, 40),
   }
 }
 
+// get_firm_progress — tek firmanın ya da (firm_id verilmezse) tüm firmaların
+// Belge Takip ilerleme yüzdesi.
+export async function getFirmProgress(supabase: SupabaseClient, firmId?: string) {
+  if (firmId) {
+    const r = await getFirmMissingDocuments(supabase, firmId)
+    if (!r.ok) return r
+    return { ok: true, grounded: true, firm_id: r.firm_id, firm_name: r.firm_name, percent: r.percent, done: r.done, total: r.total, missing: r.count }
+  }
+  const { data } = await supabase.from('firms').select('id, name, status, activities, contract_start')
+  const firmalar = (data ?? []) as FirmaBelgeSatiri[]
+  const tamam = await tamamlananBelgeler(supabase)
+  const liste = firmalar
+    .filter((f) => f.status !== 'tmfb_kapsamdisi')
+    .map((f) => {
+      const r = firmaIlerlemesi(f, tamam.get(f.id) ?? new Set<string>())
+      return { firm_id: f.id, firm_name: f.name, percent: r.yuzde, missing: r.eksikler.length }
+    })
+    .sort((a, b) => a.percent - b.percent)
+  const ort = liste.length ? Math.round(liste.reduce((t, x) => t + x.percent, 0) / liste.length) : 0
+  return { ok: true, grounded: true, firm_count: liste.length, average_percent: ort, lowest: liste.slice(0, 15) }
+}
+
+// ---------------------------------------------------------------------------
+// list_firms — firma sayısı ve isimleri (duruma göre).
+// ---------------------------------------------------------------------------
+
+const DURUM_TR: Record<string, string> = {
+  active: 'Aktif',
+  passive: 'Pasif',
+  archived: 'Arşiv',
+  tmfb_kapsamdisi: 'TMFB Kapsamdışı',
+}
+
+export async function listFirms(supabase: SupabaseClient, status?: string) {
+  const { data } = await supabase.from('firms').select('id, name, status').order('name')
+  const hepsi = (data ?? []) as { id: string; name: string; status: string }[]
+  const sayim: Record<string, number> = {}
+  for (const f of hepsi) {
+    const k = DURUM_TR[f.status] ?? f.status
+    sayim[k] = (sayim[k] ?? 0) + 1
+  }
+  const filtreli = status && status !== 'all' ? hepsi.filter((f) => f.status === status) : hepsi
+  return {
+    ok: true,
+    grounded: true,
+    total_all: hepsi.length,
+    by_status: sayim,
+    filter: status && status !== 'all' ? (DURUM_TR[status] ?? status) : 'tümü',
+    count: filtreli.length,
+    firms: filtreli.slice(0, 200).map((f) => ({ id: f.id, name: f.name, status: DURUM_TR[f.status] ?? f.status })),
+  }
+}
+
+// ---------------------------------------------------------------------------
+// get_visit_overview — belirli ayda ziyaret edilen / edilmeyen firmalar.
+// Firma Takvimi sayfasıyla aynı kural: tüm firmalar, o ay (visits.visit_date)
+// en az bir ziyareti olmayanlar "ziyaret edilmeyen"dir.
+// ---------------------------------------------------------------------------
+
+function istanbulAyi(): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Istanbul', year: 'numeric', month: '2-digit' })
+    .format(new Date())
+    .slice(0, 7)
+}
+
+export async function getVisitOverview(supabase: SupabaseClient, month?: string) {
+  const ay = month && /^\d{4}-\d{2}$/.test(month) ? month : istanbulAyi()
+  const [y, m] = ay.split('-').map(Number)
+  const sonGun = new Date(y, m, 0).getDate()
+  const bas = `${ay}-01`
+  const son = `${ay}-${String(sonGun).padStart(2, '0')}`
+
+  const [{ data: firmalar }, { data: ziyaretler }] = await Promise.all([
+    supabase.from('firms').select('id, name').order('name'),
+    supabase.from('visits').select('firm_id').gte('visit_date', bas).lte('visit_date', son),
+  ])
+  const ziyaretEdilen = new Set(((ziyaretler ?? []) as { firm_id: string }[]).map((z) => z.firm_id))
+  const hepsi = (firmalar ?? []) as { id: string; name: string }[]
+  const edilmeyen = hepsi.filter((f) => !ziyaretEdilen.has(f.id))
+  return {
+    ok: true,
+    grounded: true,
+    month: ay,
+    total_firms: hepsi.length,
+    visited_count: hepsi.length - edilmeyen.length,
+    unvisited_count: edilmeyen.length,
+    unvisited_firms: edilmeyen.slice(0, 100).map((f) => ({ id: f.id, name: f.name })),
+  }
+}
 
 // ---------------------------------------------------------------------------
 // search_regulation — yüklü GERÇEK mevzuat belgelerinde arama (mevzuat_ara RPC).

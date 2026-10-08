@@ -28,6 +28,9 @@ import {
   searchRegulation,
   getUnInfo,
   checkMixedLoading,
+  getFirmProgress,
+  listFirms,
+  getVisitOverview,
   type TaskScope,
 } from '@/lib/ai/dataTools'
 
@@ -86,6 +89,24 @@ export async function POST(req: NextRequest) {
     }
     const sonuc = await getFirmMissingDocuments(supabase, firmId)
     return NextResponse.json(sonuc)
+  }
+
+  // ---- list_firms: firma sayısı/isimleri (duruma göre) ----------------------
+  if (tool === 'list_firms') {
+    const status = typeof args.status === 'string' ? args.status : undefined
+    return NextResponse.json(await listFirms(supabase, status))
+  }
+
+  // ---- get_visit_overview: ziyaret edilen/edilmeyen firmalar (aylık) ---------
+  if (tool === 'get_visit_overview') {
+    const month = typeof args.month === 'string' ? args.month : undefined
+    return NextResponse.json(await getVisitOverview(supabase, month))
+  }
+
+  // ---- get_firm_progress: Belge Takip ilerleme yüzdesi -----------------------
+  if (tool === 'get_firm_progress') {
+    const firmId = typeof args.firm_id === 'string' && args.firm_id ? args.firm_id : undefined
+    return NextResponse.json(await getFirmProgress(supabase, firmId))
   }
 
   // ---- search_regulation: yüklü mevzuat belgelerinde arama ------------------

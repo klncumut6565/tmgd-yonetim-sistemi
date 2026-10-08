@@ -343,11 +343,13 @@ Eylem bloğu yazıyorsan MUTLAKA üç ters tırnakla KAPAT — kapatmazsan blok 
         }
       } else {
         const sonuc = await getFirmMissingDocuments(supabase, firmId)
-        if (sonuc.count === 0) {
-          finalAnswer += `\n\n📊 GERÇEK SİSTEM SONUCU: ${firmAdi} için eksik/tamamlanmamış belge bulunmuyor.`
+        if (!sonuc.ok) {
+          finalAnswer += `\n\n⚠️ ${sonuc.error}`
+        } else if (sonuc.count === 0) {
+          finalAnswer += `\n\n📊 GERÇEK SİSTEM SONUCU: ${firmAdi} — Belge Takip %${sonuc.percent}, eksik belge bulunmuyor.`
         } else {
-          const satirlar = sonuc.documents.map((d) => `• ${d.code}${d.period ? ` (${d.period})` : ''}`).join('\n')
-          finalAnswer += `\n\n📊 GERÇEK SİSTEM SONUCU: ${firmAdi} — ${sonuc.count} eksik belge:\n${satirlar}`
+          const satirlar = sonuc.documents.map((d) => `• ${d.belge}`).join('\n')
+          finalAnswer += `\n\n📊 GERÇEK SİSTEM SONUCU: ${firmAdi} — Belge Takip %${sonuc.percent} (${sonuc.done}/${sonuc.total}), ${sonuc.count} eksik belge:\n${satirlar}`
         }
       }
       // Bunlar navigasyon eylemi değil, veri sorgusu — widget'ın
