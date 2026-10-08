@@ -302,7 +302,8 @@ export function useRealtimeVoice(options: RealtimeVoiceOptions = {}) {
   }, [guncelle, metrikGuncelle, kaynaklariKapat, saglayiciKur]);
   yenidenBaglanRef.current = yenidenBaglan;
 
-  const connect = useCallback(async () => {
+  /** Bağlantı kurulup mikrofon açıldıysa true, hata olduysa (kaynaklar kapatılmış) false. */
+  const connect = useCallback(async (): Promise<boolean> => {
     // Önceki (hatalı/yarım kalmış) bağlantıdan artık kaynak bırakma.
     await kaynaklariKapat();
     kullaniciMetinRef.current = "";
@@ -361,6 +362,7 @@ export function useRealtimeVoice(options: RealtimeVoiceOptions = {}) {
       micRef.current = mic;
 
       guncelle({ state: "listening" });
+      return true;
     } catch (e) {
       // Bağlantı kurulduktan sonra mikrofon izni reddedilirse vb. durumlarda
       // WebSocket/ses kuyruğu açık kalmasın.
@@ -368,6 +370,7 @@ export function useRealtimeVoice(options: RealtimeVoiceOptions = {}) {
       playbackRef.current = playbackRef.current ?? playback;
       await kaynaklariKapat();
       guncelle({ state: "error", error: e instanceof Error ? e.message : String(e) });
+      return false;
     }
   }, [guncelle, kaynaklariKapat, saglayiciKur]);
 

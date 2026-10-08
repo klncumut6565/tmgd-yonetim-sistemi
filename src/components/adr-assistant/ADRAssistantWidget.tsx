@@ -107,8 +107,8 @@ export default function ADRAssistantWidget() {
     setSesliGorusmeAktif(deger);
   }
 
-  // Canlı Konuşma (BETA) — gerçek zamanlı Gemini Live modu. Yukarıdaki
-  // turn-based "Sesli Görüşme"den TAMAMEN AYRI ve BAĞIMSIZ bir hook
+  // Canlı Konuşma — ANA ses yolu (gerçek zamanlı Gemini Live). Kurulamazsa
+  // turn-based klasik "Sesli Görüşme"ye düşülür (sesliBaslatTikla). Ayrı bir hook
   // (bkz. useRealtimeVoice.ts) — ikisi aynı anda mikrofonu paylaşamaz,
   // bu yüzden biri aktifken diğerinin butonu devre dışı bırakılır.
   const canli = useRealtimeVoice({
@@ -415,6 +415,31 @@ export default function ADRAssistantWidget() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sesHataKodu]);
+
+  /** ANA SES YOLU: Canlı Konuşma (Gemini Live). Bağlantı kurulamazsa
+   *  otomatik olarak klasik sesli görüşmeye (MediaRecorder → STT → LLM → TTS)
+   *  düşülür. */
+  async function sesliBaslatTikla() {
+    if (canliAktif) {
+      canli.disconnect();
+      return;
+    }
+    // MOBİL FIX: yedek akışta TTS kilidi dokunma olayı İÇİNDE açılmalı.
+    if (ttsDesteklenir) ttsKilidiAc();
+    const basarili = await canli.connect();
+    if (basarili) return;
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: crypto.randomUUID(),
+        role: "assistant",
+        content: "⚠️ Canlı bağlantı kurulamadı, klasik sesli komut moduna geçtim.",
+        error: true,
+      },
+    ]);
+    sesliGorusmeyiAyarla(true);
+    dinlemeyeBasla();
+  }
 
   function mikrofonTikla() {
     if (sesliGorusmeAktif) {
@@ -789,10 +814,10 @@ export default function ADRAssistantWidget() {
         {sesliGorusmeAktif && !dinliyor && !kaydediyor && !konusuyor && !cevriliyor && (
           <p className="text-xs text-indigo-500 mb-1">⏳ Bir sonraki cümlen için hazırlanıyor...</p>
         )}
-        {!sesliGorusmeAktif && herhangiSesDestegi && !sending && (
+        {!sesliGorusmeAktif && !canliAktif && herhangiSesDestegi && !sending && (
           <p className="text-xs text-gray-400 mb-1">
-            🎤 Mikrofona bas — konuş, sustuğunda otomatik gönderilir. Cevap sesli gelir;
-            araya girip sözünü kesebilirsin.
+            🎤 Bas ve konuş — canlı, kesintisiz sesli sohbet; asistanın sözünü kesebilirsin.
+            Bağlanamazsa otomatik klasik moda geçer (🎙️ ile elle de başlatabilirsin).
           </p>
         )}
         {!herhangiSesDestegi && (
@@ -811,11 +836,11 @@ export default function ADRAssistantWidget() {
           <p className="text-xs text-amber-600 mb-1">{sesHatasi}</p>
         )}
 
-        {/* Canlı Konuşma (BETA) — durum ve transkript göstergesi */}
+        {/* Canlı Konuşma — durum ve transkript göstergesi */}
         {canliAktif && (
           <div className="mb-1.5 p-2 bg-purple-50 border border-purple-200 rounded-lg">
             <p className="text-xs text-purple-700 font-medium">
-              🔴 Canlı Konuşma (Beta) —{" "}
+              🎤 Canlı Konuşma —{" "}
               {{
                 connecting: "bağlanıyor...",
                 reconnecting: "oturum yenileniyor, konuşmaya devam edebilirsin...",
@@ -884,12 +909,26 @@ export default function ADRAssistantWidget() {
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
           />
+          {/* ANA SESLİ BUTON: Canlı Konuşma (gerçek zamanlı). */}
+          <button
+            type="button"
+            onClick={sesliBaslatTikla}
+            disabled={sesliGorusmeAktif || dinliyor || kaydediyor}
+            title={canliAktif ? "Canlı konuşmayı bitir" : "Sesli konuş (canlı, kesintisiz)"}
+            className={
+              "w-9 h-9 shrink-0 rounded-full flex items-center justify-center transition disabled:opacity-30 " +
+              (canliAktif ? "bg-purple-700 text-white animate-pulse" : "bg-purple-100 hover:bg-purple-200")
+            }
+          >
+            🎤
+          </button>
+          {/* YEDEK: klasik sesli komut (konuş → gönder → sesli cevap). */}
           {herhangiSesDestegi && (
             <button
               type="button"
               onClick={mikrofonTikla}
               disabled={canliAktif}
-              title={sesliGorusmeAktif ? "Görüşmeyi bitir" : "Sesli görüşme başlat"}
+              title={sesliGorusmeAktif ? "Görüşmeyi bitir" : "Klasik sesli komut (yedek mod)"}
               className={
                 "w-9 h-9 shrink-0 rounded-full flex items-center justify-center transition disabled:opacity-30 " +
                 (dinliyor || kaydediyor
@@ -899,25 +938,9 @@ export default function ADRAssistantWidget() {
                     : "bg-gray-100 hover:bg-gray-200")
               }
             >
-              {sesliGorusmeAktif ? "📞" : "🎤"}
+              {sesliGorusmeAktif ? "📞" : "🎙️"}
             </button>
           )}
-          <button
-            type="button"
-            onClick={() => (canliAktif ? canli.disconnect() : canli.connect())}
-            disabled={sesliGorusmeAktif || dinliyor || kaydediyor}
-            title={
-              canliAktif
-                ? "Canlı konuşmayı bitir"
-                : "Canlı Konuşma başlat (BETA — gerçek zamanlı, kesintisiz sesli sohbet)"
-            }
-            className={
-              "w-9 h-9 shrink-0 rounded-full flex items-center justify-center transition disabled:opacity-30 " +
-              (canliAktif ? "bg-purple-700 text-white animate-pulse" : "bg-gray-100 hover:bg-gray-200")
-            }
-          >
-            🔴
-          </button>
           <button
             onClick={() => gonder()}
             disabled={sending || !input.trim()}
