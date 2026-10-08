@@ -21,7 +21,7 @@ import { TOOL_DEFS, NAV_TOOL_NAMES } from '@/lib/ai/toolDefs'
 import { executeDataTool } from '@/lib/ai/toolExec'
 
 export const dynamic = 'force-dynamic'
-export const maxDuration = 30
+export const maxDuration = 60
 
 function extractUnNumbers(text: string): string[] {
   const matches = text.match(/\b\d{4}\b/g) ?? []
@@ -253,7 +253,7 @@ Eylem bloğu yazıyorsan MUTLAKA üç ters tırnakla KAPAT — kapatmazsan blok 
   if (!result.ok) {
     return NextResponse.json(
       {
-        error: 'Hiçbir AI motoru yanıt veremedi.',
+        error: 'Hiçbir AI motoru yanıt veremedi. Yönetim → AI Motor Anahtarları sayfasından kota/kredi durumunu kontrol et.',
         details: result.errors,
       },
       { status: 502 }

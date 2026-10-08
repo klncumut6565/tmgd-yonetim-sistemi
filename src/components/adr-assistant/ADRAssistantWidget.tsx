@@ -19,6 +19,7 @@
 // tam sayfa yenilemesinde (F5) sıfırlanır. Kalıcı geçmiş istenirse ayrı
 // bir migration ile eklenebilir (bkz. session notları).
 
+import { hataTurkce } from "@/lib/voice/hatalar";
 import { searchFirm } from "@/lib/ai/dataTools";
 import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
@@ -565,11 +566,18 @@ export default function ADRAssistantWidget() {
           history: history.slice(0, -1), // son mesaj zaten "question" olarak ayrı gidiyor
         }),
       });
-      const json = await res.json();
+      // Zaman aşımında Vercel JSON yerine HTML döner; güvenle ayrıştır.
+      const hamYanit = await res.text();
+      let json: any;
+      try {
+        json = JSON.parse(hamYanit);
+      } catch {
+        throw new Error("did not match the expected pattern");
+      }
 
       if (!res.ok) {
         const detayMetni = Array.isArray(json.details)
-          ? json.details.map((d: { provider: string; message: string }) => `• ${d.provider}: ${d.message}`).join("\n")
+          ? json.details.map((d: { provider: string; message: string }) => `• ${d.message}`).join("\n")
           : "";
         const hataMetni = (json.error ?? "Bir hata oluştu.") + (detayMetni ? "\n\n" + detayMetni : "");
         setMessages((prev) => [
@@ -615,7 +623,7 @@ export default function ADRAssistantWidget() {
         {
           id: crypto.randomUUID(),
           role: "assistant",
-          content: "Bağlantı hatası: " + (e instanceof Error ? e.message : String(e)),
+          content: "Bağlantı hatası: " + hataTurkce(e),
           error: true,
         },
       ]);

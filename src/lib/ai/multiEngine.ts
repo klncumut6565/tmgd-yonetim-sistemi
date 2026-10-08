@@ -11,6 +11,32 @@
 
 export type ProviderKey = 'grok' | 'gemini' | 'openrouter';
 
+/** Motor hatasını kullanıcıya TÜRKÇE ve anlaşılır gösterir (ham metin teşhis için kısa eklenir). */
+export function motorHatasiTurkce(provider: string, message: string): string {
+  const m = message.toLowerCase()
+  const ad = provider === 'grok' ? 'Grok' : provider === 'gemini' ? 'Gemini' : provider === 'openrouter' ? 'OpenRouter' : provider
+  let ozet: string
+  if (m.includes('429') || m.includes('quota') || m.includes('rate limit') || m.includes('resource_exhausted'))
+    ozet = 'kullanım kotası doldu (ücretsiz limit veya faturalandırma kontrol edilmeli)'
+  else if (m.includes('credits') || m.includes('licenses') || m.includes('402') || m.includes('insufficient'))
+    ozet = 'hesapta kredi yok (kredi satın alınmalı)'
+  else if (m.includes('403') || m.includes('permission'))
+    ozet = 'erişim izni yok (anahtar yetkisi veya kredi kontrol edilmeli)'
+  else if (m.includes('401') || m.includes('api key') || m.includes('unauthorized') || m.includes('invalid'))
+    ozet = 'API anahtarı geçersiz'
+  else if (m.includes('404') || m.includes('not found'))
+    ozet = 'model bulunamadı (model adı kontrol edilmeli)'
+  else if (m.includes('500') || m.includes('502') || m.includes('503') || m.includes('overloaded'))
+    ozet = 'servis geçici olarak yanıt vermiyor'
+  else if (m.includes('boş yanıt') || m.includes('empty'))
+    ozet = 'boş yanıt döndü'
+  else if (m.includes('fetch failed') || m.includes('network') || m.includes('timeout'))
+    ozet = 'bağlantı kurulamadı'
+  else if (/[çğıöşüÇĞİÖŞÜ]/.test(message)) ozet = message.slice(0, 120)
+  else ozet = 'beklenmeyen hata'
+  return `${ad}: ${ozet}`
+}
+
 /**
  * Yanıt uzunluğu sınırı — sağlayıcıya göre.
  *
@@ -262,7 +288,8 @@ export async function callWithFallback(
   const errors: EngineCallResult['errors'] = [];
 
   const sorted = [...configs]
-    .filter((c) => !!c.api_key)
+    // Groq kaydı SES TANIMA (Whisper) içindir, sohbet motoru değildir → atla.
+    .filter((c) => !!c.api_key && typeof CALLERS[c.provider] === 'function')
     .sort((a, b) => a.priority - b.priority);
 
   for (const cfg of sorted) {
@@ -284,7 +311,7 @@ export async function callWithFallback(
     } catch (err) {
       errors.push({
         provider: cfg.provider,
-        message: err instanceof Error ? err.message : String(err),
+        message: motorHatasiTurkce(cfg.provider, err instanceof Error ? err.message : String(err)),
       });
       continue;
     }

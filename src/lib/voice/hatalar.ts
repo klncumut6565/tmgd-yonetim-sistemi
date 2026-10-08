@@ -57,6 +57,9 @@ export function hataTurkce(e: unknown): string {
   }
 
   // --- Ağ / sunucu ---
+  if (kucuk.includes("did not match the expected pattern") || kucuk.includes("unexpected token") || kucuk.includes("is not valid json") || kucuk.includes("unexpected end of json")) {
+    return "Sunucu beklenen yanıtı vermedi (muhtemelen zaman aşımı veya geçici sunucu hatası). Soruyu tekrar dene.";
+  }
   if (kucuk.includes("failed to fetch") || kucuk.includes("networkerror") || kucuk.includes("load failed")) {
     return "Sunucuya ulaşılamadı. İnternet bağlantını kontrol edip tekrar dene.";
   }
