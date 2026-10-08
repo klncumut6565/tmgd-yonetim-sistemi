@@ -13,6 +13,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
 import { hataCevir } from "@/lib/hataCevir";
+import FiyatlandirmaPlanlari from "@/components/FiyatlandirmaPlanlari";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -159,7 +160,16 @@ export default function LoginPage() {
     </>
   );
 
+  // "Ücretsiz Başla": kayıt formunu aç ve sayfanın en üstüne dön.
+  function ucretsizBasla() {
+    setMode("register");
+    setError("");
+    setInfo("");
+    if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
   return (
+    <div>
     <div className="min-h-screen flex items-center justify-center bg-slate-100 p-4">
       <div className="relative w-full max-w-[880px] md:h-[560px] bg-white rounded-2xl shadow-xl overflow-hidden">
         {/* ---- GİRİŞ — masaüstünde sol yarıda sabit ---- */}
@@ -315,6 +325,8 @@ export default function LoginPage() {
           )}
         </div>
       </div>
+    </div>
+    <FiyatlandirmaPlanlari onBasla={ucretsizBasla} />
     </div>
   );
 }
