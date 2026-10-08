@@ -63,6 +63,54 @@ const ACTION_BLOCK_RE = /```eylem\s*([\s\S]*?)```/i;
 // kullanıcıya görünüyordu — o yüzden bunu da yakalıyoruz.
 const ACTION_BLOCK_ACIK_RE = /```eylem\s*([\s\S]*)$/i;
 
+/** `a=1, b="x", c=true` biçimindeki argüman metnini nesneye çevirir (Python tarzı çağrı). */
+function pyArgs(metin: string): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  const t = metin.trim();
+  if (!t) return out;
+  if (t.startsWith("{")) {
+    try { const o = JSON.parse(t); if (o && typeof o === "object") return o as Record<string, unknown>; } catch { /* aşağıda dene */ }
+  }
+  const re = /([A-Za-z_]\w*)\s*[=:]\s*("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|\[[^\]]*\]|[^,]+)/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(t))) {
+    const ham = m[2].trim();
+    let v: unknown = ham;
+    if (/^(true|false)$/i.test(ham)) v = ham.toLowerCase() === "true";
+    else if (/^-?\d+(\.\d+)?$/.test(ham)) v = Number(ham);
+    else if (/^["']/.test(ham)) v = ham.slice(1, -1);
+    else if (ham.startsWith("[")) { try { v = JSON.parse(ham.replace(/'/g, '"')); } catch { v = ham; } }
+    out[m[1]] = v;
+  }
+  return out;
+}
+
+/**
+ * Bazı modeller kendi özel çağrı sözdizimini kullanır:
+ *   <|tool_call_start|>[get_notifications()]<|tool_call_end|>
+ *   [list_tmgd(include_inactive=false), get_dashboard_summary()]
+ * İşaretçileri ve çağrıları bulup standart "tool" eylemine çevirir.
+ */
+function ozelCagriSozdizimi(text: string): { calls: { type: "tool"; name: string; args: Record<string, unknown> }[]; cleaned: string } {
+  const calls: { type: "tool"; name: string; args: Record<string, unknown> }[] = [];
+  const cevir = (govde: string) => {
+    const re = /([A-Za-z_]\w*)\s*\(([^()]*)\)/g;
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(govde))) calls.push({ type: "tool", name: m[1], args: pyArgs(m[2]) });
+  };
+  let cleaned = text.replace(/<\|tool_call_start\|>([\s\S]*?)<\|tool_call_end\|>/g, (_a, g: string) => {
+    cevir(g);
+    return "";
+  });
+  // Kapanışsız başlangıç işaretçisi
+  cleaned = cleaned.replace(/<\|tool_call_start\|>([\s\S]*)$/g, (_a, g: string) => {
+    cevir(g);
+    return "";
+  });
+  cleaned = cleaned.replace(/<\|[a-z_]+\|>/g, "");
+  return { calls, cleaned: cleaned.trim() };
+}
+
 /**
  * Modeller bazen eylem bloğunu ```eylem çiti OLMADAN, çıplak JSON olarak yazar
  * (ve bazen art arda birden fazla): {"type":"tool","name":"…","args":{…}}.
@@ -73,6 +121,9 @@ export function cipakToolJsonlari(text: string): {
   cleaned: string;
 } {
   const calls: Extract<AssistantAction, { type: "tool" | "go_to_page" }>[] = [];
+  const ozel = ozelCagriSozdizimi(text);
+  calls.push(...ozel.calls);
+  text = ozel.cleaned;
   let cleaned = "";
   let i = 0;
   while (i < text.length) {
