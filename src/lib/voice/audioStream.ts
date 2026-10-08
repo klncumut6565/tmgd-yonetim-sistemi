@@ -7,36 +7,102 @@
 // PCM/24kHz/mono. Tarayıcının getUserMedia'sı genelde 44.1/48kHz yakalar,
 // bu yüzden manuel downsampling gerekiyor.
 //
-// NOT: ScriptProcessorNode kullanılıyor (AudioWorkletNode değil) — API
-// deprecated olsa da hâlâ tüm güncel tarayıcılarda çalışıyor ve ayrı bir
-// worklet modül dosyası yüklemeyi gerektirmiyor. Üretimde/ileride
-// AudioWorkletNode'a taşınması önerilir (daha düşük gecikme, ana thread'i
-// bloklamaz).
+// MİKROFON YAKALAMA: AudioWorklet (ses işleme ayrı thread'de, ana thread'i
+// bloklamaz) + durumlu (stateful) resampler + sabit ~20 ms'lik çıkış
+// parçaları (Google Live API önerisi 20-40 ms). AudioWorklet desteklenmezse
+// (eski tarayıcılar) aynı resampler ile ScriptProcessorNode'a düşülür.
+//
+// RESAMPLER: alan-ortalamalı (box filter) — her 16 kHz çıkış örneği, giriş
+// akışındaki ilgili aralığın kesirli ağırlıklı ortalamasıdır. Bu hem
+// anti-aliasing (alçak geçiren) görevi görür hem de 44.1 kHz gibi tam katı
+// olmayan oranlarda çalışır. Durum parçalar arasında korunur, böylece
+// chunk sınırlarında süreksizlik oluşmaz.
 
 const HEDEF_ORNEKLEME = 16000; // Gemini Live giriş gereksinimi
 const CIKIS_ORNEKLEME = 24000; // Gemini Live çıkış formatı
-const CHUNK_BUFFER_BOYUTU = 4096; // ScriptProcessorNode buffer boyutu
+const CIKIS_PARCA_MS = 20; // gönderilen her PCM parçasının süresi
+const CIKIS_PARCA_ORNEK = (HEDEF_ORNEKLEME * CIKIS_PARCA_MS) / 1000; // 320
+const FALLBACK_BUFFER_BOYUTU = 2048; // yalnızca ScriptProcessor yedeği için
 
-function float32ToInt16PCM(input: Float32Array): Int16Array {
-  const out = new Int16Array(input.length);
-  for (let i = 0; i < input.length; i++) {
-    const s = Math.max(-1, Math.min(1, input[i]));
-    out[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
+/** Durumlu alan-ortalamalı resampler + sabit boyutlu Int16 parçalayıcı. */
+class PcmResampler {
+  private oran: number;
+  private acc = 0;
+  private gerekli: number;
+  private cikis = new Int16Array(CIKIS_PARCA_ORNEK);
+  private doluluk = 0;
+
+  constructor(girisOrnekleme: number, private onChunk: (pcm: ArrayBuffer) => void) {
+    this.oran = girisOrnekleme / HEDEF_ORNEKLEME;
+    this.gerekli = this.oran;
   }
-  return out;
+
+  push(input: Float32Array) {
+    for (let i = 0; i < input.length; i++) {
+      const x = input[i];
+      let kalan = 1;
+      while (kalan > 1e-9) {
+        const al = kalan < this.gerekli ? kalan : this.gerekli;
+        this.acc += x * al;
+        this.gerekli -= al;
+        kalan -= al;
+        if (this.gerekli <= 1e-9) {
+          const v = Math.max(-1, Math.min(1, this.acc / this.oran));
+          this.cikis[this.doluluk++] = v < 0 ? v * 0x8000 : v * 0x7fff;
+          this.acc = 0;
+          this.gerekli = this.oran;
+          if (this.doluluk === CIKIS_PARCA_ORNEK) {
+            this.onChunk(this.cikis.slice().buffer as ArrayBuffer);
+            this.doluluk = 0;
+          }
+        }
+      }
+    }
+  }
 }
 
-/** Basit doğrusal downsampling — orijinal örnekleme hızından 16kHz'e indirger. */
-function downsampleTo16k(input: Float32Array, girisOrnekleme: number): Float32Array {
-  if (girisOrnekleme === HEDEF_ORNEKLEME) return input;
-  const oran = girisOrnekleme / HEDEF_ORNEKLEME;
-  const yeniUzunluk = Math.floor(input.length / oran);
-  const sonuc = new Float32Array(yeniUzunluk);
-  for (let i = 0; i < yeniUzunluk; i++) {
-    sonuc[i] = input[Math.floor(i * oran)];
+/** AudioWorklet kaynak kodu (Blob URL ile yüklenir — ayrı dosya gerekmez).
+ *  Yukarıdaki PcmResampler ile AYNI algoritma; thread sınırı yüzünden kopya. */
+const WORKLET_KAYNAK = `
+class MikrofonIsleyici extends AudioWorkletProcessor {
+  constructor() {
+    super();
+    this.oran = sampleRate / ${HEDEF_ORNEKLEME};
+    this.gerekli = this.oran;
+    this.acc = 0;
+    this.cikis = new Int16Array(${CIKIS_PARCA_ORNEK});
+    this.doluluk = 0;
   }
-  return sonuc;
+  process(inputs) {
+    const kanal = inputs[0] && inputs[0][0];
+    if (!kanal) return true;
+    for (let i = 0; i < kanal.length; i++) {
+      const x = kanal[i];
+      let kalan = 1;
+      while (kalan > 1e-9) {
+        const al = kalan < this.gerekli ? kalan : this.gerekli;
+        this.acc += x * al;
+        this.gerekli -= al;
+        kalan -= al;
+        if (this.gerekli <= 1e-9) {
+          let v = this.acc / this.oran;
+          v = v > 1 ? 1 : v < -1 ? -1 : v;
+          this.cikis[this.doluluk++] = v < 0 ? v * 0x8000 : v * 0x7fff;
+          this.acc = 0;
+          this.gerekli = this.oran;
+          if (this.doluluk === ${CIKIS_PARCA_ORNEK}) {
+            const kopya = this.cikis.slice();
+            this.port.postMessage(kopya.buffer, [kopya.buffer]);
+            this.doluluk = 0;
+          }
+        }
+      }
+    }
+    return true;
+  }
 }
+registerProcessor("mikrofon-isleyici", MikrofonIsleyici);
+`;
 
 export type MicCapture = {
   stop: () => void;
@@ -49,35 +115,63 @@ export type MicCapture = {
  */
 export async function startMicCapture(onChunk: (pcm: ArrayBuffer) => void): Promise<MicCapture> {
   const stream = await navigator.mediaDevices.getUserMedia({
-    audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true },
+    audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true },
   });
 
   const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
   const audioContext = new AudioCtx();
+  // Tarayıcı otomatik oynatma politikası askıya almış olabilir.
+  if (audioContext.state === "suspended") await audioContext.resume().catch(() => {});
   const source = audioContext.createMediaStreamSource(stream);
-  // ScriptProcessorNode(bufferSize, girişKanalı, çıkışKanalı)
-  const processor = audioContext.createScriptProcessor(CHUNK_BUFFER_BOYUTU, 1, 1);
-
-  processor.onaudioprocess = (ev) => {
-    const girisVerisi = ev.inputBuffer.getChannelData(0);
-    const downsampled = downsampleTo16k(girisVerisi, audioContext.sampleRate);
-    const pcm16 = float32ToInt16PCM(downsampled);
-    onChunk(pcm16.buffer as ArrayBuffer);
-  };
-
-  source.connect(processor);
-  // ScriptProcessorNode'un çalışması için bir çıkışa bağlı olması gerekir
-  // (Web Audio API kısıtı) — burada sessiz bir gain node kullanılabilirdi,
-  // ama processor.connect(destination) ile hoparlöre gürültü gitmemesi için
-  // ayrıca bir GainNode(0) araya konur.
   const sessizCikis = audioContext.createGain();
   sessizCikis.gain.value = 0;
-  processor.connect(sessizCikis);
   sessizCikis.connect(audioContext.destination);
+
+  let temizle: () => void;
+
+  try {
+    if (typeof AudioWorkletNode !== "undefined" && audioContext.audioWorklet) {
+      const url = URL.createObjectURL(new Blob([WORKLET_KAYNAK], { type: "application/javascript" }));
+      try {
+        await audioContext.audioWorklet.addModule(url);
+      } finally {
+        URL.revokeObjectURL(url);
+      }
+      const node = new AudioWorkletNode(audioContext, "mikrofon-isleyici", {
+        numberOfInputs: 1,
+        numberOfOutputs: 1,
+        channelCount: 1,
+        channelCountMode: "explicit",
+      });
+      node.port.onmessage = (ev: MessageEvent<ArrayBuffer>) => onChunk(ev.data);
+      source.connect(node);
+      node.connect(sessizCikis);
+      temizle = () => {
+        node.port.onmessage = null;
+        node.disconnect();
+      };
+    } else {
+      // Yedek: ScriptProcessorNode (deprecated) + aynı durumlu resampler.
+      const resampler = new PcmResampler(audioContext.sampleRate, onChunk);
+      const processor = audioContext.createScriptProcessor(FALLBACK_BUFFER_BOYUTU, 1, 1);
+      processor.onaudioprocess = (ev) => resampler.push(ev.inputBuffer.getChannelData(0));
+      source.connect(processor);
+      processor.connect(sessizCikis);
+      temizle = () => {
+        processor.onaudioprocess = null;
+        processor.disconnect();
+      };
+    }
+  } catch (e) {
+    // Worklet yüklenemezse mikrofon açık kalmasın.
+    stream.getTracks().forEach((t) => t.stop());
+    audioContext.close();
+    throw e;
+  }
 
   return {
     stop: () => {
-      processor.disconnect();
+      temizle();
       source.disconnect();
       stream.getTracks().forEach((t) => t.stop());
       audioContext.close();
@@ -99,6 +193,9 @@ export class AudioPlaybackQueue {
   constructor() {
     const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
     this.audioContext = new AudioCtx();
+    // Kullanıcı tıklamasıyla (Canlı Konuşma butonu) oluşturulur; yine de
+    // askıdaysa devam ettir.
+    void this.audioContext.resume().catch(() => {});
   }
 
   onSpeaking(handler: (speaking: boolean) => void) {
