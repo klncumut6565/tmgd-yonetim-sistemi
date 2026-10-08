@@ -19,6 +19,7 @@
 // tam sayfa yenilemesinde (F5) sıfırlanır. Kalıcı geçmiş istenirse ayrı
 // bir migration ile eklenebilir (bkz. session notları).
 
+import { searchFirm } from "@/lib/ai/dataTools";
 import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
@@ -502,11 +503,7 @@ export default function ADRAssistantWidget() {
       // "ABC firmasını aç" — firma ID'si gerekiyor. Bunu da yerel çözebiliriz:
       // Supabase'den doğrudan arayarak (LLM'e gitmeye gerek yok).
       if (yerel.action?.type === "open_firm" && !yerel.action.firm_id) {
-        const { data: eslesenler } = await supabase
-          .from("firms")
-          .select("id, name")
-          .ilike("name", `%${yerel.action.firm_name}%`)
-          .limit(6);
+        const { matches: eslesenler } = await searchFirm(supabase, yerel.action.firm_name);
 
         if (eslesenler && eslesenler.length === 1) {
           yerel.action = { ...yerel.action, firm_id: eslesenler[0].id, firm_name: eslesenler[0].name };

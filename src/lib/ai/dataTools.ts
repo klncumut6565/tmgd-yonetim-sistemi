@@ -31,14 +31,65 @@ import { buildChecklist, codeLabel, codeSection } from '@/lib/belgeKatalogu'
 
 export type FirmMatch = { id: string; name: string }
 
+// Türkçe-dayanıklı normalizasyon: büyük/küçük harf, İ/I/ı/i, aksan (ç ş ğ ü ö),
+// noktalama ve ticari ekler ("A.Ş.", "LTD ŞTİ") farkı arama sonucunu etkilemez.
+export function normAd(s: string): string {
+  return s
+    .toLocaleLowerCase('tr')
+    .replace(/ı/g, 'i')
+    .replace(/ç/g, 'c')
+    .replace(/ş/g, 's')
+    .replace(/ğ/g, 'g')
+    .replace(/ü/g, 'u')
+    .replace(/ö/g, 'o')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+const TICARI_EK = new Set(['as', 'a', 's', 'ltd', 'sti', 'san', 'tic', 've', 'sanayi', 'ticaret', 'limited', 'sirketi', 'anonim', 'inc'])
+
+function levenshtein(a: string, b: string): number {
+  const dp = Array.from({ length: a.length + 1 }, (_, i) => [i, ...Array(b.length).fill(0)])
+  for (let j = 0; j <= b.length; j++) dp[0][j] = j
+  for (let i = 1; i <= a.length; i++)
+    for (let j = 1; j <= b.length; j++)
+      dp[i][j] = Math.min(dp[i - 1][j] + 1, dp[i][j - 1] + 1, dp[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1))
+  return dp[a.length][b.length]
+}
+
 export async function searchFirm(
   supabase: SupabaseClient,
   query: string
 ): Promise<{ matches: FirmMatch[] }> {
-  const q = query.trim()
+  const q = normAd(query)
   if (!q) return { matches: [] }
-  const { data } = await supabase.from('firms').select('id, name').ilike('name', `%${q}%`).limit(6)
-  return { matches: (data ?? []) as FirmMatch[] }
+  const { data } = await supabase.from('firms').select('id, name').limit(2000)
+  const firmalar = (data ?? []) as FirmMatch[]
+  const qTok = q.split(' ').filter((t) => t && !TICARI_EK.has(t))
+  const puanli = firmalar
+    .map((f) => {
+      const n = normAd(f.name)
+      const nTok = n.split(' ')
+      let puan = 0
+      if (n === q) puan = 100
+      else if (n.startsWith(q)) puan = 90
+      else if (n.includes(q)) puan = 80
+      else if (qTok.length && qTok.every((t) => nTok.some((x) => x.startsWith(t)))) puan = 70
+      else if (qTok.length) {
+        // Yazım/ses hatası toleransı (sesli giriş): her sorgu kelimesi bir firma kelimesine ≤1-2 harf yakın
+        const ok = qTok.every((t) =>
+          nTok.some((x) => levenshtein(t, x.slice(0, Math.max(t.length, 1))) <= (t.length > 5 ? 2 : 1) || levenshtein(t, x) <= (t.length > 5 ? 2 : 1))
+        )
+        if (ok) puan = 50
+      }
+      return { f, puan }
+    })
+    .filter((x) => x.puan > 0)
+    .sort((a, b) => b.puan - a.puan || a.f.name.length - b.f.name.length)
+  return { matches: puanli.slice(0, 6).map((x) => x.f) }
 }
 
 // ---------------------------------------------------------------------------
