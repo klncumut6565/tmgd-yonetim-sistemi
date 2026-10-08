@@ -14,7 +14,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getSuperAdminFromRequest } from '@/lib/supabase/verifySuperAdmin'
 import { callWithFallback, type ProviderConfig, type ChatMessage } from '@/lib/ai/multiEngine'
-import { extractAction } from '@/lib/ai/actions'
+import { extractAction, tumAracCagrilari, cipakToolJsonlari } from '@/lib/ai/actions'
 import { checkPair, type UnRow, type CheckResult } from '@/lib/adrMix'
 import { searchFirm, getFirmTaskSummary, getFirmMissingDocuments } from '@/lib/ai/dataTools'
 import { TOOL_DEFS, NAV_TOOL_NAMES } from '@/lib/ai/toolDefs'
@@ -232,22 +232,37 @@ Eylem bloğu yazıyorsan MUTLAKA üç ters tırnakla KAPAT — kapatmazsan blok 
   // modele "ARAÇ SONUCU" diye verir ve son cevabı ister. En çok 4 adım.
   const araMesajlar: ChatMessage[] = [...messages]
   for (let adim = 0; adim < 4 && result.ok; adim++) {
-    const { cleanText: onMetin, action: a } = extractAction(result.text as string)
-    if (a?.type !== 'tool') break
+    // Çitli ```eylem``` bloğu VEYA çıplak JSON; birden fazla çağrı da olabilir.
+    const cit = extractAction(result.text as string)
+    const ham = tumAracCagrilari(result.text as string)
+    const cagrilar = ham.calls.filter((c): c is Extract<typeof c, { type: 'tool' }> => c.type === 'tool')
+    if (cit.action?.type === 'tool' && cagrilar.length === 0) cagrilar.push(cit.action)
+    if (cagrilar.length === 0) break
     // Navigasyon araçları sunucuda çalışmaz: uygulamaya eylem olarak döner.
-    if ((NAV_TOOL_NAMES as readonly string[]).includes(a.name)) break
-    const yurutulen = await executeDataTool(supabase, a.name, a.args)
-    let govde = JSON.stringify(yurutulen.body)
-    if (govde.length > 6000) govde = govde.slice(0, 6000) + '…(kısaltıldı)'
+    if (cagrilar.some((c) => (NAV_TOOL_NAMES as readonly string[]).includes(c.name))) break
+    const sonuclar: string[] = []
+    for (const c of cagrilar.slice(0, 3)) {
+      const y = await executeDataTool(supabase, c.name, c.args)
+      let govde = JSON.stringify(y.body)
+      if (govde.length > 6000) govde = govde.slice(0, 6000) + '…(kısaltıldı)'
+      sonuclar.push(`ARAÇ SONUCU (${c.name}): ${govde}`)
+    }
     araMesajlar.push({ role: 'assistant', content: result.text as string })
     araMesajlar.push({
       role: 'user',
       content:
-        `ARAÇ SONUCU (${a.name}): ${govde}\n` +
-        'Bu GERÇEK sonuca göre devam et: başka bir araç gerekiyorsa tek bir eylem bloğu yaz, değilse kullanıcıya Türkçe SON CEVABI yaz (eylem bloğu yazma). Sayıları aynen aktar.' +
-        (onMetin ? '' : ''),
+        sonuclar.join('\n') +
+        '\nBu GERÇEK sonuçlara göre devam et: başka bir araç gerekiyorsa tek bir eylem bloğu yaz, değilse kullanıcıya Türkçe SON CEVABI yaz (JSON/eylem bloğu YAZMA). Sayıları aynen aktar.',
     })
     result = await callWithFallback(configs, systemPrompt, araMesajlar)
+  }
+
+  // Güvenlik ağı: döngü bittiği halde cevapta çıplak araç JSON'u kaldıysa kullanıcıya gösterme.
+  if (result.ok) {
+    const temiz = cipakToolJsonlari(result.text as string)
+    if (temiz.calls.length > 0) {
+      result = { ...result, text: temiz.cleaned || 'Bu isteği şu an tamamlayamadım, lütfen soruyu tekrar sorar mısın?' }
+    }
   }
 
   if (!result.ok) {

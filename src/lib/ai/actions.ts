@@ -63,6 +63,56 @@ const ACTION_BLOCK_RE = /```eylem\s*([\s\S]*?)```/i;
 // kullanıcıya görünüyordu — o yüzden bunu da yakalıyoruz.
 const ACTION_BLOCK_ACIK_RE = /```eylem\s*([\s\S]*)$/i;
 
+/**
+ * Modeller bazen eylem bloğunu ```eylem çiti OLMADAN, çıplak JSON olarak yazar
+ * (ve bazen art arda birden fazla): {"type":"tool","name":"…","args":{…}}.
+ * Bu fonksiyon metindeki dengeli süslü parantezli bu nesneleri bulur.
+ */
+export function cipakToolJsonlari(text: string): {
+  calls: Extract<AssistantAction, { type: "tool" | "go_to_page" }>[];
+  cleaned: string;
+} {
+  const calls: Extract<AssistantAction, { type: "tool" | "go_to_page" }>[] = [];
+  let cleaned = "";
+  let i = 0;
+  while (i < text.length) {
+    const bas = text.indexOf("{", i);
+    if (bas === -1) { cleaned += text.slice(i); break; }
+    cleaned += text.slice(i, bas);
+    let derin = 0, j = bas, str = false, esc = false;
+    for (; j < text.length; j++) {
+      const c = text[j];
+      if (str) { if (esc) esc = false; else if (c === "\\") esc = true; else if (c === '"') str = false; continue; }
+      if (c === '"') str = true;
+      else if (c === "{") derin++;
+      else if (c === "}") { derin--; if (derin === 0) break; }
+    }
+    if (derin !== 0) { cleaned += text.slice(bas); break; }
+    const parca = text.slice(bas, j + 1);
+    let alindi = false;
+    try {
+      const p = JSON.parse(parca);
+      if (p?.type === "tool" && typeof p.name === "string" && p.name.trim()) {
+        const args = p.args && typeof p.args === "object" && !Array.isArray(p.args) ? p.args : {};
+        calls.push({ type: "tool", name: p.name.trim(), args });
+        alindi = true;
+      } else if (p?.type === "go_to_page" && typeof p.page === "string" && p.page in GO_TO_PAGES) {
+        calls.push({ type: "go_to_page", page: p.page });
+        alindi = true;
+      }
+    } catch { /* JSON değil */ }
+    if (!alindi) cleaned += parca;
+    i = j + 1;
+  }
+  return { calls, cleaned: cleaned.replace(/```(?:eylem|json)?\s*```/g, "").trim() };
+}
+
+/** Metindeki TÜM araç çağrılarını (çitli veya çıplak) döndürür. */
+export function tumAracCagrilari(text: string) {
+  const cikti = cipakToolJsonlari(text);
+  return { calls: cikti.calls, cleaned: cikti.cleaned };
+}
+
 export function extractAction(text: string): { cleanText: string; action: AssistantAction | null } {
   let match = text.match(ACTION_BLOCK_RE);
   let kullanilanRegex = ACTION_BLOCK_RE;
@@ -73,7 +123,11 @@ export function extractAction(text: string): { cleanText: string; action: Assist
     kullanilanRegex = ACTION_BLOCK_ACIK_RE;
   }
 
-  if (!match) return { cleanText: text, action: null };
+  if (!match) {
+    const ham = cipakToolJsonlari(text);
+    if (ham.calls.length > 0) return { cleanText: ham.cleaned, action: ham.calls[0] };
+    return { cleanText: text, action: null };
+  }
 
   const cleanText = text.replace(kullanilanRegex, "").trim();
 
