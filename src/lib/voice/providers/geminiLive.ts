@@ -39,7 +39,13 @@ export class GeminiLiveProvider implements RealtimeProvider {
   private interruptedHandler: (() => void) | null = null;
   private turnCompleteHandler: (() => void) | null = null;
   private toolCallHandler: ToolCallHandler | null = null;
+  private goAwayHandler: ((timeLeftMs: number | null) => void) | null = null;
+  private closeHandler: (() => void) | null = null;
   private setupDone = false;
+  /** disconnect() ile bilinçli kapatıldıysa onclose hata/yeniden bağlanma tetiklemez. */
+  private kapatildi = false;
+  /** Sunucunun verdiği en son oturum devam (resumption) tutamacı. */
+  private resumeHandle: string | null = null;
   private setupResolve: (() => void) | null = null;
 
   /** Gerçek araç çalıştırma mantığını dışarıdan (hook'tan) alır — bu sınıf
@@ -48,7 +54,22 @@ export class GeminiLiveProvider implements RealtimeProvider {
     this.toolCallHandler = handler;
   }
 
-  async connect(session: RealtimeSessionResponse): Promise<void> {
+  /** Oturum yeniden bağlanırken kullanılacak en son tutamaç (yoksa null). */
+  getResumeHandle(): string | null {
+    return this.resumeHandle;
+  }
+
+  /** Sunucu "oturum yakında kapanacak" (goAway) dediğinde tetiklenir. */
+  onGoAway(handler: (timeLeftMs: number | null) => void) {
+    this.goAwayHandler = handler;
+  }
+
+  /** Bilinçsiz (beklenmeyen) bağlantı kopmasında tetiklenir; hook yeniden bağlanmayı dener. */
+  onClose(handler: () => void) {
+    this.closeHandler = handler;
+  }
+
+  async connect(session: RealtimeSessionResponse, resumeHandle?: string | null): Promise<void> {
     // API sürümü: Google'ın resmi dokümantasyonu ephemeral token'lar için
     // açıkça "only works for the live API, and ONLY with the v1beta version
     // of the API" diyor — bu yüzden varsayılan v1beta.
@@ -63,6 +84,8 @@ export class GeminiLiveProvider implements RealtimeProvider {
     // WebSocket) için access_token query parametresi kullanılıyor.
     const url = `wss://${WS_HOST}${wsPath}?access_token=${encodeURIComponent(session.token)}`;
 
+    this.kapatildi = false;
+    this.resumeHandle = resumeHandle ?? null;
     await new Promise<void>((resolve, reject) => {
       const ws = new WebSocket(url);
       ws.binaryType = "arraybuffer";
@@ -76,14 +99,21 @@ export class GeminiLiveProvider implements RealtimeProvider {
           JSON.stringify({
             setup: {
               model: GEMINI_LIVE_MODEL,
-              responseModalities: ["AUDIO"],
+              // Şema (Google Live API referansı): responseModalities
+              // generationConfig İÇİNDE; transcription alanları setup'ın
+              // ÜST seviyesinde.
+              generationConfig: { responseModalities: ["AUDIO"] },
               systemInstruction: { parts: [{ text: GEMINI_LIVE_SYSTEM_INSTRUCTION }] },
-              generationConfig: {
-                // Kullanıcıya hem sesli hem yazılı transcript gösterebilmek için.
-                inputAudioTranscription: {},
-                outputAudioTranscription: {},
-              },
+              inputAudioTranscription: {},
+              outputAudioTranscription: {},
               tools: [{ functionDeclarations: GEMINI_FUNCTION_DECLARATIONS }],
+              // Oturum devamı: sunucu sessionResumptionUpdate ile tutamaç
+              // yollar; bağlantı kopunca/goAway'de bununla kaldığı yerden
+              // devam edilir.
+              sessionResumption: resumeHandle ? { handle: resumeHandle } : {},
+              // Uzun konuşmalarda bağlam penceresini otomatik kaydır
+              // (ses token'ları hızlı birikir).
+              contextWindowCompression: { slidingWindow: {} },
             },
           })
         );
@@ -94,8 +124,13 @@ export class GeminiLiveProvider implements RealtimeProvider {
       };
 
       ws.onclose = (ev) => {
-        if (!this.setupDone) reject(new Error(`Bağlantı kapandı (${ev.code}).`));
-        this.errorHandler?.(`Bağlantı kapandı${ev.reason ? `: ${ev.reason}` : "."}`);
+        if (!this.setupDone) {
+          reject(new Error(`Bağlantı kapandı (${ev.code})${ev.reason ? `: ${ev.reason}` : "."}`));
+          return;
+        }
+        if (this.kapatildi) return; // kullanıcı kapattı — hata değil
+        if (this.closeHandler) this.closeHandler();
+        else this.errorHandler?.(`Bağlantı kapandı${ev.reason ? `: ${ev.reason}` : "."}`);
       };
 
       ws.onmessage = (ev) => this.handleMessage(ev);
@@ -152,8 +187,15 @@ export class GeminiLiveProvider implements RealtimeProvider {
     const outT = (sc.outputTranscription ?? (msg.outputTranscription as { text?: string } | undefined))?.text ?? "";
     if (outT) this.transcriptHandler?.({ type: "partial", speaker: "assistant", text: outT });
 
+    if (msg.sessionResumptionUpdate) {
+      const u = msg.sessionResumptionUpdate as { newHandle?: string; resumable?: boolean };
+      if (u.resumable && u.newHandle) this.resumeHandle = u.newHandle;
+    }
+
     if (msg.goAway) {
-      this.errorHandler?.("Oturum süresi doluyor, yeniden bağlanılması gerekecek.");
+      const t = (msg.goAway as { timeLeft?: string }).timeLeft;
+      const ms = t ? Math.round(parseFloat(t) * 1000) : NaN; // "50s" biçimi
+      this.goAwayHandler?.(Number.isFinite(ms) ? ms : null);
     }
   }
 
@@ -254,6 +296,7 @@ export class GeminiLiveProvider implements RealtimeProvider {
   }
 
   async disconnect(): Promise<void> {
+    this.kapatildi = true;
     this.ws?.close();
     this.ws = null;
     this.setupDone = false;

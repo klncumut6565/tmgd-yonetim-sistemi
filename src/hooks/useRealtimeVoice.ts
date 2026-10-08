@@ -48,6 +48,8 @@ export function useRealtimeVoice() {
   const micRef = useRef<MicCapture | null>(null);
   const playbackRef = useRef<AudioPlaybackQueue | null>(null);
   const mutedRef = useRef(false);
+  const yenidenBaglaniyorRef = useRef(false);
+  const yenidenBaglanRef = useRef<(() => Promise<void>) | null>(null);
   // Gemini transkripti parça parça gönderir; konuşmacı başına biriktirilir.
   const kullaniciMetinRef = useRef("");
   const asistanMetinRef = useRef("");
@@ -100,30 +102,10 @@ export function useRealtimeVoice() {
     }
   }, []);
 
-  const connect = useCallback(async () => {
-    // Önceki (hatalı/yarım kalmış) bağlantıdan artık kaynak bırakma.
-    await kaynaklariKapat();
-    kullaniciMetinRef.current = "";
-    asistanMetinRef.current = "";
-    guncelle({
-      state: "connecting",
-      error: undefined,
-      transcript: "",
-      partialTranscript: "",
-      assistantTranscript: "",
-    });
-    const provider = new GeminiLiveProvider();
-    const playback = new AudioPlaybackQueue();
-    try {
-      const res = await authFetch("/api/assistant/realtime/session", { method: "POST" });
-      const sessionData = (await res.json()) as RealtimeSessionResponse & { error?: string; details?: string };
-      if (!res.ok || !sessionData.token) {
-        const mesaj = [sessionData.error, sessionData.details].filter(Boolean).join(" — ");
-        throw new Error(mesaj || "Oturum başlatılamadı.");
-      }
-
-      playback.onSpeaking((speaking) => guncelle({ isSpeaking: speaking, state: speaking ? "speaking" : "listening" }));
-
+  /** Yeni bir provider'ı kurar: tüm olay dinleyicilerini bağlar. Hem ilk
+   *  bağlantıda hem yeniden bağlanmada aynı şekilde kullanılır. */
+  const saglayiciKur = useCallback(
+    (provider: GeminiLiveProvider, playback: AudioPlaybackQueue) => {
       provider.onTranscript((event) => {
         if (event.type === "error") return;
         if (event.speaker === "user") {
@@ -163,13 +145,83 @@ export function useRealtimeVoice() {
       });
       provider.onError((message) => guncelle({ state: "error", error: message }));
       provider.onToolCall(araciCalistir);
+      // Oturum süresi doluyor → tutamaç varsa HEMEN kesintisiz yeniden bağlan.
+      provider.onGoAway(() => {
+        if (provider.getResumeHandle()) void yenidenBaglanRef.current?.();
+      });
+      // Beklenmeyen kopma → (varsa tutamaçla) yeniden bağlan.
+      provider.onClose(() => void yenidenBaglanRef.current?.());
+    },
+    [araciCalistir, guncelle]
+  );
+
+  /** Mikrofon kesilmeden yeni bir WebSocket oturumu açar; tutamaç varsa
+   *  konuşma kaldığı yerden devam eder. Üst üste en çok 3 deneme. */
+  const yenidenBaglan = useCallback(async () => {
+    if (yenidenBaglaniyorRef.current || !providerRef.current) return;
+    yenidenBaglaniyorRef.current = true;
+    const eski = providerRef.current;
+    const tutamac = eski.getResumeHandle();
+    try {
+      for (let deneme = 1; deneme <= 3; deneme++) {
+        try {
+          const res = await authFetch("/api/assistant/realtime/session", { method: "POST" });
+          const sessionData = (await res.json()) as RealtimeSessionResponse & { error?: string };
+          if (!res.ok || !sessionData.token) throw new Error(sessionData.error || "Oturum yenilenemedi.");
+          const yeni = new GeminiLiveProvider();
+          const playback = playbackRef.current;
+          if (!playback) return; // kullanıcı bu sırada kapattı
+          saglayiciKur(yeni, playback);
+          await yeni.connect(sessionData, tutamac);
+          providerRef.current = yeni; // mikrofon artık buna yazar
+          await eski.disconnect().catch(() => {});
+          guncelle({ state: "listening", error: undefined });
+          return;
+        } catch {
+          if (!providerRef.current) return; // kullanıcı kapattı
+          await new Promise((r) => setTimeout(r, 500 * deneme));
+        }
+      }
+      await kaynaklariKapat();
+      guncelle({ state: "error", error: "Canlı bağlantı koptu ve yeniden kurulamadı. Tekrar başlatın." });
+    } finally {
+      yenidenBaglaniyorRef.current = false;
+    }
+  }, [guncelle, kaynaklariKapat, saglayiciKur]);
+  yenidenBaglanRef.current = yenidenBaglan;
+
+  const connect = useCallback(async () => {
+    // Önceki (hatalı/yarım kalmış) bağlantıdan artık kaynak bırakma.
+    await kaynaklariKapat();
+    kullaniciMetinRef.current = "";
+    asistanMetinRef.current = "";
+    guncelle({
+      state: "connecting",
+      error: undefined,
+      transcript: "",
+      partialTranscript: "",
+      assistantTranscript: "",
+    });
+    const provider = new GeminiLiveProvider();
+    const playback = new AudioPlaybackQueue();
+    try {
+      const res = await authFetch("/api/assistant/realtime/session", { method: "POST" });
+      const sessionData = (await res.json()) as RealtimeSessionResponse & { error?: string; details?: string };
+      if (!res.ok || !sessionData.token) {
+        const mesaj = [sessionData.error, sessionData.details].filter(Boolean).join(" — ");
+        throw new Error(mesaj || "Oturum başlatılamadı.");
+      }
+
+      playback.onSpeaking((speaking) => guncelle({ isSpeaking: speaking, state: speaking ? "speaking" : "listening" }));
+      saglayiciKur(provider, playback);
 
       await provider.connect(sessionData);
       providerRef.current = provider;
       playbackRef.current = playback;
 
+      // Mikrofon her zaman GÜNCEL provider'a yazar (yeniden bağlanmada değişir).
       const mic = await startMicCapture((pcm) => {
-        if (!mutedRef.current) provider.sendAudio(pcm);
+        if (!mutedRef.current) providerRef.current?.sendAudio(pcm);
       });
       micRef.current = mic;
 
@@ -182,7 +234,7 @@ export function useRealtimeVoice() {
       await kaynaklariKapat();
       guncelle({ state: "error", error: e instanceof Error ? e.message : String(e) });
     }
-  }, [araciCalistir, guncelle, kaynaklariKapat]);
+  }, [guncelle, kaynaklariKapat, saglayiciKur]);
 
   const disconnect = useCallback(async () => {
     await kaynaklariKapat();

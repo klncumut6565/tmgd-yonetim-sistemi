@@ -89,7 +89,13 @@ export interface RealtimeSessionResponse {
 }
 
 export interface RealtimeProvider {
-  connect(session: RealtimeSessionResponse): Promise<void>;
+  connect(session: RealtimeSessionResponse, resumeHandle?: string | null): Promise<void>;
+  /** Oturum devam tutamacı (yoksa null) — yeniden bağlanmada kullanılır. */
+  getResumeHandle(): string | null;
+  /** Sunucu oturumun yakında kapanacağını bildirdiğinde (goAway). */
+  onGoAway(handler: (timeLeftMs: number | null) => void): void;
+  /** Bilinçsiz bağlantı kopması. */
+  onClose(handler: () => void): void;
   disconnect(): Promise<void>;
   sendAudio(chunk: ArrayBuffer): void;
   interrupt(): void;
