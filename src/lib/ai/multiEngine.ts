@@ -29,7 +29,9 @@ export function motorHatasiTurkce(provider: string, message: string): string {
   else if (m.includes('500') || m.includes('502') || m.includes('503') || m.includes('overloaded'))
     ozet = 'servis geçici olarak yanıt vermiyor'
   else if (m.includes('boş yanıt') || m.includes('empty'))
-    ozet = 'boş yanıt döndü'
+    ozet = m.includes('length')
+      ? 'model cevabı yazamadan token sınırına takıldı (akıl yürüten ücretsiz model); farklı bir model seç'
+      : 'boş yanıt döndü (ücretsiz model yoğun veya içerik üretmedi; farklı bir model dene)'
   else if (m.includes('fetch failed') || m.includes('network') || m.includes('timeout'))
     ozet = 'bağlantı kurulamadı'
   else if (/[çğıöşüÇĞİÖŞÜ]/.test(message)) ozet = message.slice(0, 120)
@@ -49,7 +51,7 @@ export function motorHatasiTurkce(provider: string, message: string): string {
 const MAX_TOKENS: Record<ProviderKey, number> = {
   grok: 1200,
   gemini: 1200,
-  openrouter: 600,
+  openrouter: 1500, // ücretsiz akıl yürüten modeller token'ın çoğunu düşünmeye harcar; 600 boş yanıta yol açıyordu
 };
 
 export type ProviderConfig = {
@@ -136,6 +138,7 @@ async function callOpenRouter(apiKey: string, model: string, systemPrompt: strin
       model,
       messages: [{ role: 'system', content: systemPrompt }, ...messages],
       max_tokens: MAX_TOKENS.openrouter,
+      reasoning: { effort: 'low' }, // akıl yürütme tokenlarını azalt (desteklemeyen modeller yok sayar)
     }),
   });
 
@@ -146,7 +149,10 @@ async function callOpenRouter(apiKey: string, model: string, systemPrompt: strin
 
   const json = await res.json();
   const text = json?.choices?.[0]?.message?.content;
-  if (!text) throw new Error('OpenRouter: boş yanıt');
+  if (!text) {
+    const bitis = json?.choices?.[0]?.finish_reason
+    throw new Error(`OpenRouter: boş yanıt (${bitis ?? json?.error?.message ?? 'bilinmiyor'})`)
+  }
   return text;
 }
 
