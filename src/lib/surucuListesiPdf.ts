@@ -284,13 +284,8 @@ function kapakSayfasiCiz(doc: JsPDFType, veri: SurucuListesiPdfVerisi) {
   // karekodun hemen üstüne sabitlenir.
   const qrBoyutKapak = 22;
   const qrYKapak = H - qrBoyutKapak - 12;
-  imzaBlokuCiz(doc, veri, H - 38 - 6 - IMZA_BLOK_YUKSEKLIK, IMZA_BLOK_YUKSEKLIK);
+  imzaBlokuCiz(doc, veri, qrYKapak - 3 - IMZA_BLOK_YUKSEKLIK, IMZA_BLOK_YUKSEKLIK);
 
-  doc.setFontSize(9.5);
-  doc.setFont(FONT, "normal");
-  doc.setTextColor(90, 90, 90);
-  doc.text("Doküman No: TMGDK-L3", W / 2, H - 34 - 0, { align: "center" });
-  doc.text(`Düzenleme Tarihi: ${veri.bugun}`, W / 2, H - 28, { align: "center" });
 
   // Sağ alt köşe: SİAM TMGDK kurumsal logosu + karekod — diğer TÜM
   // belgelerin kapağıyla (Görevli Listesi, Belge Oluştur) AYNI yerleşim.
