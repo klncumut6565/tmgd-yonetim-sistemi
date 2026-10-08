@@ -132,7 +132,11 @@ export class GeminiLiveProvider implements RealtimeProvider {
               // Şema (Google Live API referansı): responseModalities
               // generationConfig İÇİNDE; transcription alanları setup'ın
               // ÜST seviyesinde.
-              generationConfig: { responseModalities: ["AUDIO"] },
+              generationConfig: {
+                responseModalities: ["AUDIO"],
+                // Konuşma dili HER ZAMAN Türkçe (otomatik dil algılama yok).
+                speechConfig: { languageCode: "tr-TR" },
+              },
               systemInstruction: { parts: [{ text: systemInstruction || GEMINI_LIVE_SYSTEM_INSTRUCTION }] },
               inputAudioTranscription: {},
               outputAudioTranscription: {},
