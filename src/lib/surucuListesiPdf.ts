@@ -13,6 +13,7 @@
 import type { jsPDF as JsPDFType } from "jspdf";
 import { LIBERATION_SANS_REGULAR_B64, LIBERATION_SANS_BOLD_B64 } from "./pdfFonts";
 import { SIAM_LOGO_B64, SIAM_LOGO_EN_BOY, SIAM_QR_B64 } from "./kapakVarliklari";
+import { hazirlayanKasesi, kontrolEdenKasesi, type GomuluKase } from "./kaseler";
 
 const FONT = "LiberationSans";
 const RENK_VURGU: [number, number, number] = [30, 64, 175];
@@ -59,6 +60,10 @@ export type SurucuListesiPdfVerisi = {
   satirlar: SurucuListesiPdfSatiri[];
   logo?: LogoData;
   ekler?: SurucuBelgeEki[];
+  /** true ise imza tablolarına gömülü kaşeler basılır (bkz. lib/kaseler.ts). */
+  kaseEkle?: boolean;
+  /** true ise HAZIRLAYAN kaşesinin ıslak imzalı sürümü kullanılır (varsa). */
+  imzaliKase?: boolean;
 };
 
 function fontuKaydet(doc: JsPDFType) {
@@ -274,23 +279,17 @@ function kapakSayfasiCiz(doc: JsPDFType, veri: SurucuListesiPdfVerisi) {
   doc.setTextColor(0, 0, 0);
   doc.text(veri.firmaAdi, W / 2, kutuAlti + 25, { align: "center", maxWidth: W - 2 * M });
 
-  // Hazırlayan (TMGD) / Sorumlu Kişi — Görevli Listesi kapak sayfasıyla
-  // (gorevliListesiPdf.ts) AYNI iki sütunlu imza alanı. "Sorumlu Kişi",
-  // onaylayanAdi (firms.approver_name / tesis sorumlusu) ile doldurulur.
-  const imzaY = kutuAlti + 65;
-  doc.setFontSize(9.5);
-  doc.setFont(FONT, "bold");
-  doc.setTextColor(0, 0, 0);
-  doc.text("Hazırlayan (TMGD)", W / 2 - 42, imzaY, { align: "center" });
-  doc.text("Sorumlu Kişi", W / 2 + 42, imzaY, { align: "center" });
-  doc.setFont(FONT, "normal");
-  doc.text(veri.hazirlayanAdi || "", W / 2 - 42, imzaY + 6, { align: "center" });
-  doc.text(veri.onaylayanAdi || "", W / 2 + 42, imzaY + 6, { align: "center" });
+  // HAZIRLAYAN / KONTROL EDEN / ONAYLAYAN çerçeveli imza tablosu (+ isteğe bağlı
+  // kaşe/imza) — Belge Oluştur ve Görevli Listesi kapağıyla AYNI desen ve konum:
+  // karekodun hemen üstüne sabitlenir.
+  const qrBoyutKapak = 22;
+  const qrYKapak = H - qrBoyutKapak - 12;
+  imzaBlokuCiz(doc, veri, H - 38 - 6 - IMZA_BLOK_YUKSEKLIK, IMZA_BLOK_YUKSEKLIK);
 
   doc.setFontSize(9.5);
   doc.setFont(FONT, "normal");
   doc.setTextColor(90, 90, 90);
-  doc.text("Doküman No: TMGDK-L3", W / 2, H - 34, { align: "center" });
+  doc.text("Doküman No: TMGDK-L3", W / 2, H - 34 - 0, { align: "center" });
   doc.text(`Düzenleme Tarihi: ${veri.bugun}`, W / 2, H - 28, { align: "center" });
 
   // Sağ alt köşe: SİAM TMGDK kurumsal logosu + karekod — diğer TÜM
@@ -390,13 +389,16 @@ function baslikKutusuCiz(doc: JsPDFType, veri: SurucuListesiPdfVerisi, sayfaNo =
   });
 }
 
+// Belge Oluştur / Görevli Listesi ile AYNI yükseklik (kaşe kırpılmadan sığsın).
+const IMZA_BLOK_YUKSEKLIK = 40;
+const IMZA_BLOK_YUKSEKLIK_ICERIK = IMZA_BLOK_YUKSEKLIK - 5;
+
 /**
- * Tablodan sonraki HAZIRLAYAN / KONTROL EDEN / ONAYLAYAN üç sütunlu imza
- * bloğu — BelgeOlusturForm.tsx'teki (belgeAltTablosuCiz) AYNI sabit desen:
- * "KONTROL EDEN" her zaman ve her firma için sabit TMGD Koordinatörü'dür.
+ * HAZIRLAYAN / KONTROL EDEN / ONAYLAYAN üç sütunlu, ÇERÇEVELİ imza tablosu —
+ * gorevliListesiPdf.ts → imzaBlokuCiz() ile AYNI görünüm ve kaşe hesabı.
+ * "KONTROL EDEN" her zaman sabit TMGD Koordinatörü'dür.
  */
-function imzaBlokuCiz(doc: JsPDFType, veri: SurucuListesiPdfVerisi, y: number) {
-  const yukseklik = 18;
+function imzaBlokuCiz(doc: JsPDFType, veri: SurucuListesiPdfVerisi, y: number, yukseklik: number) {
   const kolonGenislik = (W - 2 * M) / 3;
 
   const isimler = [veri.hazirlayanAdi.trim(), "YAKUP ATAŞ", veri.onaylayanAdi.trim()];
@@ -407,6 +409,45 @@ function imzaBlokuCiz(doc: JsPDFType, veri: SurucuListesiPdfVerisi, y: number) {
     "Sorumlu Kişi",
   ];
   const isimliUnvanlar = [altBasliklar[0], altBasliklar[1], "Tesis Sorumlusu"];
+
+  doc.setDrawColor(0, 0, 0);
+  doc.setLineWidth(0.3);
+  doc.rect(M, y, W - 2 * M, yukseklik);
+  doc.line(M + kolonGenislik, y, M + kolonGenislik, y + yukseklik);
+  doc.line(M + kolonGenislik * 2, y, M + kolonGenislik * 2, y + yukseklik);
+
+  const kaseCiz = (kase: GomuluKase | undefined, kolonIndex: number) => {
+    if (!kase) return;
+    const yaziAlti = 14.5;
+    const kenarPay = 2;
+    const kucultme = 0.88;
+    const gercekOlcu = !!kase.hedefGenislikMm;
+
+    const kullanilabilirG = (kolonGenislik - kenarPay * 2) * (gercekOlcu ? 1 : kucultme);
+    const kullanilabilirY = (yukseklik - yaziAlti - kenarPay) * (gercekOlcu ? 1 : kucultme);
+    if (kullanilabilirY <= 3) return;
+
+    let kaseG = kase.hedefGenislikMm ? Math.min(kase.hedefGenislikMm, kullanilabilirG) : kullanilabilirG;
+    let kaseY = kaseG / (kase.enBoyOrani || 1);
+    if (kaseY > kullanilabilirY) {
+      kaseY = kullanilabilirY;
+      kaseG = kaseY * (kase.enBoyOrani || 1);
+    }
+    const kolonSol = M + kolonGenislik * kolonIndex;
+    const kaseX = kolonSol + (kolonGenislik - kaseG) / 2;
+    const bosluk = yukseklik - yaziAlti - kenarPay;
+    const kaseYPos = y + yaziAlti + (bosluk - kaseY) / 2;
+    try {
+      doc.addImage(kase.data, kase.fmt, kaseX, kaseYPos, kaseG, kaseY, undefined, "FAST");
+    } catch {
+      /* görsel eklenemezse tablo yine basılsın */
+    }
+  };
+
+  if (veri.kaseEkle) {
+    kaseCiz(hazirlayanKasesi(veri.hazirlayanAdi || "", veri.imzaliKase), 0);
+    kaseCiz(kontrolEdenKasesi(veri.imzaliKase), 1);
+  }
 
   basliklar.forEach((b, i) => {
     const x = M + kolonGenislik * i + kolonGenislik / 2;
@@ -420,14 +461,14 @@ function imzaBlokuCiz(doc: JsPDFType, veri: SurucuListesiPdfVerisi, y: number) {
     if (isim) {
       doc.setFontSize(7.5);
       doc.setFont(FONT, "bold");
-      doc.text(isim.toLocaleUpperCase("tr-TR"), x, y + 10.5, { align: "center", maxWidth: kolonGenislik - 4 });
+      doc.text(isim.toLocaleUpperCase("tr-TR"), x, y + 9.3, { align: "center", maxWidth: kolonGenislik - 4 });
       doc.setFontSize(6);
       doc.setFont(FONT, "normal");
-      doc.text(isimliUnvanlar[i], x, y + 14.3, { align: "center", maxWidth: kolonGenislik - 4 });
+      doc.text(isimliUnvanlar[i], x, y + 12.3, { align: "center", maxWidth: kolonGenislik - 4 });
     } else {
       doc.setFontSize(6.5);
       doc.setFont(FONT, "normal");
-      doc.text(altBasliklar[i], x, y + 10.5, { align: "center", maxWidth: kolonGenislik - 4 });
+      doc.text(altBasliklar[i], x, y + 9.3, { align: "center", maxWidth: kolonGenislik - 4 });
     }
   });
 }
@@ -497,9 +538,17 @@ export async function surucuListesiPdfOlustur(veri: SurucuListesiPdfVerisi): Pro
     },
   });
 
-  const sonY = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 8;
-  const imzaY = sonY > H - 24 ? H - 22 : sonY;
-  imzaBlokuCiz(doc, veri, imzaY);
+  const sonY = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 6;
+  const blokYuk = IMZA_BLOK_YUKSEKLIK_ICERIK;
+  let imzaY = sonY;
+  if (imzaY + blokYuk > H - 8) {
+    // Tablonun altında yeterli yer yoksa imza bloğu yeni (yatay) sayfaya geçer.
+    doc.addPage("a4", "landscape");
+    fontuKaydet(doc);
+    baslikKutusuCiz(doc, veri, doc.getNumberOfPages());
+    imzaY = 38;
+  }
+  imzaBlokuCiz(doc, veri, imzaY, blokYuk);
 
   // SRC5/Ehliyet ekleri — tabloya ait sayfalardan SONRA, sürücü sırasına göre.
   for (const ek of veri.ekler ?? []) {

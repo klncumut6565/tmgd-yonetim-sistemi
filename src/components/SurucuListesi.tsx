@@ -137,6 +137,8 @@ export default function SurucuListesi({
   const [error, setError] = useState("");
   const [mesaj, setMesaj] = useState("");
   const [busy, setBusy] = useState(false);
+  const [kaseEkle, setKaseEkle] = useState(false);
+  const [imzaliKase, setImzaliKase] = useState(false);
   const { canWrite } = useUser();
 
   const [hazirlayanAdi, setHazirlayanAdi] = useState("");
@@ -579,6 +581,8 @@ export default function SurucuListesi({
         satirlar: satirlariHazirla(),
         logo,
         ekler,
+        kaseEkle,
+        imzaliKase,
       });
       if (pencere.closed) return;
 
@@ -610,6 +614,8 @@ export default function SurucuListesi({
         satirlar: satirlariHazirla(),
         logo,
         ekler,
+        kaseEkle,
+        imzaliKase,
       });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -671,6 +677,41 @@ export default function SurucuListesi({
           </button>
         </div>
       </div>
+
+      {/* KAŞE / İMZA — PDF'teki imza tablolarına gömülü kaşeleri basar
+          (Görevli Listesi / Belge Oluştur ile aynı kutular). */}
+      <label className="mb-2 flex items-start gap-2 text-sm border rounded-lg p-3 cursor-pointer hover:bg-gray-50">
+        <input
+          type="checkbox"
+          checked={kaseEkle}
+          onChange={(e) => setKaseEkle(e.target.checked)}
+          className="w-4 h-4 mt-0.5"
+        />
+        <span>
+          <span className="text-gray-700 font-medium">Kaşe ve imzaları PDF&apos;e ekle</span>
+          <span className="block text-xs text-gray-500 mt-0.5">
+            İşaretlenirse kapak ve tablo sayfasındaki HAZIRLAYAN ve KONTROL EDEN kutularına,
+            isim ve unvanın altındaki imza boşluğuna kaşeler basılır.
+          </span>
+        </span>
+      </label>
+      {kaseEkle && (
+        <label className="mb-3 ml-6 flex items-start gap-2 text-sm cursor-pointer">
+          <input
+            type="checkbox"
+            checked={imzaliKase}
+            onChange={(e) => setImzaliKase(e.target.checked)}
+            className="w-4 h-4 mt-0.5"
+          />
+          <span>
+            <span className="text-gray-700">İmzalı kaşeyi kullan</span>
+            <span className="block text-xs text-amber-700 mt-0.5">
+              Kaşeyle birlikte ıslak imza görüntüsü de basılır — yalnızca imzalı sürümü kayıtlı olan
+              TMGD&apos;ler için geçerlidir.
+            </span>
+          </span>
+        </label>
+      )}
 
       {error && (
         <div className="mb-3 p-2 rounded-lg bg-red-50 text-red-700 text-sm">{error}</div>
