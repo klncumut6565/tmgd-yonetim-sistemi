@@ -302,23 +302,36 @@ const DURUM_TR: Record<string, string> = {
   tmfb_kapsamdisi: 'TMFB Kapsamdışı',
 }
 
+const DURUM_ESLE: Record<string, string> = {
+  aktif: 'active', active: 'active',
+  pasif: 'passive', passive: 'passive',
+  arsiv: 'archived', 'arşiv': 'archived', archived: 'archived',
+  tmfb_kapsamdisi: 'tmfb_kapsamdisi', kapsamdisi: 'tmfb_kapsamdisi', 'kapsamdışı': 'tmfb_kapsamdisi',
+  all: 'all', hepsi: 'all', tumu: 'all', 'tümü': 'all',
+}
+
 export async function listFirms(supabase: SupabaseClient, status?: string) {
   const { data } = await supabase.from('firms').select('id, name, status').order('name')
   const hepsi = (data ?? []) as { id: string; name: string; status: string }[]
   const sayim: Record<string, number> = {}
+  const isimler: Record<string, string[]> = {}
   for (const f of hepsi) {
     const k = DURUM_TR[f.status] ?? f.status
     sayim[k] = (sayim[k] ?? 0) + 1
+    ;(isimler[k] ??= []).push(f.name)
   }
-  const filtreli = status && status !== 'all' ? hepsi.filter((f) => f.status === status) : hepsi
+  const st = status ? (DURUM_ESLE[status.toLocaleLowerCase('tr').trim()] ?? status) : 'all'
+  const filtreli = st !== 'all' ? hepsi.filter((f) => f.status === st) : hepsi
   return {
     ok: true,
     grounded: true,
     total_all: hepsi.length,
     by_status: sayim,
-    filter: status && status !== 'all' ? (DURUM_TR[status] ?? status) : 'tümü',
+    // Her durumun FİRMA İSİMLERİ — "hangi firma pasif/aktif" sorusu buradan cevaplanır.
+    names_by_status: isimler,
+    filter: st !== 'all' ? (DURUM_TR[st] ?? st) : 'tümü',
     count: filtreli.length,
-    firms: filtreli.slice(0, 200).map((f) => ({ id: f.id, name: f.name, status: DURUM_TR[f.status] ?? f.status })),
+    firms: filtreli.slice(0, 300).map((f) => ({ id: f.id, name: f.name, status: DURUM_TR[f.status] ?? f.status })),
   }
 }
 

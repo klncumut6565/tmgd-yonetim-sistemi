@@ -82,7 +82,8 @@ export const TOOL_DEFS = [
     name: 'list_firms',
     description:
       'Sistemdeki GERÇEK firma sayısını ve isimlerini döndürür (toplam, duruma göre dağılım ve liste). ' +
-      '"Kaç firmam var", "firmalarımı say/listele", "kaç aktif firma" gibi sorularda çağrılır.',
+      '"Kaç firmam var", "firmalarımı say/listele", "kaç aktif firma", "hangi firma pasif/aktif" gibi sorularda çağrılır. ' +
+      'Sonuçta names_by_status (durum → firma isimleri) vardır: "hangi firma pasif" sorusunda İSİMLERİ mutlaka söyle, sadece sayı verme.',
     parameters: {
       type: 'object',
       properties: {
