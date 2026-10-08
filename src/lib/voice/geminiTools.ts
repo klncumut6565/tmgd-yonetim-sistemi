@@ -84,6 +84,54 @@ export const GEMINI_FUNCTION_DECLARATIONS = [
       required: ['firm_id'],
     },
   },
+  {
+    name: 'search_regulation',
+    description:
+      'Sisteme yüklenmiş GERÇEK mevzuat belgelerinde (ADR, Tehlikeli Madde Yönetmeliği vb.) arama yapar ve ilgili ' +
+      'bölümleri kaynak/sayfa ile döndürür. Mevzuat, madde veya yükümlülük sorularında cevaptan ÖNCE çağrılır; ' +
+      'cevap dönen metne dayandırılır ve kaynak söylenir. Sonuç boşsa bunu söyle, kendi bilginden uydurma.',
+    parameters: {
+      type: 'object',
+      properties: {
+        query: { type: 'string', description: 'Aranacak konu/ifade (Türkçe, örn. "yangın söndürücü sayısı")' },
+      },
+      required: ['query'],
+    },
+  },
+  {
+    name: 'get_un_info',
+    description:
+      'Bir veya birden fazla UN numarasının GERÇEK ADR Tablo A kaydını döndürür (madde adı, sınıf, ambalaj grubu, ' +
+      'tünel kodu, tehlike no, etiketler, taşıma kategorisi). UN numarası geçen her soruda ÖNCE çağrılır.',
+    parameters: {
+      type: 'object',
+      properties: {
+        un_numbers: {
+          type: 'array',
+          items: { type: 'string' },
+          description: '4 haneli UN numaraları, örn. ["1203", "1950"]',
+        },
+      },
+      required: ['un_numbers'],
+    },
+  },
+  {
+    name: 'check_mixed_loading',
+    description:
+      'İki veya daha fazla UN numaralı maddenin aynı araçta birlikte taşınıp taşınamayacağını (ADR 7.5.2 karışık ' +
+      'yükleme) sistemin GERÇEK hesaplama motoruyla kontrol eder. Bu konuda kendin hüküm VERME, bu aracın sonucunu aktar.',
+    parameters: {
+      type: 'object',
+      properties: {
+        un_numbers: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Karşılaştırılacak en az iki UN numarası, örn. ["1203", "1428"]',
+        },
+      },
+      required: ['un_numbers'],
+    },
+  },
 ] as const;
 
 /** Sesli asistanın sistem talimatı — halüsinasyon önleme ilkeleri buraya
@@ -97,6 +145,9 @@ KESİN KURALLAR:
 - Firma ismi belirsizse (birden fazla eşleşme) kullanıcıya hangisini kastettiğini sor, rastgele seçme.
 - Bir aracı çağıramadıysan veya sonuç alamadıysan "bu bilgiye şu anda ulaşamıyorum" de — sayı uydurma.
 - Hiçbir veriyi SİLEMEZSİN. Kullanıcı silme isterse nazikçe reddet ve bunun uygulama üzerinden manuel yapılması gerektiğini söyle.
+- Mevzuat/madde sorularında önce search_regulation çağır ve cevabı dönen metne dayandır, kaynağı (belge adı, sayfa) söyle. Sonuç yoksa "yüklü mevzuatta bulamadım" de.
+- UN numarası geçen sorularda önce get_un_info çağır; Tablo A'da yoksa "doğrulayamadım" de.
+- Birlikte taşıma / karışık yükleme sorularında HÜKÜM VERME, check_mixed_loading sonucunu aktar (yasak/şartlı/uyumlu ve ADR referansı).
 - Emin olmadığın mevzuat/ADR bilgisinde belirsizliğini belirt.
 `.trim();
 

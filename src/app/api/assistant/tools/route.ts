@@ -21,7 +21,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getSuperAdminFromRequest } from '@/lib/supabase/verifySuperAdmin'
-import { searchFirm, getFirmTaskSummary, getFirmMissingDocuments, type TaskScope } from '@/lib/ai/dataTools'
+import {
+  searchFirm,
+  getFirmTaskSummary,
+  getFirmMissingDocuments,
+  searchRegulation,
+  getUnInfo,
+  checkMixedLoading,
+  type TaskScope,
+} from '@/lib/ai/dataTools'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 15
@@ -78,6 +86,22 @@ export async function POST(req: NextRequest) {
     }
     const sonuc = await getFirmMissingDocuments(supabase, firmId)
     return NextResponse.json(sonuc)
+  }
+
+  // ---- search_regulation: yüklü mevzuat belgelerinde arama ------------------
+  if (tool === 'search_regulation') {
+    const query = typeof args.query === 'string' ? args.query : ''
+    return NextResponse.json(await searchRegulation(supabase, query))
+  }
+
+  // ---- get_un_info: gerçek Tablo A kaydı ------------------------------------
+  if (tool === 'get_un_info') {
+    return NextResponse.json(await getUnInfo(supabase, args.un_numbers))
+  }
+
+  // ---- check_mixed_loading: ADR 7.5.2 karışık yükleme motoru ----------------
+  if (tool === 'check_mixed_loading') {
+    return NextResponse.json(await checkMixedLoading(supabase, args.un_numbers))
   }
 
   return NextResponse.json({ error: `Bilinmeyen araç: ${tool}` }, { status: 400 })
