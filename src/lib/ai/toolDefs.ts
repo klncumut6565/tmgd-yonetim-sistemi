@@ -106,7 +106,7 @@ export const TOOL_DEFS = [
   {
     name: 'list_tmgd',
     description:
-      'Roller bölümündeki TMGD (Tehlikeli Madde Güvenlik Danışmanı) personelini döndürür: aktif çalışan TMGD sayısı, her TMGD için ad, ' +
+      'Roller bölümündeki TMGD (Tehlikeli Madde Güvenlik Danışmanı) personelini döndürür (rolü TMGD, Yönetici veya Asistan olanlar; Süper Yönetici hariç): aktif çalışan TMGD sayısı, her TMGD için ad, ' +
       'e-posta, telefon, atandığı firma sayısı, sertifika (S2) geçerlilik tarihi ve kalan gün; ayrıca aktif personelin rol dağılımı. ' +
       '"Kaç aktif TMGD var", "TMGD bilgileri", "TMGD sertifikası ne zaman bitiyor" sorularında çağrılır.',
     parameters: {

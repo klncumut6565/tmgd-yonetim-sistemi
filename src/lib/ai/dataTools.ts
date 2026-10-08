@@ -603,14 +603,47 @@ export async function getDashboardSummary(supabase: SupabaseClient) {
   type R = Record<string, unknown>
   const rows = (r: { data: unknown }) => (r.data ?? []) as R[]
 
-  const tmgdSertifika = rows(tmgdS2)
-    .map((r) => ({
-      firm_name: String((r.firms as { name?: string } | null)?.name ?? ''),
+  // TMGD sertifikası KİŞİYE aittir (gösterge paneliyle aynı kural): firma → atanmış danışman
+  // (user_firms → profiles; TMGD > Asistan > Yönetici öncelikli, Süper Yönetici HARİÇ),
+  // kişi bazında tekilleştirilir, en erken tarih esas alınır.
+  const s2 = rows(tmgdS2)
+  const s2FirmaIds = Array.from(new Set(s2.map((r) => String(r.firm_id)).filter(Boolean)))
+  const atanan = new Map<string, { userId: string; ad: string }>()
+  if (s2FirmaIds.length) {
+    const { data: at } = await supabase
+      .from('user_firms')
+      .select('firm_id, user_id, profiles ( full_name, role, is_active )')
+      .in('firm_id', s2FirmaIds)
+    const oncelik: Record<string, number> = { tmgd: 0, assistant: 1, admin: 2 }
+    const secili = new Map<string, number>()
+    for (const a of (at ?? []) as unknown as { firm_id: string; user_id: string; profiles: { full_name?: string; role?: string; is_active?: boolean | null } | null }[]) {
+      const pr = a.profiles
+      if (!pr || pr.is_active === false) continue
+      const o = oncelik[String(pr.role)]
+      if (o === undefined) continue // süper yönetici / firma kullanıcısı / izleyici hariç
+      const m = secili.get(a.firm_id)
+      if (m === undefined || o < m) {
+        atanan.set(a.firm_id, { userId: a.user_id, ad: String(pr.full_name || '').trim() || '(isim girilmemiş)' })
+        secili.set(a.firm_id, o)
+      }
+    }
+  }
+  const kisiBazli = new Map<string, { kisi: string; firma?: string; valid_until: string; days_left: number }>()
+  for (const r of s2) {
+    const gun = gunKaldi(String(r.valid_until))
+    if (gun > 120) continue
+    const at = atanan.get(String(r.firm_id))
+    const anahtar = at ? `u:${at.userId}` : `f:${r.firm_id}`
+    const mevcut = kisiBazli.get(anahtar)
+    if (mevcut && mevcut.days_left <= gun) continue
+    kisiBazli.set(anahtar, {
+      kisi: at ? at.ad : 'TMGD atanmamış',
+      ...(at ? {} : { firma: String((r.firms as { name?: string } | null)?.name ?? '') }),
       valid_until: String(r.valid_until),
-      days_left: gunKaldi(String(r.valid_until)),
-    }))
-    .filter((x) => x.days_left <= 120)
-    .slice(0, 15)
+      days_left: gun,
+    })
+  }
+  const tmgdSertifika = Array.from(kisiBazli.values()).sort((a, b) => a.days_left - b.days_left).slice(0, 15)
 
   return {
     ok: true,
@@ -660,6 +693,8 @@ const ROL_TR: Record<string, string> = {
   company: 'Firma Kullanıcısı',
 }
 
+const DANISMAN_ROLLER = new Set(['tmgd', 'admin', 'assistant'])
+
 export async function listTmgd(supabase: SupabaseClient, includeInactive = false) {
   const { data: profiller } = await supabase
     .from('profiles')
@@ -678,7 +713,8 @@ export async function listTmgd(supabase: SupabaseClient, includeInactive = false
     rolSayim[k] = (rolSayim[k] ?? 0) + 1
   }
 
-  const tmgdler = hepsi.filter((p) => p.role === 'tmgd' && (includeInactive || aktifMi(p)))
+  // Danışman personel = TMGD + Yönetici + Asistan (süper yönetici, firma kullanıcısı ve izleyici HARİÇ).
+  const tmgdler = hepsi.filter((p) => DANISMAN_ROLLER.has(p.role) && (includeInactive || aktifMi(p)))
   const ids = tmgdler.map((p) => p.id)
 
   const atamalar: Record<string, string[]> = {}
@@ -701,8 +737,9 @@ export async function listTmgd(supabase: SupabaseClient, includeInactive = false
   return {
     ok: true,
     grounded: true,
-    aktif_tmgd_sayisi: hepsi.filter((p) => p.role === 'tmgd' && aktifMi(p)).length,
-    pasif_veya_onaysiz_tmgd_sayisi: hepsi.filter((p) => p.role === 'tmgd' && !aktifMi(p)).length,
+    aktif_tmgd_sayisi: hepsi.filter((p) => DANISMAN_ROLLER.has(p.role) && aktifMi(p)).length,
+    aciklama: 'TMGD danışman sayısına rolü TMGD, Yönetici veya Asistan olan aktif kişiler dahildir; Süper Yönetici dahil değildir.',
+    pasif_veya_onaysiz_tmgd_sayisi: hepsi.filter((p) => DANISMAN_ROLLER.has(p.role) && !aktifMi(p)).length,
     aktif_personel_rol_dagilimi: rolSayim,
     tmgd_listesi: tmgdler.map((p) => {
       const firmalar = atamalar[p.id] ?? []
@@ -710,6 +747,7 @@ export async function listTmgd(supabase: SupabaseClient, includeInactive = false
       const enErken = tarihler[0]
       return {
         ad: p.full_name,
+        rol: ROL_TR[p.role] ?? p.role,
         e_posta: p.email,
         telefon: p.phone,
         durum: aktifMi(p) ? 'Aktif' : 'Pasif/Onaysız',
