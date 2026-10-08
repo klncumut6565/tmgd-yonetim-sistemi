@@ -52,6 +52,7 @@ const GOREV_BASLIKLARI = [
   "Paketleyen",
   "Dolduran",
   "Yükleyen",
+  "Taşımacı",
 ];
 const DIGER = "Diğer (serbest metin)";
 const GOREV_SECENEKLERI = [...GOREV_BASLIKLARI, DIGER];
