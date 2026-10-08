@@ -16,7 +16,9 @@ import { getSuperAdminFromRequest } from '@/lib/supabase/verifySuperAdmin'
 import { callWithFallback, type ProviderConfig, type ChatMessage } from '@/lib/ai/multiEngine'
 import { extractAction } from '@/lib/ai/actions'
 import { checkPair, type UnRow, type CheckResult } from '@/lib/adrMix'
-import { searchFirm, getFirmTaskSummary, getFirmMissingDocuments, buildOperationalContext } from '@/lib/ai/dataTools'
+import { searchFirm, getFirmTaskSummary, getFirmMissingDocuments } from '@/lib/ai/dataTools'
+import { TOOL_DEFS, NAV_TOOL_NAMES } from '@/lib/ai/toolDefs'
+import { executeDataTool } from '@/lib/ai/toolExec'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 30
@@ -52,7 +54,7 @@ export async function POST(req: NextRequest) {
       .eq('id', firmId)
       .single()
     if (firm) {
-      firmContext = `Şu an görüntülenen firma: ${firm.name}. Faaliyet konuları: ${(firm.activities ?? []).join(', ') || 'belirtilmemiş'}.`
+      firmContext = `Şu an görüntülenen firma: ${firm.name} (firma ID: ${firmId}). Faaliyet konuları: ${(firm.activities ?? []).join(', ') || 'belirtilmemiş'}.`
     }
   }
 
@@ -113,14 +115,15 @@ export async function POST(req: NextRequest) {
     // asistan mevzuat bağlamı olmadan çalışmaya devam etsin.
   }
 
-  // Operasyonel gerçek veri (firma sayısı, ziyaret edilmeyen, ilerleme, eksik belge):
-  // soruda geçiyorsa sunucu hesaplar, modele hazır verilir.
-  let sistemVerisiContext = ''
-  try {
-    sistemVerisiContext = await buildOperationalContext(supabase, question, firmId)
-  } catch {
-    // veri okunamadıysa asistan eski davranışla çalışmaya devam etsin
-  }
+  // Ortak araç kataloğu (sesli asistanla AYNI — bkz. toolDefs.ts): prompt'a
+  // otomatik eklenir; yeni araç eklendiğinde yazılı asistan da kazanır.
+  const aracKatalogu = TOOL_DEFS.map((t) => {
+    const props = (t.parameters as { properties?: Record<string, { type?: string }> }).properties ?? {}
+    const imza = Object.entries(props)
+      .map(([k, v]) => `${k}: ${v.type ?? 'string'}`)
+      .join(', ')
+    return `- ${t.name}(${imza}) — ${t.description}`
+  }).join('\n')
 
   const systemPrompt = `### DİL KURALI — EN ÖNEMLİ KURAL ###
 SEN SADECE TÜRKÇE KONUŞURSUN. Her cevabın istisnasız TÜRKÇE olmalı.
@@ -179,30 +182,25 @@ Belirli bir sekme de isteniyorsa "tab" ekle, UN numarası da varsa "un_numbers" 
 \`\`\`
 "title" alanına kullanıcının tarif ettiği görevi KISA ve NET bir başlık olarak yaz (baştaki "şu görevi ekle" gibi komut kelimelerini çıkar). Görev OTOMATİK OLARAK KAYDEDİLMEZ — sistem Görevler sayfasını açıp başlığı forma doldurur, kullanıcı firmayı seçip "Ekle" butonuna basmalıdır. Bunu kullanıcıya kısaca belirt.
 
-6) Kullanıcı bir firmanın GÖREV SAYISINI/DURUMUNU soruyorsa (örn. "ABC'nin kaç gecikmiş görevi var", "bugün hangi görevlerim var", "XYZ'nin yaklaşan görevleri neler"):
+6) VERİ ve BİLGİ ARAÇLARI (sesli asistanla AYNI araçlar): firma sayısı/listesi, ziyaret edilmeyen firmalar, Belge Takip ilerleme yüzdesi, eksik belgeler, görevler, mevzuat araması, UN/Tablo A, karışık yükleme gibi GERÇEK veri gereken HER soruda aşağıdaki araçlardan birini çağır. Çağırmak için cevabının SONUNA tek bir blok ekle:
 \`\`\`eylem
-{"type":"get_task_summary","firm_name":"ABC","scope":"overdue"}
+{"type":"tool","name":"ARAC_ADI","args":{"parametre":"değer"}}
 \`\`\`
-"scope" değerleri: "overdue" (gecikmiş), "today" (bugün), "upcoming" (yaklaşan/gelecek), "all" (tümü — tamamlanmış/iptal hariç). Bu eylemi ürettiğinde SAYIYI VEYA GÖREV İSİMLERİNİ SEN YAZMA (tahmin etme) — sistem bu eylemi gördüğünde gerçek veritabanı sorgusunu otomatik çalıştırıp sonucu cevabına ekleyecek. Sen sadece "Kontrol ediyorum..." gibi kısa bir cümle yaz.
+Sistem aracı çalıştırıp sonucu sana "ARAÇ SONUCU" olarak verecek; sonra kullanıcıya SON CEVABI yaz (blok yazma). Bir firma ID'si gerekiyorsa: yukarıda "firma ID" verilmişse onu kullan, yoksa önce search_firm ile gerçek ID'yi bul (ID uydurma). Gerekirse araçları sırayla çağır (her adımda tek blok). Araç sonucundaki sayı/isim/yüzdeyi AYNEN aktar.
+Sayfa değiştirme: {"type":"tool","name":"go_to_page","args":{"page":"firma_takvimi"}} (firmalar, gorevler, araclar, suruculer, personeller, ziyaretler, raporlar, adr_bilgi_motoru, ayarlar, dashboard).
+ARAÇLAR:
+${aracKatalogu}
 
-7) Kullanıcı bir firmanın EKSİK/TAMAMLANMAMIŞ BELGELERİNİ soruyorsa (örn. "ABC'nin eksik belgeleri neler", "XYZ'de hangi belgeler tamamlanmadı"):
-\`\`\`eylem
-{"type":"get_missing_documents","firm_name":"ABC"}
-\`\`\`
-Aynı şekilde: liste veya sayıyı SEN UYDURMA, sistem gerçek sorguyu çalıştırıp ekleyecek.
-
-Bu yedi durumun DIŞINDA hiçbir eylem bloğu üretme — sadece soruları normal şekilde cevapla. Eylem bloğunu ürettiğinde bile önce kısa bir Türkçe cümleyle ne yaptığını açıkla.
+Bu durumların DIŞINDA hiçbir eylem bloğu üretme — sadece soruları normal şekilde cevapla. Eylem bloğunu ürettiğinde bile önce kısa bir Türkçe cümleyle ne yaptığını açıkla.
 
 ### HALÜSİNASYON YASAĞI — OPERASYONEL VERİLER (KRİTİK) ###
-Firma görev sayısı, belge durumu, tarih, denetim sonucu gibi operasyonel TMGD verilerini SEN ASLA TAHMİN ETMEZSİN. Bu tür bir soru geldiğinde YUKARIDAKİ (6) veya (7) eylemini üretmeden kesinlikle sayı/isim/tarih söyleme. Sana bu bilgi az önce "GERÇEK SİSTEM SONUCU" veya "GERÇEK SİSTEM VERİSİ" olarak verilmemişse ve ilgili eylemi de üretmiyorsan, "Bu bilgiyi kontrol etmem gerekiyor" de.
+Firma görev sayısı, belge durumu, tarih, denetim sonucu gibi operasyonel TMGD verilerini SEN ASLA TAHMİN ETMEZSİN. Bu tür bir soru geldiğinde YUKARIDAKİ (6) araçlarından ilgili olanı çağırmadan kesinlikle sayı/isim/tarih söyleme. Sana bu bilgi "ARAÇ SONUCU" olarak verilmemişse ve ilgili eylemi de üretmiyorsan, "Bu bilgiyi kontrol etmem gerekiyor" de.
 
 ${firmContext}
 
 ${unContext}
 
 ${mevzuatContext}
-
-${sistemVerisiContext}
 
 ### SON HATIRLATMA ###
 CEVABIN TAMAMI TÜRKÇE OLACAK. Düşünme metni yazma, doğrudan cevabı ver.
@@ -227,7 +225,30 @@ Eylem bloğu yazıyorsan MUTLAKA üç ters tırnakla KAPAT — kapatmazsan blok 
 
   const messages: ChatMessage[] = [...history, { role: 'user', content: question }]
 
-  const result = await callWithFallback(configs, systemPrompt, messages)
+  let result = await callWithFallback(configs, systemPrompt, messages)
+
+  // ---- ARAÇ DÖNGÜSÜ (sesli asistanla AYNI yürütücü: toolExec.ts) ----------
+  // Model {"type":"tool",...} bloğu üretirse sunucu aracı çalıştırır, sonucu
+  // modele "ARAÇ SONUCU" diye verir ve son cevabı ister. En çok 4 adım.
+  const araMesajlar: ChatMessage[] = [...messages]
+  for (let adim = 0; adim < 4 && result.ok; adim++) {
+    const { cleanText: onMetin, action: a } = extractAction(result.text as string)
+    if (a?.type !== 'tool') break
+    // Navigasyon araçları sunucuda çalışmaz: uygulamaya eylem olarak döner.
+    if ((NAV_TOOL_NAMES as readonly string[]).includes(a.name)) break
+    const yurutulen = await executeDataTool(supabase, a.name, a.args)
+    let govde = JSON.stringify(yurutulen.body)
+    if (govde.length > 6000) govde = govde.slice(0, 6000) + '…(kısaltıldı)'
+    araMesajlar.push({ role: 'assistant', content: result.text as string })
+    araMesajlar.push({
+      role: 'user',
+      content:
+        `ARAÇ SONUCU (${a.name}): ${govde}\n` +
+        'Bu GERÇEK sonuca göre devam et: başka bir araç gerekiyorsa tek bir eylem bloğu yaz, değilse kullanıcıya Türkçe SON CEVABI yaz (eylem bloğu yazma). Sayıları aynen aktar.' +
+        (onMetin ? '' : ''),
+    })
+    result = await callWithFallback(configs, systemPrompt, araMesajlar)
+  }
 
   if (!result.ok) {
     return NextResponse.json(

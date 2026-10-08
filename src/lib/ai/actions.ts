@@ -36,7 +36,25 @@ export type AssistantAction =
   // yukleme'nin checkPair() ile çalışma şekli gibi (bkz. Bölüm 5
   // "Tool-First Architecture", Bölüm 11 "TOOL RESULT > MODEL MEMORY").
   | { type: "get_task_summary"; firm_name: string; scope: "overdue" | "today" | "upcoming" | "all" }
-  | { type: "get_missing_documents"; firm_name: string };
+  | { type: "get_missing_documents"; firm_name: string }
+  // --- Ortak araç sistemi (sesli asistanla AYNI araçlar, bkz. toolDefs.ts) ---
+  | { type: "tool"; name: string; args: Record<string, unknown> }
+  | { type: "go_to_page"; page: GoToPageKey };
+
+export const GO_TO_PAGES: Record<string, string> = {
+  dashboard: "/dashboard",
+  firma_takvimi: "/dashboard/firma-takvimi",
+  firmalar: "/firms",
+  gorevler: "/tasks",
+  araclar: "/vehicles",
+  suruculer: "/drivers",
+  personeller: "/employees",
+  ziyaretler: "/visits",
+  raporlar: "/reports",
+  adr_bilgi_motoru: "/adr",
+  ayarlar: "/settings",
+};
+export type GoToPageKey = keyof typeof GO_TO_PAGES;
 
 // Kapanışlı blok: ```eylem {...} ```
 const ACTION_BLOCK_RE = /```eylem\s*([\s\S]*?)```/i;
@@ -125,6 +143,18 @@ export function extractAction(text: string): { cleanText: string; action: Assist
       };
     }
 
+    if (parsed?.type === "tool" && typeof parsed.name === "string" && parsed.name.trim()) {
+      const args =
+        parsed.args && typeof parsed.args === "object" && !Array.isArray(parsed.args)
+          ? (parsed.args as Record<string, unknown>)
+          : {};
+      return { cleanText, action: { type: "tool", name: parsed.name.trim(), args } };
+    }
+
+    if (parsed?.type === "go_to_page" && typeof parsed.page === "string" && parsed.page in GO_TO_PAGES) {
+      return { cleanText, action: { type: "go_to_page", page: parsed.page } };
+    }
+
     const GECERLI_SCOPE = ["overdue", "today", "upcoming", "all"] as const;
     if (
       parsed?.type === "get_task_summary" &&
@@ -208,6 +238,9 @@ export function actionToUrl(action: AssistantAction, firmId: string | null): str
       const qs = params.toString();
       return `/firms/${action.firm_id}${qs ? `?${qs}` : ""}`;
     }
+    case "go_to_page":
+      return GO_TO_PAGES[action.page] ?? null;
+    case "tool":
     case "get_task_summary":
     case "get_missing_documents":
       // Bunlar navigasyon eylemi DEĞİL, salt-okunur veri sorgusu — route.ts
