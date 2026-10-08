@@ -23,9 +23,23 @@ import { authFetch } from "@/lib/supabase/authFetch";
 import { GeminiLiveProvider } from "@/lib/voice/providers/geminiLive";
 import { startMicCapture, AudioPlaybackQueue, type MicCapture } from "@/lib/voice/audioStream";
 import { buildLiveInstruction, type LiveContext } from "@/lib/voice/geminiTools";
-import type { VoiceSession, VoiceState, RealtimeSessionResponse } from "@/lib/voice/types";
+import type { VoiceSession, VoiceState, LiveMetrics, RealtimeSessionResponse } from "@/lib/voice/types";
+
+const BOS_METRIK: LiveMetrics = {
+  sonYanitMs: null,
+  sonCalmaMs: null,
+  ortYanitMs: null,
+  tur: 0,
+  sonAracMs: null,
+  kesinti: 0,
+  yenidenBaglanma: 0,
+};
+
+/** Mikrofon parçasında "ses var" saymak için RMS eşiği (Int16 ölçeğinde). */
+const SES_ESIGI_RMS = 500;
 
 const BOS_SESSION: VoiceSession = {
+  metrics: BOS_METRIK,
   state: "idle",
   isMuted: false,
   isSpeaking: false,
@@ -66,15 +80,38 @@ export function useRealtimeVoice(options: RealtimeVoiceOptions = {}) {
   const kullaniciMetinRef = useRef("");
   const asistanMetinRef = useRef("");
 
+  const durumRef = useRef<VoiceState>("idle");
+  // Gecikme ölçümü için zaman damgaları (performance.now ms).
+  const sonSesZamaniRef = useRef<number | null>(null);
+  const turSesAlindiRef = useRef(false); // bu turda ilk model sesi geldi mi
+  const yanitToplamRef = useRef({ toplam: 0, adet: 0 });
+  const dusunmeZamanlayiciRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const guncelle = useCallback((patch: Partial<VoiceSession>) => {
+    if (patch.state) durumRef.current = patch.state;
     setSession((prev) => ({ ...prev, ...patch }));
   }, []);
+
+  const metrikGuncelle = useCallback((fn: (m: LiveMetrics) => LiveMetrics) => {
+    setSession((prev) => ({ ...prev, metrics: fn(prev.metrics) }));
+  }, []);
+
+  /** Durum makinesi geçişi: bağlantı kurulmadan/hata/yeniden bağlanma
+   *  sırasında gelen ses olayları durumu bozmasın diye yok sayılır. */
+  const gec = useCallback(
+    (yeni: VoiceState) => {
+      const mevcut = durumRef.current;
+      if (mevcut === "idle" || mevcut === "error" || mevcut === "connecting" || mevcut === "reconnecting") return;
+      if (mevcut !== yeni) guncelle({ state: yeni });
+    },
+    [guncelle]
+  );
 
   /** Gemini'nin çağırdığı bir tool'u gerçek veriyle karşılar. Navigasyon
    *  eylemleri (open_firm) client-side yönlendirme yapar; diğerleri
    *  /api/assistant/tools üzerinden GERÇEK Supabase verisini getirir —
    *  hiçbir sayı/isim burada uydurulmaz (bkz. dataTools.ts). */
-  const araciCalistir = useCallback(
+  const araciCalistirIc = useCallback(
     async (name: string, args: Record<string, unknown>): Promise<unknown> => {
       if (name === "open_firm") {
         const firmId = typeof args.firm_id === "string" ? args.firm_id : "";
@@ -96,6 +133,22 @@ export function useRealtimeVoice(options: RealtimeVoiceOptions = {}) {
       return json;
     },
     [router]
+  );
+
+  const araciCalistir = useCallback(
+    async (name: string, args: Record<string, unknown>): Promise<unknown> => {
+      gec("tool_calling");
+      const t0 = performance.now();
+      try {
+        return await araciCalistirIc(name, args);
+      } finally {
+        const sure = Math.round(performance.now() - t0);
+        metrikGuncelle((m) => ({ ...m, sonAracMs: sure }));
+        console.info(`[canli-ses] araç ${name}: ${sure} ms`);
+        gec("processing"); // sonuç modele gitti, cevap bekleniyor
+      }
+    },
+    [gec, metrikGuncelle, araciCalistirIc]
   );
 
   /** Açık ne varsa (mikrofon, ses kuyruğu, WebSocket) kapatır; birden çok
@@ -138,6 +191,12 @@ export function useRealtimeVoice(options: RealtimeVoiceOptions = {}) {
             }
             kullaniciMetinRef.current += event.text;
             guncelle({ partialTranscript: kullaniciMetinRef.current });
+            gec("user_speaking");
+            // Yeni parça gelmezse kullanıcı sustu say → model "düşünüyor".
+            if (dusunmeZamanlayiciRef.current) clearTimeout(dusunmeZamanlayiciRef.current);
+            dusunmeZamanlayiciRef.current = setTimeout(() => {
+              if (durumRef.current === "user_speaking") gec("processing");
+            }, 900);
           }
         } else if (event.type === "partial") {
           // Asistan cevap vermeye başladı → kullanıcının cümlesi tamamlandı.
@@ -146,6 +205,7 @@ export function useRealtimeVoice(options: RealtimeVoiceOptions = {}) {
             turKullaniciRef.current = kullaniciMetinRef.current;
             kullaniciMetinRef.current = "";
           }
+          if (dusunmeZamanlayiciRef.current) clearTimeout(dusunmeZamanlayiciRef.current);
           asistanMetinRef.current += event.text;
           guncelle({ assistantTranscript: asistanMetinRef.current });
         }
@@ -158,14 +218,38 @@ export function useRealtimeVoice(options: RealtimeVoiceOptions = {}) {
           kullaniciMetinRef.current = "";
         }
         turuIsle();
+        turSesAlindiRef.current = false; // sonraki tur için ölçümü sıfırla
+        // Ses hâlâ çalıyorsa onSpeaking(false) "dinliyor"a geçirecek; çalmıyorsa şimdi geç.
+        if (!playback.isPlaying()) gec("listening");
       });
       provider.onAudio((chunk) => {
-        if (!mutedRef.current) playback.enqueue(chunk);
+        if (mutedRef.current) return;
+        const ilkSes = !turSesAlindiRef.current;
+        if (ilkSes) {
+          // Bu turun İLK model sesi: kullanıcının son sesinden beri geçen süre.
+          turSesAlindiRef.current = true;
+          if (dusunmeZamanlayiciRef.current) clearTimeout(dusunmeZamanlayiciRef.current);
+          const son = sonSesZamaniRef.current;
+          if (son !== null) {
+            const ms = Math.round(performance.now() - son);
+            yanitToplamRef.current.toplam += ms;
+            yanitToplamRef.current.adet += 1;
+            const ort = Math.round(yanitToplamRef.current.toplam / yanitToplamRef.current.adet);
+            metrikGuncelle((m) => ({ ...m, sonYanitMs: ms, ortYanitMs: ort, tur: m.tur + 1 }));
+            console.info(`[canli-ses] ilk ses gecikmesi: ${ms} ms (ort. ${ort} ms)`);
+          }
+        }
+        playback.enqueue(chunk);
+        // Ölçüm bu tur için tamamlandı; model kendiliğinden konuşursa eski zamanı kullanma.
+        if (ilkSes) sonSesZamaniRef.current = null;
       });
       provider.onInterrupted(() => {
         turuIsle(); // kesilen turda söylenen kısım da geçmişe girsin
         playback.clear();
-        guncelle({ isSpeaking: false, state: "listening" });
+        turSesAlindiRef.current = false;
+        metrikGuncelle((m) => ({ ...m, kesinti: m.kesinti + 1 }));
+        guncelle({ isSpeaking: false });
+        gec("listening");
       });
       provider.onError((message) => guncelle({ state: "error", error: message }));
       provider.onToolCall(araciCalistir);
@@ -176,7 +260,7 @@ export function useRealtimeVoice(options: RealtimeVoiceOptions = {}) {
       // Beklenmeyen kopma → (varsa tutamaçla) yeniden bağlan.
       provider.onClose(() => void yenidenBaglanRef.current?.());
     },
-    [araciCalistir, guncelle, turuIsle]
+    [araciCalistir, guncelle, turuIsle, gec, metrikGuncelle]
   );
 
   /** Mikrofon kesilmeden yeni bir WebSocket oturumu açar; tutamaç varsa
@@ -186,6 +270,8 @@ export function useRealtimeVoice(options: RealtimeVoiceOptions = {}) {
     yenidenBaglaniyorRef.current = true;
     const eski = providerRef.current;
     const tutamac = eski.getResumeHandle();
+    const t0 = performance.now();
+    guncelle({ state: "reconnecting" });
     try {
       for (let deneme = 1; deneme <= 3; deneme++) {
         try {
@@ -199,6 +285,8 @@ export function useRealtimeVoice(options: RealtimeVoiceOptions = {}) {
           await yeni.connect(sessionData, tutamac, buildLiveInstruction(optionsRef.current.getContext?.()));
           providerRef.current = yeni; // mikrofon artık buna yazar
           await eski.disconnect().catch(() => {});
+          metrikGuncelle((m) => ({ ...m, yenidenBaglanma: m.yenidenBaglanma + 1 }));
+          console.info(`[canli-ses] yeniden bağlanma: ${Math.round(performance.now() - t0)} ms (tutamaç: ${tutamac ? "var" : "yok"})`);
           guncelle({ state: "listening", error: undefined });
           return;
         } catch {
@@ -211,7 +299,7 @@ export function useRealtimeVoice(options: RealtimeVoiceOptions = {}) {
     } finally {
       yenidenBaglaniyorRef.current = false;
     }
-  }, [guncelle, kaynaklariKapat, saglayiciKur]);
+  }, [guncelle, metrikGuncelle, kaynaklariKapat, saglayiciKur]);
   yenidenBaglanRef.current = yenidenBaglan;
 
   const connect = useCallback(async () => {
@@ -220,7 +308,11 @@ export function useRealtimeVoice(options: RealtimeVoiceOptions = {}) {
     kullaniciMetinRef.current = "";
     asistanMetinRef.current = "";
     turKullaniciRef.current = "";
+    sonSesZamaniRef.current = null;
+    turSesAlindiRef.current = false;
+    yanitToplamRef.current = { toplam: 0, adet: 0 };
     guncelle({
+      metrics: BOS_METRIK,
       state: "connecting",
       error: undefined,
       transcript: "",
@@ -237,7 +329,19 @@ export function useRealtimeVoice(options: RealtimeVoiceOptions = {}) {
         throw new Error(mesaj || "Oturum başlatılamadı.");
       }
 
-      playback.onSpeaking((speaking) => guncelle({ isSpeaking: speaking, state: speaking ? "speaking" : "listening" }));
+      playback.onSpeaking((speaking) => {
+        guncelle({ isSpeaking: speaking });
+        if (speaking) {
+          // İlk sesin gerçekten çalmaya başlaması (ağ + zamanlama dahil).
+          if (sonSesZamaniRef.current !== null && durumRef.current !== "speaking") {
+            const ms = Math.round(performance.now() - sonSesZamaniRef.current);
+            metrikGuncelle((m) => ({ ...m, sonCalmaMs: ms }));
+          }
+          gec("speaking");
+        } else if (durumRef.current === "speaking") {
+          gec("listening");
+        }
+      });
       saglayiciKur(provider, playback);
 
       await provider.connect(sessionData, null, buildLiveInstruction(optionsRef.current.getContext?.()));
@@ -246,7 +350,13 @@ export function useRealtimeVoice(options: RealtimeVoiceOptions = {}) {
 
       // Mikrofon her zaman GÜNCEL provider'a yazar (yeniden bağlanmada değişir).
       const mic = await startMicCapture((pcm) => {
-        if (!mutedRef.current) providerRef.current?.sendAudio(pcm);
+        if (mutedRef.current) return;
+        // Kullanıcının son "ses var" anı — gecikme ölçümünün başlangıcı.
+        const v = new Int16Array(pcm);
+        let toplam = 0;
+        for (let i = 0; i < v.length; i++) toplam += v[i] * v[i];
+        if (Math.sqrt(toplam / v.length) > SES_ESIGI_RMS) sonSesZamaniRef.current = performance.now();
+        providerRef.current?.sendAudio(pcm);
       });
       micRef.current = mic;
 

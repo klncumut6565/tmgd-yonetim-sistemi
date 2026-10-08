@@ -22,9 +22,12 @@
 export type VoiceState =
   | "idle"
   | "connecting"
-  | "listening"
-  | "processing"
-  | "speaking"
+  | "listening" // bağlı, kullanıcı konuşmuyor, model susuyor
+  | "user_speaking" // kullanıcı konuşuyor (transkript akıyor)
+  | "processing" // kullanıcı sustu, model cevabı hazırlıyor
+  | "tool_calling" // model bir araç çağırdı, sonuç bekleniyor
+  | "speaking" // model sesi çalıyor
+  | "reconnecting" // oturum yenileniyor (mikrofon açık kalır)
   | "error";
 
 export interface VoiceSession {
@@ -34,7 +37,23 @@ export interface VoiceSession {
   transcript: string;
   partialTranscript: string;
   assistantTranscript: string;
+  metrics: LiveMetrics;
   error?: string;
+}
+
+/** Canlı konuşma gecikme ölçümleri (yaklaşık değerler, tarayıcıdan ölçülür). */
+export interface LiveMetrics {
+  /** Son turda: kullanıcının son sesi → modelin ilk ses parçası (ms). */
+  sonYanitMs: number | null;
+  /** Son turda: kullanıcının son sesi → ilk sesin çalmaya başlaması (ms). */
+  sonCalmaMs: number | null;
+  /** Oturum boyunca yanıt gecikmesi ortalaması (ms). */
+  ortYanitMs: number | null;
+  tur: number;
+  /** Son araç çağrısının süresi (ms). */
+  sonAracMs: number | null;
+  kesinti: number;
+  yenidenBaglanma: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -119,17 +138,4 @@ export interface RealtimeProvider {
    *  gerçek veriyi getirip Promise ile döner; sağlayıcı sonucu uygun
    *  protokol mesajıyla sağlayıcıya geri iletir. */
   onToolCall(handler: (name: string, args: Record<string, unknown>) => Promise<unknown>): void;
-}
-
-// ---------------------------------------------------------------------------
-// Voice metrics (Bölüm 32 — Logging)
-// ---------------------------------------------------------------------------
-
-export interface VoiceMetrics {
-  sessionId: string;
-  sttLatency: number;
-  intentLatency: number;
-  llmLatency: number;
-  ttsLatency: number;
-  totalLatency: number;
 }

@@ -658,13 +658,14 @@ export default function ADRAssistantWidget() {
             {canliAktif && (
               <span className="text-xs bg-purple-600 text-white px-2 py-0.5 rounded-full animate-pulse">
                 🔴{" "}
-                {canli.session.state === "connecting"
-                  ? "Bağlanıyor..."
-                  : canli.session.state === "speaking"
-                    ? "Konuşuyor..."
-                    : canli.session.state === "processing"
-                      ? "Düşünüyor..."
-                      : "Dinliyor..."}
+                {{
+                  connecting: "Bağlanıyor...",
+                  reconnecting: "Yeniden bağlanıyor...",
+                  user_speaking: "Seni duyuyor...",
+                  processing: "Düşünüyor...",
+                  tool_calling: "Veriye bakıyor...",
+                  speaking: "Konuşuyor...",
+                }[canli.session.state as string] ?? "Dinliyor..."}
               </span>
             )}
           </h2>
@@ -815,12 +816,22 @@ export default function ADRAssistantWidget() {
           <div className="mb-1.5 p-2 bg-purple-50 border border-purple-200 rounded-lg">
             <p className="text-xs text-purple-700 font-medium">
               🔴 Canlı Konuşma (Beta) —{" "}
-              {canli.session.state === "connecting"
-                ? "bağlanıyor..."
-                : canli.session.state === "speaking"
-                  ? "asistan konuşuyor, araya girebilirsin"
-                  : "seni dinliyorum..."}
+              {{
+                connecting: "bağlanıyor...",
+                reconnecting: "oturum yenileniyor, konuşmaya devam edebilirsin...",
+                user_speaking: "seni duyuyorum...",
+                processing: "cevap hazırlanıyor...",
+                tool_calling: "gerçek veriye bakıyorum...",
+                speaking: "asistan konuşuyor, araya girebilirsin",
+              }[canli.session.state as string] ?? "seni dinliyorum..."}
             </p>
+            {canli.session.metrics.sonYanitMs !== null && (
+              <p className="text-[10px] text-purple-400">
+                ⏱ ilk ses: {canli.session.metrics.sonYanitMs} ms
+                {canli.session.metrics.ortYanitMs !== null && ` (ort. ${canli.session.metrics.ortYanitMs} ms, ${canli.session.metrics.tur} tur)`}
+                {canli.session.metrics.sonAracMs !== null && ` · araç: ${canli.session.metrics.sonAracMs} ms`}
+              </p>
+            )}
             {(canli.session.partialTranscript || canli.session.transcript) && (
               <p className="text-xs text-purple-500 mt-0.5 italic">
                 🧑 {canli.session.partialTranscript || canli.session.transcript}

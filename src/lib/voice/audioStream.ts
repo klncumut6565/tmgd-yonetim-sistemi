@@ -228,6 +228,11 @@ export class AudioPlaybackQueue {
     };
   }
 
+  /** Kuyrukta çalan/çalınacak ses var mı (modelin üretimi bitmiş olsa bile). */
+  isPlaying(): boolean {
+    return this.kuyruk.length > 0;
+  }
+
   /** Barge-in: henüz çalınmamış/çalmakta olan tüm parçaları anında durdurur. */
   clear() {
     this.kuyruk.forEach((s) => {
