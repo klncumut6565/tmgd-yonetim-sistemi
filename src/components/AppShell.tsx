@@ -27,7 +27,8 @@ export default function AppShell({
   const [menuAcik, setMenuAcik] = useState(false);
   useEffect(() => setMenuAcik(false), [pathname]);
 
-  const isLoginPage = pathname === "/login";
+  // Herkese açık sayfalar: giriş ve yasal metinler (oturum/bekçi gerektirmez)
+  const isLoginPage = pathname === "/login" || (pathname?.startsWith("/yasal/") ?? false);
 
   if (isLoginPage) {
     return <AuthGuard>{children}</AuthGuard>;

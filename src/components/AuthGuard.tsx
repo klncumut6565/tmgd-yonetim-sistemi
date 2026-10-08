@@ -20,7 +20,8 @@ export default function AuthGuard({
   const router = useRouter();
   const { loading, authed, profile, isApproved } = useUser();
 
-  const isLoginPage = pathname === "/login";
+  // Herkese açık sayfalar: giriş ve yasal metinler (oturum/bekçi gerektirmez)
+  const isLoginPage = pathname === "/login" || (pathname?.startsWith("/yasal/") ?? false);
 
   useEffect(() => {
     if (loading) return;

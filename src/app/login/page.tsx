@@ -14,6 +14,7 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
 import { hataCevir } from "@/lib/hataCevir";
 import FiyatlandirmaPlanlari from "@/components/FiyatlandirmaPlanlari";
+import { YASAL_METINLER } from "@/lib/yasalMetinler";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -327,6 +328,21 @@ export default function LoginPage() {
       </div>
     </div>
     <FiyatlandirmaPlanlari onBasla={ucretsizBasla} />
+    <footer className="bg-slate-950 border-t border-slate-800 px-4 py-6">
+      <nav className="flex flex-wrap justify-center gap-x-6 gap-y-2 text-xs text-blue-300/80">
+        {YASAL_METINLER.map((m) => (
+          <a
+            key={m.slug}
+            href={`/yasal/${m.slug}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hover:text-blue-200 hover:underline"
+          >
+            {m.baslik}
+          </a>
+        ))}
+      </nav>
+    </footer>
     </div>
   );
 }
