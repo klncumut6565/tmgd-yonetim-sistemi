@@ -26,6 +26,7 @@ import { authFetch } from "@/lib/supabase/authFetch";
 import { useSpeechToText } from "@/hooks/useSpeechToText";
 import { useAudioRecorder } from "@/hooks/useAudioRecorder";
 import { useTextToSpeech } from "@/hooks/useTextToSpeech";
+import { KLASIK_SES_AKTIF } from "@/lib/voice/config";
 import { useRealtimeVoice } from "@/hooks/useRealtimeVoice";
 import type { ChatMessage } from "@/lib/ai/multiEngine";
 import { actionToUrl } from "@/lib/ai/actions";
@@ -428,6 +429,7 @@ export default function ADRAssistantWidget() {
     if (ttsDesteklenir) ttsKilidiAc();
     const basarili = await canli.connect();
     if (basarili) return;
+    if (!KLASIK_SES_AKTIF) return; // klasik mod kapalı: hata mesajı zaten gösteriliyor
     setMessages((prev) => [
       ...prev,
       {
@@ -814,13 +816,12 @@ export default function ADRAssistantWidget() {
         {sesliGorusmeAktif && !dinliyor && !kaydediyor && !konusuyor && !cevriliyor && (
           <p className="text-xs text-indigo-500 mb-1">⏳ Bir sonraki cümlen için hazırlanıyor...</p>
         )}
-        {!sesliGorusmeAktif && !canliAktif && herhangiSesDestegi && !sending && (
+        {!sesliGorusmeAktif && !canliAktif && !sending && (
           <p className="text-xs text-gray-400 mb-1">
             🎤 Bas ve konuş — canlı, kesintisiz sesli sohbet; asistanın sözünü kesebilirsin.
-            Bağlanamazsa otomatik klasik moda geçer (🎙️ ile elle de başlatabilirsin).
           </p>
         )}
-        {!herhangiSesDestegi && (
+        {KLASIK_SES_AKTIF && !herhangiSesDestegi && (
           <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2 mb-1">
             ⚠️ Bu tarayıcı ses kaydını desteklemiyor (MediaRecorder yok). Chrome, Edge veya Firefox
             deneyebilirsin — ya da soruyu yazarak sorabilirsin.
@@ -923,7 +924,7 @@ export default function ADRAssistantWidget() {
             🎤
           </button>
           {/* YEDEK: klasik sesli komut (konuş → gönder → sesli cevap). */}
-          {herhangiSesDestegi && (
+          {KLASIK_SES_AKTIF && herhangiSesDestegi && (
             <button
               type="button"
               onClick={mikrofonTikla}
