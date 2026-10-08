@@ -5,14 +5,14 @@
 // (Grok/Gemini/OpenRouter) fallback ile Turkce cevap uretir. Cok-turlu
 // sohbet destekler (onceki mesajlar "history" ile gonderilir).
 //
-// Yalnizca super_admin cagirabilir (Bearer token, bkz. verifySuperAdmin.ts).
+// super_admin, admin ve tmgd cagirabilir (Bearer token, bkz. verifySuperAdmin.ts).
 //
 // ONEMLI: Karisik yukleme UYUMLULUK sorulari icin bu asistan KESIN HUKUM
 // VERMEZ — mevcut /adr?tab=karisik aracina yonlendirir.
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { getSuperAdminFromRequest } from '@/lib/supabase/verifySuperAdmin'
+import { getAsistanKullanicisiFromRequest, asistanVeriIstemcisi } from '@/lib/supabase/verifySuperAdmin'
 import { callWithFallback, type ProviderConfig, type ChatMessage } from '@/lib/ai/multiEngine'
 import { extractAction, tumAracCagrilari, cipakToolJsonlari } from '@/lib/ai/actions'
 import { checkPair, type UnRow, type CheckResult } from '@/lib/adrMix'
@@ -29,7 +29,7 @@ function extractUnNumbers(text: string): string[] {
 }
 
 export async function POST(req: NextRequest) {
-  const admin = await getSuperAdminFromRequest(req)
+  const admin = await getAsistanKullanicisiFromRequest(req)
   if (!admin) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
   }
@@ -43,7 +43,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: '"question" alanı boş olamaz.' }, { status: 400 })
   }
 
-  const supabase = createAdminClient()
+  // Veri: süper yönetici → service-role; admin/tmgd → kendi yetkisiyle (RLS). Anahtarlar: her zaman service-role.
+  const supabase = asistanVeriIstemcisi(admin)
+  const adminDb = createAdminClient()
 
   // 1) Firma bağlamı (widget şu an bir firma sayfasındaysa gönderilir)
   let firmContext = ''
@@ -206,7 +208,7 @@ ${mevzuatContext}
 CEVABIN TAMAMI TÜRKÇE OLACAK. Düşünme metni yazma, doğrudan cevabı ver.
 Eylem bloğu yazıyorsan MUTLAKA üç ters tırnakla KAPAT — kapatmazsan blok kullanıcıya ham haliyle görünür.`.trim()
 
-  const { data: providerRows, error: provErr } = await supabase
+  const { data: providerRows, error: provErr } = await adminDb
     .from('ai_provider_keys')
     .select('provider, api_key, model, priority')
 
@@ -242,7 +244,7 @@ Eylem bloğu yazıyorsan MUTLAKA üç ters tırnakla KAPAT — kapatmazsan blok 
     if (cagrilar.some((c) => (NAV_TOOL_NAMES as readonly string[]).includes(c.name))) break
     const sonuclar: string[] = []
     for (const c of cagrilar.slice(0, 3)) {
-      const y = await executeDataTool(supabase, c.name, c.args, { userId: admin.id })
+      const y = await executeDataTool(supabase, c.name, c.args, { userId: admin.id, isSuperAdmin: admin.role === 'super_admin' })
       let govde = JSON.stringify(y.body)
       if (govde.length > 6000) govde = govde.slice(0, 6000) + '…(kısaltıldı)'
       sonuclar.push(`ARAÇ SONUCU (${c.name}): ${govde}`)

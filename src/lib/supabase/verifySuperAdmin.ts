@@ -96,3 +96,64 @@ export async function getYoneticiFromRequest(
     role: profile.role as 'admin' | 'super_admin',
   }
 }
+
+
+/**
+ * Sesli/yazılı ASİSTAN kullanıcısı: onaylı + aktif super_admin, admin veya tmgd.
+ * Dönen `token` ile süper yönetici DIŞINDAKİ roller için kullanıcı-kapsamlı
+ * (RLS'e tabi) istemci kurulur — böylece TMGD/Yönetici yalnızca kendi
+ * yetkisi dahilindeki firma/verileri görür (service-role sızıntısı olmaz).
+ */
+export async function getAsistanKullanicisiFromRequest(
+  req: Request
+): Promise<{ id: string; email: string | null; role: 'super_admin' | 'admin' | 'tmgd'; token: string } | null> {
+  const authHeader = req.headers.get('authorization')
+  const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null
+  if (!token) return null
+
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  if (!url || !anonKey) return null
+
+  const anonClient = createSupabaseClient(url, anonKey)
+  const { data: { user }, error } = await anonClient.auth.getUser(token)
+  if (error || !user) return null
+
+  const admin = createAdminClient()
+  const { data: profile } = await admin
+    .from('profiles')
+    .select('role, approval_status, is_active')
+    .eq('id', user.id)
+    .single()
+
+  if (
+    !profile ||
+    profile.approval_status !== 'approved' ||
+    !profile.is_active ||
+    !['super_admin', 'admin', 'tmgd'].includes(profile.role)
+  ) {
+    return null
+  }
+
+  return {
+    id: user.id,
+    email: user.email ?? null,
+    role: profile.role as 'super_admin' | 'admin' | 'tmgd',
+    token,
+  }
+}
+
+/** Kullanıcının kendi oturumuyla çalışan (RLS'e tabi) Supabase istemcisi. */
+export function createUserScopedClient(token: string) {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL as string
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY as string
+  return createSupabaseClient(url, anonKey, {
+    global: { headers: { Authorization: `Bearer ${token}` } },
+    auth: { autoRefreshToken: false, persistSession: false },
+  })
+}
+
+/** Veri sorguları için istemci: süper yönetici → service-role, diğerleri → RLS'li kullanıcı istemcisi. */
+export function asistanVeriIstemcisi(k: { role: string; token: string }) {
+  return k.role === 'super_admin' ? createAdminClient() : createUserScopedClient(k.token)
+}

@@ -20,7 +20,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { getSuperAdminFromRequest } from '@/lib/supabase/verifySuperAdmin'
+import { getAsistanKullanicisiFromRequest } from '@/lib/supabase/verifySuperAdmin'
 import { halusinasyonMu } from '@/lib/ai/halusinasyon'
 
 export const dynamic = 'force-dynamic'
@@ -196,7 +196,7 @@ async function openRouterDene(
 }
 
 export async function POST(req: NextRequest) {
-  const admin = await getSuperAdminFromRequest(req)
+  const admin = await getAsistanKullanicisiFromRequest(req)
   if (!admin) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
   }

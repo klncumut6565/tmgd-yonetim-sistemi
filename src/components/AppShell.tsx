@@ -23,6 +23,7 @@ export default function AppShell({
   const router = useRouter();
   const { profile, isApproved, isSuperAdmin } = useUser();
 
+  const asistanYetkili = isSuperAdmin || profile?.role === "admin" || profile?.role === "tmgd";
   const [menuAcik, setMenuAcik] = useState(false);
   useEffect(() => setMenuAcik(false), [pathname]);
 
@@ -100,10 +101,10 @@ export default function AppShell({
         </div>
       </div>
 
-      {/* Kalıcı ADR Asistanı — sadece super_admin, sayfa/route değişse
+      {/* Kalıcı ADR Asistanı — super_admin, admin ve tmgd, sayfa/route değişse
           bile burada (AppShell seviyesinde) mount edildiği için hayatta
-          kalır. Buzz entegrasyonu kapsamında sadece super_admin. */}
-      {isApproved && isSuperAdmin && <ADRAssistantWidget />}
+          kalır.  */}
+      {isApproved && asistanYetkili && <ADRAssistantWidget />}
     </AuthGuard>
   );
 }

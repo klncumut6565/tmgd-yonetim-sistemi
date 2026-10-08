@@ -35,7 +35,7 @@ export async function executeDataTool(
   supabase: SupabaseClient,
   tool: string,
   args: Record<string, unknown>,
-  ctx?: { userId?: string }
+  ctx?: { userId?: string; isSuperAdmin?: boolean }
 ): Promise<ToolResult> {
   const str = (k: string) => (typeof args[k] === 'string' ? (args[k] as string) : '')
 
@@ -60,8 +60,8 @@ export async function executeDataTool(
     case 'get_dashboard_summary':
       return { status: 200, body: await getDashboardSummary(supabase) }
     case 'get_notifications':
-      // Asistan yalnızca Süper Yönetici tarafından kullanılır → zilde onay bekleyenler de görünür.
-      return { status: 200, body: await getNotifications(supabase, ctx?.userId, true) }
+      // Zilde onay bekleyenler yalnızca Süper Yönetici'ye gösterilir.
+      return { status: 200, body: await getNotifications(supabase, ctx?.userId, ctx?.isSuperAdmin === true) }
     case 'list_tmgd':
       return { status: 200, body: await listTmgd(supabase, args.include_inactive === true) }
     case 'get_visit_overview':

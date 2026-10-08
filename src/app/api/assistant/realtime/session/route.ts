@@ -30,7 +30,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { getSuperAdminFromRequest } from '@/lib/supabase/verifySuperAdmin'
+import { getAsistanKullanicisiFromRequest } from '@/lib/supabase/verifySuperAdmin'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 15
@@ -49,7 +49,7 @@ export const maxDuration = 15
 const TOKEN_GECERLILIK_DK = 30
 
 export async function POST(req: NextRequest) {
-  const admin = await getSuperAdminFromRequest(req)
+  const admin = await getAsistanKullanicisiFromRequest(req)
   if (!admin) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
   }

@@ -15,19 +15,18 @@
 // (bkz. src/lib/ai/dataTools.ts — metin asistanıyla AYNI fonksiyonlar,
 // tek bir yerden yönetilir, iki farklı mantık olmasın diye).
 //
-// Yalnızca super_admin çağırabilir — /api/adr-assistant ve
+// super_admin, admin ve tmgd çağırabilir (süper yönetici dışı roller RLS'li istemciyle) — /api/adr-assistant ve
 // /api/speech-to-text ile AYNI yetkilendirme deseni.
 
 import { NextRequest, NextResponse } from 'next/server'
-import { createAdminClient } from '@/lib/supabase/admin'
-import { getSuperAdminFromRequest } from '@/lib/supabase/verifySuperAdmin'
+import { getAsistanKullanicisiFromRequest, asistanVeriIstemcisi } from '@/lib/supabase/verifySuperAdmin'
 import { executeDataTool } from '@/lib/ai/toolExec'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 15
 
 export async function POST(req: NextRequest) {
-  const admin = await getSuperAdminFromRequest(req)
+  const admin = await getAsistanKullanicisiFromRequest(req)
   if (!admin) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
   }
@@ -40,9 +39,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: '"tool" alanı zorunlu.' }, { status: 400 })
   }
 
-  const supabase = createAdminClient()
+  const supabase = asistanVeriIstemcisi(admin)
 
   // Tüm araçlar ortak yürütücüde (yazılı asistanla AYNI) — bkz. toolExec.ts
-  const sonuc = await executeDataTool(supabase, tool, args, { userId: admin.id })
+  const sonuc = await executeDataTool(supabase, tool, args, { userId: admin.id, isSuperAdmin: admin.role === 'super_admin' })
   return NextResponse.json(sonuc.body, { status: sonuc.status })
 }
