@@ -418,3 +418,86 @@ export async function checkMixedLoading(supabase: SupabaseClient, unNumbers: unk
   }
   return { ok: true, grounded: true, pairs, not_found: missing }
 }
+
+// ---------------------------------------------------------------------------
+// Yazılı asistan için OPERASYONEL BAĞLAM (deterministik, anahtar kelime tabanlı)
+// ---------------------------------------------------------------------------
+// Sesli asistan araç çağırır; yazılı asistan (LLM) araç çağıramadığı için
+// "erişemiyorum" diyebiliyordu. Soruda firma sayısı / ziyaret edilmeyen firma /
+// ilerleme yüzdesi / eksik belge geçiyorsa gerçek veriyi sunucu hesaplar ve
+// prompt'a "GERÇEK SİSTEM VERİSİ" olarak ekler — model sayıyı uydurmaz, "erişemem" demez.
+
+function trKucuk(s: string): string {
+  return s.toLocaleLowerCase('tr').replace(/\s+/g, ' ')
+}
+
+export async function buildOperationalContext(
+  supabase: SupabaseClient,
+  question: string,
+  currentFirmId?: string
+): Promise<string> {
+  const q = trKucuk(question)
+  const sayiSorusu0 = /kaç\s+(adet\s+)?firma|firma\s*say|toplam firma|firmalarım|firma listesi|firmaları listele|tüm firma/.test(q)
+  const ziyaretSorusu =
+    /ziyaret\s*(edilmeyen|edilmemiş|etmediğim|edilmeyecek|kalan)|ziyaret\s*et(me|medi)|kaç.*ziyaret|ziyaret.*(kaç|sayı)|ziyaret edilecek/.test(q)
+  const sayiSorusu = sayiSorusu0 && !ziyaretSorusu
+  const ilerlemeSorusu = /ilerleme|yüzde|tamamlanma|%/.test(q)
+  const eksikSorusu = /eksik\s*belge|belge.*eksik|eksik.*belge|tamamlanmamış belge/.test(q)
+
+  if (!sayiSorusu && !ziyaretSorusu && !ilerlemeSorusu && !eksikSorusu) return ''
+
+  const parcalar: string[] = [
+    '### GERÇEK SİSTEM VERİSİ (veritabanından AZ ÖNCE okundu — bu bilgilere ERİŞEBİLİYORSUN) ###',
+    'Aşağıdaki sayı ve isimleri AYNEN kullan. "Veritabanına erişemiyorum", "manuel kontrol et" DEME. Yüzdeyi "yüzde 85" biçiminde söyle.',
+  ]
+
+  if (sayiSorusu) {
+    const r = await listFirms(supabase)
+    parcalar.push(
+      `FİRMA SAYISI: toplam ${r.total_all}. Duruma göre: ${Object.entries(r.by_status).map(([k, v]) => `${k} ${v}`).join(', ')}.`,
+      `Firma isimleri: ${r.firms.map((f) => f.name).join('; ')}`
+    )
+  }
+
+  if (ziyaretSorusu) {
+    const v = await getVisitOverview(supabase)
+    parcalar.push(
+      `ZİYARET DURUMU (${v.month}): toplam ${v.total_firms} firma, ziyaret edilen ${v.visited_count}, ziyaret EDİLMEYEN ${v.unvisited_count}.`,
+      v.unvisited_count > 0 ? `Ziyaret edilmeyen firmalar: ${v.unvisited_firms.map((f) => f.name).join('; ')}` : 'Ziyaret edilmeyen firma kalmadı.'
+    )
+  }
+
+  if (ilerlemeSorusu || eksikSorusu) {
+    // Sorudaki firma adlarını yakala; yoksa ve "bu firma" geçiyorsa mevcut firmayı kullan.
+    const { data } = await supabase.from('firms').select('id, name')
+    const firmalar = (data ?? []) as { id: string; name: string }[]
+    let secilen = firmalar.filter((f) => f.name.length >= 3 && q.includes(trKucuk(f.name))).slice(0, 3)
+    if (secilen.length === 0 && currentFirmId) {
+      const f = firmalar.find((x) => x.id === currentFirmId)
+      if (f) secilen = [f]
+    }
+    if (secilen.length === 0) {
+      const g = await getFirmProgress(supabase)
+      if ('average_percent' in g && g.lowest) {
+        parcalar.push(
+          `BELGE TAKİP GENEL: ${g.firm_count} firmanın ortalama ilerlemesi yüzde ${g.average_percent}. En düşük: ${g.lowest
+            .slice(0, 10)
+            .map((x) => `${x.firm_name} %${x.percent}`)
+            .join('; ')}. (Belirli bir firma sorulacaksa firma adını söylemesini iste.)`
+        )
+      }
+    }
+    for (const f of secilen) {
+      const m = await getFirmMissingDocuments(supabase, f.id)
+      if (!m.ok) continue
+      parcalar.push(
+        `BELGE TAKİP — ${m.firm_name}: ilerleme yüzde ${m.percent} (${m.done}/${m.total} tamam), eksik ${m.count} belge.` +
+          (eksikSorusu && m.count > 0
+            ? ` Eksikler: ${m.documents.map((d) => d.belge).join('; ')}`
+            : '')
+      )
+    }
+  }
+
+  return parcalar.join('\n')
+}

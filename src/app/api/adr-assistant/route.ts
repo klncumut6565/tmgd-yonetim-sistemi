@@ -16,7 +16,7 @@ import { getSuperAdminFromRequest } from '@/lib/supabase/verifySuperAdmin'
 import { callWithFallback, type ProviderConfig, type ChatMessage } from '@/lib/ai/multiEngine'
 import { extractAction } from '@/lib/ai/actions'
 import { checkPair, type UnRow, type CheckResult } from '@/lib/adrMix'
-import { searchFirm, getFirmTaskSummary, getFirmMissingDocuments } from '@/lib/ai/dataTools'
+import { searchFirm, getFirmTaskSummary, getFirmMissingDocuments, buildOperationalContext } from '@/lib/ai/dataTools'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 30
@@ -113,6 +113,15 @@ export async function POST(req: NextRequest) {
     // asistan mevzuat bağlamı olmadan çalışmaya devam etsin.
   }
 
+  // Operasyonel gerçek veri (firma sayısı, ziyaret edilmeyen, ilerleme, eksik belge):
+  // soruda geçiyorsa sunucu hesaplar, modele hazır verilir.
+  let sistemVerisiContext = ''
+  try {
+    sistemVerisiContext = await buildOperationalContext(supabase, question, firmId)
+  } catch {
+    // veri okunamadıysa asistan eski davranışla çalışmaya devam etsin
+  }
+
   const systemPrompt = `### DİL KURALI — EN ÖNEMLİ KURAL ###
 SEN SADECE TÜRKÇE KONUŞURSUN. Her cevabın istisnasız TÜRKÇE olmalı.
 - Kullanıcı hangi dilde yazarsa yazsın, sen TÜRKÇE cevap verirsin.
@@ -185,13 +194,15 @@ Aynı şekilde: liste veya sayıyı SEN UYDURMA, sistem gerçek sorguyu çalış
 Bu yedi durumun DIŞINDA hiçbir eylem bloğu üretme — sadece soruları normal şekilde cevapla. Eylem bloğunu ürettiğinde bile önce kısa bir Türkçe cümleyle ne yaptığını açıkla.
 
 ### HALÜSİNASYON YASAĞI — OPERASYONEL VERİLER (KRİTİK) ###
-Firma görev sayısı, belge durumu, tarih, denetim sonucu gibi operasyonel TMGD verilerini SEN ASLA TAHMİN ETMEZSİN. Bu tür bir soru geldiğinde YUKARIDAKİ (6) veya (7) eylemini üretmeden kesinlikle sayı/isim/tarih söyleme. Sana bu bilgi az önce "GERÇEK SİSTEM SONUCU" olarak verilmemişse ve ilgili eylemi de üretmiyorsan, "Bu bilgiyi kontrol etmem gerekiyor" de.
+Firma görev sayısı, belge durumu, tarih, denetim sonucu gibi operasyonel TMGD verilerini SEN ASLA TAHMİN ETMEZSİN. Bu tür bir soru geldiğinde YUKARIDAKİ (6) veya (7) eylemini üretmeden kesinlikle sayı/isim/tarih söyleme. Sana bu bilgi az önce "GERÇEK SİSTEM SONUCU" veya "GERÇEK SİSTEM VERİSİ" olarak verilmemişse ve ilgili eylemi de üretmiyorsan, "Bu bilgiyi kontrol etmem gerekiyor" de.
 
 ${firmContext}
 
 ${unContext}
 
 ${mevzuatContext}
+
+${sistemVerisiContext}
 
 ### SON HATIRLATMA ###
 CEVABIN TAMAMI TÜRKÇE OLACAK. Düşünme metni yazma, doğrudan cevabı ver.
