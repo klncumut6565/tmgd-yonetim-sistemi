@@ -16,6 +16,8 @@ import {
   getFirmProgress,
   listFirms,
   getVisitOverview,
+  getDashboardSummary,
+  listTmgd,
   type TaskScope,
 } from '@/lib/ai/dataTools'
 
@@ -53,6 +55,10 @@ export async function executeDataTool(
     }
     case 'list_firms':
       return { status: 200, body: await listFirms(supabase, str('status') || undefined) }
+    case 'get_dashboard_summary':
+      return { status: 200, body: await getDashboardSummary(supabase) }
+    case 'list_tmgd':
+      return { status: 200, body: await listTmgd(supabase, args.include_inactive === true) }
     case 'get_visit_overview':
       return { status: 200, body: await getVisitOverview(supabase, str('month') || undefined) }
     case 'get_firm_progress':

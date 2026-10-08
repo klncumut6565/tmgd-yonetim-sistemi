@@ -96,6 +96,27 @@ export const TOOL_DEFS = [
     },
   },
   {
+    name: 'get_dashboard_summary',
+    description:
+      'Gösterge panelindeki GERÇEK bilgileri döndürür: toplam firma ve durum dağılımı, açık görev, yüklenen belge dosyası, araç sayısı, ' +
+      'süresi yaklaşan sürücü/araç/firma belgeleri, TMFB ve TMGD sertifika uyarıları, son görevler. "Gösterge panelinde ne var", ' +
+      '"süresi dolacak belge var mı", "kaç açık görevim var", "kaç aracım var" gibi sorularda çağrılır.',
+    parameters: { type: 'object', properties: {} },
+  },
+  {
+    name: 'list_tmgd',
+    description:
+      'Roller bölümündeki TMGD (Tehlikeli Madde Güvenlik Danışmanı) personelini döndürür: aktif çalışan TMGD sayısı, her TMGD için ad, ' +
+      'e-posta, telefon, atandığı firma sayısı, sertifika (S2) geçerlilik tarihi ve kalan gün; ayrıca aktif personelin rol dağılımı. ' +
+      '"Kaç aktif TMGD var", "TMGD bilgileri", "TMGD sertifikası ne zaman bitiyor" sorularında çağrılır.',
+    parameters: {
+      type: 'object',
+      properties: {
+        include_inactive: { type: 'boolean', description: 'true ise pasif/onaysız TMGD de listelenir (varsayılan false)' },
+      },
+    },
+  },
+  {
     name: 'get_visit_overview',
     description:
       'Firma Takvimi ile aynı kuralla, bir ayda ziyaret edilen ve ziyaret EDİLMEYEN firma sayısını ve ziyaret edilmeyen ' +

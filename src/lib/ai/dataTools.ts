@@ -565,3 +565,158 @@ export async function buildOperationalContext(
 
   return parcalar.join('\n')
 }
+
+
+// ---------------------------------------------------------------------------
+// get_dashboard_summary — Gösterge paneliyle AYNI kaynaklar ve eşikler.
+// ---------------------------------------------------------------------------
+
+function gunKaldi(tarih: string): number {
+  const bugun = new Date(new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Istanbul' }).format(new Date()) + 'T00:00:00')
+  const t = new Date(tarih.slice(0, 10) + 'T00:00:00')
+  return Math.round((t.getTime() - bugun.getTime()) / 86400000)
+}
+
+export async function getDashboardSummary(supabase: SupabaseClient) {
+  const GENEL = 45 // GENEL_UYARI_GUN (uyariEsikleri.ts) ile aynı
+  const [firmalar, gorev, belge, arac, surucuAdr, aracAdr, muayene, ehliyet, belgeler, tmfb, tmgdS2, son] =
+    await Promise.all([
+      supabase.from('firms').select('status'),
+      supabase.from('tasks').select('*', { count: 'exact', head: true }).in('status', ['todo', 'in_progress', 'review']),
+      supabase.from('firm_belge_dosyalari').select('*', { count: 'exact', head: true }),
+      supabase.from('vehicles').select('*', { count: 'exact', head: true }),
+      supabase.from('adr_expiring_drivers').select('first_name, last_name, adr_valid_until, firm_name, days_left').lte('days_left', GENEL).order('days_left').limit(15),
+      supabase.from('adr_expiring_vehicles').select('plate_number, adr_valid_until, firm_name, days_left').lte('days_left', GENEL).order('days_left').limit(15),
+      supabase.from('expiring_vehicle_inspections').select('plate_number, inspection_valid_until, firm_name, days_left').lte('days_left', GENEL).order('days_left').limit(15),
+      supabase.from('expiring_driver_licenses').select('first_name, last_name, driving_license_valid_until, firm_name, days_left').lte('days_left', GENEL).order('days_left').limit(15),
+      supabase.from('expiring_documents').select('title, expiry_date, firm_name, days_left').lte('days_left', GENEL).order('days_left').limit(20),
+      supabase.from('expiring_documents').select('title, expiry_date, firm_name, days_left').ilike('title', '%TMFB%').lte('days_left', 150).order('days_left').limit(15),
+      supabase.from('firm_belgeleri').select('firm_id, valid_until, firms ( name )').eq('code', 'S2').not('valid_until', 'is', null).order('valid_until'),
+      supabase.from('tasks').select('title, status, priority, due_date, firms ( name )').order('updated_at', { ascending: false }).limit(6),
+    ])
+
+  const durum: Record<string, number> = {}
+  for (const f of (firmalar.data ?? []) as { status: string }[]) {
+    const k = DURUM_TR[f.status] ?? f.status
+    durum[k] = (durum[k] ?? 0) + 1
+  }
+  type R = Record<string, unknown>
+  const rows = (r: { data: unknown }) => (r.data ?? []) as R[]
+
+  const tmgdSertifika = rows(tmgdS2)
+    .map((r) => ({
+      firm_name: String((r.firms as { name?: string } | null)?.name ?? ''),
+      valid_until: String(r.valid_until),
+      days_left: gunKaldi(String(r.valid_until)),
+    }))
+    .filter((x) => x.days_left <= 120)
+    .slice(0, 15)
+
+  return {
+    ok: true,
+    grounded: true,
+    kartlar: {
+      toplam_firma: (firmalar.data ?? []).length,
+      firma_durum_dagilimi: durum,
+      acik_gorev: gorev.count ?? 0,
+      yuklenen_belge_dosyasi: belge.count ?? 0,
+      arac_sayisi: arac.count ?? 0,
+    },
+    uyari_esigi_gun: GENEL,
+    suresi_yaklasan_surucu_belgeleri: [
+      ...rows(surucuAdr).map((d) => ({ tur: 'SRC-5 (ADR)', kisi: `${d.first_name} ${d.last_name}`, firma: d.firm_name, bitis: d.adr_valid_until, kalan_gun: d.days_left })),
+      ...rows(ehliyet).map((d) => ({ tur: 'Ehliyet', kisi: `${d.first_name} ${d.last_name}`, firma: d.firm_name, bitis: d.driving_license_valid_until, kalan_gun: d.days_left })),
+    ],
+    suresi_yaklasan_arac_belgeleri: [
+      ...rows(aracAdr).map((v) => ({ tur: 'ADR Belgesi', plaka: v.plate_number, firma: v.firm_name, bitis: v.adr_valid_until, kalan_gun: v.days_left })),
+      ...rows(muayene).map((v) => ({ tur: 'Muayene', plaka: v.plate_number, firma: v.firm_name, bitis: v.inspection_valid_until, kalan_gun: v.days_left })),
+    ],
+    suresi_yaklasan_firma_belgeleri: rows(belgeler)
+      .filter((b) => !/TMGD Sertifika/i.test(String(b.title)))
+      .map((b) => ({ belge: String(b.title).replace(/^Belge Takip:\s*/, ''), firma: b.firm_name, bitis: b.expiry_date, kalan_gun: b.days_left })),
+    tmfb_uyarilari_150_gun: rows(tmfb).map((b) => ({ belge: b.title, firma: b.firm_name, bitis: b.expiry_date, kalan_gun: b.days_left })),
+    tmgd_sertifika_uyarilari_120_gun: tmgdSertifika,
+    son_guncellenen_gorevler: rows(son).map((t) => ({
+      baslik: t.title,
+      durum: t.status,
+      oncelik: t.priority,
+      bitis: t.due_date,
+      firma: (t.firms as { name?: string } | null)?.name ?? null,
+    })),
+  }
+}
+
+// ---------------------------------------------------------------------------
+// list_tmgd — Roller bölümündeki TMGD (danışman) personeli: sayı, kişi bilgisi,
+// atandığı firma sayısı ve S2 (TMGD Sertifikası) geçerlilik tarihi.
+// ---------------------------------------------------------------------------
+
+const ROL_TR: Record<string, string> = {
+  super_admin: 'Süper Yönetici',
+  admin: 'Yönetici',
+  tmgd: 'TMGD',
+  assistant: 'Asistan',
+  viewer: 'İzleyici',
+  company: 'Firma Kullanıcısı',
+}
+
+export async function listTmgd(supabase: SupabaseClient, includeInactive = false) {
+  const { data: profiller } = await supabase
+    .from('profiles')
+    .select('id, full_name, email, phone, role, is_active, approval_status')
+    .order('full_name')
+  const hepsi = ((profiller ?? []) as {
+    id: string; full_name: string; email: string | null; phone: string | null
+    role: string; is_active: boolean | null; approval_status: string | null
+  }[])
+  const aktifMi = (p: { is_active: boolean | null; approval_status: string | null }) =>
+    p.is_active !== false && (p.approval_status == null || p.approval_status === 'approved')
+
+  const rolSayim: Record<string, number> = {}
+  for (const p of hepsi.filter(aktifMi)) {
+    const k = ROL_TR[p.role] ?? p.role
+    rolSayim[k] = (rolSayim[k] ?? 0) + 1
+  }
+
+  const tmgdler = hepsi.filter((p) => p.role === 'tmgd' && (includeInactive || aktifMi(p)))
+  const ids = tmgdler.map((p) => p.id)
+
+  const atamalar: Record<string, string[]> = {}
+  if (ids.length) {
+    const { data } = await supabase.from('user_firms').select('user_id, firm_id').in('user_id', ids)
+    for (const a of (data ?? []) as { user_id: string; firm_id: string }[]) (atamalar[a.user_id] ??= []).push(a.firm_id)
+  }
+  const tumFirmaIds = Array.from(new Set(Object.values(atamalar).flat()))
+  const sertifika: Record<string, string> = {}
+  if (tumFirmaIds.length) {
+    const { data } = await supabase
+      .from('firm_belgeleri')
+      .select('firm_id, valid_until')
+      .eq('code', 'S2')
+      .not('valid_until', 'is', null)
+      .in('firm_id', tumFirmaIds)
+    for (const r of (data ?? []) as { firm_id: string; valid_until: string }[]) sertifika[r.firm_id] = r.valid_until
+  }
+
+  return {
+    ok: true,
+    grounded: true,
+    aktif_tmgd_sayisi: hepsi.filter((p) => p.role === 'tmgd' && aktifMi(p)).length,
+    pasif_veya_onaysiz_tmgd_sayisi: hepsi.filter((p) => p.role === 'tmgd' && !aktifMi(p)).length,
+    aktif_personel_rol_dagilimi: rolSayim,
+    tmgd_listesi: tmgdler.map((p) => {
+      const firmalar = atamalar[p.id] ?? []
+      const tarihler = firmalar.map((f) => sertifika[f]).filter(Boolean).sort()
+      const enErken = tarihler[0]
+      return {
+        ad: p.full_name,
+        e_posta: p.email,
+        telefon: p.phone,
+        durum: aktifMi(p) ? 'Aktif' : 'Pasif/Onaysız',
+        atanan_firma_sayisi: firmalar.length,
+        sertifika_gecerlilik: enErken ?? null,
+        sertifika_kalan_gun: enErken ? gunKaldi(enErken) : null,
+      }
+    }),
+  }
+}
