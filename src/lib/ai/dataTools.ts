@@ -577,6 +577,53 @@ function gunKaldi(tarih: string): number {
   return Math.round((t.getTime() - bugun.getTime()) / 86400000)
 }
 
+type TmgdUyari = { id: string; kisi: string; firma?: string; valid_until: string; days_left: number }
+
+/** Gösterge paneli + bildirim zili ile AYNI kural: kişi bazlı, 120 gün, Süper Yönetici hariç. */
+async function tmgdSertifikaUyarilari(
+  supabase: SupabaseClient,
+  s2: Record<string, unknown>[]
+): Promise<TmgdUyari[]> {
+  const s2FirmaIds = Array.from(new Set(s2.map((r) => String(r.firm_id)).filter(Boolean)))
+  const atanan = new Map<string, { userId: string; ad: string }>()
+  if (s2FirmaIds.length) {
+    const { data: at } = await supabase
+      .from('user_firms')
+      .select('firm_id, user_id, profiles ( full_name, role, is_active )')
+      .in('firm_id', s2FirmaIds)
+    const oncelik: Record<string, number> = { tmgd: 0, assistant: 1, admin: 2 }
+    const secili = new Map<string, number>()
+    for (const a of (at ?? []) as unknown as { firm_id: string; user_id: string; profiles: { full_name?: string; role?: string; is_active?: boolean | null } | null }[]) {
+      const pr = a.profiles
+      if (!pr || pr.is_active === false) continue
+      const o = oncelik[String(pr.role)]
+      if (o === undefined) continue
+      const m = secili.get(a.firm_id)
+      if (m === undefined || o < m) {
+        atanan.set(a.firm_id, { userId: a.user_id, ad: String(pr.full_name || '').trim() || '(isim girilmemiş)' })
+        secili.set(a.firm_id, o)
+      }
+    }
+  }
+  const kisiBazli = new Map<string, TmgdUyari>()
+  for (const r of s2) {
+    const gun = gunKaldi(String(r.valid_until))
+    if (gun > 120) continue
+    const at = atanan.get(String(r.firm_id))
+    const anahtar = at ? `u:${at.userId}` : `f:${r.firm_id}`
+    const mevcut = kisiBazli.get(anahtar)
+    if (mevcut && mevcut.days_left <= gun) continue
+    kisiBazli.set(anahtar, {
+      id: `tmgd-${anahtar}`,
+      kisi: at ? at.ad : 'TMGD atanmamış',
+      ...(at ? {} : { firma: String((r.firms as { name?: string } | null)?.name ?? '') }),
+      valid_until: String(r.valid_until),
+      days_left: gun,
+    })
+  }
+  return Array.from(kisiBazli.values()).sort((x, y) => x.days_left - y.days_left)
+}
+
 export async function getDashboardSummary(supabase: SupabaseClient) {
   const GENEL = 45 // GENEL_UYARI_GUN (uyariEsikleri.ts) ile aynı
   const [firmalar, gorev, belge, arac, surucuAdr, aracAdr, muayene, ehliyet, belgeler, tmfb, tmgdS2, son] =
@@ -603,47 +650,7 @@ export async function getDashboardSummary(supabase: SupabaseClient) {
   type R = Record<string, unknown>
   const rows = (r: { data: unknown }) => (r.data ?? []) as R[]
 
-  // TMGD sertifikası KİŞİYE aittir (gösterge paneliyle aynı kural): firma → atanmış danışman
-  // (user_firms → profiles; TMGD > Asistan > Yönetici öncelikli, Süper Yönetici HARİÇ),
-  // kişi bazında tekilleştirilir, en erken tarih esas alınır.
-  const s2 = rows(tmgdS2)
-  const s2FirmaIds = Array.from(new Set(s2.map((r) => String(r.firm_id)).filter(Boolean)))
-  const atanan = new Map<string, { userId: string; ad: string }>()
-  if (s2FirmaIds.length) {
-    const { data: at } = await supabase
-      .from('user_firms')
-      .select('firm_id, user_id, profiles ( full_name, role, is_active )')
-      .in('firm_id', s2FirmaIds)
-    const oncelik: Record<string, number> = { tmgd: 0, assistant: 1, admin: 2 }
-    const secili = new Map<string, number>()
-    for (const a of (at ?? []) as unknown as { firm_id: string; user_id: string; profiles: { full_name?: string; role?: string; is_active?: boolean | null } | null }[]) {
-      const pr = a.profiles
-      if (!pr || pr.is_active === false) continue
-      const o = oncelik[String(pr.role)]
-      if (o === undefined) continue // süper yönetici / firma kullanıcısı / izleyici hariç
-      const m = secili.get(a.firm_id)
-      if (m === undefined || o < m) {
-        atanan.set(a.firm_id, { userId: a.user_id, ad: String(pr.full_name || '').trim() || '(isim girilmemiş)' })
-        secili.set(a.firm_id, o)
-      }
-    }
-  }
-  const kisiBazli = new Map<string, { kisi: string; firma?: string; valid_until: string; days_left: number }>()
-  for (const r of s2) {
-    const gun = gunKaldi(String(r.valid_until))
-    if (gun > 120) continue
-    const at = atanan.get(String(r.firm_id))
-    const anahtar = at ? `u:${at.userId}` : `f:${r.firm_id}`
-    const mevcut = kisiBazli.get(anahtar)
-    if (mevcut && mevcut.days_left <= gun) continue
-    kisiBazli.set(anahtar, {
-      kisi: at ? at.ad : 'TMGD atanmamış',
-      ...(at ? {} : { firma: String((r.firms as { name?: string } | null)?.name ?? '') }),
-      valid_until: String(r.valid_until),
-      days_left: gun,
-    })
-  }
-  const tmgdSertifika = Array.from(kisiBazli.values()).sort((a, b) => a.days_left - b.days_left).slice(0, 15)
+  const tmgdSertifika = (await tmgdSertifikaUyarilari(supabase, rows(tmgdS2))).slice(0, 15)
 
   return {
     ok: true,
@@ -756,5 +763,66 @@ export async function listTmgd(supabase: SupabaseClient, includeInactive = false
         sertifika_kalan_gun: enErken ? gunKaldi(enErken) : null,
       }
     }),
+  }
+}
+
+
+// ---------------------------------------------------------------------------
+// get_notifications — Bildirim zilindeki GERÇEK liste (NotificationBell.tsx ile aynı kurallar):
+// onay bekleyen kullanıcılar, belge uyarıları (45 gün; TMFB 150; TMGD sertifikası 120),
+// sürücü/araç uyarıları. Kullanıcının zilden "kaldırdığı" bildirimler elenir.
+// ---------------------------------------------------------------------------
+
+export async function getNotifications(supabase: SupabaseClient, userId?: string, onayBekleyenGoster = true) {
+  const GENEL = 45
+  const [kaldirilan, bekleyen, belgeler, tmfb, s2, surucuAdr, aracAdr, muayene, ehliyet] = await Promise.all([
+    userId ? supabase.from('dismissed_notifications').select('notification_key').eq('user_id', userId) : Promise.resolve({ data: [] }),
+    onayBekleyenGoster ? supabase.from('profiles').select('full_name, email').eq('approval_status', 'pending').limit(10) : Promise.resolve({ data: [] }),
+    supabase.from('expiring_documents').select('id, title, firm_name, days_left, expiry_date').lte('days_left', GENEL).order('days_left'),
+    supabase.from('expiring_documents').select('id, title, firm_name, days_left, expiry_date').ilike('title', '%TMFB%').lte('days_left', 150).order('days_left'),
+    supabase.from('firm_belgeleri').select('id, firm_id, valid_until, firms ( name )').eq('code', 'S2').not('valid_until', 'is', null).order('valid_until'),
+    supabase.from('adr_expiring_drivers').select('id, first_name, last_name, firm_name, days_left, adr_valid_until').lte('days_left', GENEL).order('days_left'),
+    supabase.from('adr_expiring_vehicles').select('id, plate_number, firm_name, days_left, adr_valid_until').lte('days_left', GENEL).order('days_left'),
+    supabase.from('expiring_vehicle_inspections').select('id, plate_number, firm_name, days_left, inspection_valid_until').lte('days_left', GENEL).order('days_left'),
+    supabase.from('expiring_driver_licenses').select('id, first_name, last_name, firm_name, days_left, driving_license_valid_until').lte('days_left', GENEL).order('days_left'),
+  ])
+  type R = Record<string, unknown>
+  const rows = (r: { data: unknown }) => (r.data ?? []) as R[]
+  const gizli = new Set(rows(kaldirilan).map((r) => String(r.notification_key)))
+
+  type B = { id: string; baslik: string; firma: string; kalan_gun: number; bitis: string }
+  const liste: B[] = []
+  const gorulen = new Set<string>()
+  for (const d of [...rows(belgeler), ...rows(tmfb)]) {
+    const id = String(d.id)
+    if (gorulen.has(id) || /TMGD Sertifika/i.test(String(d.title))) continue
+    gorulen.add(id)
+    liste.push({ id, baslik: String(d.title).replace(/^Belge Takip:\s*/, ''), firma: String(d.firm_name ?? ''), kalan_gun: Number(d.days_left), bitis: String(d.expiry_date) })
+  }
+  for (const t of await tmgdSertifikaUyarilari(supabase, rows(s2))) {
+    liste.push({
+      id: t.id,
+      baslik: t.kisi === 'TMGD atanmamış' ? 'TMGD atanmamış' : `TMGD Sertifikası — ${t.kisi}`,
+      firma: t.firma ? `${t.firma} — bu firmaya TMGD atanmamış` : '',
+      kalan_gun: t.days_left,
+      bitis: t.valid_until,
+    })
+  }
+  for (const d of rows(surucuAdr)) liste.push({ id: `drv-adr-${d.id}`, baslik: `${d.first_name} ${d.last_name} — SRC-5`, firma: String(d.firm_name), kalan_gun: Number(d.days_left), bitis: String(d.adr_valid_until) })
+  for (const v of rows(aracAdr)) liste.push({ id: `veh-adr-${v.id}`, baslik: `${v.plate_number} — ADR Belgesi`, firma: String(v.firm_name), kalan_gun: Number(v.days_left), bitis: String(v.adr_valid_until) })
+  for (const v of rows(muayene)) liste.push({ id: `veh-insp-${v.id}`, baslik: `${v.plate_number} — Muayene`, firma: String(v.firm_name), kalan_gun: Number(v.days_left), bitis: String(v.inspection_valid_until) })
+  for (const d of rows(ehliyet)) liste.push({ id: `drv-lic-${d.id}`, baslik: `${d.first_name} ${d.last_name} — Ehliyet`, firma: String(d.firm_name), kalan_gun: Number(d.days_left), bitis: String(d.driving_license_valid_until) })
+
+  const gorunur = liste.filter((b) => !gizli.has(b.id)).sort((a, b) => a.kalan_gun - b.kalan_gun)
+  const etiket = (g: number) => (g < 0 ? `${Math.abs(g)} gün geçti` : g === 0 ? 'Bugün doluyor' : `${g} gün kaldı`)
+  const onay = rows(bekleyen)
+  return {
+    ok: true,
+    grounded: true,
+    toplam_bildirim: gorunur.length + onay.length,
+    onay_bekleyen_kullanici_sayisi: onay.length,
+    onay_bekleyen_kullanicilar: onay.map((u) => ({ ad: u.full_name, e_posta: u.email })),
+    belge_ve_evrak_uyarisi_sayisi: gorunur.length,
+    uyarilar: gorunur.slice(0, 60).map((b) => ({ baslik: b.baslik, firma: b.firma, bitis: b.bitis, kalan: etiket(b.kalan_gun), kalan_gun: b.kalan_gun })),
   }
 }

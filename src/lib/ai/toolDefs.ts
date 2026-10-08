@@ -104,6 +104,14 @@ export const TOOL_DEFS = [
     parameters: { type: 'object', properties: {} },
   },
   {
+    name: 'get_notifications',
+    description:
+      'Bildirim zilindeki GERÇEK bildirimleri döndürür (zilden kaldırılanlar hariç): onay bekleyen kullanıcılar, süresi yaklaşan/geçen ' +
+      'belgeler (TMFB, TMGD sertifikası, firma belgeleri), sürücü SRC-5/ehliyet, araç ADR/muayene uyarıları; her biri için başlık, firma, ' +
+      'bitiş tarihi ve kalan gün. "Bildirimlerim neler", "zilde ne yazıyor", "kaç bildirimim var" sorularında çağrılır.',
+    parameters: { type: 'object', properties: {} },
+  },
+  {
     name: 'list_tmgd',
     description:
       'Roller bölümündeki TMGD (Tehlikeli Madde Güvenlik Danışmanı) personelini döndürür (rolü TMGD, Yönetici veya Asistan olanlar; Süper Yönetici hariç): aktif çalışan TMGD sayısı, her TMGD için ad, ' +

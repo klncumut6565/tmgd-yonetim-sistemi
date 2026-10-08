@@ -43,6 +43,6 @@ export async function POST(req: NextRequest) {
   const supabase = createAdminClient()
 
   // Tüm araçlar ortak yürütücüde (yazılı asistanla AYNI) — bkz. toolExec.ts
-  const sonuc = await executeDataTool(supabase, tool, args)
+  const sonuc = await executeDataTool(supabase, tool, args, { userId: admin.id })
   return NextResponse.json(sonuc.body, { status: sonuc.status })
 }

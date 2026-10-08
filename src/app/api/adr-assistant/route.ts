@@ -242,7 +242,7 @@ Eylem bloğu yazıyorsan MUTLAKA üç ters tırnakla KAPAT — kapatmazsan blok 
     if (cagrilar.some((c) => (NAV_TOOL_NAMES as readonly string[]).includes(c.name))) break
     const sonuclar: string[] = []
     for (const c of cagrilar.slice(0, 3)) {
-      const y = await executeDataTool(supabase, c.name, c.args)
+      const y = await executeDataTool(supabase, c.name, c.args, { userId: admin.id })
       let govde = JSON.stringify(y.body)
       if (govde.length > 6000) govde = govde.slice(0, 6000) + '…(kısaltıldı)'
       sonuclar.push(`ARAÇ SONUCU (${c.name}): ${govde}`)

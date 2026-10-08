@@ -18,6 +18,7 @@ import {
   getVisitOverview,
   getDashboardSummary,
   listTmgd,
+  getNotifications,
   type TaskScope,
 } from '@/lib/ai/dataTools'
 
@@ -33,7 +34,8 @@ const FIRM_ID_GEREKLI = {
 export async function executeDataTool(
   supabase: SupabaseClient,
   tool: string,
-  args: Record<string, unknown>
+  args: Record<string, unknown>,
+  ctx?: { userId?: string }
 ): Promise<ToolResult> {
   const str = (k: string) => (typeof args[k] === 'string' ? (args[k] as string) : '')
 
@@ -57,6 +59,9 @@ export async function executeDataTool(
       return { status: 200, body: await listFirms(supabase, str('status') || undefined) }
     case 'get_dashboard_summary':
       return { status: 200, body: await getDashboardSummary(supabase) }
+    case 'get_notifications':
+      // Asistan yalnızca Süper Yönetici tarafından kullanılır → zilde onay bekleyenler de görünür.
+      return { status: 200, body: await getNotifications(supabase, ctx?.userId, true) }
     case 'list_tmgd':
       return { status: 200, body: await listTmgd(supabase, args.include_inactive === true) }
     case 'get_visit_overview':
