@@ -96,7 +96,9 @@ const ACMA_FIILLERI = ["ac", "acar", "gec", "goster", "git", "getir", "acabilir"
 const EKRAN_KELIMELERI = ["ekranini", "ekrani", "ekran", "penceresini", "pencereyi", "pencere", "sayfasini", "sayfayi", "sayfa", "sekmesini", "sekmeyi", "sekme", "bolumunu", "bolum", "listesini"];
 
 function acmaNiyetiVarMi(metin: string): boolean {
-  return ACMA_FIILLERI.some((f) => new RegExp(`\\b${f}`, "i").test(metin));
+  // "gösterge" (gosterge) kelimesi "göster" fiiliyle KARIŞMASIN.
+  const t = metin.replace(/\bgosterge\w*/g, "");
+  return ACMA_FIILLERI.some((f) => new RegExp(`\\b${f}`, "i").test(t));
 }
 
 /** Metinden UN numaralarını çıkarır (4 haneli sayılar). */
@@ -178,6 +180,12 @@ export function yerelNiyetCoz(mesaj: string, firmaBagalamiVar: boolean): LocalIn
       cevap: parcalar.join(", ") + ". Kontrol edip \"Kalem Ekle\"ye basman yeterli.",
     };
   }
+
+  // ---- 1c) SORU ise komut değildir -------------------------------------
+  // "kaç aktif TMGD var ve gösterge panelinde ne var?" gibi veri soruları
+  // sayfa açma niyeti sayılmaz; araçlı LLM akışına gitmeli.
+  const soruMu = /\b(kac|kactir|kaci|ne var|nedir|hangi|hangisi|kimler|kimdir|kim|ne kadar|kadar|durumu|listele|say)\b/.test(m) || /\?/.test(mesaj);
+  if (soruMu) return null;
 
   // ---- 2) İsimle firma açma --------------------------------------------
   // "ABC firmasını aç", "XYZ Ltd firmasına git"
