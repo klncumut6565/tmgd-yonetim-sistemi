@@ -142,7 +142,7 @@ export function useRealtimeVoice(options: RealtimeVoiceOptions = {}) {
         // sidebar'daki genel sayfaya değil.
         const firmaEsle = pathnameRef.current?.match(/^\/firms\/([^/?#]+)/);
         const hedef = typeof args.page === "string"
-          ? (sayfaHedefi(args.page, firmaEsle ? firmaEsle[1] : null) ?? SAYFA_YOLLARI[args.page])
+          ? (sayfaHedefi(args.page, firmaEsle ? firmaEsle[1] : null, args.month) ?? SAYFA_YOLLARI[args.page])
           : undefined;
         if (!hedef) return { error: "Geçersiz sayfa." };
         router.push(hedef);

@@ -39,7 +39,7 @@ export type AssistantAction =
   | { type: "get_missing_documents"; firm_name: string }
   // --- Ortak araç sistemi (sesli asistanla AYNI araçlar, bkz. toolDefs.ts) ---
   | { type: "tool"; name: string; args: Record<string, unknown> }
-  | { type: "go_to_page"; page: GoToPageKey }
+  | { type: "go_to_page"; page: GoToPageKey; month?: string }
   | { type: "go_back" };
 
 const GECERLI_ALT = ["evrak", "sevkiyat", "envanter", "liste", "gorevli", "surucu_listesi", "arac_evraki"];
@@ -76,7 +76,35 @@ export const FIRMA_SEKME_ESLEME: Record<string, string> = {
  * içinde karşılığı olan bir üst sekmesi varsa o sekmeye gider; yoksa (ya da
  * firma sayfasında değilse) sidebar'daki genel sayfaya gider.
  */
-export function sayfaHedefi(page: string, firmId: string | null): string | null {
+const AY_ADLARI = ["ocak","subat","mart","nisan","mayis","haziran","temmuz","agustos","eylul","ekim","kasim","aralik"];
+
+/** "2026-09", "gecen_ay", "bu_ay", "gelecek_ay", 9, "eylül" → "YYYY-MM" (göreli ifadeler
+ *  istemcinin saatine göre çözülür; model tarihi bilmek zorunda kalmaz). Ay adı/numarası
+ *  yılsız verilirse gelecekteki bir ay en yakın GEÇMİŞ yılına yorumlanır. */
+export function ayCoz(m: unknown, simdi: Date = new Date()): string | null {
+  if (m === undefined || m === null || m === "") return null;
+  const fmt = (y: number, a: number) => `${y}-${String(a + 1).padStart(2, "0")}`;
+  const y = simdi.getFullYear();
+  const a = simdi.getMonth();
+  const t = String(m).trim().toLowerCase()
+    .replace(/ı/g, "i").replace(/ş/g, "s").replace(/ğ/g, "g").replace(/ü/g, "u").replace(/ö/g, "o").replace(/ç/g, "c")
+    .replace(/\s+/g, "_");
+  if (/^\d{4}-\d{2}$/.test(t)) return +t.slice(5) >= 1 && +t.slice(5) <= 12 ? t : null;
+  if (/^(gecen|onceki)(_ay)?$/.test(t)) return a === 0 ? fmt(y - 1, 11) : fmt(y, a - 1);
+  if (/^(bu|su_an|simdiki)(_ay)?$/.test(t)) return fmt(y, a);
+  if (/^(gelecek|sonraki|onumuzdeki)(_ay)?$/.test(t)) return a === 11 ? fmt(y + 1, 0) : fmt(y, a + 1);
+  let ay = -1;
+  if (/^\d{1,2}$/.test(t)) ay = +t - 1;
+  else ay = AY_ADLARI.findIndex((n) => t.startsWith(n));
+  if (ay < 0 || ay > 11) return null;
+  return fmt(ay > a ? y - 1 : y, ay);
+}
+
+export function sayfaHedefi(page: string, firmId: string | null, month?: unknown): string | null {
+  if (page === "firma_takvimi") {
+    const ay = ayCoz(month);
+    return ay ? `${GO_TO_PAGES.firma_takvimi}?ay=${ay}` : GO_TO_PAGES.firma_takvimi;
+  }
   const sekme = FIRMA_SEKME_ESLEME[page];
   if (firmId && sekme) return `/firms/${firmId}?tab=${sekme}`;
   return GO_TO_PAGES[page] ?? null;
@@ -174,7 +202,7 @@ export function cipakToolJsonlari(text: string): {
         calls.push({ type: "tool", name: p.name.trim(), args });
         alindi = true;
       } else if (p?.type === "go_to_page" && typeof p.page === "string" && p.page in GO_TO_PAGES) {
-        calls.push({ type: "go_to_page", page: p.page });
+        calls.push({ type: "go_to_page", page: p.page, month: typeof p.month === "string" ? p.month : undefined });
         alindi = true;
       }
     } catch { /* JSON değil */ }
@@ -287,7 +315,7 @@ export function extractAction(text: string): { cleanText: string; action: Assist
     }
 
     if (parsed?.type === "go_to_page" && typeof parsed.page === "string" && parsed.page in GO_TO_PAGES) {
-      return { cleanText, action: { type: "go_to_page", page: parsed.page } };
+      return { cleanText, action: { type: "go_to_page", page: parsed.page, month: typeof parsed.month === "string" ? parsed.month : undefined } };
     }
 
     const GECERLI_SCOPE = ["overdue", "today", "upcoming", "all"] as const;
@@ -376,7 +404,7 @@ export function actionToUrl(action: AssistantAction, firmId: string | null): str
       return `/firms/${action.firm_id}${qs ? `?${qs}` : ""}`;
     }
     case "go_to_page":
-      return sayfaHedefi(action.page, firmId);
+      return sayfaHedefi(action.page, firmId, action.month);
     case "go_back":
       // Tarayıcı geçmişinde geri gitmek URL değil; çağıran taraf router.back() yapar.
       return null;

@@ -12,8 +12,9 @@
 // firma detayındaki Ziyaret Raporu maddeleri de aynı tabloyu kullandığı için
 // buradan eklenen kayıtlar oralarda da görünür.
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
 import { useUser } from "@/hooks/useUser";
 import { hataCevir } from "@/lib/hataCevir";
@@ -129,11 +130,28 @@ function ayBasiOfset(yil: number, ay: number): number {
 }
 
 export default function FirmaTakvimiPage() {
+  return (
+    <Suspense fallback={<div className="p-8 text-gray-500">Yükleniyor...</div>}>
+      <FirmaTakvimiIcerik />
+    </Suspense>
+  );
+}
+
+function FirmaTakvimiIcerik() {
   const { canWrite } = useUser();
 
   const bugun = useMemo(() => new Date(), []);
-  const [yil, setYil] = useState(bugun.getFullYear());
-  const [ay, setAy] = useState(bugun.getMonth()); // 0-11
+  // ?ay=YYYY-MM ile (ör. asistan: "geçen ayın takvimini aç") belirli bir ay açılır.
+  const ayParam = useSearchParams().get("ay");
+  const ayEsle = ayParam ? /^(\d{4})-(\d{2})$/.exec(ayParam) : null;
+  const ilkYil = ayEsle && +ayEsle[2] >= 1 && +ayEsle[2] <= 12 ? +ayEsle[1] : bugun.getFullYear();
+  const ilkAy = ayEsle && +ayEsle[2] >= 1 && +ayEsle[2] <= 12 ? +ayEsle[2] - 1 : bugun.getMonth();
+  const [yil, setYil] = useState(ilkYil);
+  const [ay, setAy] = useState(ilkAy); // 0-11
+  useEffect(() => {
+    setYil(ilkYil);
+    setAy(ilkAy);
+  }, [ilkYil, ilkAy]);
 
   const [firmalar, setFirmalar] = useState<Firm[]>([]);
   const [ziyaretler, setZiyaretler] = useState<Visit[]>([]);

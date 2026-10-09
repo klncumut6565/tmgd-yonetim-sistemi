@@ -196,6 +196,12 @@ export const TOOL_DEFS = [
             'suruculer=Sürücüler, personeller=Personeller, ziyaretler=Ziyaretler, raporlar=Raporlar, ' +
             'adr_bilgi_motoru=ADR Bilgi Motoru, ayarlar=Ayarlar',
         },
+        month: {
+          type: 'string',
+          description:
+            "Yalnızca firma_takvimi için, opsiyonel: açılacak ay. 'gecen_ay' | 'bu_ay' | 'gelecek_ay' | 'YYYY-MM' (ör. 2026-09) | ay adı (ör. 'eylül'). " +
+            "Tarihi tahmin etme; kullanıcı 'geçen ay' derse gecen_ay, 'eylül' derse eylul yaz.",
+        },
       },
       required: ['page'],
     },

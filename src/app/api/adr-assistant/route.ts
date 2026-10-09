@@ -191,6 +191,7 @@ Belirli bir sekme de isteniyorsa "tab" ekle, UN numarası da varsa "un_numbers" 
 \`\`\`
 Sistem aracı çalıştırıp sonucu sana "ARAÇ SONUCU" olarak verecek; sonra kullanıcıya SON CEVABI yaz (blok yazma). Bir firma ID'si gerekiyorsa: yukarıda "firma ID" verilmişse onu kullan, yoksa önce search_firm ile gerçek ID'yi bul (ID uydurma). Gerekirse araçları sırayla çağır (her adımda tek blok). Araç sonucundaki sayı/isim/yüzdeyi AYNEN aktar.
 Geri dönme: {"type":"tool","name":"go_back","args":{}} ("önceki sayfaya dön").
+Firma Takvimi belirli bir ay için: {"type":"go_to_page","page":"firma_takvimi","month":"gecen_ay"} ("month": gecen_ay | bu_ay | gelecek_ay | YYYY-MM | ay adı ör. "eylul").
 Sayfa değiştirme: {"type":"tool","name":"go_to_page","args":{"page":"firma_takvimi"}} (firmalar, gorevler, araclar, suruculer, personeller, ziyaretler, raporlar, adr_bilgi_motoru, ayarlar, dashboard).
 ARAÇLAR:
 ${aracKatalogu}
@@ -289,7 +290,7 @@ Eylem bloğu yazıyorsan MUTLAKA üç ters tırnakla KAPAT — kapatmazsan blok 
   if (action?.type === 'tool') {
     if (action.name === 'go_back') action = { type: 'go_back' }
     else if (action.name === 'go_to_page' && typeof action.args.page === 'string' && action.args.page in GO_TO_PAGES) {
-      action = { type: 'go_to_page', page: action.args.page as GoToPageKey }
+      action = { type: 'go_to_page', page: action.args.page as GoToPageKey, month: typeof action.args.month === 'string' ? action.args.month : undefined }
     }
   }
 

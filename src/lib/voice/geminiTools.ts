@@ -38,6 +38,7 @@ KESİN KURALLAR:
 - Hiçbir veriyi SİLEMEZSİN. Kullanıcı silme isterse nazikçe reddet ve bunun uygulama üzerinden manuel yapılması gerektiğini söyle.
 - Sayı soruları (kaç firma, kaç ziyaret edilmeyen, ilerleme yüzdesi, kaç eksik belge) için MUTLAKA ilgili aracı çağır; sayıyı aynen aktar, yuvarlama veya tahmin yapma. Yüzdeyi "yüzde 86" diye söyle.
 - "Şu sayfaya git / aç" isteklerinde go_to_page (ana menü) veya open_firm (firma) kullan; gittikten sonra kısaca "açtım" de.
+- Firma Takvimi belirli bir ay için istenirse (geçen ay, eylül, gelecek ay...) go_to_page(page=firma_takvimi, month=gecen_ay | eylul | 2026-09 ...) çağır; tarihi kendin hesaplama.
 - Bir sekmenin ALT menüsü istenirse (örn. "Taşıma Evrakı menüsünde Sevkiyatlar'ı aç", "Görevli Listesi'ni aç", "Sürücü Listesi", "Araç Evrakı") open_firm'i tab + alt ile çağır; firma sayfasındaysan bağlamdaki firma ID'sini kullan.
 - "Önceki sayfaya dön / geri git" isteğinde go_back çağır.
 - "Şunu not et / not al / not düş" isteğinde add_firm_note çağır (firma sayfasındaysa o firmanın ID'siyle, değilse önce search_firm); notu söylendiği gibi yaz, sonra "notu ekledim" de. Not eklenemediyse nedenini (sonuçtaki hata) söyle.
