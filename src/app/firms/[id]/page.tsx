@@ -917,14 +917,14 @@ function FirmDetailInner({
   }
 
   return (
-    <div className="p-8">
-      <div className="flex items-center justify-between mb-1">
-        <div className="flex items-center gap-3">
+    <div className="p-3 sm:p-8">
+      <div className="flex flex-wrap items-center justify-between gap-2 mb-1">
+        <div className="flex items-center gap-3 min-w-0">
           {logoUrl && (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={logoUrl} alt="logo" className="h-10 w-10 object-contain rounded" />
           )}
-          <h1 className="text-3xl font-bold">{firm.name}</h1>
+          <h1 className="text-xl sm:text-3xl font-bold break-words">{firm.name}</h1>
         </div>
         <Link href="/firms" className="text-sm text-gray-500 hover:underline">
           ← Firmalar
@@ -1220,7 +1220,7 @@ function FirmDetailInner({
 
       {/* BELGE TAKİP — faaliyete göre şekillenen akordeon liste */}
       {tab === "belge_takip" && (
-        <div className="flex gap-6 items-start">
+        <div className="flex flex-col lg:flex-row gap-6 items-stretch lg:items-start">
           {/* SOL: belge takip listesi */}
           <div className="flex-1 min-w-0 max-w-4xl">
           {/* Genel ilerleme */}
@@ -1327,7 +1327,7 @@ function FirmDetailInner({
 
                         return (
                           <div key={itemKey} className="px-4 py-2 text-sm hover:bg-gray-50">
-                            <div className="flex items-center gap-3">
+                            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
                               <label className={"flex items-center gap-3 flex-1 min-w-0 " + (canWrite ? "cursor-pointer" : "")}>
                                 <input
                                   type="checkbox"
@@ -1336,7 +1336,7 @@ function FirmDetailInner({
                                   onChange={() => toggleItem(it.code, it.period)}
                                   className="w-4 h-4 shrink-0"
                                 />
-                                <span className={"truncate " + (done ? "line-through text-gray-400" : "")}>
+                                <span className={"sm:truncate break-words min-w-0 " + (done ? "line-through text-gray-400" : "")}>
                                   {it.label}
                                 </span>
                                 {itemFiles.length > 0 && (
@@ -1359,7 +1359,7 @@ function FirmDetailInner({
                               {isZiyaret ? (
                                 /* Ziyaret Tarihi — Ziyaretler özelliğiyle bağlantılı: girilen
                                    tarih gerçek bir visits kaydı oluşturur/günceller. */
-                                <div className="flex items-center gap-1 shrink-0 text-xs text-gray-400">
+                                <div className="flex flex-wrap items-center gap-1 sm:shrink-0 text-xs text-gray-400">
                                   <span title="Ziyaret Tarihi — Ziyaretler sekmesiyle bağlantılıdır">📅 Ziyaret Tarihi:</span>
                                   <DateInput
                                     value={visitDate}
@@ -1374,7 +1374,7 @@ function FirmDetailInner({
                                    sistem bu tarihi ziyaret raporu ayları ve yıllık
                                    faaliyet raporu hesaplarında kullandığı için ayrı
                                    bir tarih tutmak tutarsızlık yaratırdı. */
-                                <div className="flex items-center gap-1 shrink-0 text-xs text-gray-400">
+                                <div className="flex flex-wrap items-center gap-1 sm:shrink-0 text-xs text-gray-400">
                                   <span title="Sözleşme Başlangıç Tarihi — ziyaret ve yıllık rapor takvimini belirler">
                                     📅 Başlangıç:
                                   </span>
@@ -1387,7 +1387,7 @@ function FirmDetailInner({
                               ) : gecerlilikYok ? null : (
                                 /* Geçerlilik tarihi — isteğe bağlı. DateInput hibrit bileşeni:
                                    hem GG.AA.YYYY yazılabilir hem 📅 ikonundan takvim açılır. */
-                                <div className="flex items-center gap-1 shrink-0 text-xs text-gray-400">
+                                <div className="flex flex-wrap items-center gap-1 sm:shrink-0 text-xs text-gray-400">
                                   <span title="Belge Geçerlilik Tarihi (isteğe bağlı)">📅 Geçerlilik:</span>
                                   <DateInput
                                     value={expiryDate}
@@ -1398,7 +1398,7 @@ function FirmDetailInner({
                               )}
 
                               {/* Dosya ekleme — çoklu seçim, PDF/Word/JPEG/PNG */}
-                              <div className="flex items-center gap-1 shrink-0">
+                              <div className="flex flex-wrap items-center gap-1 sm:shrink-0">
                                 {uploading && (
                                   <span className="text-xs text-gray-400">Yükleniyor...</span>
                                 )}

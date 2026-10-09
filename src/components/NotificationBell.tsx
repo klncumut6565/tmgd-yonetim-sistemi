@@ -390,7 +390,7 @@ export default function NotificationBell() {
   );
 
   return (
-    <div className="relative" ref={ref}>
+    <div className="sm:relative" ref={ref}>
       <button
         onClick={() => setOpen((o) => !o)}
         className="relative p-2 rounded hover:bg-gray-100"
@@ -405,7 +405,7 @@ export default function NotificationBell() {
       </button>
 
       {open && (
-        <div className="absolute right-0 mt-2 w-96 bg-white border rounded-xl shadow-xl z-50 overflow-hidden max-h-[80vh] flex flex-col">
+        <div className="fixed left-2 right-2 top-14 sm:absolute sm:left-auto sm:right-0 sm:top-auto sm:mt-2 sm:w-96 bg-white border rounded-xl shadow-xl z-50 overflow-hidden max-h-[80vh] flex flex-col">
           {/* Başlık */}
           <div className="p-3 border-b font-medium text-sm flex items-center justify-between">
             <span>Bildirimler {total > 0 && `(${total})`}</span>
