@@ -6,11 +6,19 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
+// Bilinen Türkçe KADIN sesleri (Microsoft Emel, Google Türkçe, Apple Yelda...)
+// ve erkek sesleri — kadın sesi her zaman tercih edilir, ses sürekliliği için.
+const KADIN_ISIMLER = /emel|yelda|filiz|seda|google t[üu]rk[çc]e|female|kad[ıi]n/i;
+const ERKEK_ISIMLER = /tolga|ahmet|cem|male|erkek/i;
+
 function turkceSesiSec(): SpeechSynthesisVoice | null {
-  const sesler = window.speechSynthesis.getVoices();
+  const sesler = window.speechSynthesis
+    .getVoices()
+    .filter((s) => s.lang.toLowerCase().startsWith("tr"));
   return (
-    sesler.find((s) => s.lang.toLowerCase().startsWith("tr")) ??
-    sesler.find((s) => s.lang.toLowerCase().startsWith("tr-tr")) ??
+    sesler.find((s) => KADIN_ISIMLER.test(s.name) && !ERKEK_ISIMLER.test(s.name)) ??
+    sesler.find((s) => !ERKEK_ISIMLER.test(s.name)) ??
+    sesler[0] ??
     null
   );
 }

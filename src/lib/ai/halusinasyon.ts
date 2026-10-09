@@ -67,7 +67,7 @@ const KALIPLAR: RegExp[] = [
   /don'?t forget to subscribe/,
 
   // Tek başına anlamsız kısa çıktılar
-  /^(tesekkurler|tesekkur ederim|sagolun|thank you|thanks|bye|hosca kalin)$/,
+  /^(thank you|thanks|bye)$/,
   /^(altyazi|subtitle)s?$/,
 ];
 
@@ -94,7 +94,7 @@ export function halusinasyonMu(metin: string): boolean {
   if (kelimeler.length >= 2 && kelimeler.length <= 6) {
     const benzersiz = new Set(kelimeler);
     // Tüm kelimeler aynı (ya da tek kelimenin tekrarı) ve kısa
-    if (benzersiz.size === 1 && kelimeler[0].length <= 8) return true;
+    if (benzersiz.size === 1 && kelimeler[0].length <= 8 && !/^(tamam|evet|hayir|olur|peki|tesekkurler|sagol)$/.test(kelimeler[0])) return true;
   }
 
   const sade = trNormalize(ham);

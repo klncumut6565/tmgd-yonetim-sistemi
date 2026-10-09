@@ -17,6 +17,7 @@
 //
 // Bu hook ADRAssistantWidget içinde "Canlı Konuşma (Beta)" butonuna bağlıdır.
 
+import { supabase } from "@/lib/supabase/client";
 import { useCallback, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { authFetch } from "@/lib/supabase/authFetch";
@@ -139,6 +140,13 @@ export function useRealtimeVoice(options: RealtimeVoiceOptions = {}) {
       if (name === "open_firm") {
         const firmId = typeof args.firm_id === "string" ? args.firm_id : "";
         if (!firmId) return { error: "firm_id eksik." };
+        // Modelin uydurduğu ID'ye güvenme: biçim + gerçekten var mı ve
+        // kullanıcı görebiliyor mu (RLS) kontrolü, ardından yönlendirme.
+        if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(firmId)) {
+          return { error: "Geçersiz firma ID'si. Önce search_firm ile firmayı ara." };
+        }
+        const { data: varMi } = await supabase.from("firms").select("id").eq("id", firmId).maybeSingle();
+        if (!varMi) return { error: "Bu ID'ye ait erişilebilir bir firma yok. Önce search_firm ile firmayı ara." };
         const tab = typeof args.tab === "string" ? args.tab : undefined;
         router.push(await firmTabUrl(firmId, tab));
         return { ok: true, navigated: true };

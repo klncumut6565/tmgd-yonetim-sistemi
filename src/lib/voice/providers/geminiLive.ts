@@ -135,7 +135,12 @@ export class GeminiLiveProvider implements RealtimeProvider {
               generationConfig: {
                 responseModalities: ["AUDIO"],
                 // Konuşma dili HER ZAMAN Türkçe (otomatik dil algılama yok).
-                speechConfig: { languageCode: "tr-TR" },
+                speechConfig: {
+                  languageCode: "tr-TR",
+                  // SABİT KADIN SESİ — voiceName verilmezse model sesi
+                  // oturumdan oturuma değişebiliyor. "Kore" kadın sesidir.
+                  voiceConfig: { prebuiltVoiceConfig: { voiceName: "Kore" } },
+                },
               },
               systemInstruction: { parts: [{ text: systemInstruction || GEMINI_LIVE_SYSTEM_INSTRUCTION }] },
               inputAudioTranscription: {},

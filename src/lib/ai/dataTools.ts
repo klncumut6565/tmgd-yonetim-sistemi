@@ -401,7 +401,7 @@ export async function searchRegulation(
       kaynak: p.sayi_no ? `${p.baslik} (${p.sayi_no})` : p.baslik,
       sayfa: p.sayfa_no,
       // Sesli cevap için çok uzun metin göndermeyelim.
-      icerik: p.icerik.length > 1200 ? p.icerik.slice(0, 1200) + '…' : p.icerik,
+      icerik: p.icerik.length > 3000 ? p.icerik.slice(0, 3000) + ' […devamı var: metin kesildi, kesin hüküm için maddenin tamamına bakılmalı]' : p.icerik,
     }))
     return parts.length
       ? { ok: true, parts }
