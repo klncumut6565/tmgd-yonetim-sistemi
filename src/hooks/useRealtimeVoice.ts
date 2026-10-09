@@ -19,7 +19,8 @@
 
 import { supabase } from "@/lib/supabase/client";
 import { useCallback, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
+import { sayfaHedefi } from "@/lib/ai/actions";
 import { authFetch } from "@/lib/supabase/authFetch";
 import { GeminiLiveProvider } from "@/lib/voice/providers/geminiLive";
 import { startMicCapture, AudioPlaybackQueue, type MicCapture } from "@/lib/voice/audioStream";
@@ -85,6 +86,9 @@ export function useRealtimeVoice(options: RealtimeVoiceOptions = {}) {
   optionsRef.current = options;
   const turKullaniciRef = useRef("");
   const router = useRouter();
+  const pathname = usePathname();
+  const pathnameRef = useRef(pathname);
+  pathnameRef.current = pathname;
   const [session, setSession] = useState<VoiceSession>(BOS_SESSION);
 
   const providerRef = useRef<GeminiLiveProvider | null>(null);
@@ -131,7 +135,12 @@ export function useRealtimeVoice(options: RealtimeVoiceOptions = {}) {
   const araciCalistirIc = useCallback(
     async (name: string, args: Record<string, unknown>): Promise<unknown> => {
       if (name === "go_to_page") {
-        const hedef = typeof args.page === "string" ? SAYFA_YOLLARI[args.page] : undefined;
+        // Firma sayfasındaysak önce O FİRMANIN üst sekmesine git (ör. Araçlar),
+        // sidebar'daki genel sayfaya değil.
+        const firmaEsle = pathnameRef.current?.match(/^\/firms\/([^/?#]+)/);
+        const hedef = typeof args.page === "string"
+          ? (sayfaHedefi(args.page, firmaEsle ? firmaEsle[1] : null) ?? SAYFA_YOLLARI[args.page])
+          : undefined;
         if (!hedef) return { error: "Geçersiz sayfa." };
         router.push(hedef);
         return { ok: true, navigated: true, page: args.page };

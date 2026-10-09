@@ -152,7 +152,7 @@ export const TOOL_DEFS = [
   {
     name: 'go_to_page',
     description:
-      'Uygulamanın ana menü sayfalarından birine gider (navigasyon). Belirli bir firmanın sayfası için open_firm kullanılır.',
+      'Uygulamanın ana menü sayfalarından birine gider (navigasyon). Kullanıcı bir firma sayfasındaysa gorevler/araclar/suruculer/personeller/ziyaretler için o firmanın üst sekmesi açılır (genel sidebar sayfası değil). Belirli bir firmanın sayfası için open_firm kullanılır.',
     parameters: {
       type: 'object',
       properties: {

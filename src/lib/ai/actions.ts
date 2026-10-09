@@ -56,6 +56,26 @@ export const GO_TO_PAGES: Record<string, string> = {
 };
 export type GoToPageKey = keyof typeof GO_TO_PAGES;
 
+/** Ana menü sayfası → firma sayfasındaki ÜST SEKME karşılığı. */
+export const FIRMA_SEKME_ESLEME: Record<string, string> = {
+  gorevler: "tasks",
+  araclar: "vehicles",
+  suruculer: "drivers",
+  personeller: "employees",
+  ziyaretler: "visits",
+};
+
+/**
+ * Kullanıcı bir FİRMA sayfasındayken (firmId varsa) ve istenen sayfanın firma
+ * içinde karşılığı olan bir üst sekmesi varsa o sekmeye gider; yoksa (ya da
+ * firma sayfasında değilse) sidebar'daki genel sayfaya gider.
+ */
+export function sayfaHedefi(page: string, firmId: string | null): string | null {
+  const sekme = FIRMA_SEKME_ESLEME[page];
+  if (firmId && sekme) return `/firms/${firmId}?tab=${sekme}`;
+  return GO_TO_PAGES[page] ?? null;
+}
+
 // Kapanışlı blok: ```eylem {...} ```
 const ACTION_BLOCK_RE = /```eylem\s*([\s\S]*?)```/i;
 // Kapanışsız blok: model kapanış işaretini yazmayı unutabiliyor ya da
@@ -344,7 +364,7 @@ export function actionToUrl(action: AssistantAction, firmId: string | null): str
       return `/firms/${action.firm_id}${qs ? `?${qs}` : ""}`;
     }
     case "go_to_page":
-      return GO_TO_PAGES[action.page] ?? null;
+      return sayfaHedefi(action.page, firmId);
     case "tool":
     case "get_task_summary":
     case "get_missing_documents":
