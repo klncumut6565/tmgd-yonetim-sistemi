@@ -186,13 +186,30 @@ export async function startMicCapture(onChunk: (pcm: ArrayBuffer) => void): Prom
  */
 export class AudioPlaybackQueue {
   private audioContext: AudioContext;
+  private cikis: GainNode;
   private kuyruk: AudioBufferSourceNode[] = [];
   private sonrakiBaslangicZamani = 0;
   private onSpeakingChange: ((speaking: boolean) => void) | null = null;
 
+  /** JITTER TAMPONU: ağdan gelen parçalar geç kalsa da ses kopmasın diye
+   *  konuşma başında / kuyruk boşalıp yeniden dolduğunda çalma bu kadar
+   *  ileriye planlanır. (Kısa tutuldu: gecikme hissi yaratmasın.) */
+  private static readonly JITTER_SN = 0.12;
+  /** Barge-in'de sesin tık sesi çıkarmadan kısılma süresi. */
+  private static readonly SONUM_SN = 0.03;
+
   constructor() {
     const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-    this.audioContext = new AudioCtx();
+    // Bağlamı doğrudan 24 kHz'de aç: her parçanın ayrı ayrı yeniden
+    // örneklenmesinden doğan kenar çıtırtılarını önler. Desteklenmezse
+    // varsayılana düşer.
+    try {
+      this.audioContext = new AudioCtx({ sampleRate: CIKIS_ORNEKLEME });
+    } catch {
+      this.audioContext = new AudioCtx();
+    }
+    this.cikis = this.audioContext.createGain();
+    this.cikis.connect(this.audioContext.destination);
     // Kullanıcı tıklamasıyla (Canlı Konuşma butonu) oluşturulur; yine de
     // askıdaysa devam ettir.
     void this.audioContext.resume().catch(() => {});
@@ -204,7 +221,10 @@ export class AudioPlaybackQueue {
 
   /** Ham 24kHz/16-bit/mono PCM parçasını kuyruğa ekler ve sırayla çalar. */
   enqueue(pcmChunk: ArrayBuffer) {
-    const int16 = new Int16Array(pcmChunk);
+    // Tek sayıda bayt gelirse (yarım örnek) Int16Array hata verir — kırp.
+    const bayt = pcmChunk.byteLength - (pcmChunk.byteLength % 2);
+    if (bayt <= 0) return;
+    const int16 = new Int16Array(pcmChunk.slice(0, bayt));
     const float32 = new Float32Array(int16.length);
     for (let i = 0; i < int16.length; i++) float32[i] = int16[i] / 0x8000;
 
@@ -213,10 +233,15 @@ export class AudioPlaybackQueue {
 
     const source = this.audioContext.createBufferSource();
     source.buffer = buffer;
-    source.connect(this.audioContext.destination);
+    source.connect(this.cikis);
 
     const simdi = this.audioContext.currentTime;
-    const baslangic = Math.max(simdi, this.sonrakiBaslangicZamani);
+    // Kuyruk boşalmışsa (ilk parça ya da ağ gecikmesi sonrası) çalmayı
+    // jitter payı kadar ileriye planla; böylece sonraki parçalar yetişir.
+    let baslangic = this.sonrakiBaslangicZamani;
+    if (baslangic < simdi + 0.005) {
+      baslangic = simdi + AudioPlaybackQueue.JITTER_SN;
+    }
     source.start(baslangic);
     this.sonrakiBaslangicZamani = baslangic + buffer.duration;
 
@@ -233,22 +258,44 @@ export class AudioPlaybackQueue {
     return this.kuyruk.length > 0;
   }
 
-  /** Barge-in: henüz çalınmamış/çalmakta olan tüm parçaları anında durdurur. */
+  /** Barge-in: çalan/çalınacak tüm parçaları, tık sesi çıkmaması için
+   *  ~30 ms'lik kısa bir kısılmayla durdurur. */
   clear() {
-    this.kuyruk.forEach((s) => {
-      try {
-        s.stop();
-      } catch {
-        // zaten durmuşsa hata verebilir, önemsiz
-      }
-    });
+    const eskiler = this.kuyruk;
     this.kuyruk = [];
-    this.sonrakiBaslangicZamani = this.audioContext.currentTime;
     this.onSpeakingChange?.(false);
+
+    const t = this.audioContext.currentTime;
+    const eskiGain = this.cikis;
+    try {
+      eskiGain.gain.cancelScheduledValues(t);
+      eskiGain.gain.setValueAtTime(eskiGain.gain.value, t);
+      eskiGain.gain.linearRampToValueAtTime(0, t + AudioPlaybackQueue.SONUM_SN);
+    } catch {}
+
+    // Yeni konuşma için temiz bir çıkış düğümü; eskisi kısılıp atılır.
+    this.cikis = this.audioContext.createGain();
+    this.cikis.connect(this.audioContext.destination);
+    this.sonrakiBaslangicZamani = 0;
+
+    setTimeout(() => {
+      eskiler.forEach((s) => {
+        try {
+          s.stop();
+        } catch {
+          // zaten durmuşsa hata verebilir, önemsiz
+        }
+      });
+      try {
+        eskiGain.disconnect();
+      } catch {}
+    }, AudioPlaybackQueue.SONUM_SN * 1000 + 20);
   }
 
   close() {
     this.clear();
-    this.audioContext.close();
+    setTimeout(() => {
+      void this.audioContext.close().catch(() => {});
+    }, 120);
   }
 }
