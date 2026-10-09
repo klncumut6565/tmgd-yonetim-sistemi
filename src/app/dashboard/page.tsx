@@ -250,7 +250,6 @@ export default function DashboardPage() {
       }));
 
       setDrivers([...drvAdr, ...drvLic].sort((a, b) => a.days_left - b.days_left));
-      setVehicles([...vehAdr, ...vehInsp].sort((a, b) => a.days_left - b.days_left));
 
       // Firma/Belge Takip belgeleri — genel pencere + TMFB'nin özel
       // (150 gün) sonuçları birleştirilir. id bazlı tekilleştirme yapılır.
@@ -258,15 +257,33 @@ export default function DashboardPage() {
       const belgeHam = [...(expDocsRes.data || []), ...(expTmfbRes.data || [])];
       const gorulen = new Set<string>();
       const belgeListesi: ExpiringItem[] = [];
+      // "Araç Evrakı Oluştur" ekranından gelen PLAKALI belgeler (ör. "Araç
+      // Muayenesi — 27 TG 298") firma belgesi değil ARAÇ belgesidir: aynı tür
+      // belge (muayene) iki ayrı bölümde görünüp çelişki yaratmasın diye
+      // "Araç Belgeleri" kartına taşınır.
+      const aracEvrakKalemleri: ExpiringItem[] = [];
       for (const b of belgeHam as Record<string, unknown>[]) {
         const bid = String(b.id);
         if (gorulen.has(bid)) continue;
         // TMGD Sertifikası kendi bölümünde gösteriliyor — burada elenir.
         if (/TMGD Sertifika/i.test(String(b.title))) continue;
         gorulen.add(bid);
-        // Başlıktaki "Belge Takip: " ön ekini kaldır — panelde zaten
-        // "Firma Belgeleri" başlığı altında gösteriliyor.
-        const baslik = String(b.title).replace(/^Belge Takip:\s*/, "");
+        // Başlıktaki "Belge Takip: " / "Araç Evrakı: " ön eki kaldırılır —
+        // panelde zaten bölüm başlığı bağlamı veriyor.
+        const baslik = String(b.title).replace(/^(Belge Takip|Araç Evrakı):\s*/, "");
+        const aracEvraki = /^Araç Evrakı:/.test(String(b.title));
+        const plakali = aracEvraki ? /^(.*?)\s+—\s+(.+)$/.exec(baslik) : null;
+        if (plakali) {
+          aracEvrakKalemleri.push({
+            id: `arac-evrak-${bid}`,
+            label: plakali[2],
+            docType: plakali[1],
+            valid_until: String(b.expiry_date),
+            days_left: Number(b.days_left),
+            firm_name: String(b.firm_name),
+          });
+          continue;
+        }
         belgeListesi.push({
           id: `doc-${bid}`,
           label: baslik,
@@ -276,6 +293,22 @@ export default function DashboardPage() {
           firm_name: String(b.firm_name),
         });
       }
+      // Muayene iki kaynaktan gelebilir (araç kaydındaki tarih + Araç Evrakı
+      // yüklemesi): aynı plaka için ikisi de varsa ÇAKIŞMAMASI için yalnızca
+      // daha geç (güncel) olan gösterilir.
+      const muayeneMi = (t: string) => /muayene/i.test(t);
+      const aracListesi: ExpiringItem[] = [...vehAdr, ...vehInsp];
+      for (const k of aracEvrakKalemleri) {
+        if (muayeneMi(k.docType)) {
+          const i = aracListesi.findIndex((v) => v.label === k.label && muayeneMi(v.docType));
+          if (i >= 0) {
+            if (new Date(k.valid_until) > new Date(aracListesi[i].valid_until)) aracListesi[i] = k;
+            continue;
+          }
+        }
+        aracListesi.push(k);
+      }
+      setVehicles(aracListesi.sort((a, b) => a.days_left - b.days_left));
       setBelgeler(belgeListesi.sort((a, b) => a.days_left - b.days_left));
 
       // ---- TMGD Sertifikaları (S2) — kendi bölümü, 120 gün eşiği ----------
@@ -441,7 +474,7 @@ export default function DashboardPage() {
         </div>
 
         <div className="border rounded-xl p-4">
-          <h3 className="font-medium text-gray-600 mb-3">Araç Belgeleri (ADR · Muayene)</h3>
+          <h3 className="font-medium text-gray-600 mb-3">Araç Belgeleri (ADR · Muayene · Ruhsat · Sigorta · Diğer)</h3>
           {loading && <p className="text-sm text-gray-500">Yükleniyor...</p>}
           {!loading && vehicles.length === 0 && (
             <p className="text-sm text-gray-500">{GENEL_UYARI_GUN} gün içinde süresi dolan araç belgesi yok. ✓</p>

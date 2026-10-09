@@ -673,7 +673,7 @@ export async function getDashboardSummary(supabase: SupabaseClient) {
     ],
     suresi_yaklasan_firma_belgeleri: rows(belgeler)
       .filter((b) => !/TMGD Sertifika/i.test(String(b.title)))
-      .map((b) => ({ belge: String(b.title).replace(/^Belge Takip:\s*/, ''), firma: b.firm_name, bitis: b.expiry_date, kalan_gun: b.days_left })),
+      .map((b) => ({ belge: String(b.title).replace(/^(Belge Takip|Araç Evrakı):\s*/, ''), firma: b.firm_name, bitis: b.expiry_date, kalan_gun: b.days_left })),
     tmfb_uyarilari_150_gun: rows(tmfb).map((b) => ({ belge: b.title, firma: b.firm_name, bitis: b.expiry_date, kalan_gun: b.days_left })),
     tmgd_sertifika_uyarilari_120_gun: tmgdSertifika,
     son_guncellenen_gorevler: rows(son).map((t) => ({
@@ -797,7 +797,7 @@ export async function getNotifications(supabase: SupabaseClient, userId?: string
     const id = String(d.id)
     if (gorulen.has(id) || /TMGD Sertifika/i.test(String(d.title))) continue
     gorulen.add(id)
-    liste.push({ id, baslik: String(d.title).replace(/^Belge Takip:\s*/, ''), firma: String(d.firm_name ?? ''), kalan_gun: Number(d.days_left), bitis: String(d.expiry_date) })
+    liste.push({ id, baslik: String(d.title).replace(/^(Belge Takip|Araç Evrakı):\s*/, ''), firma: String(d.firm_name ?? ''), kalan_gun: Number(d.days_left), bitis: String(d.expiry_date) })
   }
   for (const t of await tmgdSertifikaUyarilari(supabase, rows(s2))) {
     liste.push({

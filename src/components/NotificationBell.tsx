@@ -140,7 +140,7 @@ export default function NotificationBell() {
       belgeSonuclari.push(
         ...(((data as ExpiringDoc[]) || [])
           .filter((d) => !/TMGD Sertifika/i.test(d.title))
-          .map((d) => ({ ...d, title: d.title.replace(/^Belge Takip:\s*/, "") })))
+          .map((d) => ({ ...d, title: d.title.replace(/^(Belge Takip|Araç Evrakı):\s*/, "") })))
       );
     }
 
@@ -218,7 +218,7 @@ export default function NotificationBell() {
     const gorulenIdler = new Set(belgeSonuclari.map((d) => d.id));
     for (const d of (tmfbData as ExpiringDoc[]) || []) {
       if (!gorulenIdler.has(d.id)) {
-        belgeSonuclari.push({ ...d, title: d.title.replace(/^Belge Takip:\s*/, "") });
+        belgeSonuclari.push({ ...d, title: d.title.replace(/^(Belge Takip|Araç Evrakı):\s*/, "") });
       }
     }
     
