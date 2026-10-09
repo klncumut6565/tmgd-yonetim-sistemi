@@ -20,6 +20,7 @@ import {
   listTmgd,
   getNotifications,
   addFirmNote,
+  getFirmDocuments,
   type TaskScope,
 } from '@/lib/ai/dataTools'
 
@@ -63,6 +64,9 @@ export async function executeDataTool(
     case 'get_notifications':
       // Zilde onay bekleyenler yalnızca Süper Yönetici'ye gösterilir.
       return { status: 200, body: await getNotifications(supabase, ctx?.userId, ctx?.isSuperAdmin === true) }
+    case 'get_firm_documents':
+      if (!str('firm_id')) return FIRM_ID_GEREKLI
+      return { status: 200, body: await getFirmDocuments(supabase, str('firm_id'), str('query') || undefined) }
     case 'add_firm_note':
       if (!str('firm_id')) return FIRM_ID_GEREKLI
       return {

@@ -856,3 +856,73 @@ export async function addFirmNote(
   if (error) return { ok: false, error: 'Not kaydedilemedi: ' + error.message }
   return { ok: true, firm: (firma as { name: string }).name, saved: metin.slice(0, 4000) }
 }
+
+
+/**
+ * get_firm_documents — bir firmanın Belge Takip'teki belgeleri ve YÜKLÜ
+ * belgelere ait tarihler (geçerlilik/bitiş tarihi, kalan gün, dosya sayısı).
+ * `query` verilirse belge adına göre süzülür (ör. "TMFB", "muayene").
+ */
+export async function getFirmDocuments(supabase: SupabaseClient, firmId: string, query?: string) {
+  const { data: firma } = await supabase
+    .from('firms')
+    .select('id, name, status, activities, contract_start')
+    .eq('id', firmId)
+    .maybeSingle()
+  if (!firma) return { ok: false, error: 'Firma bulunamadı.' }
+  const f = firma as FirmaBelgeSatiri
+
+  const [{ data: satirlar }, { data: dosyalar }] = await Promise.all([
+    supabase.from('firm_belgeleri').select('code, period, done, valid_until').eq('firm_id', firmId).limit(5000),
+    supabase.from('firm_belge_dosyalari').select('code, period').eq('firm_id', firmId).limit(5000),
+  ])
+  const kayit = new Map<string, { done: boolean; valid_until: string | null }>()
+  for (const r of (satirlar ?? []) as { code: string; period: string | null; done: boolean; valid_until: string | null }[]) {
+    kayit.set(`${r.code}|${r.period ?? ''}`, { done: !!r.done, valid_until: r.valid_until })
+  }
+  const dosyaSayisi = new Map<string, number>()
+  for (const r of (dosyalar ?? []) as { code: string; period: string | null }[]) {
+    const k = `${r.code}|${r.period ?? ''}`
+    dosyaSayisi.set(k, (dosyaSayisi.get(k) ?? 0) + 1)
+  }
+
+  const bugun = new Date()
+  bugun.setHours(0, 0, 0, 0)
+  const norm = (t: string) => normAd(t)
+  const q = query ? norm(query) : ''
+  const liste: {
+    belge: string; bolum: string; tamamlandi: boolean; gecerlilik_tarihi: string | null;
+    kalan_gun: number | null; yuklu_dosya_sayisi: number
+  }[] = []
+
+  for (const sec of buildChecklist(f.activities ?? [], f.contract_start)) {
+    for (const it of sec.items) {
+      if (!takipteSayilirMi(it.code)) continue
+      const k = `${it.code}|${it.period}`
+      const kr = kayit.get(k)
+      const dosya = dosyaSayisi.get(k) ?? 0
+      const belge = codeLabel(it.code, it.period)
+      if (q && !norm(belge).includes(q) && !norm(codeSection(it.code)).includes(q)) continue
+      const vu = kr?.valid_until ?? null
+      let kalan: number | null = null
+      if (vu) kalan = Math.round((new Date(vu).getTime() - bugun.getTime()) / 86400000)
+      // Sorgu yoksa yalnızca tarihi olan ya da dosya yüklenmiş belgeler listelenir.
+      if (!q && !vu && dosya === 0) continue
+      liste.push({
+        belge, bolum: codeSection(it.code), tamamlandi: !!kr?.done,
+        gecerlilik_tarihi: vu, kalan_gun: kalan, yuklu_dosya_sayisi: dosya,
+      })
+    }
+  }
+  liste.sort((a, b) => (a.kalan_gun ?? 99999) - (b.kalan_gun ?? 99999))
+  return {
+    ok: true,
+    grounded: true,
+    firm_id: firmId,
+    firm_name: f.name,
+    sozlesme_baslangic: f.contract_start,
+    count: liste.length,
+    documents: liste.slice(0, 60),
+    note: q ? undefined : 'Yalnızca geçerlilik tarihi girilmiş veya dosya yüklenmiş belgeler listelendi; belirli bir belge için query ver.',
+  }
+}

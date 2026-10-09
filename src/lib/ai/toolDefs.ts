@@ -54,6 +54,21 @@ export const TOOL_DEFS = [
     },
   },
   {
+    name: 'get_firm_documents',
+    description:
+      "Bir firmanın Belge Takip ekranındaki belgelerini ve YÜKLÜ belgelere ait TARİHLERİ döndürür (geçerlilik/bitiş tarihi, kalan gün, yüklü dosya sayısı, tamamlandı mı). " +
+      "'TMFB ne zaman doluyor', 'muayene tarihi', 'hangi belgelerin süresi yaklaşıyor' gibi sorularda kullanılır. Tarihi ASLA tahmin etme. " +
+      'Belirli bir belge için query ver (ör. "TMFB", "sigorta"); vermezsen tarihi/dosyası olan belgeler listelenir.',
+    parameters: {
+      type: 'object',
+      properties: {
+        firm_id: { type: 'string', description: "search_firm sonucundaki gerçek firma ID'si (firma sayfasındaysa o firma)" },
+        query: { type: 'string', description: 'Belge adından süzmek için kelime (opsiyonel)' },
+      },
+      required: ['firm_id'],
+    },
+  },
+  {
     name: 'add_firm_note',
     description:
       "Bir firmanın Notlar sekmesine yeni not EKLER (kullanıcı 'şunu not et / not al / not düş' dediğinde). " +
