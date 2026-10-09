@@ -74,6 +74,31 @@ export default function ADRAssistantWidget() {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<DisplayMessage[]>([]);
+  // SOHBET KALICILIĞI: menüler arası geçişte bileşen yeniden kurulsa bile
+  // sohbet sıfırlanmasın diye oturum boyunca sessionStorage'da tutulur.
+  const sohbetYuklendiRef = useRef(false);
+  useEffect(() => {
+    try {
+      const ham = sessionStorage.getItem("adr-asistan-sohbet");
+      if (ham) {
+        const k = JSON.parse(ham) as { messages?: DisplayMessage[]; open?: boolean };
+        if (Array.isArray(k.messages) && k.messages.length) {
+          setMessages(k.messages.filter((m) => !m.pending));
+        }
+        if (k.open) setOpen(true);
+      }
+    } catch {}
+    sohbetYuklendiRef.current = true;
+  }, []);
+  useEffect(() => {
+    if (!sohbetYuklendiRef.current) return;
+    try {
+      sessionStorage.setItem(
+        "adr-asistan-sohbet",
+        JSON.stringify({ messages: messages.filter((m) => !m.pending).slice(-60), open })
+      );
+    } catch {}
+  }, [messages, open]);
   /**
    * Mesaj listesinin GÜNCEL kopyası.
    *
