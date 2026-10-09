@@ -826,3 +826,33 @@ export async function getNotifications(supabase: SupabaseClient, userId?: string
     uyarilar: gorunur.slice(0, 60).map((b) => ({ baslik: b.baslik, firma: b.firma, bitis: b.bitis, kalan: etiket(b.kalan_gun), kalan_gun: b.kalan_gun })),
   }
 }
+
+
+/**
+ * Firma Notları'na (Notlar sekmesi) yeni not ekler. Notlar yalnızca Süper
+ * Yönetici'ye açıktır (RLS: firm_notes_super_admin_all) — diğer roller için
+ * kullanıcıya anlaşılır bir mesaj döner. Asistan eklediği için is_assistant=true.
+ */
+export async function addFirmNote(
+  supabase: SupabaseClient,
+  userId: string | undefined,
+  isSuperAdmin: boolean,
+  firmId: string,
+  content: string
+) {
+  const metin = content.trim()
+  if (!metin) return { ok: false, error: 'Not metni boş.' }
+  if (!isSuperAdmin) {
+    return { ok: false, error: "Firma notları yalnızca Süper Yönetici'ye açık; bu rolle not eklenemiyor." }
+  }
+  const { data: firma } = await supabase.from('firms').select('id, name').eq('id', firmId).maybeSingle()
+  if (!firma) return { ok: false, error: 'Bu ID ile bir firma bulunamadı. Önce search_firm ile firmayı ara.' }
+  const { error } = await supabase.from('firm_notes').insert({
+    firm_id: firmId,
+    author_id: userId ?? null,
+    is_assistant: true,
+    content: metin.slice(0, 4000),
+  })
+  if (error) return { ok: false, error: 'Not kaydedilemedi: ' + error.message }
+  return { ok: true, firm: (firma as { name: string }).name, saved: metin.slice(0, 4000) }
+}

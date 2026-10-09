@@ -146,6 +146,11 @@ export function useRealtimeVoice(options: RealtimeVoiceOptions = {}) {
         return { ok: true, navigated: true, page: args.page };
       }
 
+      if (name === "go_back") {
+        router.back();
+        return { ok: true, navigated: true };
+      }
+
       if (name === "open_firm") {
         const firmId = typeof args.firm_id === "string" ? args.firm_id : "";
         if (!firmId) return { error: "firm_id eksik." };

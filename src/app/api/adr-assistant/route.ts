@@ -14,7 +14,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getAsistanKullanicisiFromRequest, asistanVeriIstemcisi } from '@/lib/supabase/verifySuperAdmin'
 import { callWithFallback, type ProviderConfig, type ChatMessage } from '@/lib/ai/multiEngine'
-import { extractAction, tumAracCagrilari, cipakToolJsonlari } from '@/lib/ai/actions'
+import { extractAction, tumAracCagrilari, cipakToolJsonlari, GO_TO_PAGES, type GoToPageKey } from '@/lib/ai/actions'
 import { checkPair, type UnRow, type CheckResult } from '@/lib/adrMix'
 import { searchFirm, getFirmTaskSummary, getFirmMissingDocuments } from '@/lib/ai/dataTools'
 import { TOOL_DEFS, NAV_TOOL_NAMES } from '@/lib/ai/toolDefs'
@@ -189,6 +189,7 @@ Belirli bir sekme de isteniyorsa "tab" ekle, UN numarası da varsa "un_numbers" 
 {"type":"tool","name":"ARAC_ADI","args":{"parametre":"değer"}}
 \`\`\`
 Sistem aracı çalıştırıp sonucu sana "ARAÇ SONUCU" olarak verecek; sonra kullanıcıya SON CEVABI yaz (blok yazma). Bir firma ID'si gerekiyorsa: yukarıda "firma ID" verilmişse onu kullan, yoksa önce search_firm ile gerçek ID'yi bul (ID uydurma). Gerekirse araçları sırayla çağır (her adımda tek blok). Araç sonucundaki sayı/isim/yüzdeyi AYNEN aktar.
+Geri dönme: {"type":"tool","name":"go_back","args":{}} ("önceki sayfaya dön").
 Sayfa değiştirme: {"type":"tool","name":"go_to_page","args":{"page":"firma_takvimi"}} (firmalar, gorevler, araclar, suruculer, personeller, ziyaretler, raporlar, adr_bilgi_motoru, ayarlar, dashboard).
 ARAÇLAR:
 ${aracKatalogu}
@@ -281,6 +282,15 @@ Eylem bloğu yazıyorsan MUTLAKA üç ters tırnakla KAPAT — kapatmazsan blok 
   const { cleanText, action: rawAction } = extractAction(result.text as string)
   let finalAnswer = cleanText
   let action = rawAction
+
+  // Navigasyon araçları {"type":"tool","name":...} biçiminde gelirse uygulama
+  // eylemine çevir (sunucuda çalışmazlar).
+  if (action?.type === 'tool') {
+    if (action.name === 'go_back') action = { type: 'go_back' }
+    else if (action.name === 'go_to_page' && typeof action.args.page === 'string' && action.args.page in GO_TO_PAGES) {
+      action = { type: 'go_to_page', page: action.args.page as GoToPageKey }
+    }
+  }
 
   // open_firm eylemiyse: LLM sadece bir isim söyledi, firm_id BİLMİYOR
   // ve UYDURAMAZ. Sunucu gerçek "firms" tablosunda arar:

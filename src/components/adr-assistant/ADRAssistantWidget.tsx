@@ -625,7 +625,9 @@ export default function ADRAssistantWidget() {
           seslendirVeDinle(json.answer as string);
         }
 
-        if (json.action) {
+        if (json.action?.type === "go_back") {
+          router.back();
+        } else if (json.action) {
           const url = actionToUrl(json.action, firmId);
           if (url) {
             router.push(url);

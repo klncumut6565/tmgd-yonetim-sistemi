@@ -46,6 +46,27 @@ export const TOOL_DEFS = [
     },
   },
   {
+    name: 'add_firm_note',
+    description:
+      "Bir firmanın Notlar sekmesine yeni not EKLER (kullanıcı 'şunu not et / not al / not düş' dediğinde). " +
+      "Önce search_firm ile gerçek firma ID'si bulunur (kullanıcı bir firma sayfasındaysa o firmanın ID'si kullanılır). " +
+      'Notu kullanıcının söylediği gibi, anlamını değiştirmeden yaz. Kaydettikten sonra "notu ekledim" de.',
+    parameters: {
+      type: 'object',
+      properties: {
+        firm_id: { type: 'string', description: "Gerçek firma ID'si" },
+        content: { type: 'string', description: 'Kaydedilecek not metni' },
+      },
+      required: ['firm_id', 'content'],
+    },
+  },
+  {
+    name: 'go_back',
+    description:
+      "Önceki sayfaya geri döner (tarayıcıdaki geri tuşu gibi). 'önceki sayfaya dön', 'geri git' dendiğinde kullanılır.",
+    parameters: { type: 'object', properties: {} },
+  },
+  {
     name: 'get_task_summary',
     description:
       'Bir firmanın GERÇEK görev sayısını ve listesini döndürür (gecikmiş/bugünkü/yaklaşan/tümü). ' +
@@ -222,6 +243,6 @@ export const TOOL_DEFS = [
 ] as const;
 
 /** Tarayıcıda/uygulamada sayfa değiştiren (sunucuda çalıştırılmayan) araçlar. */
-export const NAV_TOOL_NAMES = ['open_firm', 'go_to_page'] as const;
+export const NAV_TOOL_NAMES = ['open_firm', 'go_to_page', 'go_back'] as const;
 
 export const TOOL_NAMES = TOOL_DEFS.map((t) => t.name) as string[];

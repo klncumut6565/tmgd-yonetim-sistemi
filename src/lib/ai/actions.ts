@@ -39,7 +39,8 @@ export type AssistantAction =
   | { type: "get_missing_documents"; firm_name: string }
   // --- Ortak araç sistemi (sesli asistanla AYNI araçlar, bkz. toolDefs.ts) ---
   | { type: "tool"; name: string; args: Record<string, unknown> }
-  | { type: "go_to_page"; page: GoToPageKey };
+  | { type: "go_to_page"; page: GoToPageKey }
+  | { type: "go_back" };
 
 export const GO_TO_PAGES: Record<string, string> = {
   dashboard: "/dashboard",
@@ -276,6 +277,10 @@ export function extractAction(text: string): { cleanText: string; action: Assist
       return { cleanText, action: { type: "tool", name: parsed.name.trim(), args } };
     }
 
+    if (parsed?.type === "go_back") {
+      return { cleanText, action: { type: "go_back" } };
+    }
+
     if (parsed?.type === "go_to_page" && typeof parsed.page === "string" && parsed.page in GO_TO_PAGES) {
       return { cleanText, action: { type: "go_to_page", page: parsed.page } };
     }
@@ -365,6 +370,9 @@ export function actionToUrl(action: AssistantAction, firmId: string | null): str
     }
     case "go_to_page":
       return sayfaHedefi(action.page, firmId);
+    case "go_back":
+      // Tarayıcı geçmişinde geri gitmek URL değil; çağıran taraf router.back() yapar.
+      return null;
     case "tool":
     case "get_task_summary":
     case "get_missing_documents":
