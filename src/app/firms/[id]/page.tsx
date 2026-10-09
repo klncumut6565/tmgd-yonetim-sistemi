@@ -314,6 +314,14 @@ function FirmDetailInner({
     const altParam = searchParams.get("alt");
     if (altParam === "arac_evraki") setAracAltSekme("arac_evraki");
     if (altParam === "surucu_listesi") setSurucuAltSekme("surucu_listesi");
+    // Asistan/harici bağlantılar için: ?tab=adr_transport&alt=sevkiyat gibi
+    // alt menüyü doğrudan açar ("liste" sekmeye göre çözülür).
+    if (tabParam === "adr_transport" && (altParam === "evrak" || altParam === "sevkiyat" || altParam === "envanter")) {
+      setAdrAltSekme(altParam);
+    }
+    if (tabParam === "employees" && (altParam === "liste" || altParam === "gorevli")) setPersonelAltSekme(altParam);
+    if (tabParam === "drivers" && altParam === "liste") setSurucuAltSekme("liste");
+    if (tabParam === "vehicles" && altParam === "liste") setAracAltSekme("liste");
 
     const aracIdParam = searchParams.get("arac_id");
     if (aracIdParam) setAracEvrakiPreselectId(aracIdParam);

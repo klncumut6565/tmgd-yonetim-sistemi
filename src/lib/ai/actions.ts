@@ -26,8 +26,8 @@ export type FirmTabKey = (typeof VALID_FIRM_TABS)[number];
 export type AssistantAction =
   | { type: "open_belge_olustur" }
   | { type: "open_karisik_yukleme"; un_numbers: string[] }
-  | { type: "open_firm_tab"; tab: FirmTabKey; un_numbers?: string[]; quantity?: number }
-  | { type: "open_firm"; firm_id?: string; firm_name: string; tab?: FirmTabKey; un_numbers?: string[]; quantity?: number }
+  | { type: "open_firm_tab"; tab: FirmTabKey; alt?: string; un_numbers?: string[]; quantity?: number }
+  | { type: "open_firm"; firm_id?: string; firm_name: string; tab?: FirmTabKey; alt?: string; un_numbers?: string[]; quantity?: number }
   | { type: "prefill_task"; title: string }
   // --- Salt-okunur VERİ eylemleri (Halüsinasyon Önleme Mimarisi) ---
   // Bunlar navigasyon YAPMAZ; sunucu tarafında (route.ts) gerçek Supabase
@@ -41,6 +41,11 @@ export type AssistantAction =
   | { type: "tool"; name: string; args: Record<string, unknown> }
   | { type: "go_to_page"; page: GoToPageKey }
   | { type: "go_back" };
+
+const GECERLI_ALT = ["evrak", "sevkiyat", "envanter", "liste", "gorevli", "surucu_listesi", "arac_evraki"];
+function gecerliAlt(v: unknown): string | undefined {
+  return typeof v === "string" && GECERLI_ALT.includes(v) ? v : undefined;
+}
 
 export const GO_TO_PAGES: Record<string, string> = {
   dashboard: "/dashboard",
@@ -241,7 +246,7 @@ export function extractAction(text: string): { cleanText: string; action: Assist
           : undefined;
       return {
         cleanText,
-        action: { type: "open_firm_tab", tab: parsed.tab as FirmTabKey, un_numbers: unNumbers },
+        action: { type: "open_firm_tab", tab: parsed.tab as FirmTabKey, alt: gecerliAlt(parsed.alt), un_numbers: unNumbers },
       };
     }
 
@@ -265,7 +270,7 @@ export function extractAction(text: string): { cleanText: string; action: Assist
       // Sunucu tarafı (route.ts) gerçek veritabanı aramasıyla dolduracak.
       return {
         cleanText,
-        action: { type: "open_firm", firm_name: parsed.firm_name.trim(), tab, un_numbers: unNumbers },
+        action: { type: "open_firm", firm_name: parsed.firm_name.trim(), tab, alt: gecerliAlt(parsed.alt), un_numbers: unNumbers },
       };
     }
 
@@ -340,6 +345,7 @@ export function actionToUrl(action: AssistantAction, firmId: string | null): str
     case "open_firm_tab": {
       if (!firmId) return null;
       const params = new URLSearchParams({ tab: action.tab });
+      if (action.alt) params.set("alt", action.alt);
       if (action.un_numbers && action.un_numbers.length > 0) {
         params.set("evrak_un", action.un_numbers.join(","));
       }
@@ -361,6 +367,7 @@ export function actionToUrl(action: AssistantAction, firmId: string | null): str
       if (!action.firm_id) return null;
       const params = new URLSearchParams();
       if (action.tab) params.set("tab", action.tab);
+      if (action.tab && action.alt) params.set("alt", action.alt);
       if (action.un_numbers && action.un_numbers.length > 0) {
         params.set("evrak_un", action.un_numbers.join(","));
       }

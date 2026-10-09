@@ -165,6 +165,7 @@ Bu eylemi ürettiğinde UYUMLULUK SONUCUNU SEN YAZMA (tahmin etme) — sistem bu
 {"type":"open_firm_tab","tab":"adr_transport"}
 \`\`\`
 Geçerli "tab" değerleri: belge_takip, tasks, documents, belge_olustur, vehicles, drivers, employees, visits, adr_transport (Taşıma Evrakı), genel, denetim, notlar. Başka bir değer ASLA üretme.
+Alt menü de isteniyorsa "alt" ekle (örn. "Taşıma Evrakı menüsünde Sevkiyatlar"): {"type":"open_firm_tab","tab":"adr_transport","alt":"sevkiyat"}. Geçerli "alt": adr_transport → evrak (Taşıma Evrakı) | sevkiyat (Sevkiyatlar) | envanter (Kimyasal Envanter); employees → liste | gorevli (Görevli Listesi); drivers → liste | surucu_listesi (Sürücü Listesi); vehicles → liste | arac_evraki (Araç Evrakı Oluştur).
 
 4) Kullanıcı BAŞKA BİR FİRMAYI İSMİYLE açmak istiyorsa (örn. "ABC firmasını aç", "XYZ Ltd'nin taşıma evrakını göster") — bu, hangi ekranda olunursa olunsun kullanılabilir (genel ekranda dahil):
 \`\`\`eylem

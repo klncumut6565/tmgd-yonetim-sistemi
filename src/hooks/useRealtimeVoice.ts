@@ -68,9 +68,12 @@ const SAYFA_YOLLARI: Record<string, string> = {
 
 /** Gemini function-call adı -> uygulama içi firma sekmesi eşleşmesi
  *  gerekmiyor; open_firm zaten tam "tab" parametresini iletir. */
-async function firmTabUrl(firmId: string, tab?: string): Promise<string> {
-  const params = tab ? `?tab=${encodeURIComponent(tab)}` : "";
-  return `/firms/${firmId}${params}`;
+async function firmTabUrl(firmId: string, tab?: string, alt?: string): Promise<string> {
+  const q = new URLSearchParams();
+  if (tab) q.set("tab", tab);
+  if (tab && alt) q.set("alt", alt);
+  const qs = q.toString();
+  return `/firms/${firmId}${qs ? `?${qs}` : ""}`;
 }
 
 export interface RealtimeVoiceOptions {
@@ -162,7 +165,8 @@ export function useRealtimeVoice(options: RealtimeVoiceOptions = {}) {
         const { data: varMi } = await supabase.from("firms").select("id").eq("id", firmId).maybeSingle();
         if (!varMi) return { error: "Bu ID'ye ait erişilebilir bir firma yok. Önce search_firm ile firmayı ara." };
         const tab = typeof args.tab === "string" ? args.tab : undefined;
-        router.push(await firmTabUrl(firmId, tab));
+        const alt = typeof args.alt === "string" ? args.alt : undefined;
+        router.push(await firmTabUrl(firmId, tab, alt));
         return { ok: true, navigated: true };
       }
 

@@ -41,6 +41,14 @@ export const TOOL_DEFS = [
             'adr_transport', 'genel', 'denetim', 'notlar',
           ],
         },
+        alt: {
+          type: 'string',
+          description:
+            "Sekmenin ALT menüsü (opsiyonel). adr_transport: evrak (Taşıma Evrakı) | sevkiyat (Sevkiyatlar) | envanter (Kimyasal Envanter); " +
+            "employees: liste (Personel Listesi) | gorevli (Görevli Listesi); drivers: liste (Sürücü Kayıtları) | surucu_listesi (Sürücü Listesi); " +
+            "vehicles: liste (Araçlar) | arac_evraki (Araç Evrakı Oluştur).",
+          enum: ['evrak','sevkiyat','envanter','liste','gorevli','surucu_listesi','arac_evraki'],
+        },
       },
       required: ['firm_id'],
     },
