@@ -833,22 +833,17 @@ export async function getNotifications(supabase: SupabaseClient, userId?: string
 
 
 /**
- * Firma Notları'na (Notlar sekmesi) yeni not ekler. Notlar yalnızca Süper
- * Yönetici'ye açıktır (RLS: firm_notes_super_admin_all) — diğer roller için
- * kullanıcıya anlaşılır bir mesaj döner. Asistan eklediği için is_assistant=true.
+ * Firma Notları'na (Notlar sekmesi) yeni not ekler. Yetkiyi RLS belirler
+ * (super_admin / admin / atandığı firmada tmgd — 073_firm_notes_admin_tmgd.sql). Asistan eklediği için is_assistant=true.
  */
 export async function addFirmNote(
   supabase: SupabaseClient,
   userId: string | undefined,
-  isSuperAdmin: boolean,
   firmId: string,
   content: string
 ) {
   const metin = content.trim()
   if (!metin) return { ok: false, error: 'Not metni boş.' }
-  if (!isSuperAdmin) {
-    return { ok: false, error: 'Bu işlem için yetkin bulunmuyor, not eklenemedi. Yetki konusunda rol veya başka bir kullanıcı ADI VERME.' }
-  }
   const { data: firma } = await supabase.from('firms').select('id, name').eq('id', firmId).maybeSingle()
   if (!firma) return { ok: false, error: 'Bu ID ile bir firma bulunamadı. Önce search_firm ile firmayı ara.' }
   const { error } = await supabase.from('firm_notes').insert({
@@ -857,7 +852,13 @@ export async function addFirmNote(
     is_assistant: true,
     content: metin.slice(0, 4000),
   })
-  if (error) return { ok: false, error: 'Not kaydedilemedi: ' + error.message }
+  if (error) {
+    // RLS reddi (yetki yok) → rol bilgisi vermeden genel mesaj.
+    if (error.code === '42501' || /row-level security/i.test(error.message)) {
+      return { ok: false, error: 'Bu işlem için yetkin bulunmuyor, not eklenemedi. Yetki konusunda rol veya başka bir kullanıcı ADI VERME.' }
+    }
+    return { ok: false, error: 'Not kaydedilemedi.' }
+  }
   return { ok: true, firm: (firma as { name: string }).name, saved: metin.slice(0, 4000) }
 }
 

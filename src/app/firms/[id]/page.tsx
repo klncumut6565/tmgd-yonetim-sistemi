@@ -211,6 +211,8 @@ function FirmDetailInner({
     atananFirmaIdleri(profile.id).then(setAtananIdler);
   }, [profile?.id]);
   const isSuperAdminOnly = profile?.role === "super_admin";
+  // Notlar: super_admin + admin + tmgd (RLS: 073_firm_notes_admin_tmgd.sql)
+  const notlarYetkili = profile?.role === "super_admin" || profile?.role === "admin" || profile?.role === "tmgd";
   const isCompany = profile?.role === "company";
   // Firma (company) rolünden gizlenen sekmeler: Görevler, Belgeler,
   // Belge Oluştur, Firma Bilgileri (genel).
@@ -460,7 +462,8 @@ function FirmDetailInner({
   const isTasimaci = (firm?.activities || []).includes("tasimaci");
   const TASIMACI_SEKMELERI: TabKey[] = ["vehicles", "drivers"];
   const visibleTabs = TABS.filter((t) => {
-    if (t.key === "denetim" || t.key === "notlar") return isSuperAdminOnly;
+    if (t.key === "denetim") return isSuperAdminOnly;
+    if (t.key === "notlar") return notlarYetkili;
     if (isCompany && COMPANY_GIZLI_SEKMELER.includes(t.key)) return false;
     return isTasimaci || !TASIMACI_SEKMELERI.includes(t.key);
   });
@@ -1937,7 +1940,7 @@ function FirmDetailInner({
         <FirmAuditTab firmId={id} />
       )}
 
-      {tab === "notlar" && isSuperAdminOnly && (
+      {tab === "notlar" && notlarYetkili && (
         <FirmNotesTab firmId={id} />
       )}
       </div>

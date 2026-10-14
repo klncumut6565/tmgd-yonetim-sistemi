@@ -71,7 +71,7 @@ export async function executeDataTool(
       if (!str('firm_id')) return FIRM_ID_GEREKLI
       return {
         status: 200,
-        body: await addFirmNote(supabase, ctx?.userId, ctx?.isSuperAdmin === true, str('firm_id'), str('content')),
+        body: await addFirmNote(supabase, ctx?.userId, str('firm_id'), str('content')),
       }
     case 'list_tmgd':
       return { status: 200, body: await listTmgd(supabase, args.include_inactive === true, ctx?.isSuperAdmin === true) }
