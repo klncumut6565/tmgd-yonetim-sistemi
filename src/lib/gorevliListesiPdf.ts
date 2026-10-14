@@ -310,7 +310,6 @@ function tanimlarSayfasiCiz(
 ) {
   sayfaYonunuAyarla(false);
   doc.addPage("a4", "portrait");
-  fontuKaydet(doc);
 
   // Kapak sayfasıyla AYNI ince çerçeve (bkz. kapakCercevesiCiz).
   kapakCercevesiCiz(doc);
@@ -431,7 +430,6 @@ function tanimlarSayfasiCiz(
   }
   if (tanimImzaY + IMZA_BLOK_YUKSEKLIK_ICERIK > altSinir) {
     doc.addPage("a4", "portrait");
-    fontuKaydet(doc);
     kapakCercevesiCiz(doc);
     baslikKutusuCiz(doc, veri);
     tanimImzaY = altSinir - IMZA_BLOK_YUKSEKLIK_ICERIK;
@@ -672,7 +670,6 @@ export async function gorevliListesiPdfOlustur(
   // Sayfa 3 — başlık kutusu + tablo (YATAY — uzun metinli sütunlar rahat sığsın diye)
   sayfaYonunuAyarla(true);
   doc.addPage("a4", "landscape");
-  fontuKaydet(doc);
   baslikKutusuCiz(doc, veri);
 
   autoTable(doc, {
@@ -789,7 +786,6 @@ export async function gorevliListesiPdfOlustur(
   let dipnotY: number;
   if (sonY + gerekliYukseklik > H - 10) {
     doc.addPage();
-    fontuKaydet(doc);
     baslikKutusuCiz(doc, veri);
     doc.setFontSize(7.5);
     doc.setFont(FONT, "normal");

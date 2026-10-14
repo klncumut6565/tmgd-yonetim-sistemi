@@ -126,7 +126,6 @@ async function belgeEkiSayfasiEkle(doc: JsPDFType, ek: SurucuBelgeEki) {
   // DİKEY açılır.
   sayfaYonunuAyarla(false);
   doc.addPage("a4", "portrait");
-  fontuKaydet(doc);
 
   doc.setFontSize(12);
   doc.setFont(FONT, "bold");
@@ -482,7 +481,6 @@ export async function surucuListesiPdfOlustur(veri: SurucuListesiPdfVerisi): Pro
   // Sayfa 2 — başlık kutusu + tablo (YATAY)
   sayfaYonunuAyarla(true);
   doc.addPage("a4", "landscape");
-  fontuKaydet(doc);
   baslikKutusuCiz(doc, veri, 1);
 
   autoTable(doc, {
@@ -539,7 +537,6 @@ export async function surucuListesiPdfOlustur(veri: SurucuListesiPdfVerisi): Pro
   if (imzaY + blokYuk > H - 8) {
     // Tablonun altında yeterli yer yoksa imza bloğu yeni (yatay) sayfaya geçer.
     doc.addPage("a4", "landscape");
-    fontuKaydet(doc);
     baslikKutusuCiz(doc, veri, doc.getNumberOfPages());
     imzaY = 38;
   }
