@@ -293,44 +293,42 @@ export async function aracEvraklariPdfOlustur(veri: AracEvraklariPdfVerisi): Pro
   fontuKaydet(doc);
   await statikHazir;
 
-  // Ek sırası sabit: 1-2 firma ortak, 3-5 araca özel, 6 yazılı talimat
-  // (jenerik), 7 araca özel, 8 ADR çanta (jenerik), 9-10 araca özel.
-  //
-  // ÖZEL DURUM — Ek-10 (Karayolu İle Atık Taşıma Aracı Uygunluk Belgesi):
-  // bu belge yüklenmemişse (dataUrls boşsa) hem kapak sayfasındaki
-  // "Doküman İçeriği" listesinden hem de PDF içeriğinden TAMAMEN
-  // ÇIKARILIR — diğer Ek'lerin aksine "belge yüklenmemiştir" boş sayfası
-  // dahi eklenmez.
-  const ekBasliklari = veri.belgeler
-    .slice()
-    .sort((a, b) => a.ekNo - b.ekNo)
-    .reduce<string[]>((acc, b) => {
-      if (b.dataUrls.length === 0) return acc; // eki yüklenmemiş başlık kapakta listelenmez
-      acc[b.ekNo - 1] = b.baslik;
-      return acc;
-    }, []);
-  ekBasliklari[5] = "Yazılı Talimat";
-  ekBasliklari[7] = "ADR Çantası İçeriği";
+  // Ek SIRASI sabit (1-2 firma ortak, 3-5 araca özel, yazılı talimat, 7 araca
+  // özel, ADR çantası, 9-10 araca özel); ancak eki yüklenmemiş başlıklar hiç
+  // gösterilmez ve kalanlar 1'den başlayarak YENİDEN NUMARALANDIRILIR — hem
+  // kapaktaki liste hem sayfa başlıkları aynı yeni numarayı kullanır.
+  type Giris =
+    | { tur: "belge"; baslik: string; dataUrls: string[] }
+    | { tur: "talimat" }
+    | { tur: "adr_canta"; gorsel: string };
+  const siraliBelgeler = veri.belgeler.slice().sort((a, b) => a.ekNo - b.ekNo);
+  const girisler: Giris[] = [];
+  const belgeEkle = (b: AracEvrakBelgesi) => {
+    if (b.dataUrls.length > 0) girisler.push({ tur: "belge", baslik: b.baslik, dataUrls: b.dataUrls });
+  };
+  siraliBelgeler.filter((b) => b.ekNo < 6).forEach(belgeEkle);
+  girisler.push({ tur: "talimat" });
+  siraliBelgeler.filter((b) => b.ekNo === 7).forEach(belgeEkle);
+  const adrCantaGorsel = await statikGorselGetir(ADR_CANTA_ICERIGI_GORSELI);
+  if (adrCantaGorsel) girisler.push({ tur: "adr_canta", gorsel: adrCantaGorsel });
+  siraliBelgeler.filter((b) => b.ekNo > 8).forEach(belgeEkle);
+
+  const ekBasliklari = girisler.map((g) =>
+    g.tur === "belge" ? g.baslik : g.tur === "talimat" ? "Yazılı Talimat" : "ADR Çantası İçeriği"
+  );
 
   kapakSayfasiCiz(doc, veri, ekBasliklari);
 
-  for (const belge of veri.belgeler.filter((b) => b.ekNo < 6).sort((a, b) => a.ekNo - b.ekNo)) {
-    // Eki yüklenmemiş başlık için sayfa hiç eklenmez.
-    for (const dataUrl of belge.dataUrls) await gorselliEkSayfasiEkle(doc, belge.ekNo, belge.baslik, dataUrl);
-  }
-
-  await yaziliTalimatEkleriEkle(doc, 6, veri.logo);
-
-  const ek7 = veri.belgeler.find((b) => b.ekNo === 7);
-  if (ek7) {
-    for (const dataUrl of ek7.dataUrls) await gorselliEkSayfasiEkle(doc, 7, ek7.baslik, dataUrl);
-  }
-
-  const adrCantaGorsel = await statikGorselGetir(ADR_CANTA_ICERIGI_GORSELI);
-  if (adrCantaGorsel) await gorselliEkSayfasiEkle(doc, 8, "ADR ÇANTASI İÇERİĞİ", adrCantaGorsel, veri.logo);
-
-  for (const belge of veri.belgeler.filter((b) => b.ekNo > 8).sort((a, b) => a.ekNo - b.ekNo)) {
-    for (const dataUrl of belge.dataUrls) await gorselliEkSayfasiEkle(doc, belge.ekNo, belge.baslik, dataUrl);
+  for (let i = 0; i < girisler.length; i++) {
+    const g = girisler[i];
+    const ekNo = i + 1;
+    if (g.tur === "belge") {
+      for (const dataUrl of g.dataUrls) await gorselliEkSayfasiEkle(doc, ekNo, g.baslik, dataUrl);
+    } else if (g.tur === "talimat") {
+      await yaziliTalimatEkleriEkle(doc, ekNo, veri.logo);
+    } else {
+      await gorselliEkSayfasiEkle(doc, ekNo, "ADR ÇANTASI İÇERİĞİ", g.gorsel, veri.logo);
+    }
   }
 
   return doc.output("blob");
