@@ -140,6 +140,7 @@ export default function ADRAssistantWidget() {
   // (bkz. useRealtimeVoice.ts) — ikisi aynı anda mikrofonu paylaşamaz,
   // bu yüzden biri aktifken diğerinin butonu devre dışı bırakılır.
   const canli = useRealtimeVoice({
+    onEndConversation: () => setOpen(false),
     // Live oturumu açılırken/yenilenirken: şu anki firma + panel sohbet geçmişi.
     getContext: () => ({
       firmId,

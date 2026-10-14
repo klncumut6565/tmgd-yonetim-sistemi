@@ -90,6 +90,12 @@ export const TOOL_DEFS = [
     parameters: { type: 'object', properties: {} },
   },
   {
+    name: 'end_conversation',
+    description:
+      "Sesli sohbeti kapatır. Kullanıcı 'sohbeti kapat / bitir / görüşmeyi sonlandır' dediğinde ÖNCE bunu çağır, ardından veda cümlesini söyle; veda bitince panel otomatik kapanır.",
+    parameters: { type: 'object', properties: {} },
+  },
+  {
     name: 'get_task_summary',
     description:
       'Bir firmanın GERÇEK görev sayısını ve listesini döndürür (gecikmiş/bugünkü/yaklaşan/tümü). ' +
@@ -272,6 +278,6 @@ export const TOOL_DEFS = [
 ] as const;
 
 /** Tarayıcıda/uygulamada sayfa değiştiren (sunucuda çalıştırılmayan) araçlar. */
-export const NAV_TOOL_NAMES = ['open_firm', 'go_to_page', 'go_back'] as const;
+export const NAV_TOOL_NAMES = ['open_firm', 'go_to_page', 'go_back', 'end_conversation'] as const;
 
 export const TOOL_NAMES = TOOL_DEFS.map((t) => t.name) as string[];

@@ -82,12 +82,16 @@ export interface RealtimeVoiceOptions {
   /** Bir konuşma turu bittiğinde (kullanıcı + asistan metni) çağrılır;
    *  widget bunu panel sohbet geçmişine ekler. */
   onTurn?: (turn: { user: string; assistant: string }) => void;
+  /** Kullanıcı "sohbeti kapat" dedi ve veda cümlesi bitti; widget paneli kapatır. */
+  onEndConversation?: () => void;
 }
 
 export function useRealtimeVoice(options: RealtimeVoiceOptions = {}) {
   const optionsRef = useRef(options);
   optionsRef.current = options;
   const turKullaniciRef = useRef("");
+  const bitirRef = useRef(false);
+  const bitirKontrolRef = useRef<() => void>(() => {});
   const router = useRouter();
   const pathname = usePathname();
   const pathnameRef = useRef(pathname);
@@ -147,6 +151,13 @@ export function useRealtimeVoice(options: RealtimeVoiceOptions = {}) {
         if (!hedef) return { error: "Geçersiz sayfa." };
         router.push(hedef);
         return { ok: true, navigated: true, page: args.page };
+      }
+
+      if (name === "end_conversation") {
+        bitirRef.current = true;
+        // Veda hiç gelmezse takılmasın: en geç 15 sn sonra kapat.
+        setTimeout(() => bitirKontrolRef.current(), 15000);
+        return { ok: true, note: "Şimdi veda cümlesini söyle; ardından sohbet kapanacak." };
       }
 
       if (name === "go_back") {
@@ -270,6 +281,7 @@ export function useRealtimeVoice(options: RealtimeVoiceOptions = {}) {
         turSesAlindiRef.current = false; // sonraki tur için ölçümü sıfırla
         // Ses hâlâ çalıyorsa onSpeaking(false) "dinliyor"a geçirecek; çalmıyorsa şimdi geç.
         if (!playback.isPlaying()) gec("listening");
+        if (bitirRef.current && !playback.isPlaying()) setTimeout(() => bitirKontrolRef.current(), 400);
       });
       provider.onAudio((chunk) => {
         if (mutedRef.current) return;
@@ -388,8 +400,9 @@ export function useRealtimeVoice(options: RealtimeVoiceOptions = {}) {
             metrikGuncelle((m) => ({ ...m, sonCalmaMs: ms }));
           }
           gec("speaking");
-        } else if (durumRef.current === "speaking") {
-          gec("listening");
+        } else {
+          if (durumRef.current === "speaking") gec("listening");
+          if (bitirRef.current) setTimeout(() => bitirKontrolRef.current(), 600);
         }
       });
       saglayiciKur(provider, playback);
@@ -429,6 +442,13 @@ export function useRealtimeVoice(options: RealtimeVoiceOptions = {}) {
     asistanMetinRef.current = "";
     setSession(BOS_SESSION);
   }, [kaynaklariKapat]);
+
+  bitirKontrolRef.current = () => {
+    if (!bitirRef.current) return;
+    if (playbackRef.current?.isPlaying()) return;
+    bitirRef.current = false;
+    void disconnect().then(() => optionsRef.current.onEndConversation?.());
+  };
 
   const interrupt = useCallback(() => {
     providerRef.current?.interrupt();
