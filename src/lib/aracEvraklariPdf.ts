@@ -223,10 +223,6 @@ async function gorselliEkSayfasiEkle(doc: JsPDFType, ekNo: number, baslik: strin
   }
 }
 
-function bosEkSayfasiEkle(doc: JsPDFType, ekNo: number, baslik: string) {
-  ekSayfaBasligiCiz(doc, ekNo, baslik);
-}
-
 /** Ek-6 Yazılı Talimat: metin sayfası (gerçek yazı, görsel değil) + 3
  *  tablo görseli. logo verilirse ilk sayfanın sol üst köşesine firma
  *  logosu eklenir. */
@@ -309,7 +305,7 @@ export async function aracEvraklariPdfOlustur(veri: AracEvraklariPdfVerisi): Pro
     .slice()
     .sort((a, b) => a.ekNo - b.ekNo)
     .reduce<string[]>((acc, b) => {
-      if (b.ekNo === 10 && b.dataUrls.length === 0) return acc;
+      if (b.dataUrls.length === 0) return acc; // eki yüklenmemiş başlık kapakta listelenmez
       acc[b.ekNo - 1] = b.baslik;
       return acc;
     }, []);
@@ -319,35 +315,22 @@ export async function aracEvraklariPdfOlustur(veri: AracEvraklariPdfVerisi): Pro
   kapakSayfasiCiz(doc, veri, ekBasliklari);
 
   for (const belge of veri.belgeler.filter((b) => b.ekNo < 6).sort((a, b) => a.ekNo - b.ekNo)) {
-    if (belge.dataUrls.length > 0) {
-      for (const dataUrl of belge.dataUrls) await gorselliEkSayfasiEkle(doc, belge.ekNo, belge.baslik, dataUrl);
-    } else {
-      bosEkSayfasiEkle(doc, belge.ekNo, belge.baslik);
-    }
+    // Eki yüklenmemiş başlık için sayfa hiç eklenmez.
+    for (const dataUrl of belge.dataUrls) await gorselliEkSayfasiEkle(doc, belge.ekNo, belge.baslik, dataUrl);
   }
 
   await yaziliTalimatEkleriEkle(doc, 6, veri.logo);
 
   const ek7 = veri.belgeler.find((b) => b.ekNo === 7);
   if (ek7) {
-    if (ek7.dataUrls.length > 0) {
-      for (const dataUrl of ek7.dataUrls) await gorselliEkSayfasiEkle(doc, 7, ek7.baslik, dataUrl);
-    } else {
-      bosEkSayfasiEkle(doc, 7, ek7.baslik);
-    }
+    for (const dataUrl of ek7.dataUrls) await gorselliEkSayfasiEkle(doc, 7, ek7.baslik, dataUrl);
   }
 
   const adrCantaGorsel = await statikGorselGetir(ADR_CANTA_ICERIGI_GORSELI);
   if (adrCantaGorsel) await gorselliEkSayfasiEkle(doc, 8, "ADR ÇANTASI İÇERİĞİ", adrCantaGorsel, veri.logo);
 
   for (const belge of veri.belgeler.filter((b) => b.ekNo > 8).sort((a, b) => a.ekNo - b.ekNo)) {
-    if (belge.dataUrls.length > 0) {
-      for (const dataUrl of belge.dataUrls) await gorselliEkSayfasiEkle(doc, belge.ekNo, belge.baslik, dataUrl);
-    } else if (belge.ekNo !== 10) {
-      // Ek-10 istisnası: belge yoksa "belge yüklenmemiştir" sayfası bile
-      // eklenmez (bkz. yukarıdaki ekBasliklari açıklaması).
-      bosEkSayfasiEkle(doc, belge.ekNo, belge.baslik);
-    }
+    for (const dataUrl of belge.dataUrls) await gorselliEkSayfasiEkle(doc, belge.ekNo, belge.baslik, dataUrl);
   }
 
   return doc.output("blob");
