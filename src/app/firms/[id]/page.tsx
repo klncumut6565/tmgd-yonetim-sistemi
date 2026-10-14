@@ -1331,7 +1331,7 @@ function FirmDetailInner({
                         // belgelerdir, bir bitiş tarihi taşımazlar. Bu maddelerde
                         // geçerlilik girişi/rozeti hiç gösterilmez.
                         const gecerlilikYok =
-                          /^[PTKL]\d/.test(it.code) || it.code === "YFR" || it.code === "D3" || it.code === "D4" || it.code === "D5";
+                          /^[PTKL]\d/.test(it.code) || it.code === "YFR" || it.code === "G4" || it.code === "D3" || it.code === "D4" || it.code === "D5";
 
                         return (
                           <div key={itemKey} className="px-4 py-2 text-sm hover:bg-gray-50">

@@ -161,6 +161,7 @@ const SPECIAL_ITEMS: Record<string, { label: string; section: string }> = {
   G1: { label: "Tehlikeli Madde Faaliyet Belgesi (TMFB)", section: "TMFB · EK-3 · Görevli Listesi" },
   G2: { label: "Tehlikeli Madde Faaliyet Tespit Raporu (Ek-3 ve Eki)", section: "TMFB · EK-3 · Görevli Listesi" },
   G3: { label: "Tehlikeli Madde İş ve İşlemlerinde Görevli Personel Listesi", section: "TMFB · EK-3 · Görevli Listesi" },
+  G4: { label: "Sürücü (SRC-5) Listesi", section: "TMFB · EK-3 · Görevli Listesi" },
   S1: { label: "TMGD Hizmet Sözleşmesi", section: "TMGD Sözleşme · Sertifika · Yetki" },
   S2: { label: "TMGD Sertifikası", section: "TMGD Sözleşme · Sertifika · Yetki" },
   S3: { label: "U-Net Yetkilendirme Kaydı (SİAM TMGDK Sertifikası)", section: "TMGD Sözleşme · Sertifika · Yetki" },
@@ -353,6 +354,10 @@ export function buildChecklist(
         { code: "G1", period: "", label: "Tehlikeli Madde Faaliyet Belgesi (TMFB) — geçerlilik takibi" },
         { code: "G2", period: "", label: "Tehlikeli Madde Faaliyet Tespit Raporu (Ek-3 ve Eki)" },
         { code: "G3", period: "", label: "Tehlikeli Madde İş ve İşlemlerinde Görevli Personel Listesi" },
+        // Yalnızca faaliyet konusu "Taşımacı" olan firmalarda görünür.
+        ...(activities.includes("tasimaci")
+          ? [{ code: "G4", period: "", label: "Sürücü (SRC-5) Listesi" }]
+          : []),
       ],
     },
     {
