@@ -74,7 +74,7 @@ export async function executeDataTool(
         body: await addFirmNote(supabase, ctx?.userId, ctx?.isSuperAdmin === true, str('firm_id'), str('content')),
       }
     case 'list_tmgd':
-      return { status: 200, body: await listTmgd(supabase, args.include_inactive === true) }
+      return { status: 200, body: await listTmgd(supabase, args.include_inactive === true, ctx?.isSuperAdmin === true) }
     case 'get_visit_overview':
       return { status: 200, body: await getVisitOverview(supabase, str('month') || undefined) }
     case 'get_firm_progress':

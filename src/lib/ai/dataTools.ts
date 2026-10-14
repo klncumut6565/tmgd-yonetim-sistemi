@@ -702,7 +702,7 @@ const ROL_TR: Record<string, string> = {
 
 const DANISMAN_ROLLER = new Set(['tmgd', 'admin', 'assistant'])
 
-export async function listTmgd(supabase: SupabaseClient, includeInactive = false) {
+export async function listTmgd(supabase: SupabaseClient, includeInactive = false, superGoster = false) {
   const { data: profiller } = await supabase
     .from('profiles')
     .select('id, full_name, email, phone, role, is_active, approval_status')
@@ -716,6 +716,8 @@ export async function listTmgd(supabase: SupabaseClient, includeInactive = false
 
   const rolSayim: Record<string, number> = {}
   for (const p of hepsi.filter(aktifMi)) {
+    // Süper Yönetici rolünün varlığı, süper yönetici olmayan kullanıcıya hiçbir zaman gösterilmez.
+    if (p.role === 'super_admin' && !superGoster) continue
     const k = ROL_TR[p.role] ?? p.role
     rolSayim[k] = (rolSayim[k] ?? 0) + 1
   }
@@ -745,7 +747,9 @@ export async function listTmgd(supabase: SupabaseClient, includeInactive = false
     ok: true,
     grounded: true,
     aktif_tmgd_sayisi: hepsi.filter((p) => DANISMAN_ROLLER.has(p.role) && aktifMi(p)).length,
-    aciklama: 'TMGD danışman sayısına rolü TMGD, Yönetici veya Asistan olan aktif kişiler dahildir; Süper Yönetici dahil değildir.',
+    aciklama: superGoster
+      ? 'TMGD danışman sayısına rolü TMGD, Yönetici veya Asistan olan aktif kişiler dahildir; Süper Yönetici dahil değildir.'
+      : 'TMGD danışman sayısına rolü TMGD, Yönetici veya Asistan olan aktif kişiler dahildir.',
     pasif_veya_onaysiz_tmgd_sayisi: hepsi.filter((p) => DANISMAN_ROLLER.has(p.role) && !aktifMi(p)).length,
     aktif_personel_rol_dagilimi: rolSayim,
     tmgd_listesi: tmgdler.map((p) => {
@@ -843,7 +847,7 @@ export async function addFirmNote(
   const metin = content.trim()
   if (!metin) return { ok: false, error: 'Not metni boş.' }
   if (!isSuperAdmin) {
-    return { ok: false, error: "Firma notları yalnızca Süper Yönetici'ye açık; bu rolle not eklenemiyor." }
+    return { ok: false, error: 'Bu işlem için yetkin bulunmuyor, not eklenemedi. Yetki konusunda rol veya başka bir kullanıcı ADI VERME.' }
   }
   const { data: firma } = await supabase.from('firms').select('id, name').eq('id', firmId).maybeSingle()
   if (!firma) return { ok: false, error: 'Bu ID ile bir firma bulunamadı. Önce search_firm ile firmayı ara.' }
