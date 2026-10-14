@@ -80,7 +80,17 @@ function gorselEnBoyOraniOku(dataUrl: string): Promise<number> {
 
 /** Bir uzak yoldan (public/ altı) görseli fetch edip dataURL'e çevirir —
  *  statik Ek-6/Ek-8 varlıkları için. */
-async function statikGorselGetir(yol: string): Promise<string | null> {
+const statikOnbellek = new Map<string, Promise<string | null>>();
+function statikGorselGetir(yol: string): Promise<string | null> {
+  // Aynı oturumda tekrar tekrar indirilmesin (her önizlemede yeniden fetch yoktu → vardı).
+  let p = statikOnbellek.get(yol);
+  if (!p) {
+    p = statikGorselGetirHam(yol);
+    statikOnbellek.set(yol, p);
+  }
+  return p;
+}
+async function statikGorselGetirHam(yol: string): Promise<string | null> {
   try {
     const res = await fetch(yol);
     if (!res.ok) return null;
@@ -169,7 +179,6 @@ function kapakSayfasiCiz(doc: JsPDFType, veri: AracEvraklariPdfVerisi, ekBaslikl
  *  bunu isteyen çağrılar için — kapakSayfasiCiz ile AYNI hesaplama). */
 function ekSayfaBasligiCiz(doc: JsPDFType, ekNo: number, baslik: string, logo?: LogoData) {
   doc.addPage();
-  fontuKaydet(doc);
 
   if (logo) {
     try {
@@ -223,7 +232,6 @@ function bosEkSayfasiEkle(doc: JsPDFType, ekNo: number, baslik: string) {
  *  logosu eklenir. */
 async function yaziliTalimatEkleriEkle(doc: JsPDFType, ekNo: number, logo?: LogoData) {
   doc.addPage();
-  fontuKaydet(doc);
 
   if (logo) {
     try {
@@ -262,8 +270,7 @@ async function yaziliTalimatEkleriEkle(doc: JsPDFType, ekNo: number, logo?: Logo
     const satirlar = doc.splitTextToSize(madde, genislik - 6);
     if (y + satirlar.length * 4.4 > H - 20) {
       doc.addPage();
-      fontuKaydet(doc);
-      y = 20;
+          y = 20;
     }
     doc.text("–", M, y);
     doc.text(satirlar, M + 5, y);
@@ -278,8 +285,17 @@ async function yaziliTalimatEkleriEkle(doc: JsPDFType, ekNo: number, logo?: Logo
 
 export async function aracEvraklariPdfOlustur(veri: AracEvraklariPdfVerisi): Promise<Blob> {
   const { jsPDF } = await import("jspdf");
+  // Statik Ek-6/Ek-8 görsellerini PDF üretimi başlamadan PARALEL indir.
+  const statikHazir = Promise.all([
+    ...YAZILI_TALIMAT_TABLO_GORSELLERI.map((y) => statikGorselGetir(y)),
+    statikGorselGetir(ADR_CANTA_ICERIGI_GORSELI),
+  ]);
   const doc = new jsPDF({ compress: true, orientation: "portrait", unit: "mm", format: "a4" }) as unknown as JsPDFType;
+  // Yazı tipi belge başına BİR kez kaydedilir — önceden her sayfada yeniden
+  // kaydediliyordu (iki TTF'nin her seferinde ayrıştırılması önizlemeyi
+  // yavaşlatan ana nedendi).
   fontuKaydet(doc);
+  await statikHazir;
 
   // Ek sırası sabit: 1-2 firma ortak, 3-5 araca özel, 6 yazılı talimat
   // (jenerik), 7 araca özel, 8 ADR çanta (jenerik), 9-10 araca özel.
