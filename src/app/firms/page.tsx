@@ -15,6 +15,7 @@ import { TMFB_KAPSAMDISI, atananFirmaIdleri } from "@/lib/firmaGorunurluk";
 import { hataCevir } from "@/lib/hataCevir";
 import { ACTIVITIES, ACTIVITY_LABELS, buildChecklist } from "@/lib/belgeKatalogu";
 
+import { firmaLogoAdresleri, logoKucukKopyaYukle } from "@/lib/depoOnbellek";
 type Firm = {
   id: string;
   name: string;
@@ -115,14 +116,9 @@ export default function FirmsPage() {
       setLogoUrlByFirm({});
       return;
     }
-    const results = await Promise.all(
-      withLogo.map(async (f) => {
-        const { data } = await supabase.storage
-          .from("firm-files")
-          .createSignedUrl(f.logo_url as string, 3600);
-        return [f.id, data?.signedUrl || ""] as const;
-      })
-    );
+    // Veri tasarrufu: küçük kopya (varsa) + tek istekte toplu imzalama + 6 saatlik yerel önbellek
+    const adresler = await firmaLogoAdresleri(withLogo.map((f) => f.logo_url as string));
+    const results = withLogo.map((f) => [f.id, adresler[f.logo_url as string] || ""] as const);
     const map: Record<string, string> = {};
     results.forEach(([id, url]) => {
       if (url) map[id] = url;
@@ -268,6 +264,7 @@ export default function FirmsPage() {
         setError("Firma eklendi ama logo yüklenemedi: " + hataCevir(upErr));
       } else {
         await supabase.from("firms").update({ logo_url: path }).eq("id", created.id);
+        await logoKucukKopyaYukle(path, logoFile); // listelerde gösterilecek küçük kopya
       }
     }
 

@@ -38,6 +38,7 @@ import {
 import DateInput from "@/components/DateInput";
 import type { LogoData } from "@/lib/aracEvraklariPdf";
 
+import { depoDosyasiGetir } from "@/lib/depoOnbellek";
 // ── Tipler ────────────────────────────────────────────────────────────────
 /** ADR Tablo A satırı (adr_un_numbers tablosu) */
 type TabloARow = {
@@ -1395,12 +1396,9 @@ export default function TasimaEvraki({
   async function logoDataUrl(): Promise<LogoData> {
     if (!logoUrl) return null;
     try {
-      const { data: signed } = await supabase.storage
-        .from("firm-files")
-        .createSignedUrl(logoUrl, 600);
-      if (!signed?.signedUrl) return null;
-      const res = await fetch(signed.signedUrl);
-      const blob = await res.blob();
+      // Oturum boyunca bellekte tutulur: önizleme + indirme dosyayı bir kez indirir (veri tasarrufu)
+      const blob = await depoDosyasiGetir("firm-files", logoUrl);
+      if (!blob) return null;
       const fmt: "PNG" | "JPEG" = blob.type.includes("png") ? "PNG" : "JPEG";
       const dataUrl = await new Promise<string>((resolve, reject) => {
         const r = new FileReader();

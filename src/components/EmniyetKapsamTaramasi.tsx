@@ -35,6 +35,7 @@ import { hazirlayanKasesi, kontrolEdenKasesi } from "@/lib/kaseler";
 import { guzergahKrokisiUret } from "@/lib/rotaKrokisi";
 import type { RotaNoktasi } from "@/components/RotaHaritasi";
 
+import { depoDosyasiGetir } from "@/lib/depoOnbellek";
 // Leaflet (window/document'a ihtiyaç duyar) yalnızca istemcide, dinamik
 // olarak yüklenir — Next.js sunucu tarafı render'ında (SSR) çökmesin diye.
 const RotaHaritasi = dynamic(() => import("@/components/RotaHaritasi"), {
@@ -324,12 +325,9 @@ export default function EmniyetKapsamTaramasi({ firmId, firmaAdi }: Props) {
         .single();
       const logoUrl = (frm as { logo_url: string | null } | null)?.logo_url ?? null;
       if (!logoUrl) return null;
-      const { data: signed } = await supabase.storage
-        .from("firm-files")
-        .createSignedUrl(logoUrl, 600);
-      if (!signed?.signedUrl) return null;
-      const res = await fetch(signed.signedUrl);
-      const blob = await res.blob();
+      // Oturum boyunca bellekte tutulur: önizleme + indirme dosyayı bir kez indirir (veri tasarrufu)
+      const blob = await depoDosyasiGetir("firm-files", logoUrl);
+      if (!blob) return null;
       const fmt: "PNG" | "JPEG" = blob.type.includes("png") ? "PNG" : "JPEG";
       const dataUrl = await new Promise<string>((resolve, reject) => {
         const r = new FileReader();

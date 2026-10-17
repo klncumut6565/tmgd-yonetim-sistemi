@@ -37,8 +37,10 @@ export default function PendingApprovalsBell() {
   useEffect(() => {
     yukle();
 
-    // 30 saniyede bir yenile
-    const zamanlayici = setInterval(yukle, 30000);
+    // 2 dakikada bir ve yalnızca sekme görünürken yenile (veri tasarrufu; önce 30 sn)
+    const zamanlayici = setInterval(() => {
+      if (document.visibilityState === "visible") yukle();
+    }, 2 * 60_000);
 
     // Sekmeye geri dönülünce yenile. Mobilde ekran her açıldığında bu olay
     // tetiklendiği için 20 saniyelik bir bekleme sınırı uygulanır.
@@ -49,10 +51,13 @@ export default function PendingApprovalsBell() {
       yukle();
     };
     window.addEventListener("focus", odak);
+    const gorunur = () => document.visibilityState === "visible" && odak();
+    document.addEventListener("visibilitychange", gorunur);
 
     return () => {
       clearInterval(zamanlayici);
       window.removeEventListener("focus", odak);
+      document.removeEventListener("visibilitychange", gorunur);
     };
   }, [yukle]);
 

@@ -33,6 +33,7 @@ import { hataCevir } from "@/lib/hataCevir";
 import { gorevliListesiExcelOlustur } from "@/lib/gorevliListesiExcel";
 import { gorevliListesiPdfOlustur, type LogoData } from "@/lib/gorevliListesiPdf";
 
+import { depoDosyasiGetir } from "@/lib/depoOnbellek";
 type GorevliKaydi = {
   id: string;
   firm_id: string;
@@ -308,12 +309,9 @@ export default function GorevliListesi({
   async function logoDataUrl(): Promise<LogoData> {
     if (!logoUrl) return null;
     try {
-      const { data: signed } = await supabase.storage
-        .from("firm-files")
-        .createSignedUrl(logoUrl, 600);
-      if (!signed?.signedUrl) return null;
-      const res = await fetch(signed.signedUrl);
-      const blob = await res.blob();
+      // Oturum boyunca bellekte tutulur: önizleme + indirme dosyayı bir kez indirir (veri tasarrufu)
+      const blob = await depoDosyasiGetir("firm-files", logoUrl);
+      if (!blob) return null;
       const fmt: "PNG" | "JPEG" = blob.type.includes("png") ? "PNG" : "JPEG";
       const dataUrl = await new Promise<string>((resolve, reject) => {
         const r = new FileReader();

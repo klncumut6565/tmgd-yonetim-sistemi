@@ -33,6 +33,7 @@ import BelgeOlusturForm from "@/components/BelgeOlusturForm";
 import DateInput from "@/components/DateInput";
 import FirmAuditTab from "@/components/audit/FirmAuditTab";
 import FirmNotesTab from "@/components/notes/FirmNotesTab";
+import { firmaLogoAdresi, logoKucukKopyaYukle } from "@/lib/depoOnbellek";
 import {
   VEHICLE_FIELDS,
   DRIVER_FIELDS,
@@ -372,10 +373,8 @@ function FirmDetailInner({
 
     // Logo önizlemesi için imzalı URL üret
     if (f?.logo_url) {
-      const { data: signed } = await supabase.storage
-        .from("firm-files")
-        .createSignedUrl(f.logo_url, 3600);
-      setLogoUrl(signed?.signedUrl || null);
+      // Küçük kopya + önbellekli imzalı adres (veri tasarrufu)
+      setLogoUrl(await firmaLogoAdresi(f.logo_url));
     } else {
       setLogoUrl(null);
     }
@@ -885,6 +884,7 @@ function FirmDetailInner({
       setSaveMsg("Logo yüklenemedi: " + hataCevir(upErr));
     } else {
       await supabase.from("firms").update({ logo_url: path }).eq("id", id);
+      await logoKucukKopyaYukle(path, file); // listelerde gösterilecek küçük kopya
       await loadFirm();
       setSaveMsg("✓ Logo güncellendi");
     }

@@ -39,6 +39,7 @@ import {
 } from "@/lib/kapakVarliklari";
 import type { jsPDF as JsPDFType } from "jspdf";
 
+import { depoDosyasiGetir, firmaLogoAdresi } from "@/lib/depoOnbellek";
 type Firm = {
   id: string;
   name: string;
@@ -390,10 +391,8 @@ export default function BelgeOlusturForm({ fixedFirmId, initialFirmId, compact =
         setLogoPreview(null);
         return;
       }
-      const { data } = await supabase.storage
-        .from("firm-files")
-        .createSignedUrl(firm.logo_url, 3600);
-      setLogoPreview(data?.signedUrl || null);
+      // Küçük kopya + önbellekli imzalı adres (veri tasarrufu)
+      setLogoPreview(await firmaLogoAdresi(firm.logo_url));
     })();
   }, [firm?.logo_url]);
 
@@ -444,13 +443,9 @@ export default function BelgeOlusturForm({ fixedFirmId, initialFirmId, compact =
   // Logo'yu imzalı URL üzerinden dataURL'e çevir (jsPDF için)
   async function logoDataUrl(path: string): Promise<{ data: string; fmt: "PNG" | "JPEG"; enBoyOrani: number } | null> {
     try {
-      const { data: signed } = await supabase.storage
-        .from("firm-files")
-        .createSignedUrl(path, 600);
-      if (!signed?.signedUrl) return null;
-
-      const res = await fetch(signed.signedUrl);
-      const blob = await res.blob();
+      // Oturum boyunca bellekte tutulur: önizleme + indirme dosyayı bir kez indirir (veri tasarrufu)
+      const blob = await depoDosyasiGetir("firm-files", path);
+      if (!blob) return null;
       const fmt: "PNG" | "JPEG" = blob.type.includes("png") ? "PNG" : "JPEG";
       const dataUrl = await new Promise<string>((resolve, reject) => {
         const r = new FileReader();

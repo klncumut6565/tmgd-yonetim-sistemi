@@ -30,6 +30,7 @@ import { authFetch } from "@/lib/supabase/authFetch";
 import { hataCevir } from "@/lib/hataCevir";
 import { pdfIlkSayfayiGorselYap } from "@/lib/pdfSayfaGorseli";
 import { useUser } from "@/hooks/useUser";
+import { depoDosyasiGetir } from "@/lib/depoOnbellek";
 import {
   aracEvraklariPdfOlustur,
   type AracEvrakBelgesi,
@@ -499,10 +500,9 @@ export default function AracEvraklari({
   async function logoDataUrl(): Promise<LogoData> {
     if (!logoUrl) return null;
     try {
-      const { data: signed } = await supabase.storage.from("firm-files").createSignedUrl(logoUrl, 600);
-      if (!signed?.signedUrl) return null;
-      const res = await fetch(signed.signedUrl);
-      const blob = await res.blob();
+      // Oturum boyunca bellekte tutulur: önizleme + indirme dosyayı bir kez indirir (veri tasarrufu)
+      const blob = await depoDosyasiGetir("firm-files", logoUrl);
+      if (!blob) return null;
       const fmt: "PNG" | "JPEG" = blob.type.includes("png") ? "PNG" : "JPEG";
       const dataUrl = await new Promise<string>((resolve, reject) => {
         const r = new FileReader();
@@ -526,10 +526,9 @@ export default function AracEvraklari({
    *  gömülebilecek hazır bir JPEG dataURL'e çevirir. */
   async function belgeDataUrlHazirla(yol: string): Promise<string | null> {
     try {
-      const { data: signed } = await supabase.storage.from("firm-files").createSignedUrl(yol, 600);
-      if (!signed?.signedUrl) return null;
-      const res = await fetch(signed.signedUrl);
-      const blob = await res.blob();
+      // Oturum boyunca bellekte tutulur: önizleme + indirme dosyayı bir kez indirir (veri tasarrufu)
+      const blob = await depoDosyasiGetir("firm-files", yol);
+      if (!blob) return null;
       if (blob.type === "application/pdf" || yol.toLowerCase().endsWith(".pdf")) {
         return await pdfIlkSayfayiGorselYap(await blob.arrayBuffer());
       }

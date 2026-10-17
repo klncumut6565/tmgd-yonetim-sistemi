@@ -324,7 +324,11 @@ export default function NotificationBell() {
 
   useEffect(() => {
     load();
-    const t = setInterval(load, 30000);
+    // Veri tasarrufu: uyarılar gün bazında değiştiği için 5 dakikada bir ve yalnızca sekme
+    // görünürken yoklanır (önce 30 sn'de bir, arka planda da). Sekmeye dönünce hemen yenilenir.
+    const t = setInterval(() => {
+      if (document.visibilityState === "visible") load();
+    }, 5 * 60_000);
     // Mobilde ekran açılışı da "focus" sayılır; art arda sorgu atılmaması
     // için son tazelemeden sonra 20 saniyelik bir bekleme uygulanır.
     let sonTazeleme = Date.now();
@@ -334,9 +338,12 @@ export default function NotificationBell() {
       load();
     };
     window.addEventListener("focus", onFocus);
+    const onVisible = () => document.visibilityState === "visible" && onFocus();
+    document.addEventListener("visibilitychange", onVisible);
     return () => {
       clearInterval(t);
       window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisible);
     };
   }, [load]);
 
