@@ -150,6 +150,11 @@ export default function ADRAssistantWidget() {
   }, [kullanici?.full_name]);
   const canli = useRealtimeVoice({
     onEndConversation: () => setOpen(false),
+    // Telefonda panel sayfanın neredeyse tamamını kapatır: sesle kaydırma /
+    // tıklama yapıldığında sonucu görebilmek için panel kapanır (görüşme sürer).
+    onPageAction: () => {
+      if (window.innerWidth < 768) setOpen(false);
+    },
     // Live oturumu açılırken/yenilenirken: şu anki firma + panel sohbet geçmişi.
     getContext: () => ({
       userName: kullaniciAdiRef.current,
@@ -727,6 +732,7 @@ export default function ADRAssistantWidget() {
       <>
       {sesKuresi}
       <button
+        data-asistan-ui
         onClick={() => setOpen(true)}
         title="ADR Asistanı"
         className="group fixed bottom-4 right-4 z-50 flex items-center gap-2 rounded-full bg-black text-white shadow-lg opacity-45 hover:opacity-100 focus:opacity-100 transition-all duration-300 px-3 py-3 hover:px-4 hover:py-2.5 focus:px-4 focus:py-2.5"
@@ -750,10 +756,12 @@ export default function ADRAssistantWidget() {
       {/* Karartma (backdrop) — mobilde panel dışına dokununca kapansın,
           ayrıca panelin "sayfayı kaplamadığını" görsel olarak belirginleştirir. */}
       <div
+        data-asistan-ui
         className="fixed inset-0 bg-black/30 z-40"
         onClick={() => setOpen(false)}
       />
       <div
+        data-asistan-ui
         className="fixed right-0 top-0 h-full w-[88%] max-w-[420px] bg-white shadow-2xl z-50 flex flex-col border-l"
         onClick={idleZamanlayiciyiSifirla}
         onKeyDown={idleZamanlayiciyiSifirla}

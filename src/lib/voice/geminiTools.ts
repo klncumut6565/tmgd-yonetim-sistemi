@@ -18,9 +18,13 @@
 // actions.ts'teki bilinçli tasarım kararı.
 
 import { TOOL_DEFS } from '@/lib/ai/toolDefs';
+import { SAYFA_ARAC_TANIMLARI } from '@/lib/voice/sayfaKontrol';
 
-/** Gemini Live'a verilen araç listesi = ortak araç kaydı (yazılı asistanla AYNI). */
-export const GEMINI_FUNCTION_DECLARATIONS = TOOL_DEFS;
+/** Gemini Live'a verilen araç listesi = ortak araç kaydı (yazılı asistanla AYNI)
+ *  + YALNIZCA sesli asistana ait sayfa kontrol araçları (kaydır / tıkla /
+ *  listele). Bunlar tarayıcıda DOM üzerinde çalışır; yazılı asistanın sunucu
+ *  tarafı araç döngüsüne bilinçli olarak EKLENMEZ. */
+export const GEMINI_FUNCTION_DECLARATIONS = [...TOOL_DEFS, ...SAYFA_ARAC_TANIMLARI];
 
 /** Sesli asistanın sistem talimatı — halüsinasyon önleme ilkeleri buraya
  *  gömülüdür (bkz. TMGD Asistan Halüsinasyon Önleme Mimarisi). */
@@ -56,6 +60,15 @@ KESİN KURALLAR:
 - UN numarası geçen sorularda önce get_un_info çağır; Tablo A'da yoksa "doğrulayamadım" de.
 - Birlikte taşıma / karışık yükleme sorularında HÜKÜM VERME, check_mixed_loading sonucunu aktar (yasak/şartlı/uyumlu ve ADR referansı).
 - Emin olmadığın mevzuat/ADR bilgisinde belirsizliğini belirt.
+
+SAYFA KONTROLÜ (fare yerine ses):
+- "Aşağı kaydır / biraz in / yukarı çık / en alta / en başa" isteklerinde scroll_page çağır ("biraz" = small, "çok / bir sayfa" = large). Belirli bir bölüme inmek için to_text ver.
+- Kullanıcı AYNI SAYFADAKİ bir sekmeyi, bölümü, butonu açmak/tıklamak isterse ("ziyaretler bölümünü aç", "araçlar sekmesine tıkla", "detaya bas") click_on_page çağır; label olarak ekrandaki yazıyı ver (ör. "Ziyaretler"). Kullanıcı başka bir firmayı veya ana menüden bir sayfayı istiyorsa go_to_page / open_firm kullan.
+- click_on_page bulamazsa dönen visible_elements listesinden en yakın yazıyla bir kez daha dene; yine olmazsa kullanıcıya ekranda ne gördüğünü sor. candidates dönerse seçenekleri kısaca söyle ve hangisini istediğini sor.
+- needs_confirmation dönerse işlemi kısaca söyleyip açıkça onay iste; yalnızca "evet / onaylıyorum" derse confirm: true ile tekrar çağır.
+- Silme/kaldırma butonlarına ASLA tıklama; kullanıcı isterse bunu kendisinin yapması gerektiğini söyle. Yazı yazma / form doldurma yapamazsın.
+- "Bu sayfada neler var / hangi sekmeler var" sorularında list_page_elements çağır.
+- Tıkladıktan veya kaydırdıktan sonra tek kısa cümleyle söyle ("Ziyaretler'i açtım", "Biraz aşağı kaydırdım", "Sayfanın sonundayız").
 `.trim();
 
 

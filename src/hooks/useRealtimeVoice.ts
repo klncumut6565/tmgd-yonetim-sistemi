@@ -26,6 +26,7 @@ import { GeminiLiveProvider } from "@/lib/voice/providers/geminiLive";
 import { startMicCapture, AudioPlaybackQueue, createNoiseGate, type MicCapture, type GateStats } from "@/lib/voice/audioStream";
 import { hataTurkce } from "@/lib/voice/hatalar";
 import { buildLiveInstruction, type LiveContext } from "@/lib/voice/geminiTools";
+import { sayfayiKaydir, ogeyeTikla, sayfaOgeleriniListele } from "@/lib/voice/sayfaKontrol";
 import type { VoiceSession, VoiceState, LiveMetrics, RealtimeSessionResponse } from "@/lib/voice/types";
 
 const BOS_METRIK: LiveMetrics = {
@@ -84,6 +85,9 @@ export interface RealtimeVoiceOptions {
   onTurn?: (turn: { user: string; assistant: string }) => void;
   /** Kullanıcı "sohbeti kapat" dedi ve veda cümlesi bitti; widget paneli kapatır. */
   onEndConversation?: () => void;
+  /** Sayfa kaydırıldı / sayfada bir öğe tıklandı (başarılı). Widget dar
+   *  ekranda paneli kapatarak kullanıcının sonucu görmesini sağlar. */
+  onPageAction?: () => void;
 }
 
 export function useRealtimeVoice(options: RealtimeVoiceOptions = {}) {
@@ -167,6 +171,14 @@ export function useRealtimeVoice(options: RealtimeVoiceOptions = {}) {
         setTimeout(() => bitirKontrolRef.current(), 15000);
         return { ok: true, note: "Şimdi veda cümlesini söyle; ardından sohbet kapanacak." };
       }
+
+      // SAYFA KONTROLÜ — tarayıcıda, kullanıcının o an baktığı sayfa üzerinde.
+      if (name === "scroll_page" || name === "click_on_page") {
+        const sonuc = name === "scroll_page" ? sayfayiKaydir(args) : await ogeyeTikla(args);
+        if (sonuc.ok === true) optionsRef.current.onPageAction?.();
+        return sonuc;
+      }
+      if (name === "list_page_elements") return sayfaOgeleriniListele(args);
 
       if (name === "go_back") {
         router.back();

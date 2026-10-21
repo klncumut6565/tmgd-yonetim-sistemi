@@ -365,7 +365,7 @@ export default function VoiceOrbOverlay({ durum, asistanAnalyser, kullaniciSeviy
   // Panel açık ve yanında yeterli alan varsa üst/alt öğeler de kalan alanda ortalanır.
   const kaydir = sagBosluk > 0 && window.innerWidth - sagBosluk >= 520 ? sagBosluk : 0;
   return createPortal(
-    <div className={"fixed inset-0 z-[45] pointer-events-none transition-opacity duration-500 " + (gorunur ? "opacity-100" : "opacity-0")}>
+    <div data-asistan-ui className={"fixed inset-0 z-[45] pointer-events-none transition-opacity duration-500 " + (gorunur ? "opacity-100" : "opacity-0")}>
       <canvas ref={canvasRef} aria-hidden="true" className="absolute inset-0 w-full h-full" style={{ opacity: KURE_OPAKLIK }} />
 
       {onDurdur && (
