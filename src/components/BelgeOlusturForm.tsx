@@ -2225,26 +2225,31 @@ export async function renderYapilandirilmisBelge(
     const headerAlt = CERCEVE_KENAR + baslikYukseklik + 6;
     const kalanYukseklik = CERCEVE_ALT - headerAlt;
     const kalanGenislik = W - 2 * M;
-    const pngOrani = 210 / 297; // orijinal PNG'lerin en-boy oranı (A4 dikey)
-    let pngGenislik: number, pngYukseklik: number, pngX: number, pngY: number;
-    if (kalanGenislik / pngOrani <= kalanYukseklik) {
-      // genişlik sınırlayıcı — tam genişlik kullanılır, dikeyde ortalanır
-      pngGenislik = kalanGenislik;
-      pngYukseklik = kalanGenislik / pngOrani;
-      pngX = M;
-      pngY = headerAlt + (kalanYukseklik - pngYukseklik) / 2;
-    } else {
-      // yükseklik sınırlayıcı — tam yükseklik kullanılır, yatayda ortalanır
-      pngYukseklik = kalanYukseklik;
-      pngGenislik = kalanYukseklik * pngOrani;
-      pngX = M + (kalanGenislik - pngGenislik) / 2;
-      pngY = headerAlt;
-    }
+    // Görselin GERÇEK en-boy oranı kullanılır (K2 görsellerinin üstündeki orijinal başlık kutusu
+    // kırpıldığı için artık A4 oranında değil). Bozulmadan sığdırılır; K2 üste, diğerleri ortaya hizalanır.
+    const yerlesim = (gorsel: string) => {
+      let oran = 210 / 297;
+      try {
+        const p = doc.getImageProperties(gorsel);
+        if (p.width > 0 && p.height > 0) oran = p.width / p.height;
+      } catch {
+        /* varsayılan A4 oranı */
+      }
+      if (kalanGenislik / oran <= kalanYukseklik) {
+        // genişlik sınırlayıcı — tam genişlik
+        const yuk = kalanGenislik / oran;
+        return { x: M, y: code === "K2" ? headerAlt : headerAlt + (kalanYukseklik - yuk) / 2, w: kalanGenislik, h: yuk };
+      }
+      // yükseklik sınırlayıcı — tam yükseklik, yatayda ortalı
+      const gen = kalanYukseklik * oran;
+      return { x: M + (kalanGenislik - gen) / 2, y: headerAlt, w: gen, h: kalanYukseklik };
+    };
 
     gorseller.forEach((gorsel, i) => {
       doc.addPage();
       baslikTablosuCiz(doc, firmAdi, code, belgeAdi, sablon, logo, bugun, i + 2, toplamSayfa, baslikYukseklik, adLines);
-      doc.addImage(gorsel, "PNG", pngX, pngY, pngGenislik, pngYukseklik, undefined, "FAST");
+      const y = yerlesim(gorsel);
+      doc.addImage(gorsel, "PNG", y.x, y.y, y.w, y.h, undefined, "FAST");
     });
     return;
   }
