@@ -599,21 +599,51 @@ export default function BelgeOlusturForm({ fixedFirmId, initialFirmId, compact =
             // Kapak + form birleştirme
             const { PDFDocument } = await import("pdf-lib");
             const birlesik = await PDFDocument.create();
+            const formPdf = await PDFDocument.load(formBytes);
+
+            // K5: içerik sayfalarına da kapaktaki gibi standart BAŞLIK KUTUSU (sol üst logo, ortada form
+            // adı, sağda Doküman No / Yayın / Revizyon Tarihi / Sayfa No) basılır; orijinal formun kendi
+            // üst başlığı (form adı, açıklama, Form No / Yayın / Rev satırı) kırpılıp içerik kutunun altına yerleşir.
+            const kirpma = FORM_KIRPMA[actualCode];
+            if (kirpma) {
+              const formSayfa = formPdf.getPageCount();
+              for (let p = 0; p < formSayfa; p++) {
+                kapakDoc.addPage();
+                baslikTablosuCiz(kapakDoc, firm.name, actualCode, item.name, kSablon, logo, bugun, p + 2, 1 + formSayfa, kBaslikYuksekligi, kAdLines);
+              }
+            }
             const kapakPdf = await PDFDocument.load(
               kapakDoc.output("arraybuffer")
             );
-            const formPdf = await PDFDocument.load(formBytes);
-            for (const sayfa of await birlesik.copyPages(
-              kapakPdf,
-              kapakPdf.getPageIndices()
-            )) {
-              birlesik.addPage(sayfa);
-            }
-            for (const sayfa of await birlesik.copyPages(
-              formPdf,
-              formPdf.getPageIndices()
-            )) {
-              birlesik.addPage(sayfa);
+            const kapakSayfalari = await birlesik.copyPages(kapakPdf, kapakPdf.getPageIndices());
+            for (const sayfa of kapakSayfalari) birlesik.addPage(sayfa);
+
+            if (kirpma) {
+              const PT = 72 / 25.4;
+              const ustBosluk = (CERCEVE_KENAR + kBaslikYuksekligi + 4) * PT; // başlık kutusunun altı
+              for (let p = 0; p < formPdf.getPageCount(); p++) {
+                const kaynak = formPdf.getPage(p);
+                const { width: kW, height: kH } = kaynak.getSize();
+                const k = kirpma[p] ?? kirpma[kirpma.length - 1];
+                // pdftotext koordinatları (üstten) → PDF koordinatları (alttan)
+                const kutu = { left: 0, right: kW, top: kH - k.ust, bottom: kH - k.alt };
+                const gomulu = await birlesik.embedPage(kaynak, kutu);
+                const hedef = kapakSayfalari[p + 1];
+                const { width: hW, height: hH } = hedef.getSize();
+                const icYuk = kutu.top - kutu.bottom;
+                const kullanilabilir = hH - ustBosluk - 9.5 * PT;
+                const olcek = Math.min(1, kullanilabilir / icYuk, hW / kW);
+                const w = kW * olcek;
+                const h = icYuk * olcek;
+                hedef.drawPage(gomulu, { x: (hW - w) / 2, y: hH - ustBosluk - h, width: w, height: h });
+              }
+            } else {
+              for (const sayfa of await birlesik.copyPages(
+                formPdf,
+                formPdf.getPageIndices()
+              )) {
+                birlesik.addPage(sayfa);
+              }
             }
             const birlesikBytes = await birlesik.save();
             const pdfBlob = new Blob([birlesikBytes as unknown as BlobPart], {
@@ -1317,6 +1347,18 @@ let ALT_TABLO_UST = 244; // imza tablosu üst kenarı (içerik sayfaları)
 // pratik üst sınıra (~49.9 mm) çok yakın seçildi.
 const ALT_TABLO_YUKSEKLIK = 35.5;
 let FOOTER_UST = ALT_TABLO_UST - 2; // içerik bitişi (alt tablo öncesi)
+
+/**
+ * Hazır PDF'ten gelen kontrol formlarında (public/kontrol-formlar) içerik sayfalarına standart başlık
+ * kutusu basılacaksa: her form sayfasından alınacak dikey aralık (pt, sayfanın ÜSTÜNDEN ölçülür).
+ * K5 1. sayfa: üstteki form adı / açıklama / "Form No – Yayın Tarihi – Rev. No" satırı (0–134 pt) atılır.
+ */
+const FORM_KIRPMA: Record<string, { ust: number; alt: number }[]> = {
+  K5: [
+    { ust: 134, alt: 805 },
+    { ust: 28, alt: 662 },
+  ],
+};
 
 /** Her sayfaya orijinal belgedeki dış çerçeveyi çizer. */
 function cerceveCiz(doc: JsPDFType) {
