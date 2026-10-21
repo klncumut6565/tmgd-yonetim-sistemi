@@ -37,6 +37,7 @@ import {
 } from "@/lib/pdfFonts";
 import DateInput from "@/components/DateInput";
 import type { LogoData } from "@/lib/aracEvraklariPdf";
+import { belgeSablonu } from "@/lib/belgeSablonlari";
 
 import { depoDosyasiGetir } from "@/lib/depoOnbellek";
 // ── Tipler ────────────────────────────────────────────────────────────────
@@ -247,11 +248,92 @@ async function k3FormuCiz(
     aracManuel: string;
     kalemler: Kalem[];
     firmaFaaliyetleri: string[];
+    logo?: LogoData;
   }
 ) {
   const { K3_FORM_SAYFA1, K3_FORM_SAYFA2 } = await import("@/lib/k3FormGorselleri");
 
-  const W = 210, H = 297; // A4 mm
+  const W = 210; // A4 mm
+
+  // ── Standart başlık kutusu (Belge Oluştur K3 ile AYNI düzen) ──────────
+  // Sol: logo · Orta: belge adı + alt satır "GÖNDEREN KONTROL DÖKÜMANI" · Sağ: Doküman No / Yayın / Revizyon / Sayfa.
+  // Form görseli kutunun altına, en-boy oranı korunarak yerleşir; otomatik doldurulan alanlar görselin
+  // ORİJİNAL (tam A4, 150 DPI) mm koordinatlarından aynı dönüşümle hesaplanır.
+  const KENAR = 8.5, ICM = 12.4, CERCEVE_ALT = 287.5;
+  const VURGU: [number, number, number] = [30, 64, 175];
+  const kutuG = W - 2 * KENAR;
+  const ortaG = kutuG - 38 - 45;
+  const belgeAdi = "Sevkiyat Uygunluk Kontrol Formu (Gönderen · Yükleyen · Dolduran)";
+  const yayinTarihi = belgeSablonu("K3")?.yayinTarihi ?? "";
+  doc.setFont(FONT, "bold");
+  doc.setFontSize(9.5);
+  const olcuSatirlari: string[] = doc.splitTextToSize(belgeAdi, W - 2 * ICM - 38 - 45 - 6);
+  const kutuY = Math.max(24, 9 + olcuSatirlari.length * 4.8 + 3);
+  const icerikUst = KENAR + kutuY + 6;
+  const bugunTR = new Date().toLocaleDateString("tr-TR");
+
+  const baslikCiz = (sayfaNo: number, toplam: number) => {
+    doc.setDrawColor(0, 0, 0);
+    doc.setLineWidth(0.3);
+    doc.rect(KENAR, KENAR, kutuG, kutuY);
+    doc.line(KENAR + 38, KENAR, KENAR + 38, KENAR + kutuY);
+    doc.line(W - KENAR - 45, KENAR, W - KENAR - 45, KENAR + kutuY);
+    const ortaAyirici = KENAR + kutuY / 2;
+    doc.line(KENAR + 38, ortaAyirici, W - KENAR - 45, ortaAyirici);
+    const sagSatir = kutuY / 4;
+    for (let i = 1; i < 4; i++) doc.line(W - KENAR - 45, KENAR + sagSatir * i, W - KENAR, KENAR + sagSatir * i);
+    // Sol: logo (yoksa gönderen unvanı)
+    if (args.logo) {
+      try {
+        const k = 2.5;
+        const alanG = 38 - 2 * k;
+        const alanY = Math.min(kutuY - 2 * k, 22);
+        const oran = args.logo.enBoyOrani > 0 ? args.logo.enBoyOrani : 1;
+        let lw = alanG, lh = alanG / oran;
+        if (lh > alanY) { lh = alanY; lw = alanY * oran; }
+        doc.addImage(args.logo.data, args.logo.fmt, KENAR + k + (alanG - lw) / 2, KENAR + k + (alanY - lh) / 2 + (kutuY - 2 * k - alanY) / 2, lw, lh, undefined, "FAST");
+      } catch {
+        /* yoksay */
+      }
+    } else {
+      doc.setFont(FONT, "bold");
+      doc.setFontSize(7);
+      const f: string[] = doc.splitTextToSize((args.gonderen || "").split("\n")[0], 34);
+      doc.text(f, KENAR + 2, KENAR + kutuY / 2 - (f.length - 1) * 2);
+    }
+    // Orta: üstte belge adı, altta bölüm adı
+    const ortaX = KENAR + 38 + ortaG / 2;
+    doc.setFont(FONT, "bold");
+    doc.setFontSize(10);
+    doc.setTextColor(...VURGU);
+    const adSatir: string[] = doc.splitTextToSize(belgeAdi, ortaG - 6);
+    doc.text(adSatir, ortaX, KENAR + kutuY / 4 - (adSatir.length * 4.2) / 2 + 3.2, { align: "center" });
+    doc.setTextColor(0, 0, 0);
+    doc.setFontSize(10.5);
+    doc.text("GÖNDEREN KONTROL DÖKÜMANI", ortaX, ortaAyirici + kutuY / 4 + 1.2, { align: "center" });
+    // Sağ: doküman bilgileri
+    doc.setFont(FONT, "normal");
+    doc.setFontSize(7);
+    const sagX = W - KENAR - 43;
+    const y = (i: number) => KENAR + sagSatir * i + sagSatir / 2 + 1.2;
+    doc.text("Doküman No: TMGDK-K3", sagX, y(0));
+    doc.text(`Yayın Tarihi: ${yayinTarihi}`, sagX, y(1));
+    doc.text(`Revizyon Tarihi: ${bugunTR}`, sagX, y(2));
+    doc.text(`Sayfa No: Sayfa ${sayfaNo} / ${toplam}`, sagX, y(3));
+  };
+
+  /** Görseli başlığın altına sığdırır; ORİJİNAL tam sayfa mm koordinatını (x, y) yeni sayfa koordinatına çevirir. */
+  const yerles = (gorsel: string, kirpUstPx: number) => {
+    const p = doc.getImageProperties(gorsel);
+    const oran = p.width / p.height;
+    const alanG = W - 2 * ICM;
+    const alanY = CERCEVE_ALT - icerikUst;
+    let w = alanG, h = alanG / oran, x = ICM;
+    if (h > alanY) { h = alanY; w = alanY * oran; x = ICM + (alanG - w) / 2; }
+    const s = w / W; // orijinal A4 mm → yeni mm
+    const kirpMm = (kirpUstPx * 297) / 1754;
+    return { x, y: icerikUst, w, h, s, p: (ox: number, oy: number): [number, number] => [x + ox * s, icerikUst + (oy - kirpMm) * s] };
+  };
 
   // ── Otomatik doldurulacak veriler ────────────────────────────────────
   const kalemOzet = args.kalemler.length > 0
@@ -263,9 +345,11 @@ async function k3FormuCiz(
     ? `${args.surucu.first_name} ${args.surucu.last_name}`
     : args.surucuManuel.trim();
 
-  // ── Sayfa 1: arka plan ───────────────────────────────────────────────
+  // ── Sayfa 1: başlık + form (görselin üstündeki 129 px'lik form başlığı kırpılmış) ──
   doc.addPage();
-  doc.addImage(K3_FORM_SAYFA1, "PNG", 0, 0, W, H, undefined, "FAST");
+  baslikCiz(1, 2);
+  const L1 = yerles(K3_FORM_SAYFA1, 129);
+  doc.addImage(K3_FORM_SAYFA1, "PNG", L1.x, L1.y, L1.w, L1.h, undefined, "FAST");
 
   // "1. Tehlike İkaz İşaretleri ve Turuncu Plaka Kontrolü" — evraktaki
   // gerçek taşıma moduna göre otomatik işaretlenir: seçili moda uyan
@@ -286,15 +370,16 @@ async function k3FormuCiz(
     konteyner: { evet: 74.0, ilgiliDegil: 81.2 },
   };
   doc.setFont(FONT, "bold");
-  doc.setFontSize(7.5);
+  doc.setFontSize(7.5 * L1.s);
   doc.setTextColor(0, 0, 0);
   (Object.keys(CB_SATIRLARI) as (keyof typeof CB_SATIRLARI)[]).forEach((mod) => {
     const satirY = mod === k3Mod ? CB_SATIRLARI[mod].evet : CB_SATIRLARI[mod].ilgiliDegil;
-    doc.text("X", CB_X, satirY + 1.3, { align: "center" });
+    const [px, py] = L1.p(CB_X, satirY + 1.3);
+    doc.text("X", px, py, { align: "center" });
   });
 
   doc.setFont(FONT, "normal");
-  doc.setFontSize(8.5);
+  doc.setFontSize(8.5 * L1.s);
   doc.setTextColor(0, 0, 0);
 
   // Koordinatlar, orijinal 1241x1754px (150 DPI) görüntü üzerinde
@@ -311,13 +396,16 @@ async function k3FormuCiz(
     [kalemOzet, 127.5],
   ];
   genelBilgiler.forEach(([metin, satirY]) => {
-    const wrapped = doc.splitTextToSize(metin, W - degerX - 12);
-    doc.text(wrapped.slice(0, 2), degerX, satirY); // hücre yüksekliği sınırlı, en fazla 2 satır
+    const wrapped = doc.splitTextToSize(metin, (W - degerX - 12) * L1.s);
+    const [px, py] = L1.p(degerX, satirY);
+    doc.text(wrapped.slice(0, 2), px, py); // hücre yüksekliği sınırlı, en fazla 2 satır
   });
 
-  // ── Sayfa 2: arka plan ────────────────────────────────────────────────
+  // ── Sayfa 2: başlık + form ────────────────────────────────────────────
   doc.addPage();
-  doc.addImage(K3_FORM_SAYFA2, "PNG", 0, 0, W, H, undefined, "FAST");
+  baslikCiz(2, 2);
+  const L2 = yerles(K3_FORM_SAYFA2, 0);
+  doc.addImage(K3_FORM_SAYFA2, "PNG", L2.x, L2.y, L2.w, L2.h, undefined, "FAST");
 
   // "4. Dolduran Kontrolleri" — firmanın kayıtlı faaliyet konuları
   // arasında "dolduran" YOKSA, bu form fiilen doldurma işlemi yapmayan
@@ -336,25 +424,26 @@ async function k3FormuCiz(
       134.8, 144.3, 153.9, 163.5, 173.1, 182.7, 192.3, 201.9, 211.4, 221.1,
     ];
     doc.setFont(FONT, "bold");
-    doc.setFontSize(6.5);
+    doc.setFontSize(6.5 * L2.s);
     doc.setTextColor(0, 0, 0);
     DOLDURAN_SATIR_Y.forEach((satirY) => {
-      doc.text("X", DOLDURAN_I_X, satirY + 1.3, { align: "center" });
+      const [px, py] = L2.p(DOLDURAN_I_X, satirY + 1.3);
+      doc.text("X", px, py, { align: "center" });
     });
   }
 
   const gonderenSorumluBilgi = args.gonderenSorumlu.trim();
   doc.setFont(FONT, "bold");
-  doc.setFontSize(8.5);
+  doc.setFontSize(8.5 * L2.s);
   if (gonderenSorumluBilgi) {
     // "Gönderen – Kaşe / İmza" kutusu: sol sütun x≈19.1mm, kutunun üst
     // kısmına (y≈247.9mm) yazılır, kaşe/imza için altı boş kalır.
-    doc.text(gonderenSorumluBilgi, 19.1, 247.9);
+    doc.text(gonderenSorumluBilgi, ...L2.p(19.1, 247.9));
   }
   if (surucuAdBilgi) {
     // "Taşıyıcı / Şoför Adı Soyadı – İmza" kutusu: sağ sütun x≈101.5mm,
     // aynı satırda.
-    doc.text(surucuAdBilgi, 101.5, 247.9);
+    doc.text(surucuAdBilgi, ...L2.p(101.5, 247.9));
   }
   doc.setFont(FONT, "normal");
   doc.setTextColor(0, 0, 0);
