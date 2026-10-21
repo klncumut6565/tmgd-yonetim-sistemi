@@ -69,6 +69,21 @@ export const TOOL_DEFS = [
     },
   },
   {
+    name: 'get_firm_visits',
+    description:
+      "Bir firmanın ZİYARET geçmişini (Ziyaretler sekmesi / ziyaret raporları) döndürür: son ziyaret tarihi, kaç gün önce yapıldığı ve kimin yaptığı, " +
+      "kullanıcının kendi son ziyareti, bu yılki ziyaret sayısı, planlanan / sonraki ziyaret tarihi ve son ziyaretlerin listesi (tarih, tür, dönem, özet). " +
+      "'Son ziyaret tarihim ne zamandı', 'bu firmaya en son ne zaman gittim', 'ziyaret tarihleri', 'sonraki ziyaret ne zaman' sorularında kullanılır. Tarihi ASLA tahmin etme.",
+    parameters: {
+      type: 'object',
+      properties: {
+        firm_id: { type: 'string', description: "search_firm sonucundaki gerçek firma ID'si (firma sayfasındaysa o firma)" },
+        limit: { type: 'number', description: 'Listelenecek son ziyaret sayısı (varsayılan 10, en fazla 30)' },
+      },
+      required: ['firm_id'],
+    },
+  },
+  {
     name: 'add_firm_note',
     description:
       "Bir firmanın Notlar sekmesine yeni not EKLER (kullanıcı 'şunu not et / not al / not düş' dediğinde). " +

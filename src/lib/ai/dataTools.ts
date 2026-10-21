@@ -931,3 +931,60 @@ export async function getFirmDocuments(supabase: SupabaseClient, firmId: string,
     note: q ? undefined : 'Yalnızca geçerlilik tarihi girilmiş veya dosya yüklenmiş belgeler listelendi; belirli bir belge için query ver.',
   }
 }
+
+/**
+ * get_firm_visits — bir firmanın ziyaret geçmişi (Ziyaretler / ziyaret raporu kayıtları).
+ * Son ziyaret tarihi (bugün ve öncesi), kaç gün önce, kimin yaptığı; planlanmış (ileri tarihli)
+ * ziyaretler ve "sonraki ziyaret" tarihi; son ziyaretlerin listesi. Tarihler veritabanından aynen döner.
+ */
+export async function getFirmVisits(supabase: SupabaseClient, firmId: string, userId?: string, limit = 10) {
+  const { data: firma } = await supabase.from('firms').select('id, name').eq('id', firmId).maybeSingle()
+  if (!firma) return { ok: false, error: 'Firma bulunamadı.' }
+  const { data } = await supabase
+    .from('visits')
+    .select('visit_date, visit_type, summary, next_visit_date, visitor_id, period')
+    .eq('firm_id', firmId)
+    .order('visit_date', { ascending: false })
+    .limit(500)
+  type Z = { visit_date: string; visit_type: string | null; summary: string | null; next_visit_date: string | null; visitor_id: string | null; period: string | null }
+  const hepsi = ((data ?? []) as Z[]).filter((z) => z.visit_date && z.visit_date >= '2000-01-01') // hatalı (ör. 0020 yılı) kayıtlar dışarıda
+  const bugun = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Istanbul' }).format(new Date())
+  const gecmis = hepsi.filter((z) => z.visit_date <= bugun)
+  const planli = hepsi.filter((z) => z.visit_date > bugun).sort((a, b) => a.visit_date.localeCompare(b.visit_date))
+
+  const ids = [...new Set(hepsi.slice(0, limit + 5).map((z) => z.visitor_id).filter((x): x is string => !!x))]
+  const adlar = new Map<string, string>()
+  if (ids.length) {
+    const { data: kisiler } = await supabase.from('profiles').select('id, full_name').in('id', ids)
+    for (const k of (kisiler ?? []) as { id: string; full_name: string | null }[]) if (k.full_name) adlar.set(k.id, k.full_name)
+  }
+  const gunFarki = (d: string) => Math.round((Date.parse(bugun) - Date.parse(d)) / 86400000)
+  const satir = (z: Z) => ({
+    tarih: z.visit_date,
+    tur: z.visit_type,
+    donem: z.period,
+    ziyaret_eden: z.visitor_id ? adlar.get(z.visitor_id) ?? null : null,
+    ozet: z.summary ? z.summary.replace(/\s+/g, ' ').trim().slice(0, 200) : null,
+    sonraki_ziyaret: z.next_visit_date,
+  })
+  const son = gecmis[0]
+  const benimSon = userId ? gecmis.find((z) => z.visitor_id === userId) : undefined
+  const yil = bugun.slice(0, 4)
+  return {
+    ok: true,
+    grounded: true,
+    firm_id: firmId,
+    firm_name: (firma as { name: string }).name,
+    today: bugun,
+    toplam_ziyaret: gecmis.length,
+    bu_yil_ziyaret: gecmis.filter((z) => z.visit_date.startsWith(yil)).length,
+    son_ziyaret_tarihi: son?.visit_date ?? null,
+    son_ziyaretten_bu_yana_gun: son ? gunFarki(son.visit_date) : null,
+    son_ziyareti_yapan: son?.visitor_id ? adlar.get(son.visitor_id) ?? null : null,
+    kullanicinin_son_ziyareti: benimSon?.visit_date ?? null,
+    planlanan_ziyaretler: planli.slice(0, 5).map((z) => z.visit_date),
+    sonraki_ziyaret: planli[0]?.visit_date ?? son?.next_visit_date ?? null,
+    son_ziyaretler: gecmis.slice(0, Math.min(Math.max(limit, 1), 30)).map(satir),
+  }
+}
+
