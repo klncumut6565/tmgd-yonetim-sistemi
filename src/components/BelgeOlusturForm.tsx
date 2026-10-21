@@ -1847,7 +1847,9 @@ function baslikTablosuCiz(
   toplamSayfa: number,
   yukseklik: number,
   adLines: string[],
-  sayfaEtiketi?: string
+  sayfaEtiketi?: string,
+  /** Orta hücrede belge adının altına, ayrı satırda yazılacak bölüm adı (ör. K3 2. sayfa "GÖNDEREN KONTROL DÖKÜMANI"). */
+  altSatir?: string
 ) {
   // Başlık kutusu, dış çerçeveyle BİTİŞİK olmalı (EK-3 şablonu): sol, üst
   // ve sağ kenarları çerçevenin kenarlarıyla çakışır, alt kenarı da içerik
@@ -1869,7 +1871,7 @@ function baslikTablosuCiz(
   // KONTROL FORMU türünde tür yazısı basılmadığı için (belge adı zaten
   // "... Kontrol Formu" içerir) ayırıcı çizgi de çizilmez.
   const ortaAyirici = ustY + yukseklik / 2;
-  if (sablon.docType !== "KONTROL FORMU") {
+  if (sablon.docType !== "KONTROL FORMU" || altSatir) {
     doc.line(solKenar + 38, ortaAyirici, W - solKenar - 45, ortaAyirici);
   }
 
@@ -1912,7 +1914,19 @@ function baslikTablosuCiz(
   // Formu" içerir); belge adı kutu içinde dikey ortalanır.
   const ortaX = solKenar + 38 + (kutuGenislik - 38 - 45) / 2;
   const turuGoster = sablon.docType !== "KONTROL FORMU";
-  if (turuGoster) {
+  if (altSatir) {
+    // Üst satır: belge adı, alt satır: bölüm adı (her biri kendi yarısında dikey ortalı)
+    doc.setFontSize(10);
+    doc.setFont(FONT, "bold");
+    doc.setTextColor(...RENK_VURGU);
+    const ustBlok = adLines.length * 4.2;
+    doc.text(adLines, ortaX, ustY + yukseklik / 4 - ustBlok / 2 + 3.2, { align: "center" });
+    doc.setTextColor(0, 0, 0);
+    doc.setFontSize(10.5);
+    const altLines: string[] = doc.splitTextToSize(altSatir, kutuGenislik - 38 - 45 - 6);
+    const altBlok = altLines.length * 4.4;
+    doc.text(altLines, ortaX, ortaAyirici + yukseklik / 4 - altBlok / 2 + 3.4, { align: "center" });
+  } else if (turuGoster) {
     // Üst yarı: doküman türü (yarı yüksekliğin ortasına hizalı)
     doc.setFontSize(12);
     doc.setFont(FONT, "bold");
@@ -2280,7 +2294,7 @@ export async function renderYapilandirilmisBelge(
       if (kalanGenislik / oran <= kalanYukseklik) {
         // genişlik sınırlayıcı — tam genişlik
         const yuk = kalanGenislik / oran;
-        return { x: M, y: code === "K2" ? headerAlt : headerAlt + (kalanYukseklik - yuk) / 2, w: kalanGenislik, h: yuk };
+        return { x: M, y: code === "K2" || code === "K3" ? headerAlt : headerAlt + (kalanYukseklik - yuk) / 2, w: kalanGenislik, h: yuk };
       }
       // yükseklik sınırlayıcı — tam yükseklik, yatayda ortalı
       const gen = kalanYukseklik * oran;
@@ -2289,7 +2303,9 @@ export async function renderYapilandirilmisBelge(
 
     gorseller.forEach((gorsel, i) => {
       doc.addPage();
-      baslikTablosuCiz(doc, firmAdi, code, belgeAdi, sablon, logo, bugun, i + 2, toplamSayfa, baslikYukseklik, adLines);
+      // K3 1. içerik sayfası: görselden kırpılan "GÖNDEREN KONTROL DÖKÜMANI" başlığı kutunun alt satırına
+      const altSatir = code === "K3" && i === 0 ? "GÖNDEREN KONTROL DÖKÜMANI" : undefined;
+      baslikTablosuCiz(doc, firmAdi, code, belgeAdi, sablon, logo, bugun, i + 2, toplamSayfa, baslikYukseklik, adLines, undefined, altSatir);
       const y = yerlesim(gorsel);
       doc.addImage(gorsel, "PNG", y.x, y.y, y.w, y.h, undefined, "FAST");
     });
