@@ -23,7 +23,7 @@ import { useRouter, usePathname } from "next/navigation";
 import { sayfaHedefi } from "@/lib/ai/actions";
 import { authFetch } from "@/lib/supabase/authFetch";
 import { GeminiLiveProvider } from "@/lib/voice/providers/geminiLive";
-import { startMicCapture, AudioPlaybackQueue, type MicCapture } from "@/lib/voice/audioStream";
+import { startMicCapture, AudioPlaybackQueue, createNoiseGate, type MicCapture, type GateStats } from "@/lib/voice/audioStream";
 import { hataTurkce } from "@/lib/voice/hatalar";
 import { buildLiveInstruction, type LiveContext } from "@/lib/voice/geminiTools";
 import type { VoiceSession, VoiceState, LiveMetrics, RealtimeSessionResponse } from "@/lib/voice/types";
@@ -102,6 +102,8 @@ export function useRealtimeVoice(options: RealtimeVoiceOptions = {}) {
   const micRef = useRef<MicCapture | null>(null);
   const playbackRef = useRef<AudioPlaybackQueue | null>(null);
   const mutedRef = useRef(false);
+  const gateStatsRef = useRef<GateStats | null>(null);
+  const konusmaBasRef = useRef(0); // asistanın bu konuşmaya başladığı an (kesinti teşhisi)
   const yenidenBaglaniyorRef = useRef(false);
   const yenidenBaglanRef = useRef<(() => Promise<void>) | null>(null);
   // Gemini transkripti parça parça gönderir; konuşmacı başına biriktirilir.
@@ -300,11 +302,19 @@ export function useRealtimeVoice(options: RealtimeVoiceOptions = {}) {
             console.info(`[canli-ses] ilk ses gecikmesi: ${ms} ms (ort. ${ort} ms)`);
           }
         }
+        if (!playback.isPlaying()) konusmaBasRef.current = Date.now();
         playback.enqueue(chunk);
         // Ölçüm bu tur için tamamlandı; model kendiliğinden konuşursa eski zamanı kullanma.
         if (ilkSes) sonSesZamaniRef.current = null;
       });
       provider.onInterrupted(() => {
+        // Teşhis: asistan ne kadar konuşmuştu, kesildiği anki ses / eşik, bastırılan sesler
+        const st = gateStatsRef.current;
+        const ms = konusmaBasRef.current ? Date.now() - konusmaBasRef.current : 0;
+        console.info(
+          `[canli-ses] kesinti: asistan_ms=${ms} rms=${st?.lastRms ?? 0} esik=${st?.lastThr ?? 0} sozegirme=${st?.bargeIns ?? 0} bastirilan=${st?.suppressed ?? 0} perdesiz=${st?.unvoiced ?? 0}`,
+        );
+        konusmaBasRef.current = 0;
         turuIsle(); // kesilen turda söylenen kısım da geçmişe girsin
         playback.clear();
         turSesAlindiRef.current = false;
@@ -412,6 +422,10 @@ export function useRealtimeVoice(options: RealtimeVoiceOptions = {}) {
       playbackRef.current = playback;
 
       // Mikrofon her zaman GÜNCEL provider'a yazar (yeniden bağlanmada değişir).
+      // Gürültü kapısı + yankı koruması + söze girmede insan sesi kontrolü (audioStream.createNoiseGate):
+      // asistan konuşurken tıkırtı / kapı / alkış / çınlama asistanı kesmez; "dur", "hayır" keser.
+      const gate = createNoiseGate(SES_ESIGI_RMS);
+      gateStatsRef.current = gate.stats;
       const mic = await startMicCapture((pcm) => {
         if (mutedRef.current) return;
         // Kullanıcının son "ses var" anı — gecikme ölçümünün başlangıcı.
@@ -419,7 +433,8 @@ export function useRealtimeVoice(options: RealtimeVoiceOptions = {}) {
         let toplam = 0;
         for (let i = 0; i < v.length; i++) toplam += v[i] * v[i];
         if (Math.sqrt(toplam / v.length) > SES_ESIGI_RMS) sonSesZamaniRef.current = performance.now();
-        providerRef.current?.sendAudio(pcm);
+        const g = gate(pcm, playbackRef.current?.isPlaying() ?? false);
+        for (const o of g.outs) providerRef.current?.sendAudio(o);
       });
       micRef.current = mic;
 

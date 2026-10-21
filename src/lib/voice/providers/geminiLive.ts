@@ -152,6 +152,8 @@ export class GeminiLiveProvider implements RealtimeProvider {
               realtimeInputConfig: {
                 automaticActivityDetection: {
                   startOfSpeechSensitivity: "START_SENSITIVITY_LOW",
+                  // Konuşma başlangıcı için asgari süre (tek tıkırtı asistanı kesmesin)
+                  prefixPaddingMs: 200,
                   silenceDurationMs: 800,
                 },
               },
