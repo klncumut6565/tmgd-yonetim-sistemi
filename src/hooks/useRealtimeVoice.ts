@@ -103,6 +103,7 @@ export function useRealtimeVoice(options: RealtimeVoiceOptions = {}) {
   const playbackRef = useRef<AudioPlaybackQueue | null>(null);
   const mutedRef = useRef(false);
   const gateStatsRef = useRef<GateStats | null>(null);
+  const selamYedekRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const konusmaBasRef = useRef(0); // asistanın bu konuşmaya başladığı an (kesinti teşhisi)
   const yenidenBaglaniyorRef = useRef(false);
   const yenidenBaglanRef = useRef<(() => Promise<void>) | null>(null);
@@ -216,6 +217,8 @@ export function useRealtimeVoice(options: RealtimeVoiceOptions = {}) {
   /** Açık ne varsa (mikrofon, ses kuyruğu, WebSocket) kapatır; birden çok
    *  kez çağrılması güvenlidir. */
   const kaynaklariKapat = useCallback(async () => {
+    if (selamYedekRef.current) clearTimeout(selamYedekRef.current);
+    selamYedekRef.current = null;
     micRef.current?.stop();
     micRef.current = null;
     playbackRef.current?.close();
@@ -420,6 +423,14 @@ export function useRealtimeVoice(options: RealtimeVoiceOptions = {}) {
       await provider.connect(sessionData, null, buildLiveInstruction(optionsRef.current.getContext?.()));
       providerRef.current = provider;
       playbackRef.current = playback;
+
+      // Asistan önce konuşsun: bağlanır bağlanmaz selamlama iste (mikrofondaki ilk gürültü
+      // modelin "kullanıcı konuşuyor" diye beklemesine yol açmasın). Yeniden bağlanmada selamlanmaz.
+      provider.sendText("[SİSTEM] Oturum başladı. Kullanıcıyı ilk adıyla sıcak ve samimi selamla, nasıl olduğunu sor ve nasıl yardımcı olabileceğini söyle.");
+      const selamYedek = setTimeout(() => {
+        if (!turSesAlindiRef.current && providerRef.current === provider) provider.sendText("[SİSTEM] Şimdi selamlamayı yap, kullanıcıyı bekleme.");
+      }, 2500);
+      selamYedekRef.current = selamYedek;
 
       // Mikrofon her zaman GÜNCEL provider'a yazar (yeniden bağlanmada değişir).
       // Gürültü kapısı + yankı koruması + söze girmede insan sesi kontrolü (audioStream.createNoiseGate):

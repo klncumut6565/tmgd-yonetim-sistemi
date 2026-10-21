@@ -30,6 +30,7 @@ import { useAudioRecorder } from "@/hooks/useAudioRecorder";
 import { useTextToSpeech } from "@/hooks/useTextToSpeech";
 import { KLASIK_SES_AKTIF } from "@/lib/voice/config";
 import { useRealtimeVoice } from "@/hooks/useRealtimeVoice";
+import { useUser } from "@/hooks/useUser";
 import type { ChatMessage } from "@/lib/ai/multiEngine";
 import { actionToUrl } from "@/lib/ai/actions";
 import { yerelNiyetCoz } from "@/lib/ai/localIntent";
@@ -139,10 +140,16 @@ export default function ADRAssistantWidget() {
   // turn-based klasik "Sesli Görüşme"ye düşülür (sesliBaslatTikla). Ayrı bir hook
   // (bkz. useRealtimeVoice.ts) — ikisi aynı anda mikrofonu paylaşamaz,
   // bu yüzden biri aktifken diğerinin butonu devre dışı bırakılır.
+  const { profile: kullanici } = useUser();
+  const kullaniciAdiRef = useRef<string | null>(null);
+  useEffect(() => {
+    kullaniciAdiRef.current = kullanici?.full_name ?? null;
+  }, [kullanici?.full_name]);
   const canli = useRealtimeVoice({
     onEndConversation: () => setOpen(false),
     // Live oturumu açılırken/yenilenirken: şu anki firma + panel sohbet geçmişi.
     getContext: () => ({
+      userName: kullaniciAdiRef.current,
       firmId,
       firmName,
       history: messagesRef.current

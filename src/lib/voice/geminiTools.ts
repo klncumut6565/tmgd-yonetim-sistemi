@@ -27,6 +27,12 @@ export const GEMINI_FUNCTION_DECLARATIONS = TOOL_DEFS;
 export const GEMINI_LIVE_SYSTEM_INSTRUCTION = `
 Sen TMGD (Tehlikeli Madde Güvenlik Danışmanı) sesli asistanısın. DİL: Kullanıcı HER ZAMAN Türkçe konuşur — duyduğun her sesi Türkçe kabul et, başka bir dile (İngilizce vb.) çevirme/yorumlama; belirsiz veya anlaşılmaz sesi Türkçe en yakın karşılığıyla değerlendir ya da "tekrar eder misin?" de. SADECE Türkçe konuş, kısa ve doğal cümleler kur — sesli cevap yazılı cevaptan daha kısa olmalı.
 
+SELAMLAMA VE ÜSLUP:
+- "[SİSTEM] Oturum başladı" mesajı gelince sohbeti SEN başlat: kullanıcıyı (biliniyorsa) ilk adıyla, sıcak ve samimi selamla, günün saatine uygun ol (günaydın / iyi günler / iyi akşamlar), nasıl olduğunu sor ve nasıl yardımcı olabileceğini söyle. En fazla 2 kısa cümle. Her seferinde AYNI kalıbı kullanma, cümleleri çeşitlendir. Örnekler: "Günaydın Umut! Bugün nasılsın, sana nasıl yardımcı olayım?", "Merhaba Umut, hoş geldin! Neyle başlayalım?", "İyi akşamlar Umut, umarım günün iyi geçmiştir. Bugün ne yapıyoruz?"
+- Kullanıcıyı henüz DUYMADAN sesi veya ruh hali hakkında yorum yapma. Kullanıcı konuştuktan sonra sesi belirgin şekilde neşeli/keyifli geliyorsa ara sıra doğal bir dille söyleyebilirsin ("Sesin bugün keyifli geliyor, ne güzel!"); her cevapta değil, yorgun/üzgün gibi olumsuz çıkarımlar yapma.
+- Samimi ama işe odaklı ol; selamlaşmadan sonra kısa ve net cevap ver.
+- Bağlantı yenilendiğinde (oturum devamı) tekrar selamlama yapma, kaldığın yerden devam et.
+
 KESİN KURALLAR:
 - Bildirim zili (bildirimler, zilde ne yazıyor, onay bekleyenler, süresi yaklaşan belgeler) için get_notifications çağır; başlık, firma ve kalan günü aynen aktar.
 - Gösterge paneli bilgileri (firma/görev/araç sayıları, süresi yaklaşan belgeler) için get_dashboard_summary, TMGD personeli (aktif sayı, ad, iletişim, sertifika tarihi) için list_tmgd çağır; sayı ve isimleri aynen aktar.
@@ -56,6 +62,8 @@ KESİN KURALLAR:
  *  kullanıcının o an baktığı firma ve son konuşma geçmişi. Böylece Live
  *  asistan "şu anki firma" ve "az önce ne konuştuk" bilgisini bilir. */
 export interface LiveContext {
+  /** Giriş yapmış kullanıcının adı soyadı (selamlamada ilk adıyla hitap edilir). */
+  userName?: string | null;
   firmId: string | null;
   firmName: string | null;
   /** Panel sohbetinden son mesajlar (eskiden yeniye). */
@@ -68,6 +76,11 @@ const MESAJ_MAKS_KARAKTER = 300;
 export function buildLiveInstruction(ctx?: LiveContext | null): string {
   if (!ctx) return GEMINI_LIVE_SYSTEM_INSTRUCTION;
   const parcalar: string[] = [GEMINI_LIVE_SYSTEM_INSTRUCTION, '', 'MEVCUT BAĞLAM (uygulamadan alındı):'];
+  const ilkAd = (ctx.userName ?? '').trim().split(/\s+/)[0];
+  parcalar.push(ilkAd ? `- Kullanıcının adı: ${ilkAd} (selamlarken ve yeri geldikçe ilk adıyla hitap et).` : '- Kullanıcının adı bilinmiyor (adsız ama sıcak selamla).');
+  const simdi = new Date();
+  const saat = new Intl.DateTimeFormat('tr-TR', { hour: '2-digit', minute: '2-digit', weekday: 'long', timeZone: 'Europe/Istanbul' }).format(simdi);
+  parcalar.push(`- Şu an (Türkiye saati): ${saat}.`);
   if (ctx.firmId && ctx.firmName) {
     parcalar.push(
       `- Kullanıcı şu an "${ctx.firmName}" firmasının sayfasında (firma ID: ${ctx.firmId}). ` +
