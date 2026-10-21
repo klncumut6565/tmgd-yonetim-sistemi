@@ -31,6 +31,7 @@ import { useTextToSpeech } from "@/hooks/useTextToSpeech";
 import { KLASIK_SES_AKTIF } from "@/lib/voice/config";
 import { useRealtimeVoice } from "@/hooks/useRealtimeVoice";
 import VoiceWaveform from "@/components/adr-assistant/VoiceWaveform";
+import VoiceOrbOverlay from "@/components/adr-assistant/VoiceOrbOverlay";
 import type { VoiceState } from "@/lib/voice/types";
 import { useUser } from "@/hooks/useUser";
 import type { ChatMessage } from "@/lib/ai/multiEngine";
@@ -169,6 +170,24 @@ export default function ADRAssistantWidget() {
     },
   });
   const canliAktif = canli.session.state !== "idle" && canli.session.state !== "error";
+
+  // TAM EKRAN SES KÜRESİ: Canlı Konuşma açıkken arka planda, yarı saydam,
+  // tıklamaları engellemeyen animasyon. Kullanıcı kapatabilir; tercih
+  // tarayıcıda hatırlanır (yalnızca görsel tercih, ses akışını etkilemez).
+  const [kureAcik, setKureAcik] = useState(true);
+  useEffect(() => {
+    try {
+      if (localStorage.getItem("adr-asistan-kure") === "0") setKureAcik(false);
+    } catch {}
+  }, []);
+  function kureyiDegistir() {
+    setKureAcik((v) => {
+      try {
+        localStorage.setItem("adr-asistan-kure", v ? "0" : "1");
+      } catch {}
+      return !v;
+    });
+  }
 
   const {
     desteklenir: sesDesteklenir,
@@ -690,8 +709,23 @@ export default function ADRAssistantWidget() {
   // ---- KAPALI: sağ altta küçük, yarı saydam simge — üzerine gelince/
   // odaklanınca tam etikete genişler. Öncesinde her zaman geniş, tam opak
   // bir çubuktu; bu, sayfanın o köşesindeki metni seçmeyi zorlaştırıyordu.
+  // Panel açıkken sağda kapladığı genişlik (w-[88%] max-w-[420px] ile aynı).
+  const panelGenisligi = open && typeof window !== "undefined" ? Math.min(window.innerWidth * 0.88, 420) : 0;
+  const sesKuresi =
+    canliAktif && kureAcik ? (
+      <VoiceOrbOverlay
+        durum={canli.session.state}
+        asistanAnalyser={canli.getAssistantAnalyser}
+        kullaniciSeviyesi={canli.getUserLevel}
+        sagBosluk={panelGenisligi}
+        onDurdur={() => canli.disconnect()}
+      />
+    ) : null;
+
   if (!open) {
     return (
+      <>
+      {sesKuresi}
       <button
         onClick={() => setOpen(true)}
         title="ADR Asistanı"
@@ -705,12 +739,14 @@ export default function ADRAssistantWidget() {
           )}
         </span>
       </button>
+      </>
     );
   }
 
   // ---- AÇIK: sağ tarafta mesajlaşma paneli ----
   return (
     <>
+      {sesKuresi}
       {/* Karartma (backdrop) — mobilde panel dışına dokununca kapansın,
           ayrıca panelin "sayfayı kaplamadığını" görsel olarak belirginleştirir. */}
       <div
@@ -762,6 +798,19 @@ export default function ADRAssistantWidget() {
               className="px-2.5 py-1 rounded-full text-xs font-medium bg-red-600 text-white hover:bg-red-700"
             >
               🛑 Bitir
+            </button>
+          )}
+          {canliAktif && (
+            <button
+              onClick={kureyiDegistir}
+              title={kureAcik ? "Arka plan animasyonunu gizle" : "Arka plan animasyonunu göster"}
+              aria-pressed={kureAcik}
+              className={
+                "w-8 h-8 rounded-full flex items-center justify-center text-sm " +
+                (kureAcik ? "bg-purple-100 text-purple-700 hover:bg-purple-200" : "text-gray-400 hover:bg-gray-200")
+              }
+            >
+              ✨
             </button>
           )}
           {canliAktif && (

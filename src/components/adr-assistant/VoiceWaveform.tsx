@@ -20,6 +20,7 @@
 
 import { useEffect, useRef } from "react";
 import type { VoiceState } from "@/lib/voice/types";
+import { AnalizOkuyucu, yumusat } from "@/lib/voice/sesAnalizi";
 
 export interface VoiceWaveformProps {
   /** Mevcut ses durum makinesinin durumu (useRealtimeVoice veya klasik moddan türetilmiş). */
@@ -53,31 +54,6 @@ const ETIKET: Record<VoiceState, string> = {
   reconnecting: "Bağlantı yeniden kuruluyor",
   error: "Bağlantı hatası",
 };
-
-/** Byte zaman-alanı verisinden RMS (0..~1). */
-function rmsHesapla(veri: Uint8Array): number {
-  let t = 0;
-  for (let i = 0; i < veri.length; i++) {
-    const v = (veri[i] - 128) / 128;
-    t += v * v;
-  }
-  return Math.sqrt(t / veri.length);
-}
-
-/** Frekans verisinde [altHz, ustHz) bandının ortalama enerjisi (0..1). */
-function bantEnerjisi(veri: Uint8Array, binHz: number, altHz: number, ustHz: number): number {
-  const a = Math.max(0, Math.floor(altHz / binHz));
-  const b = Math.min(veri.length, Math.max(a + 1, Math.ceil(ustHz / binHz)));
-  let t = 0;
-  for (let i = a; i < b; i++) t += veri[i];
-  return t / ((b - a) * 255);
-}
-
-/** Zaman tabanlı yumuşatma: hızlı yükselir, yavaş söner (titreme olmaz). */
-function yumusat(mevcut: number, hedef: number, dt: number, yukselme: number, sonme: number): number {
-  const tau = hedef > mevcut ? yukselme : sonme;
-  return mevcut + (hedef - mevcut) * (1 - Math.exp(-dt / tau));
-}
 
 export default function VoiceWaveform({ durum, asistanAnalyser, kullaniciSeviyesi, sentetikKonusma, className }: VoiceWaveformProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -115,10 +91,7 @@ export default function VoiceWaveform({ durum, asistanAnalyser, kullaniciSeviyes
     };
     mq?.addEventListener?.("change", mqDegisti);
 
-    // ---- Analiz tamponları (analiz düğümü değişirse yeniden ayrılır) ----
-    let sonAnaliz: AnalyserNode | null = null;
-    let zamanVeri = new Uint8Array(0);
-    let frekVeri = new Uint8Array(0);
+    const okuyucu = new AnalizOkuyucu();
 
     // ---- Animasyon durumu ----
     const genlik = [0, 0, 0]; // her katmanın yumuşatılmış genliği (0..1)
@@ -143,22 +116,9 @@ export default function VoiceWaveform({ durum, asistanAnalyser, kullaniciSeviyes
       if (d === "speaking") {
         renk = RENK.asistan;
         hiz = 5;
-        const analiz = !sentetik ? (getAnaliz?.() ?? null) : null;
-        if (analiz) {
-          if (analiz !== sonAnaliz) {
-            sonAnaliz = analiz;
-            zamanVeri = new Uint8Array(analiz.fftSize);
-            frekVeri = new Uint8Array(analiz.frequencyBinCount);
-          }
-          analiz.getByteTimeDomainData(zamanVeri);
-          analiz.getByteFrequencyData(frekVeri);
-          const rms = rmsHesapla(zamanVeri);
-          // Çok düşük seviye = sessizlik/hece arası → dalga sakinleşir.
-          const seviye = Math.min(1, Math.max(0, (rms - 0.008) * 4.5));
-          const binHz = analiz.context.sampleRate / analiz.fftSize;
-          const alcak = bantEnerjisi(frekVeri, binHz, 80, 400);
-          const orta = bantEnerjisi(frekVeri, binHz, 400, 1600);
-          const yuksek = bantEnerjisi(frekVeri, binHz, 1600, 4000);
+        const olcum = !sentetik ? okuyucu.oku(getAnaliz?.() ?? null) : null;
+        if (olcum) {
+          const { seviye, alcak, orta, yuksek } = olcum;
           hedef = [seviye * (0.55 + 0.45 * alcak), seviye * (0.4 + 0.6 * orta), seviye * (0.3 + 0.7 * yuksek)];
         } else if (sentetik) {
           // TEMSİLİ: tarayıcı TTS sesi okunamıyor; konuşma ritmini taklit eden
@@ -241,7 +201,7 @@ export default function VoiceWaveform({ durum, asistanAnalyser, kullaniciSeviyes
       cancelAnimationFrame(rafId);
       ro?.disconnect();
       mq?.removeEventListener?.("change", mqDegisti);
-      sonAnaliz = null;
+      okuyucu.birak();
     };
   }, []);
 
