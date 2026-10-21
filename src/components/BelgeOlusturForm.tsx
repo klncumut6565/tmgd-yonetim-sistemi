@@ -2294,7 +2294,7 @@ export async function renderYapilandirilmisBelge(
       if (kalanGenislik / oran <= kalanYukseklik) {
         // genişlik sınırlayıcı — tam genişlik
         const yuk = kalanGenislik / oran;
-        return { x: M, y: code === "K2" || code === "K3" ? headerAlt : headerAlt + (kalanYukseklik - yuk) / 2, w: kalanGenislik, h: yuk };
+        return { x: M, y: code === "K2" || code === "K3" || code === "K4" ? headerAlt : headerAlt + (kalanYukseklik - yuk) / 2, w: kalanGenislik, h: yuk };
       }
       // yükseklik sınırlayıcı — tam yükseklik, yatayda ortalı
       const gen = kalanYukseklik * oran;
@@ -2303,8 +2303,9 @@ export async function renderYapilandirilmisBelge(
 
     gorseller.forEach((gorsel, i) => {
       doc.addPage();
-      // K3 tüm içerik sayfaları: görselden kırpılan "GÖNDEREN KONTROL DÖKÜMANI" başlığı kutunun alt satırına
-      const altSatir = code === "K3" ? "GÖNDEREN KONTROL DÖKÜMANI" : undefined;
+      // K3 / K4 tüm içerik sayfaları: görselden kırpılan alt başlık (K3 "GÖNDEREN KONTROL DÖKÜMANI",
+      // K4 "PAKETLEME KAPSAMINDA KONTROLLER") standart başlık kutusunun alt satırına
+      const altSatir = code === "K3" ? "GÖNDEREN KONTROL DÖKÜMANI" : code === "K4" ? "PAKETLEME KAPSAMINDA KONTROLLER" : undefined;
       baslikTablosuCiz(doc, firmAdi, code, belgeAdi, sablon, logo, bugun, i + 2, toplamSayfa, baslikYukseklik, adLines, undefined, altSatir);
       const y = yerlesim(gorsel);
       doc.addImage(gorsel, "PNG", y.x, y.y, y.w, y.h, undefined, "FAST");
