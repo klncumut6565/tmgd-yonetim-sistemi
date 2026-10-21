@@ -31,6 +31,10 @@ export interface VoiceOrbOverlayProps {
   onDurdur?: () => void;
 }
 
+/** Küre katmanının genel saydamlığı (0..1). Düşük = sayfa daha net görünür.
+ *  Durdur hapı ve alt etiket bu değerden etkilenmez (okunaklı kalsın). */
+const KURE_OPAKLIK = 0.6;
+
 const ETIKET: Record<VoiceState, string> = {
   idle: "",
   connecting: "BAĞLANIYOR",
@@ -198,8 +202,8 @@ export default function VoiceOrbOverlay({ durum, asistanAnalyser, kullaniciSeviy
 
       // 3) Pus / bulutsu (yarı saydam, kenarlara doğru tamamen şeffaf)
       const pus = ctx.createRadialGradient(cx, cy, R * 0.4, cx, cy, R * 3.6);
-      pus.addColorStop(0, `hsla(${ton},${doyg}%,32%,${0.32 * I})`);
-      pus.addColorStop(0.5, `hsla(${ton},${doyg}%,26%,${0.14 * I})`);
+      pus.addColorStop(0, `hsla(${ton},${doyg}%,32%,${0.2 * I})`);
+      pus.addColorStop(0.5, `hsla(${ton},${doyg}%,26%,${0.08 * I})`);
       pus.addColorStop(1, `hsla(${ton},${doyg}%,20%,0)`);
       ctx.fillStyle = pus;
       ctx.fillRect(0, 0, W, H);
@@ -241,8 +245,8 @@ export default function VoiceOrbOverlay({ durum, asistanAnalyser, kullaniciSeviy
       // 5) Küre gövdesi (yarı saydam koyu disk)
       ctx.globalCompositeOperation = "source-over";
       const govde = ctx.createRadialGradient(cx - R * 0.2, cy - R * 0.25, R * 0.1, cx, cy, R);
-      govde.addColorStop(0, `hsla(${ton - 12},70%,34%,${0.5 * I})`);
-      govde.addColorStop(1, `hsla(${ton - 18},75%,16%,${0.6 * I})`);
+      govde.addColorStop(0, `hsla(${ton - 12},70%,34%,${0.3 * I})`);
+      govde.addColorStop(1, `hsla(${ton - 18},75%,16%,${0.38 * I})`);
       ctx.beginPath();
       ctx.arc(cx, cy, R, 0, Math.PI * 2);
       ctx.fillStyle = govde;
@@ -362,7 +366,7 @@ export default function VoiceOrbOverlay({ durum, asistanAnalyser, kullaniciSeviy
   const kaydir = sagBosluk > 0 && window.innerWidth - sagBosluk >= 520 ? sagBosluk : 0;
   return createPortal(
     <div className={"fixed inset-0 z-[45] pointer-events-none transition-opacity duration-500 " + (gorunur ? "opacity-100" : "opacity-0")}>
-      <canvas ref={canvasRef} aria-hidden="true" className="absolute inset-0 w-full h-full" />
+      <canvas ref={canvasRef} aria-hidden="true" className="absolute inset-0 w-full h-full" style={{ opacity: KURE_OPAKLIK }} />
 
       {onDurdur && (
         <div className="absolute top-3 inset-x-0 flex justify-center" style={{ paddingRight: kaydir }}>
