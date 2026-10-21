@@ -117,6 +117,11 @@ export function useRealtimeVoice(options: RealtimeVoiceOptions = {}) {
   const turSesAlindiRef = useRef(false); // bu turda ilk model sesi geldi mi
   const yanitToplamRef = useRef({ toplam: 0, adet: 0 });
   const dusunmeZamanlayiciRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** GÖRSELLEŞTİRME: kullanıcı mikrofon seviyesi (0..1). Yalnızca gürültü
+   *  kapısının "insan sesi / kapı açık" saydığı parçalardan beslenir — ortam
+   *  gürültüsü ve hoparlör yankısı (asistanın sesi) 0 olarak kalır. State
+   *  DEĞİL (render tetiklemez); dalga bileşeni her karede okur. */
+  const kullaniciSeviyeRef = useRef(0);
 
   const guncelle = useCallback((patch: Partial<VoiceSession>) => {
     if (patch.state) durumRef.current = patch.state;
@@ -221,6 +226,7 @@ export function useRealtimeVoice(options: RealtimeVoiceOptions = {}) {
     selamYedekRef.current = null;
     micRef.current?.stop();
     micRef.current = null;
+    kullaniciSeviyeRef.current = 0;
     playbackRef.current?.close();
     playbackRef.current = null;
     const p = providerRef.current;
@@ -438,7 +444,10 @@ export function useRealtimeVoice(options: RealtimeVoiceOptions = {}) {
       const gate = createNoiseGate(SES_ESIGI_RMS);
       gateStatsRef.current = gate.stats;
       const mic = await startMicCapture((pcm) => {
-        if (mutedRef.current) return;
+        if (mutedRef.current) {
+          kullaniciSeviyeRef.current = 0;
+          return;
+        }
         // Kullanıcının son "ses var" anı — gecikme ölçümünün başlangıcı.
         const v = new Int16Array(pcm);
         let toplam = 0;
@@ -446,6 +455,8 @@ export function useRealtimeVoice(options: RealtimeVoiceOptions = {}) {
         if (Math.sqrt(toplam / v.length) > SES_ESIGI_RMS) sonSesZamaniRef.current = performance.now();
         const g = gate(pcm, playbackRef.current?.isPlaying() ?? false);
         for (const o of g.outs) providerRef.current?.sendAudio(o);
+        // Görselleştirme (salt okuma; yukarıdaki gönderim akışını etkilemez).
+        kullaniciSeviyeRef.current = g.voiced ? Math.min(1, g.rms / 6000) : 0;
       });
       micRef.current = mic;
 
@@ -491,6 +502,11 @@ export function useRealtimeVoice(options: RealtimeVoiceOptions = {}) {
     guncelle({ isMuted: false });
   }, [guncelle]);
 
+  /** Dalga görselleştirmesi için: asistanın çalınan sesinin analiz düğümü. */
+  const getAssistantAnalyser = useCallback(() => playbackRef.current?.getAnalyser() ?? null, []);
+  /** Dalga görselleştirmesi için: kapıdan geçen kullanıcı ses seviyesi (0..1). */
+  const getUserLevel = useCallback(() => kullaniciSeviyeRef.current, []);
+
   return {
     session,
     connect,
@@ -498,6 +514,8 @@ export function useRealtimeVoice(options: RealtimeVoiceOptions = {}) {
     interrupt,
     mute,
     unmute,
+    getAssistantAnalyser,
+    getUserLevel,
   };
 }
 

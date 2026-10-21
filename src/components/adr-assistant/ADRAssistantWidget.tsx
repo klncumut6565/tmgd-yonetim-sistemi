@@ -30,6 +30,8 @@ import { useAudioRecorder } from "@/hooks/useAudioRecorder";
 import { useTextToSpeech } from "@/hooks/useTextToSpeech";
 import { KLASIK_SES_AKTIF } from "@/lib/voice/config";
 import { useRealtimeVoice } from "@/hooks/useRealtimeVoice";
+import VoiceWaveform from "@/components/adr-assistant/VoiceWaveform";
+import type { VoiceState } from "@/lib/voice/types";
 import { useUser } from "@/hooks/useUser";
 import type { ChatMessage } from "@/lib/ai/multiEngine";
 import { actionToUrl } from "@/lib/ai/actions";
@@ -189,6 +191,11 @@ export default function ADRAssistantWidget() {
   } = useAudioRecorder();
   const { desteklenir: ttsDesteklenir, konusuyor, konus, durdur: ttsDurdur, kilidiAc: ttsKilidiAc } = useTextToSpeech();
 
+  // DALGA GÖRSELLEŞTİRMESİ (klasik mod): mevcut kayıt seviyesi ref'e yansıtılır,
+  // dalga bileşeni her karede okur. Kayıt eşiği altı (ortam gürültüsü) 0 sayılır.
+  const klasikSeviyeRef = useRef(0);
+  klasikSeviyeRef.current = kaydediyor ? Math.min(1, Math.max(0, (sesSeviyesi - 0.12) / 0.6)) : 0;
+
   // Sunucu tarafı transkripsiyon (MediaRecorder + /api/speech-to-text)
   // varsayılan yöntemdir: her tarayıcıda AYNI şekilde çalışır. Web Speech
   // API yalnızca kayıt desteklenmiyorsa yedek olarak kullanılır.
@@ -226,6 +233,9 @@ export default function ADRAssistantWidget() {
   const [teshisAcik, setTeshisAcik] = useState(false);
   const [cevriliyor, setCevriliyor] = useState(false);
   const bosSonucSayisiRef = useRef(0);
+  // Klasik modun görsel durumu, mevcut VoiceState değerlerine eşlenir (ikinci
+  // bir durum makinesi kurulmaz).
+  const klasikDalgaDurumu: VoiceState = konusuyor ? "speaking" : cevriliyor || sending ? "processing" : "listening";
 
   async function sesiMetneCevir(ses: Blob) {
     setCevriliyor(true);
@@ -837,6 +847,16 @@ export default function ADRAssistantWidget() {
 
       {/* Giriş alanı */}
       <div className="border-t p-3">
+        {/* Klasik sesli görüşme dalgası: kullanıcı seviyesi gerçek (kayıt
+            analizi), asistan sesi tarayıcı TTS olduğu için temsili. */}
+        {sesliGorusmeAktif && (
+          <VoiceWaveform
+            className="mb-1"
+            durum={klasikDalgaDurumu}
+            kullaniciSeviyesi={() => klasikSeviyeRef.current}
+            sentetikKonusma
+          />
+        )}
         {(dinliyor || kaydediyor) && (
           <div className="flex items-center gap-2 mb-1">
             <p className="text-xs text-red-500">🔴 Dinliyorum...</p>
@@ -880,6 +900,12 @@ export default function ADRAssistantWidget() {
         {/* Canlı Konuşma — durum ve transkript göstergesi */}
         {canliAktif && (
           <div className="mb-1.5 p-2 bg-purple-50 border border-purple-200 rounded-lg">
+            <VoiceWaveform
+              className="mb-1"
+              durum={canli.session.state}
+              asistanAnalyser={canli.getAssistantAnalyser}
+              kullaniciSeviyesi={canli.getUserLevel}
+            />
             <p className="text-xs text-purple-700 font-medium">
               🎤 Canlı Konuşma —{" "}
               {{
