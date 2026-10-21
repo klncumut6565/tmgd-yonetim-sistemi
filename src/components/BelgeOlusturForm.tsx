@@ -2303,8 +2303,8 @@ export async function renderYapilandirilmisBelge(
 
     gorseller.forEach((gorsel, i) => {
       doc.addPage();
-      // K3 1. içerik sayfası: görselden kırpılan "GÖNDEREN KONTROL DÖKÜMANI" başlığı kutunun alt satırına
-      const altSatir = code === "K3" && i === 0 ? "GÖNDEREN KONTROL DÖKÜMANI" : undefined;
+      // K3 tüm içerik sayfaları: görselden kırpılan "GÖNDEREN KONTROL DÖKÜMANI" başlığı kutunun alt satırına
+      const altSatir = code === "K3" ? "GÖNDEREN KONTROL DÖKÜMANI" : undefined;
       baslikTablosuCiz(doc, firmAdi, code, belgeAdi, sablon, logo, bugun, i + 2, toplamSayfa, baslikYukseklik, adLines, undefined, altSatir);
       const y = yerlesim(gorsel);
       doc.addImage(gorsel, "PNG", y.x, y.y, y.w, y.h, undefined, "FAST");
