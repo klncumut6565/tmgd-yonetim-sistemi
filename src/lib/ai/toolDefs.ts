@@ -194,6 +194,7 @@ export const TOOL_DEFS = [
     name: 'get_visit_overview',
     description:
       'Firma Takvimi ile AYNI kuralla bir ayda ziyaret edilen / EDİLMEYEN firmaları ve firmaların ATANDIĞI DANIŞMANLARI döndürür. ' +
+      'KURAL: ziyaret edilen = tarihi bugün veya öncesi olan kayıt; ileri tarihe takvime eklenen firma PLANLI ama ziyaret EDİLMEMİŞ sayılır (unvisited_count\'a dahil, planned_count ayrıca verilir). ' +
       'Genel çağrıda: toplam, ziyaret edilen/edilmeyen sayısı, ziyaret edilmeyen firma isimleri + her birinin danışmanı ve danışman bazında kırılım (danisman_kirilimi). ' +
       'consultant verilirse YALNIZCA o danışmanın firmaları: toplam_firma, ziyaret_edilen, ziyaret_edilmeyen ve firma isimleri. ' +
       '"Bu ay kimleri ziyaret etmedim", "ziyaret edilmeyen firmalar hangileri", "Aylin\'in üzerinde kaç firma var, kaçı ziyaret edildi", ' +

@@ -376,8 +376,9 @@ export type ZiyaretGenelOzeti = {
   total_firms: number
   visited_count: number
   unvisited_count: number
-  unvisited_firms: { id: string; name: string; danisman: string }[]
-  danisman_kirilimi: { danisman: string; toplam_firma: number; ziyaret_edilen: number; ziyaret_edilmeyen: number }[]
+  planned_count: number
+  unvisited_firms: { id: string; name: string; danisman: string; planlanan_tarih?: string }[]
+  danisman_kirilimi: { danisman: string; toplam_firma: number; ziyaret_edilen: number; ziyaret_edilmeyen: number; planlanan: number }[]
 }
 
 type DanismanOzeti = {
@@ -387,6 +388,9 @@ type DanismanOzeti = {
   ziyaret_edilmeyen: number
   ziyaret_edilen_firmalar: string[]
   ziyaret_edilmeyen_firmalar: string[]
+  /** Ziyaret edilmeyenlerden ileri bir tarihe planlanmış olanlar (ziyaret_edilmeyen'e DAHİL). */
+  planlanan: number
+  planlanan_firmalar: string[]
 }
 
 /**
@@ -407,10 +411,20 @@ export async function getVisitOverview(supabase: SupabaseClient, month?: string,
 
   const [{ data: firmalar }, { data: ziyaretler }, { data: atamalar, error: atamaHata }] = await Promise.all([
     supabase.from('firms').select('id, name').order('name'),
-    supabase.from('visits').select('firm_id').gte('visit_date', bas).lte('visit_date', son),
+    supabase.from('visits').select('firm_id, visit_date').gte('visit_date', bas).lte('visit_date', son),
     supabase.from('user_firms').select('firm_id, user_id, profiles ( full_name, role )'),
   ])
-  const ziyaretEdilen = new Set(((ziyaretler ?? []) as { firm_id: string }[]).map((z) => z.firm_id))
+  // GERÇEK ziyaret = tarihi BUGÜN (İstanbul) veya öncesi. İleri tarihe takvime
+  // eklenen firma "planlandı" ama henüz ziyaret EDİLMEDİ sayılır.
+  const bugun = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Istanbul' }).format(new Date())
+  const ziyaretEdilen = new Set<string>()
+  const planlanan = new Map<string, string>() // firm_id → en yakın plan tarihi
+  for (const z of (ziyaretler ?? []) as { firm_id: string; visit_date: string }[]) {
+    const g = String(z.visit_date).slice(0, 10)
+    if (g <= bugun) ziyaretEdilen.add(z.firm_id)
+    else if (!planlanan.has(z.firm_id) || g < planlanan.get(z.firm_id)!) planlanan.set(z.firm_id, g)
+  }
+  for (const id of ziyaretEdilen) planlanan.delete(id)
   const hepsi = (firmalar ?? []) as { id: string; name: string }[]
   const firmaAdi = new Map(hepsi.map((f) => [f.id, f.name]))
 
@@ -440,6 +454,11 @@ export async function getVisitOverview(supabase: SupabaseClient, month?: string,
       ziyaret_edilmeyen: edilmeyen.length,
       ziyaret_edilen_firmalar: edilen.map((id) => firmaAdi.get(id) ?? id).slice(0, 60),
       ziyaret_edilmeyen_firmalar: edilmeyen.map((id) => firmaAdi.get(id) ?? id).slice(0, 60),
+      planlanan: edilmeyen.filter((id) => planlanan.has(id)).length,
+      planlanan_firmalar: edilmeyen
+        .filter((id) => planlanan.has(id))
+        .map((id) => `${firmaAdi.get(id) ?? id} (${planlanan.get(id)})`)
+        .slice(0, 60),
     }
   }
 
@@ -475,12 +494,12 @@ export async function getVisitOverview(supabase: SupabaseClient, month?: string,
   const kirilim = [...danismanFirmalari.entries()]
     .map(([ad, ids]) => {
       const o = ozet(ad, ids)
-      return { danisman: o.danisman, toplam_firma: o.toplam_firma, ziyaret_edilen: o.ziyaret_edilen, ziyaret_edilmeyen: o.ziyaret_edilmeyen }
+      return { danisman: o.danisman, toplam_firma: o.toplam_firma, ziyaret_edilen: o.ziyaret_edilen, ziyaret_edilmeyen: o.ziyaret_edilmeyen, planlanan: o.planlanan }
     })
     .sort((x, z) => x.danisman.localeCompare(z.danisman, 'tr'))
   if (atanmamis.size) {
     const o = ozet('(danışman atanmamış)', atanmamis)
-    kirilim.push({ danisman: o.danisman, toplam_firma: o.toplam_firma, ziyaret_edilen: o.ziyaret_edilen, ziyaret_edilmeyen: o.ziyaret_edilmeyen })
+    kirilim.push({ danisman: o.danisman, toplam_firma: o.toplam_firma, ziyaret_edilen: o.ziyaret_edilen, ziyaret_edilmeyen: o.ziyaret_edilmeyen, planlanan: o.planlanan })
   }
   return {
     ok: true,
@@ -489,11 +508,16 @@ export async function getVisitOverview(supabase: SupabaseClient, month?: string,
     total_firms: hepsi.length,
     visited_count: hepsi.length - edilmeyen.length,
     unvisited_count: edilmeyen.length,
-    // Ziyaret edilmeyen firmalar + atandığı danışman(lar)
+    /** Ziyaret edilmeyenlerden ileri tarihe planlanmış olanlar (unvisited_count'a DAHİL). */
+    planned_count: edilmeyen.filter((f) => planlanan.has(f.id)).length,
+    today: bugun,
+    rule: 'Ziyaret edilen = bu ay tarihi bugün veya öncesi olan kayıt. İleri tarihe eklenen firma planlanmıştır ama ziyaret EDİLMEMİŞ sayılır.',
+    // Ziyaret edilmeyen firmalar + atandığı danışman(lar) + varsa plan tarihi
     unvisited_firms: edilmeyen.slice(0, 100).map((f) => ({
       id: f.id,
       name: f.name,
       danisman: (firmaDanisman.get(f.id) ?? []).join(', ') || '(atanmamış)',
+      ...(planlanan.has(f.id) ? { planlanan_tarih: planlanan.get(f.id) } : {}),
     })),
     danisman_kirilimi: kirilim,
     ...(atamaHata ? { note: 'Firma atamaları okunamadı; danışman kırılımı eksik olabilir.' } : {}),
@@ -654,12 +678,13 @@ export async function buildOperationalContext(
   if (ziyaretSorusu) {
     const v = (await getVisitOverview(supabase)) as ZiyaretGenelOzeti
     parcalar.push(
-      `ZİYARET DURUMU (${v.month}): toplam ${v.total_firms} firma, ziyaret edilen ${v.visited_count}, ziyaret EDİLMEYEN ${v.unvisited_count}.`,
+      `ZİYARET DURUMU (${v.month}): toplam ${v.total_firms} firma, ziyaret edilen ${v.visited_count}, ziyaret EDİLMEYEN ${v.unvisited_count}` +
+        (v.planned_count ? ` (bunların ${v.planned_count} tanesi ileri tarihe planlı).` : '.'),
       v.unvisited_count > 0
-        ? `Ziyaret edilmeyen firmalar (danışmanıyla): ${v.unvisited_firms.map((f) => `${f.name} [${f.danisman}]`).join('; ')}`
+        ? `Ziyaret edilmeyen firmalar (danışmanıyla): ${v.unvisited_firms.map((f) => `${f.name} [${f.danisman}]${f.planlanan_tarih ? ` (planlı: ${f.planlanan_tarih})` : ''}`).join('; ')}`
         : 'Ziyaret edilmeyen firma kalmadı.',
       v.danisman_kirilimi.length
-        ? `DANIŞMAN BAZINDA: ${v.danisman_kirilimi.map((d) => `${d.danisman}: ${d.toplam_firma} firma, ${d.ziyaret_edilen} ziyaret edildi, ${d.ziyaret_edilmeyen} edilmedi`).join('; ')}`
+        ? `DANIŞMAN BAZINDA: ${v.danisman_kirilimi.map((d) => `${d.danisman}: ${d.toplam_firma} firma, ${d.ziyaret_edilen} ziyaret edildi, ${d.ziyaret_edilmeyen} edilmedi${d.planlanan ? ` (${d.planlanan} planlı)` : ''}`).join('; ')}`
         : ''
     )
   }

@@ -691,6 +691,7 @@ export default function ADRAssistantWidget() {
         // Yazılı asistan araç çalıştırmış olabilir (ör. takvime ziyaret ekleme):
         // açık olan Firma Takvimi verisini yenilesin.
         window.dispatchEvent(new CustomEvent("tmgd:ziyaret-degisti"));
+        window.dispatchEvent(new CustomEvent("tmgd:not-degisti"));
 
         if (sesliGorusmeRef.current && ttsDesteklenir) {
           // Cevap seslendirilir; bitince GÖRÜŞME hâlâ aktifse otomatik

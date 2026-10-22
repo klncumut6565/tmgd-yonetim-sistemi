@@ -221,6 +221,10 @@ export function useRealtimeVoice(options: RealtimeVoiceOptions = {}) {
       if (name === "add_visit" && json && (json as { ok?: boolean }).ok) {
         window.dispatchEvent(new CustomEvent("tmgd:ziyaret-degisti"));
       }
+      // Not eklendiyse açık olan Notlar sekmesi kendini yenilesin.
+      if (name === "add_firm_note" && json && (json as { ok?: boolean }).ok) {
+        window.dispatchEvent(new CustomEvent("tmgd:not-degisti", { detail: { firmId: args.firm_id } }));
+      }
       return json;
     },
     [router]

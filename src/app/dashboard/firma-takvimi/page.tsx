@@ -141,6 +141,7 @@ function FirmaTakvimiIcerik() {
   const { canWrite } = useUser();
 
   const bugun = useMemo(() => new Date(), []);
+  const bugunAnahtari = tarihAnahtari(bugun.getFullYear(), bugun.getMonth(), bugun.getDate());
   // ?ay=YYYY-MM ile (ör. asistan: "geçen ayın takvimini aç") belirli bir ay açılır.
   const ayParam = useSearchParams().get("ay");
   const ayEsle = ayParam ? /^(\d{4})-(\d{2})$/.exec(ayParam) : null;
@@ -262,10 +263,31 @@ function FirmaTakvimiIcerik() {
   }, [ziyaretler]);
 
   // Bu ay ziyaret edilmiş firma id'leri
-  const ziyaretEdilenFirmaIdleri = useMemo(
+  // Bu ay takvimde (geçmiş VEYA ileri tarihli) kaydı olan firma id'leri —
+  // "Takvime Ekle" panelinde "bu ay takvimde" etiketi için.
+  const takvimdekiFirmaIdleri = useMemo(
     () => new Set(ziyaretler.map((z) => z.firm_id)),
     [ziyaretler]
   );
+
+  // GERÇEKTEN ziyaret edilmiş firmalar: bu ay, tarihi BUGÜN veya öncesi olan
+  // kayıt. İleri tarihe eklenen (planlanan) firma henüz ziyaret edilmemiştir.
+  const ziyaretEdilenFirmaIdleri = useMemo(
+    () => new Set(ziyaretler.filter((z) => String(z.visit_date).slice(0, 10) <= bugunAnahtari).map((z) => z.firm_id)),
+    [ziyaretler, bugunAnahtari]
+  );
+
+  // Henüz ziyaret edilmemiş ama ileri bir tarihe planlanmış firmalar → en yakın plan tarihi.
+  const planlananTarih = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const z of ziyaretler) {
+      const g = String(z.visit_date).slice(0, 10);
+      if (g <= bugunAnahtari) continue;
+      const onceki = m.get(z.firm_id);
+      if (!onceki || g < onceki) m.set(z.firm_id, g);
+    }
+    return m;
+  }, [ziyaretler, bugunAnahtari]);
 
   // O ay HENÜZ ziyaret edilmemiş firmalar — takvime eklenen firma
   // buradan otomatik düşer.
@@ -442,11 +464,6 @@ function FirmaTakvimiIcerik() {
   ];
   while (hucreler.length % 7 !== 0) hucreler.push(null);
 
-  const bugunAnahtari = tarihAnahtari(
-    bugun.getFullYear(),
-    bugun.getMonth(),
-    bugun.getDate()
-  );
 
   return (
     <div className="p-3 sm:p-6">
@@ -698,7 +715,7 @@ function FirmaTakvimiIcerik() {
               </p>
             )}
             {eklenebilirFirmalar.map((f) => {
-              const ziyaretEdildi = ziyaretEdilenFirmaIdleri.has(f.id);
+              const takvimde = takvimdekiFirmaIdleri.has(f.id);
               return (
                 <label
                   key={f.id}
@@ -711,9 +728,9 @@ function FirmaTakvimiIcerik() {
                     className="w-4 h-4"
                   />
                   <span className="flex-1 min-w-0 truncate">{f.name}</span>
-                  {ziyaretEdildi && (
+                  {takvimde && (
                     <span className="text-[10px] text-gray-400 shrink-0">
-                      bu ay ziyaret edildi
+                      bu ay takvimde
                     </span>
                   )}
                 </label>
@@ -768,8 +785,17 @@ function FirmaTakvimiIcerik() {
                   : undefined
               }
             >
+              {/* İleri tarihe planlanmışsa "Takvime ekle" yerine plan tarihi. */}
+              {planlananTarih.has(f.id) && (
+                <span
+                  className="text-[11px] px-2 py-1 rounded border border-indigo-200 bg-indigo-50 text-indigo-700 shrink-0"
+                  title="Bu firma ileri bir tarihe planlandı; o gün gelene kadar ziyaret edilmemiş sayılır."
+                >
+                  📅 {Number(planlananTarih.get(f.id)!.slice(8, 10))} {AY_ADLARI[Number(planlananTarih.get(f.id)!.slice(5, 7)) - 1]} planlı
+                </span>
+              )}
               {/* "Takvime ekle" firma adından ÖNCE gelir. */}
-              {canWrite && (
+              {canWrite && !planlananTarih.has(f.id) && (
                 <button
                   onClick={() => hizliEkle(f.id)}
                   disabled={hizliEkleniyorId === f.id}

@@ -81,6 +81,18 @@ export default function FirmNotesTab({ firmId }: { firmId: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [firmId]);
 
+  // Asistan (sesli/yazılı) bu firmaya not eklediğinde listeyi anında yenile —
+  // önceden yalnızca sayfa yenilenince görünüyordu.
+  useEffect(() => {
+    const yenile = (e: Event) => {
+      const hedef = (e as CustomEvent<{ firmId?: string } | undefined>).detail?.firmId;
+      if (!hedef || hedef === firmId) loadNotes();
+    };
+    window.addEventListener("tmgd:not-degisti", yenile);
+    return () => window.removeEventListener("tmgd:not-degisti", yenile);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [firmId]);
+
   const { desteklenir: sesDesteklenir, dinliyor, hata: sesHatasi, baslat: sesBaslat, durdur: sesDurdur } =
     useSpeechToText();
 
