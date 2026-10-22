@@ -44,6 +44,11 @@ export function hataTurkce(e: unknown): string {
     return "Ses işleme modülü yüklenemedi. Sayfayı yenileyip tekrar dene.";
   }
 
+  // --- Kota (kapanma kodundan ÖNCE: 1011 "RESOURCE_EXHAUSTED" de kota demektir) ---
+  if (kucuk.includes("quota") || kucuk.includes("resource_exhausted") || kucuk.includes("resource exhausted") || kucuk.includes("429") || kucuk.includes("rate limit")) {
+    return `Canlı ses servisinin (Gemini) kullanım sınırına ulaşıldı; yedek modeller de denendi. Bir süre sonra tekrar dene ya da yazarak sor. (${mesaj})`;
+  }
+
   // --- WebSocket kapanma kodları: "Bağlantı kapandı (1008): ..." ---
   const kod = /\((\d{4})\)/.exec(mesaj)?.[1];
   if (kod) {

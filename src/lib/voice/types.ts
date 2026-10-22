@@ -39,6 +39,8 @@ export interface VoiceSession {
   assistantTranscript: string;
   metrics: LiveMetrics;
   error?: string;
+  /** Bağlanılan Live modelinin okunur adı (yedek modele geçildiyse o). */
+  model?: string;
 }
 
 /** Canlı konuşma gecikme ölçümleri (yaklaşık değerler, tarayıcıdan ölçülür). */

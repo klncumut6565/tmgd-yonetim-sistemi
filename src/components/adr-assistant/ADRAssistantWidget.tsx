@@ -1047,6 +1047,9 @@ export default function ADRAssistantWidget() {
                 speaking: "asistan konuşuyor, araya girebilirsin",
               }[canli.session.state as string] ?? "seni dinliyorum..."}
             </p>
+            {canli.session.model && (
+              <p className="text-[10px] text-indigo-400">model: {canli.session.model}</p>
+            )}
             {canli.session.metrics.sonYanitMs !== null && (
               <p className="text-[10px] text-purple-400">
                 ilk ses: {canli.session.metrics.sonYanitMs} ms

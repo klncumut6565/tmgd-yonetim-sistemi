@@ -26,7 +26,36 @@ import type {
 } from "../types";
 import { GEMINI_FUNCTION_DECLARATIONS, GEMINI_LIVE_SYSTEM_INSTRUCTION } from "../geminiTools";
 
-const GEMINI_LIVE_MODEL = "models/gemini-3.1-flash-live-preview";
+/**
+ * MODEL ZİNCİRİ — bir model bağlanamazsa (kota dolu / kapatılmış / bulunamadı /
+ * sunucu hatası) sıradaki denenir. Hepsi aynı Gemini anahtarıyla çalışır.
+ *   1) gemini-3.1-flash-live-preview — mevcut, sahada test edilmiş model
+ *      (Google artık "legacy preview" diyor; önizleme kotası daha dar)
+ *   2) gemini-3.8-live — kararlı (stable) halef. Fark: araç çağrıları
+ *      varsayılan olarak ASENKRON; bizim akış senkron beklediği için
+ *      bildirimlere behavior: "BLOCKING" eklenir.
+ *   3) gemini-2.5-flash-native-audio-preview-12-2025 — eski yerli ses modeli
+ * Başarılı olan model sekme ömrü boyunca hatırlanır ve sonraki bağlantı /
+ * yeniden bağlanmada ÖNCE o denenir.
+ */
+type LiveModel = { ad: string; etiket: string; blockingAraclar?: boolean };
+export const GEMINI_LIVE_MODELLERI: LiveModel[] = [
+  { ad: "models/gemini-3.1-flash-live-preview", etiket: "Gemini 3.1 Flash Live" },
+  { ad: "models/gemini-3.8-live", etiket: "Gemini 3.8 Live", blockingAraclar: true },
+  { ad: "models/gemini-2.5-flash-native-audio-preview-12-2025", etiket: "Gemini 2.5 Flash Native Audio" },
+];
+let sonCalisanModel: string | null = null;
+
+function modelSirasi(): LiveModel[] {
+  if (!sonCalisanModel) return GEMINI_LIVE_MODELLERI;
+  const once = GEMINI_LIVE_MODELLERI.find((m) => m.ad === sonCalisanModel);
+  return once ? [once, ...GEMINI_LIVE_MODELLERI.filter((m) => m !== once)] : GEMINI_LIVE_MODELLERI;
+}
+
+function aracBildirimleri(model: LiveModel) {
+  if (!model.blockingAraclar) return GEMINI_FUNCTION_DECLARATIONS;
+  return GEMINI_FUNCTION_DECLARATIONS.map((d) => ({ ...d, behavior: "BLOCKING" }));
+}
 const WS_HOST = "generativelanguage.googleapis.com";
 
 type ToolCallHandler = (name: string, args: Record<string, unknown>) => Promise<unknown>;
@@ -47,6 +76,13 @@ export class GeminiLiveProvider implements RealtimeProvider {
   /** Sunucunun verdiği en son oturum devam (resumption) tutamacı. */
   private resumeHandle: string | null = null;
   private setupResolve: (() => void) | null = null;
+  /** Bağlanılan model (zincirdeki). */
+  private aktifModel: LiveModel | null = null;
+
+  /** Şu an bağlı olunan modelin okunur adı (yoksa null). */
+  getModelLabel(): string | null {
+    return this.aktifModel?.etiket ?? null;
+  }
 
   /** Gerçek araç çalıştırma mantığını dışarıdan (hook'tan) alır — bu sınıf
    *  yalnızca protokolü konuşur, veri erişimine karışmaz. */
@@ -80,27 +116,37 @@ export class GeminiLiveProvider implements RealtimeProvider {
     // (resmi SDK de böyle yapar; SDK v1alpha kullanır). Sürümler sırayla denenir.
     const surumler = Array.from(new Set(["v1alpha", session.apiVersion || "v1beta", "v1beta"]));
     let sonHata: Error | null = null;
-    for (const surum of surumler) {
-      try {
-        await this.baglan(session, surum, resumeHandle, systemInstruction);
-        return;
-      } catch (e) {
-        sonHata = e instanceof Error ? e : new Error(String(e));
+    const denemeler: string[] = [];
+    for (const model of modelSirasi()) {
+      for (const surum of surumler) {
         try {
-          this.ws?.close();
-        } catch {
-          /* yok say */
+          await this.baglan(session, surum, model, resumeHandle, systemInstruction);
+          this.aktifModel = model;
+          sonCalisanModel = model.ad;
+          if (denemeler.length) console.info(`[canli-ses] yedek modele geçildi: ${model.etiket} (önceki hatalar: ${denemeler.join(" | ")})`);
+          else console.info(`[canli-ses] model: ${model.etiket}`);
+          return;
+        } catch (e) {
+          sonHata = e instanceof Error ? e : new Error(String(e));
+          denemeler.push(`${model.etiket}/${surum}: ${sonHata.message}`);
+          try {
+            this.ws?.close();
+          } catch {
+            /* yok say */
+          }
+          this.ws = null;
+          this.setupDone = false;
         }
-        this.ws = null;
-        this.setupDone = false;
       }
     }
+    if (sonHata) sonHata.message = `${sonHata.message} [denenen modeller: ${GEMINI_LIVE_MODELLERI.map((m) => m.etiket).join(", ")}]`;
     throw sonHata ?? new Error("Gemini Live bağlantısı kurulamadı.");
   }
 
   private async baglan(
     session: RealtimeSessionResponse,
     surum: string,
+    model: LiveModel,
     resumeHandle?: string | null,
     systemInstruction?: string
   ): Promise<void> {
@@ -116,7 +162,25 @@ export class GeminiLiveProvider implements RealtimeProvider {
 
     this.kapatildi = false;
     this.resumeHandle = resumeHandle ?? null;
-    await new Promise<void>((resolve, reject) => {
+    await new Promise<void>((resolveIc, rejectIc) => {
+      // Sunucu hiç yanıt vermezse (kurulum takılırsa) sıradaki modele geçilsin.
+      const zamanAsimi = setTimeout(() => {
+        if (this.setupDone) return;
+        rejectIc(new Error("Kurulum zaman aşımı (sunucu yanıt vermedi)."));
+        try {
+          ws.close();
+        } catch {
+          /* yok say */
+        }
+      }, 10000);
+      const resolve = () => {
+        clearTimeout(zamanAsimi);
+        resolveIc();
+      };
+      const reject = (e: Error) => {
+        clearTimeout(zamanAsimi);
+        rejectIc(e);
+      };
       const ws = new WebSocket(url);
       ws.binaryType = "arraybuffer";
       this.ws = ws;
@@ -128,7 +192,7 @@ export class GeminiLiveProvider implements RealtimeProvider {
         ws.send(
           JSON.stringify({
             setup: {
-              model: GEMINI_LIVE_MODEL,
+              model: model.ad,
               // Şema (Google Live API referansı): responseModalities
               // generationConfig İÇİNDE; transcription alanları setup'ın
               // ÜST seviyesinde.
@@ -145,7 +209,7 @@ export class GeminiLiveProvider implements RealtimeProvider {
               systemInstruction: { parts: [{ text: systemInstruction || GEMINI_LIVE_SYSTEM_INSTRUCTION }] },
               inputAudioTranscription: {},
               outputAudioTranscription: {},
-              tools: [{ functionDeclarations: GEMINI_FUNCTION_DECLARATIONS }],
+              tools: [{ functionDeclarations: aracBildirimleri(model) }],
               // Konuşma algılama: hoparlör yankısı/gürültü modeli yanlışlıkla
               // "kullanıcı konuşuyor" diye kesmesin → başlangıç hassasiyeti düşük,
               // bitişte biraz daha uzun sessizlik beklenir.

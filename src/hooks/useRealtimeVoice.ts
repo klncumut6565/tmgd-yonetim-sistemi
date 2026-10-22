@@ -391,6 +391,7 @@ export function useRealtimeVoice(options: RealtimeVoiceOptions = {}) {
           saglayiciKur(yeni, playback);
           await yeni.connect(sessionData, tutamac, buildLiveInstruction(optionsRef.current.getContext?.()));
           providerRef.current = yeni; // mikrofon artık buna yazar
+          guncelle({ model: yeni.getModelLabel() ?? undefined });
           await eski.disconnect().catch(() => {});
           metrikGuncelle((m) => ({ ...m, yenidenBaglanma: m.yenidenBaglanma + 1 }));
           console.info(`[canli-ses] yeniden bağlanma: ${Math.round(performance.now() - t0)} ms (tutamaç: ${tutamac ? "var" : "yok"})`);
@@ -456,6 +457,7 @@ export function useRealtimeVoice(options: RealtimeVoiceOptions = {}) {
       await provider.connect(sessionData, null, buildLiveInstruction(optionsRef.current.getContext?.()));
       providerRef.current = provider;
       playbackRef.current = playback;
+      guncelle({ model: provider.getModelLabel() ?? undefined });
 
       // Asistan önce konuşsun: bağlanır bağlanmaz selamlama iste (mikrofondaki ilk gürültü
       // modelin "kullanıcı konuşuyor" diye beklemesine yol açmasın). Yeniden bağlanmada selamlanmaz.

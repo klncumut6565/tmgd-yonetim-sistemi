@@ -100,7 +100,10 @@ export async function POST(req: NextRequest) {
   // kilitlemek yalnızca ekstra bir güvenlik katmanıydı, işlevsel bir
   // gereklilik değil.
   const govde = JSON.stringify({
-    uses: 1,
+    // Bir bağlantı denemesinde model zinciri (3 model × 2 API sürümü) aynı
+    // token'ı kullanır; uses: 1 olsaydı ilk başarısız denemeden sonra yedek
+    // modeller "token kullanıldı" hatası alırdı. Süre yine 30 dk ile sınırlı.
+    uses: 8,
     expireTime,
   })
 
