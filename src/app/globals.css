@@ -57,3 +57,13 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .ai-core-halka1, .ai-core-halka2, .ai-core-cekirdek { animation: none !important; }
 }
+
+/* Canlı Konuşma butonu — aktifken ses çubukları (ADRAssistantWidget). */
+.ai-eq { display: inline-flex; align-items: center; gap: 2px; height: 16px; }
+.ai-eq > i { display: block; width: 3px; height: 100%; border-radius: 2px; background: linear-gradient(180deg, #a5f3fc, #c4b5fd 55%, #f0abfc); transform-origin: center; animation: ai-eq 1s ease-in-out infinite; }
+.ai-eq > i:nth-child(1) { animation-delay: -.45s; }
+.ai-eq > i:nth-child(2) { animation-delay: -.15s; }
+.ai-eq > i:nth-child(3) { animation-delay: -.6s; }
+.ai-eq > i:nth-child(4) { animation-delay: -.3s; }
+@keyframes ai-eq { 0%, 100% { transform: scaleY(.3); } 50% { transform: scaleY(1); } }
+@media (prefers-reduced-motion: reduce) { .ai-eq > i { animation: none; transform: scaleY(.6); } }

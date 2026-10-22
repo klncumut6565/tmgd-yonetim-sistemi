@@ -41,6 +41,25 @@ import { actionToUrl } from "@/lib/ai/actions";
 import { yerelNiyetCoz } from "@/lib/ai/localIntent";
 import { halusinasyonMu, yankiMi } from "@/lib/ai/halusinasyon";
 
+/** Çizgi ikonlar (emoji yerine; AI Core tasarımıyla uyumlu). */
+function MikrofonIkonu({ className = "w-[18px] h-[18px]" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
+      <rect x="9" y="2.5" width="6" height="12" rx="3" />
+      <path d="M5.5 11a6.5 6.5 0 0 0 13 0" />
+      <path d="M12 17.5V21" />
+    </svg>
+  );
+}
+function GonderIkonu({ className = "w-[18px] h-[18px]" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
+      <path d="M12 19V5" />
+      <path d="M5.5 11.5 12 5l6.5 6.5" />
+    </svg>
+  );
+}
+
 type DisplayMessage = ChatMessage & { id: string; pending?: boolean; error?: boolean };
 
 function useCurrentFirm() {
@@ -971,7 +990,8 @@ export default function ADRAssistantWidget() {
         )}
         {!sesliGorusmeAktif && !canliAktif && !sending && (
           <p className="text-xs text-gray-400 mb-1">
-            🎤 Bas ve konuş — canlı, kesintisiz sesli sohbet; asistanın sözünü kesebilirsin.
+            <MikrofonIkonu className="inline w-3.5 h-3.5 -mt-0.5 mr-1" />
+            Bas ve konuş — canlı, kesintisiz sesli sohbet; asistanın sözünü kesebilirsin.
           </p>
         )}
         {KLASIK_SES_AKTIF && !herhangiSesDestegi && (
@@ -992,7 +1012,7 @@ export default function ADRAssistantWidget() {
 
         {/* Canlı Konuşma — durum ve transkript göstergesi */}
         {canliAktif && (
-          <div className="mb-1.5 p-2 bg-purple-50 border border-purple-200 rounded-lg">
+          <div className="mb-1.5 p-2.5 rounded-2xl border border-indigo-100 bg-gradient-to-br from-indigo-50/90 to-violet-50/90">
             <VoiceWaveform
               className="mb-1"
               durum={canli.session.state}
@@ -1000,7 +1020,8 @@ export default function ADRAssistantWidget() {
               kullaniciSeviyesi={canli.getUserLevel}
             />
             <p className="text-xs text-purple-700 font-medium">
-              🎤 Canlı Konuşma —{" "}
+              <MikrofonIkonu className="inline w-3.5 h-3.5 -mt-0.5 mr-1" />
+              Canlı Konuşma —{" "}
               {{
                 connecting: "bağlanıyor...",
                 reconnecting: "oturum yenileniyor, konuşmaya devam edebilirsin...",
@@ -1012,14 +1033,15 @@ export default function ADRAssistantWidget() {
             </p>
             {canli.session.metrics.sonYanitMs !== null && (
               <p className="text-[10px] text-purple-400">
-                ⏱ ilk ses: {canli.session.metrics.sonYanitMs} ms
+                ilk ses: {canli.session.metrics.sonYanitMs} ms
                 {canli.session.metrics.ortYanitMs !== null && ` (ort. ${canli.session.metrics.ortYanitMs} ms, ${canli.session.metrics.tur} tur)`}
                 {canli.session.metrics.sonAracMs !== null && ` · araç: ${canli.session.metrics.sonAracMs} ms`}
               </p>
             )}
             {(canli.session.partialTranscript || canli.session.transcript) && (
               <p className="text-xs text-purple-500 mt-0.5 italic">
-                🧑 {canli.session.partialTranscript || canli.session.transcript}
+                <span className="not-italic mr-1 text-[10px] font-semibold uppercase tracking-wide text-teal-600">Sen</span>
+                {canli.session.partialTranscript || canli.session.transcript}
               </p>
             )}
             {canli.session.assistantTranscript && (
@@ -1063,7 +1085,7 @@ export default function ADRAssistantWidget() {
         )}
         <div className="flex items-end gap-2">
           <textarea
-            className="flex-1 border rounded-lg p-2 text-sm resize-none bg-white/90"
+            className="flex-1 border border-indigo-100 rounded-2xl px-3 py-2 text-sm resize-none bg-white/90 focus:outline-none focus:ring-2 focus:ring-indigo-300/60 focus:border-indigo-200 placeholder:text-slate-400"
             rows={2}
             placeholder="Soru yaz... (Enter ile gönder)"
             value={input}
@@ -1076,12 +1098,23 @@ export default function ADRAssistantWidget() {
             onClick={sesliBaslatTikla}
             disabled={sesliGorusmeAktif || dinliyor || kaydediyor}
             title={canliAktif ? "Canlı konuşmayı bitir" : "Sesli konuş (canlı, kesintisiz)"}
+            aria-label={canliAktif ? "Canlı konuşmayı bitir" : "Canlı sesli konuşmayı başlat"}
+            aria-pressed={canliAktif}
             className={
-              "w-9 h-9 shrink-0 rounded-full flex items-center justify-center transition disabled:opacity-30 " +
-              (canliAktif ? "bg-purple-700 text-white animate-pulse" : "bg-purple-100 hover:bg-purple-200")
+              "relative w-10 h-10 shrink-0 rounded-full flex items-center justify-center text-white transition duration-200 disabled:opacity-30 disabled:cursor-not-allowed " +
+              (canliAktif
+                ? "bg-gradient-to-br from-[#0b1026] via-[#1e1b4b] to-[#312e81] ring-1 ring-indigo-300/40 shadow-[0_0_0_4px_rgba(129,140,248,.18),0_6px_18px_rgba(79,70,229,.45)]"
+                : "bg-gradient-to-br from-indigo-500 via-violet-600 to-fuchsia-600 ring-1 ring-white/20 shadow-[0_6px_16px_rgba(124,58,237,.35)] hover:shadow-[0_8px_22px_rgba(124,58,237,.5)] hover:scale-105 active:scale-95")
             }
           >
-            🎤
+            {canliAktif && (
+              <span className="absolute inset-0 rounded-full ring-2 ring-violet-400/50 animate-ping [animation-duration:2.2s] motion-reduce:hidden" aria-hidden="true" />
+            )}
+            {canliAktif ? (
+              <span className="ai-eq" aria-hidden="true"><i /><i /><i /><i /></span>
+            ) : (
+              <MikrofonIkonu />
+            )}
           </button>
           {/* YEDEK: klasik sesli komut (konuş → gönder → sesli cevap). */}
           {KLASIK_SES_AKTIF && herhangiSesDestegi && (
@@ -1105,10 +1138,11 @@ export default function ADRAssistantWidget() {
           <button
             onClick={() => gonder()}
             disabled={sending || !input.trim()}
-            className="w-9 h-9 shrink-0 rounded-full bg-black text-white flex items-center justify-center disabled:opacity-40"
+            className="w-10 h-10 shrink-0 rounded-full flex items-center justify-center transition duration-200 bg-gradient-to-br from-[#0b1026] to-[#1e1b4b] text-white shadow-[0_4px_12px_rgba(30,27,75,.3)] hover:scale-105 active:scale-95 disabled:bg-none disabled:bg-slate-200 disabled:text-slate-400 disabled:shadow-none disabled:scale-100"
             title="Gönder"
+            aria-label="Gönder"
           >
-            ➤
+            <GonderIkonu />
           </button>
         </div>
       </div>
