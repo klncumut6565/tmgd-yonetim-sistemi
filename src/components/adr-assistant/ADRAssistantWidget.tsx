@@ -725,6 +725,10 @@ export default function ADRAssistantWidget() {
   // bir çubuktu; bu, sayfanın o köşesindeki metni seçmeyi zorlaştırıyordu.
   // Panel açıkken sağda kapladığı genişlik (w-[88%] max-w-[420px] ile aynı).
   const panelGenisligi = open && typeof window !== "undefined" ? Math.min(window.innerWidth * 0.88, 420) : 0;
+  // Dar ekranda (mobil/tablet) panel kürenin önünü kapatır; bu durumda panel
+  // buzlu cam yapılır ki mor küre panelin içinden parlayarak görünsün.
+  const kurePanelArkasinda =
+    canliAktif && kureAcik && open && typeof window !== "undefined" && window.innerWidth - panelGenisligi < 520;
   const sesKuresi =
     canliAktif && kureAcik ? (
       <VoiceOrbOverlay
@@ -778,7 +782,10 @@ export default function ADRAssistantWidget() {
       />
       <div
         data-asistan-ui
-        className="fixed right-0 top-0 h-full w-[88%] max-w-[420px] bg-white shadow-2xl z-50 flex flex-col border-l"
+        className={
+          "fixed right-0 top-0 h-full w-[88%] max-w-[420px] shadow-2xl z-50 flex flex-col border-l transition-colors duration-500 " +
+          (kurePanelArkasinda ? "bg-white/70 backdrop-blur-md border-white/40" : "bg-white")
+        }
         onClick={idleZamanlayiciyiSifirla}
         onKeyDown={idleZamanlayiciyiSifirla}
       >
@@ -1056,7 +1063,7 @@ export default function ADRAssistantWidget() {
         )}
         <div className="flex items-end gap-2">
           <textarea
-            className="flex-1 border rounded-lg p-2 text-sm resize-none"
+            className="flex-1 border rounded-lg p-2 text-sm resize-none bg-white/90"
             rows={2}
             placeholder="Soru yaz... (Enter ile gönder)"
             value={input}
