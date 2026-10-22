@@ -171,6 +171,7 @@ export default function ADRAssistantWidget() {
   }, [kullanici?.full_name]);
   const canli = useRealtimeVoice({
     onEndConversation: () => setOpen(false),
+    onChatWindow: (gorunur) => setOpen(gorunur),
     // Telefonda panel sayfanın neredeyse tamamını kapatır: sesle kaydırma /
     // tıklama yapıldığında sonucu görebilmek için panel kapanır (görüşme sürer).
     onPageAction: () => {
@@ -882,10 +883,21 @@ export default function ADRAssistantWidget() {
           )}
           <button
             onClick={() => setOpen(false)}
-            title="Kapat (sohbet altta 1 satırlık bara döner)"
+            title={canliAktif ? "Pencereyi gizle (sesli sohbet devam eder)" : "Pencereyi gizle"}
+            aria-label={canliAktif ? "Pencereyi gizle, sesli sohbet devam eder" : "Pencereyi gizle"}
             className="w-8 h-8 rounded-full bg-white/5 hover:bg-white/15 flex items-center justify-center text-indigo-100"
           >
-            ✕
+            {canliAktif ? (
+              // Canlı konuşmada "kapat" değil "küçült": pencere gizlenir, sohbet sürer.
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4" aria-hidden="true">
+                <path d="M4 14h6v6" />
+                <path d="M20 10h-6V4" />
+                <path d="M14 10l7-7" />
+                <path d="M3 21l7-7" />
+              </svg>
+            ) : (
+              "✕"
+            )}
           </button>
         </div>
       </div>

@@ -363,10 +363,25 @@ export function sayfaOgeleriniListele(args: { filter?: unknown }): Record<string
 }
 
 /** Bu araçların adları (useRealtimeVoice tarayıcıda yürütür). */
-export const SAYFA_ARAC_ADLARI = ["scroll_page", "click_on_page", "list_page_elements"] as const;
+export const SAYFA_ARAC_ADLARI = ["scroll_page", "click_on_page", "list_page_elements", "set_chat_window"] as const;
 
 /** Gemini Live araç tanımları — YALNIZCA sesli asistana eklenir. */
 export const SAYFA_ARAC_TANIMLARI = [
+  {
+    name: "set_chat_window",
+    description:
+      "Asistanın SOHBET PENCERESİNİ (yan paneli) gizler veya gösterir. Konuşma BİTMEZ — sesli sohbet arka planda (yarı saydam küre ile) devam eder. " +
+      "'Pencereyi gizle / kapat / küçült', 'paneli kapat', 'ekrandan çekil', 'sayfayı göreyim' → visible: false. " +
+      "'Pencereyi aç / göster', 'sohbeti göster', 'yazıları göster' → visible: true. " +
+      "Kullanıcı açıkça SOHBETİ / KONUŞMAYI bitirmek istemedikçe end_conversation DEĞİL bu araç kullanılır.",
+    parameters: {
+      type: "object",
+      properties: {
+        visible: { type: "boolean", description: "true = pencereyi göster, false = gizle" },
+      },
+      required: ["visible"],
+    },
+  },
   {
     name: "scroll_page",
     description:

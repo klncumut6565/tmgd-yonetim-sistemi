@@ -88,6 +88,8 @@ export interface RealtimeVoiceOptions {
   /** Sayfa kaydırıldı / sayfada bir öğe tıklandı (başarılı). Widget dar
    *  ekranda paneli kapatarak kullanıcının sonucu görmesini sağlar. */
   onPageAction?: () => void;
+  /** Sohbet penceresini göster/gizle (konuşma sürer). */
+  onChatWindow?: (visible: boolean) => void;
 }
 
 export function useRealtimeVoice(options: RealtimeVoiceOptions = {}) {
@@ -179,6 +181,11 @@ export function useRealtimeVoice(options: RealtimeVoiceOptions = {}) {
         return sonuc;
       }
       if (name === "list_page_elements") return sayfaOgeleriniListele(args);
+      if (name === "set_chat_window") {
+        const gorunur = args.visible === true;
+        optionsRef.current.onChatWindow?.(gorunur);
+        return { ok: true, window: gorunur ? "gösteriliyor" : "gizlendi", conversation: "devam ediyor" };
+      }
 
       if (name === "go_back") {
         router.back();

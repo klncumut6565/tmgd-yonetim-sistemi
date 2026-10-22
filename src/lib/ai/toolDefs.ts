@@ -107,7 +107,8 @@ export const TOOL_DEFS = [
   {
     name: 'end_conversation',
     description:
-      "Sesli sohbeti kapatır. Kullanıcı 'sohbeti kapat / bitir / görüşmeyi sonlandır' dediğinde ÖNCE bunu çağır, ardından veda cümlesini söyle; veda bitince panel otomatik kapanır.",
+      "Sesli sohbeti TAMAMEN BİTİRİR (bağlantı kapanır). YALNIZCA kullanıcı açıkça SOHBETİ / KONUŞMAYI bitirmek istediğinde ('sohbeti kapat / bitir', 'konuşmayı sonlandır', 'görüşmeyi kapat') çağır; ardından veda cümlesini söyle. " +
+      "'Pencereyi / paneli gizle, kapat, küçült' isteklerinde BU DEĞİL set_chat_window(visible=false) kullanılır — sohbet devam eder.",
     parameters: { type: 'object', properties: {} },
   },
   {
