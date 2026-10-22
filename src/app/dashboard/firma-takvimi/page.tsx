@@ -236,6 +236,13 @@ function FirmaTakvimiIcerik() {
     veriYukle();
   }, [veriYukle]);
 
+  // Asistan (sesli/yazılı) takvime ziyaret eklediğinde sayfayı yenile.
+  useEffect(() => {
+    const yenile = () => veriYukle();
+    window.addEventListener("tmgd:ziyaret-degisti", yenile);
+    return () => window.removeEventListener("tmgd:ziyaret-degisti", yenile);
+  }, [veriYukle]);
+
   const firmaAdi = useMemo(() => {
     const m = new Map<string, string>();
     firmalar.forEach((f) => m.set(f.id, f.name));

@@ -996,6 +996,118 @@ export async function addFirmNote(
 }
 
 
+// ---------------------------------------------------------------------------
+// add_visit — Firma Takvimi'ne ziyaret ekler (takvimdeki "Takvime Ekle" ile
+// AYNI kayıt: visits { firm_id, visit_date }). Yetki veritabanı RLS'inde:
+// yönetici her firmaya, TMGD yalnızca kendine atanmış firmaya ekleyebilir.
+// ---------------------------------------------------------------------------
+
+const AY_TR = ['ocak', 'subat', 'mart', 'nisan', 'mayis', 'haziran', 'temmuz', 'agustos', 'eylul', 'ekim', 'kasim', 'aralik']
+const AY_TR_GOSTER = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık']
+
+function istanbulBugun(): { y: number; m: number; d: number } {
+  const [y, m, d] = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Istanbul', year: 'numeric', month: '2-digit', day: '2-digit' })
+    .format(new Date())
+    .split('-')
+    .map(Number)
+  return { y, m, d }
+}
+
+function gecerliTarih(y: number, m: number, d: number): string | null {
+  if (m < 1 || m > 12 || d < 1) return null
+  if (d > new Date(y, m, 0).getDate()) return null
+  return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`
+}
+
+/** "23 ekim", "23 Ekim 2026", "2026-10-23", "23.10.2026", "23/10", "bugün", "yarın", "öbür gün"
+ *  → YYYY-MM-DD (İstanbul saatine göre; yıl verilmezse bu yıl). */
+export function tarihCoz(girdi: string): string | null {
+  const b = istanbulBugun()
+  const t = trNorm(girdi)
+  if (!t) return null
+  const kaydir = (gun: number) => {
+    const dt = new Date(Date.UTC(b.y, b.m - 1, b.d + gun))
+    return gecerliTarih(dt.getUTCFullYear(), dt.getUTCMonth() + 1, dt.getUTCDate())
+  }
+  if (/^(bugun|bu gun)$/.test(t)) return kaydir(0)
+  if (/^yarin$/.test(t)) return kaydir(1)
+  if (/^(obur gun|obür gun|ertesi gun|yarindan sonra)$/.test(t)) return kaydir(2)
+  let m = girdi.trim().match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/)
+  if (m) return gecerliTarih(+m[1], +m[2], +m[3])
+  m = girdi.trim().match(/^(\d{1,2})[./](\d{1,2})(?:[./](\d{2,4}))?$/)
+  if (m) return gecerliTarih(m[3] ? (m[3].length === 2 ? 2000 + +m[3] : +m[3]) : b.y, +m[2], +m[1])
+  // "23 ekim [2026]"
+  const k = t.split(' ')
+  const gun = Number(k[0])
+  const ayIdx = k[1] ? AY_TR.findIndex((a) => k[1].startsWith(a.slice(0, 3))) : -1
+  if (Number.isInteger(gun) && ayIdx >= 0) {
+    const yil = k[2] && /^\d{4}$/.test(k[2]) ? +k[2] : b.y
+    return gecerliTarih(yil, ayIdx + 1, gun)
+  }
+  return null
+}
+
+function tarihGoster(iso: string): string {
+  const [y, m, d] = iso.split('-').map(Number)
+  return `${d} ${AY_TR_GOSTER[m - 1]} ${y}`
+}
+
+export async function addVisit(
+  supabase: SupabaseClient,
+  args: { firm_id?: string; firm_name?: string; date?: string }
+) {
+  const tarih = args.date ? tarihCoz(args.date) : null
+  if (!tarih) {
+    return { ok: false, error: `Tarih anlaşılamadı ("${args.date ?? ''}"). Kullanıcıya hangi gün olduğunu sor (ör. "23 Ekim").` }
+  }
+
+  // Firmayı bul: ID varsa doğrula; yoksa isimle ara.
+  let firma: { id: string; name: string } | null = null
+  if (args.firm_id) {
+    const { data } = await supabase.from('firms').select('id, name').eq('id', args.firm_id).maybeSingle()
+    firma = (data as { id: string; name: string } | null) ?? null
+    if (!firma) return { ok: false, error: 'Bu ID ile erişilebilir bir firma yok. firm_name ile tekrar dene.' }
+  } else if (args.firm_name && args.firm_name.trim()) {
+    const { matches } = await searchFirm(supabase, args.firm_name)
+    const tam = matches.filter((f) => normAd(f.name) === normAd(args.firm_name!))
+    if (tam.length === 1) firma = tam[0]
+    else if (matches.length === 1) firma = matches[0]
+    else if (matches.length === 0) {
+      return { ok: false, error: `"${args.firm_name}" adında erişebildiğin bir firma bulunamadı. Kullanıcıya firma adını tekrar sor.` }
+    } else {
+      return {
+        ok: false,
+        ambiguous: true,
+        error: 'Birden fazla firma eşleşti; kullanıcıya hangisini kastettiğini sor, sonra firm_id ile tekrar çağır.',
+        candidates: matches.map((f) => ({ id: f.id, name: f.name })),
+      }
+    }
+  } else {
+    return { ok: false, error: 'Firma belirtilmedi (firm_name ya da firm_id gerekli).' }
+  }
+
+  // Aynı gün aynı firma zaten takvimdeyse tekrar ekleme.
+  const { data: mevcut } = await supabase
+    .from('visits')
+    .select('id')
+    .eq('firm_id', firma!.id)
+    .eq('visit_date', tarih)
+    .limit(1)
+  if (mevcut && mevcut.length) {
+    return { ok: true, already_exists: true, firm: firma!.name, date: tarih, date_spoken: tarihGoster(tarih) }
+  }
+
+  const { error } = await supabase.from('visits').insert([{ firm_id: firma!.id, visit_date: tarih }])
+  if (error) {
+    if (error.code === '42501' || /row-level security/i.test(error.message)) {
+      return { ok: false, error: 'Bu firma için takvime ekleme yetkin bulunmuyor. Yetki konusunda rol veya başka bir kullanıcı ADI VERME.' }
+    }
+    return { ok: false, error: 'Ziyaret takvime eklenemedi.' }
+  }
+  return { ok: true, firm: firma!.name, firm_id: firma!.id, date: tarih, date_spoken: tarihGoster(tarih) }
+}
+
+
 /**
  * get_firm_documents — bir firmanın Belge Takip'teki belgeleri ve YÜKLÜ
  * belgelere ait tarihler (geçerlilik/bitiş tarihi, kalan gün, dosya sayısı).

@@ -16,6 +16,7 @@ import {
   getFirmProgress,
   listFirms,
   getVisitOverview,
+  addVisit,
   getDashboardSummary,
   listTmgd,
   getNotifications,
@@ -82,6 +83,15 @@ export async function executeDataTool(
       }
     case 'list_tmgd':
       return { status: 200, body: await listTmgd(supabase, args.include_inactive === true, ctx?.isSuperAdmin === true) }
+    case 'add_visit':
+      return {
+        status: 200,
+        body: await addVisit(supabase, {
+          firm_id: str('firm_id') || undefined,
+          firm_name: str('firm_name') || undefined,
+          date: str('date') || undefined,
+        }),
+      }
     case 'get_visit_overview':
       return { status: 200, body: await getVisitOverview(supabase, str('month') || undefined, str('consultant') || undefined) }
     case 'get_firm_progress':

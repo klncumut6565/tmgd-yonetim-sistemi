@@ -212,6 +212,24 @@ export const TOOL_DEFS = [
     },
   },
   {
+    name: 'add_visit',
+    description:
+      "Firma Takvimi'ne belirtilen GÜNE bir firmanın ziyaretini EKLER (\"23 Ekim'e Tunç Metal'i ekle\", \"yarına Alfa Kimya'yı takvime koy\"). " +
+      'firm_name olarak kullanıcının söylediği firma adını AYNEN ver (firma sayfasındaysan ve "bu firma" diyorsa firm_id ver); ' +
+      'date olarak kullanıcının söylediği tarihi AYNEN ver ("23 ekim", "yarın", "2026-10-23") — tarihi kendin hesaplama. ' +
+      'ambiguous dönerse adayları söyleyip hangisi olduğunu sor ve firm_id ile tekrar çağır. already_exists dönerse zaten ekli olduğunu söyle. ' +
+      'Başarılıysa sonuçtaki firm ve date_spoken ile kısaca onayla ("Tunç Metal\'i 23 Ekim 2026\'ya ekledim"). Silme yapılamaz.',
+    parameters: {
+      type: 'object',
+      properties: {
+        firm_name: { type: 'string', description: 'Firma adı, kullanıcının söylediği gibi' },
+        firm_id: { type: 'string', description: "Gerçek firma ID'si (biliniyorsa; firm_name yerine)" },
+        date: { type: 'string', description: 'Tarih, kullanıcının söylediği gibi: "23 ekim", "yarın", "bugün", "23.10.2026"' },
+      },
+      required: ['date'],
+    },
+  },
+  {
     name: 'get_firm_progress',
     description:
       'Belge Takip ilerleme yüzdesini döndürür. firm_id verilirse o firmanın yüzdesi (örn. %86) ve tamamlanan/toplam sayısı; ' +

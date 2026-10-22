@@ -687,6 +687,9 @@ export default function ADRAssistantWidget() {
           ...prev,
           { id: crypto.randomUUID(), role: "assistant", content: json.answer },
         ]);
+        // Yazılı asistan araç çalıştırmış olabilir (ör. takvime ziyaret ekleme):
+        // açık olan Firma Takvimi verisini yenilesin.
+        window.dispatchEvent(new CustomEvent("tmgd:ziyaret-degisti"));
 
         if (sesliGorusmeRef.current && ttsDesteklenir) {
           // Cevap seslendirilir; bitince GÖRÜŞME hâlâ aktifse otomatik

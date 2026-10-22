@@ -210,6 +210,10 @@ export function useRealtimeVoice(options: RealtimeVoiceOptions = {}) {
         body: JSON.stringify({ tool: name, args }),
       });
       const json = await res.json().catch(() => ({ error: "Sunucu yanıtı ayrıştırılamadı." }));
+      // Takvime ziyaret eklendiyse açık olan Firma Takvimi kendini yenilesin.
+      if (name === "add_visit" && json && (json as { ok?: boolean }).ok) {
+        window.dispatchEvent(new CustomEvent("tmgd:ziyaret-degisti"));
+      }
       return json;
     },
     [router]
