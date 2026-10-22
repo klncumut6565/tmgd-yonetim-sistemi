@@ -22,6 +22,7 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { checkPair, type UnRow } from '@/lib/adrMix'
+import { ayCoz } from '@/lib/ai/actions'
 import { buildChecklist, codeLabel, codeSection } from '@/lib/belgeKatalogu'
 
 // ---------------------------------------------------------------------------
@@ -347,20 +348,140 @@ function istanbulAyi(): string {
     .slice(0, 7)
 }
 
-export async function getVisitOverview(supabase: SupabaseClient, month?: string) {
-  const ay = month && /^\d{4}-\d{2}$/.test(month) ? month : istanbulAyi()
+/** Firma Takvimi ile AYNI: firma tarafı kullanıcılar danışman sayılmaz. */
+const DANISMAN_DISI_ROLLER = new Set(['company', 'viewer'])
+
+function trNorm(t: string): string {
+  return t
+    .toLocaleLowerCase('tr-TR')
+    .replace(/ç/g, 'c').replace(/ğ/g, 'g').replace(/ı/g, 'i').replace(/i̇/g, 'i')
+    .replace(/ö/g, 'o').replace(/ş/g, 's').replace(/ü/g, 'u')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim()
+}
+
+/** "Aylin", "aylinin", "Aylin Hanım", "Aylin Yılmaz" → ad soyadla eşleşir mi? */
+function danismanEslesir(sorgu: string, adSoyad: string): boolean {
+  const q = trNorm(sorgu).split(' ').filter((w) => w && !['hanim', 'bey', 'hoca', 'tmgd'].includes(w))
+  const ad = trNorm(adSoyad).split(' ').filter(Boolean)
+  if (!q.length || !ad.length) return false
+  // Her sorgu kelimesi bir ad parçasıyla başlamalı ya da Türkçe ekle uzamış olmalı ("aylinin" ~ "aylin").
+  return q.every((w) => ad.some((p) => p === w || (p.length >= 3 && w.startsWith(p) && w.length - p.length <= 4) || (w.length >= 3 && p.startsWith(w))))
+}
+
+/** getVisitOverview'in danışman verilmeden döndürdüğü genel görünüm. */
+export type ZiyaretGenelOzeti = {
+  ok: true
+  month: string
+  total_firms: number
+  visited_count: number
+  unvisited_count: number
+  unvisited_firms: { id: string; name: string; danisman: string }[]
+  danisman_kirilimi: { danisman: string; toplam_firma: number; ziyaret_edilen: number; ziyaret_edilmeyen: number }[]
+}
+
+type DanismanOzeti = {
+  danisman: string
+  toplam_firma: number
+  ziyaret_edilen: number
+  ziyaret_edilmeyen: number
+  ziyaret_edilen_firmalar: string[]
+  ziyaret_edilmeyen_firmalar: string[]
+}
+
+/**
+ * Firma Takvimi ile AYNI kural: tüm (görülebilen) firmalar; o ay
+ * (visits.visit_date) en az bir ziyareti olmayan firma "ziyaret edilmeyen"dir.
+ * Danışman = user_firms ataması (company/viewer rolleri hariç). Bir firmaya
+ * birden çok danışman atanmışsa firma HER BİRİNİN listesinde sayılır.
+ *
+ * @param consultant Opsiyonel danışman adı ("Aylin") — yalnızca onun firmaları.
+ */
+export async function getVisitOverview(supabase: SupabaseClient, month?: string, consultant?: string) {
+  const istanbulSimdi = new Date(new Date().toLocaleString('en-US', { timeZone: 'Europe/Istanbul' }))
+  const ay = ayCoz(month, istanbulSimdi) ?? istanbulAyi()
   const [y, m] = ay.split('-').map(Number)
   const sonGun = new Date(y, m, 0).getDate()
   const bas = `${ay}-01`
   const son = `${ay}-${String(sonGun).padStart(2, '0')}`
 
-  const [{ data: firmalar }, { data: ziyaretler }] = await Promise.all([
+  const [{ data: firmalar }, { data: ziyaretler }, { data: atamalar, error: atamaHata }] = await Promise.all([
     supabase.from('firms').select('id, name').order('name'),
     supabase.from('visits').select('firm_id').gte('visit_date', bas).lte('visit_date', son),
+    supabase.from('user_firms').select('firm_id, user_id, profiles ( full_name, role )'),
   ])
   const ziyaretEdilen = new Set(((ziyaretler ?? []) as { firm_id: string }[]).map((z) => z.firm_id))
   const hepsi = (firmalar ?? []) as { id: string; name: string }[]
+  const firmaAdi = new Map(hepsi.map((f) => [f.id, f.name]))
+
+  // Firma → danışman adları; danışman → firma id'leri
+  const firmaDanisman = new Map<string, string[]>()
+  const danismanFirmalari = new Map<string, Set<string>>()
+  for (const a of (atamalar ?? []) as unknown as { firm_id: string; user_id: string; profiles: { full_name: string | null; role: string | null } | null }[]) {
+    const p = a.profiles
+    if (!p || DANISMAN_DISI_ROLLER.has(String(p.role || '')) || !firmaAdi.has(a.firm_id)) continue
+    const ad = String(p.full_name || '').trim() || '(isim girilmemiş)'
+    const liste = firmaDanisman.get(a.firm_id) ?? []
+    if (!liste.includes(ad)) liste.push(ad)
+    firmaDanisman.set(a.firm_id, liste)
+    const set = danismanFirmalari.get(ad) ?? new Set<string>()
+    set.add(a.firm_id)
+    danismanFirmalari.set(ad, set)
+  }
+
+  const ozet = (ad: string, ids: Set<string>): DanismanOzeti => {
+    const firmIds = [...ids].sort((x, z) => (firmaAdi.get(x) ?? '').localeCompare(firmaAdi.get(z) ?? '', 'tr'))
+    const edilen = firmIds.filter((id) => ziyaretEdilen.has(id))
+    const edilmeyen = firmIds.filter((id) => !ziyaretEdilen.has(id))
+    return {
+      danisman: ad,
+      toplam_firma: firmIds.length,
+      ziyaret_edilen: edilen.length,
+      ziyaret_edilmeyen: edilmeyen.length,
+      ziyaret_edilen_firmalar: edilen.map((id) => firmaAdi.get(id) ?? id).slice(0, 60),
+      ziyaret_edilmeyen_firmalar: edilmeyen.map((id) => firmaAdi.get(id) ?? id).slice(0, 60),
+    }
+  }
+
+  // Belirli danışman istendiyse
+  if (consultant && consultant.trim()) {
+    const eslesen = [...danismanFirmalari.keys()].filter((ad) => danismanEslesir(consultant, ad))
+    if (eslesen.length === 0) {
+      return {
+        ok: false,
+        grounded: true,
+        month: ay,
+        error: `"${consultant}" adında firma atanmış bir danışman bulunamadı.`,
+        danismanlar: [...danismanFirmalari.keys()].sort((x, z) => x.localeCompare(z, 'tr')),
+        ...(atamaHata ? { note: 'Firma atamaları okunamadı (yetki).' } : {}),
+      }
+    }
+    if (eslesen.length > 1) {
+      return {
+        ok: false,
+        grounded: true,
+        month: ay,
+        ambiguous: true,
+        error: 'Birden fazla danışman eşleşti; kullanıcıya hangisini kastettiğini sor.',
+        adaylar: eslesen,
+      }
+    }
+    return { ok: true, grounded: true, month: ay, ...ozet(eslesen[0], danismanFirmalari.get(eslesen[0])!) }
+  }
+
+  // Genel görünüm + danışman kırılımı
   const edilmeyen = hepsi.filter((f) => !ziyaretEdilen.has(f.id))
+  const atanmamis = new Set(hepsi.filter((f) => !firmaDanisman.has(f.id)).map((f) => f.id))
+  const kirilim = [...danismanFirmalari.entries()]
+    .map(([ad, ids]) => {
+      const o = ozet(ad, ids)
+      return { danisman: o.danisman, toplam_firma: o.toplam_firma, ziyaret_edilen: o.ziyaret_edilen, ziyaret_edilmeyen: o.ziyaret_edilmeyen }
+    })
+    .sort((x, z) => x.danisman.localeCompare(z.danisman, 'tr'))
+  if (atanmamis.size) {
+    const o = ozet('(danışman atanmamış)', atanmamis)
+    kirilim.push({ danisman: o.danisman, toplam_firma: o.toplam_firma, ziyaret_edilen: o.ziyaret_edilen, ziyaret_edilmeyen: o.ziyaret_edilmeyen })
+  }
   return {
     ok: true,
     grounded: true,
@@ -368,7 +489,14 @@ export async function getVisitOverview(supabase: SupabaseClient, month?: string)
     total_firms: hepsi.length,
     visited_count: hepsi.length - edilmeyen.length,
     unvisited_count: edilmeyen.length,
-    unvisited_firms: edilmeyen.slice(0, 100).map((f) => ({ id: f.id, name: f.name })),
+    // Ziyaret edilmeyen firmalar + atandığı danışman(lar)
+    unvisited_firms: edilmeyen.slice(0, 100).map((f) => ({
+      id: f.id,
+      name: f.name,
+      danisman: (firmaDanisman.get(f.id) ?? []).join(', ') || '(atanmamış)',
+    })),
+    danisman_kirilimi: kirilim,
+    ...(atamaHata ? { note: 'Firma atamaları okunamadı; danışman kırılımı eksik olabilir.' } : {}),
   }
 }
 
@@ -524,10 +652,15 @@ export async function buildOperationalContext(
   }
 
   if (ziyaretSorusu) {
-    const v = await getVisitOverview(supabase)
+    const v = (await getVisitOverview(supabase)) as ZiyaretGenelOzeti
     parcalar.push(
       `ZİYARET DURUMU (${v.month}): toplam ${v.total_firms} firma, ziyaret edilen ${v.visited_count}, ziyaret EDİLMEYEN ${v.unvisited_count}.`,
-      v.unvisited_count > 0 ? `Ziyaret edilmeyen firmalar: ${v.unvisited_firms.map((f) => f.name).join('; ')}` : 'Ziyaret edilmeyen firma kalmadı.'
+      v.unvisited_count > 0
+        ? `Ziyaret edilmeyen firmalar (danışmanıyla): ${v.unvisited_firms.map((f) => `${f.name} [${f.danisman}]`).join('; ')}`
+        : 'Ziyaret edilmeyen firma kalmadı.',
+      v.danisman_kirilimi.length
+        ? `DANIŞMAN BAZINDA: ${v.danisman_kirilimi.map((d) => `${d.danisman}: ${d.toplam_firma} firma, ${d.ziyaret_edilen} ziyaret edildi, ${d.ziyaret_edilmeyen} edilmedi`).join('; ')}`
+        : ''
     )
   }
 

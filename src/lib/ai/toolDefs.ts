@@ -192,12 +192,22 @@ export const TOOL_DEFS = [
   {
     name: 'get_visit_overview',
     description:
-      'Firma Takvimi ile aynı kuralla, bir ayda ziyaret edilen ve ziyaret EDİLMEYEN firma sayısını ve ziyaret edilmeyen ' +
-      'firma isimlerini döndürür. "Ziyaret edilmeyen firma sayım kaç", "bu ay kimleri ziyaret etmedim" sorularında çağrılır.',
+      'Firma Takvimi ile AYNI kuralla bir ayda ziyaret edilen / EDİLMEYEN firmaları ve firmaların ATANDIĞI DANIŞMANLARI döndürür. ' +
+      'Genel çağrıda: toplam, ziyaret edilen/edilmeyen sayısı, ziyaret edilmeyen firma isimleri + her birinin danışmanı ve danışman bazında kırılım (danisman_kirilimi). ' +
+      'consultant verilirse YALNIZCA o danışmanın firmaları: toplam_firma, ziyaret_edilen, ziyaret_edilmeyen ve firma isimleri. ' +
+      '"Bu ay kimleri ziyaret etmedim", "ziyaret edilmeyen firmalar hangileri", "Aylin\'in üzerinde kaç firma var, kaçı ziyaret edildi", ' +
+      '"hangi danışmanın kaç firması kaldı" sorularında çağrılır. Sayıları ve isimleri AYNEN aktar.',
     parameters: {
       type: 'object',
       properties: {
-        month: { type: 'string', description: 'YYYY-AA biçiminde ay (opsiyonel; boşsa içinde bulunulan ay)' },
+        month: {
+          type: 'string',
+          description: 'Ay: YYYY-AA, "bu_ay", "gecen_ay", "gelecek_ay" ya da ay adı ("eylül"). Boşsa içinde bulunulan ay. Tarihi kendin hesaplama.',
+        },
+        consultant: {
+          type: 'string',
+          description: 'Opsiyonel: danışman (TMGD) adı, kullanıcının söylediği gibi ("Aylin"). Ek almadan yazmaya gerek yok.',
+        },
       },
     },
   },

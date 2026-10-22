@@ -83,7 +83,7 @@ export async function executeDataTool(
     case 'list_tmgd':
       return { status: 200, body: await listTmgd(supabase, args.include_inactive === true, ctx?.isSuperAdmin === true) }
     case 'get_visit_overview':
-      return { status: 200, body: await getVisitOverview(supabase, str('month') || undefined) }
+      return { status: 200, body: await getVisitOverview(supabase, str('month') || undefined, str('consultant') || undefined) }
     case 'get_firm_progress':
       return { status: 200, body: await getFirmProgress(supabase, str('firm_id') || undefined) }
     case 'search_regulation':
