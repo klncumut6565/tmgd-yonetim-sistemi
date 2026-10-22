@@ -32,6 +32,8 @@ import { KLASIK_SES_AKTIF } from "@/lib/voice/config";
 import { useRealtimeVoice } from "@/hooks/useRealtimeVoice";
 import VoiceWaveform from "@/components/adr-assistant/VoiceWaveform";
 import VoiceOrbOverlay from "@/components/adr-assistant/VoiceOrbOverlay";
+import AiCoreOrb from "@/components/adr-assistant/AiCoreOrb";
+import { AnalizOkuyucu } from "@/lib/voice/sesAnalizi";
 import type { VoiceState } from "@/lib/voice/types";
 import { useUser } from "@/hooks/useUser";
 import type { ChatMessage } from "@/lib/ai/multiEngine";
@@ -180,6 +182,12 @@ export default function ADRAssistantWidget() {
   // tıklamaları engellemeyen animasyon. Kullanıcı kapatabilir; tercih
   // tarayıcıda hatırlanır (yalnızca görsel tercih, ses akışını etkilemez).
   const [kureAcik, setKureAcik] = useState(true);
+  // AI Core simgesi: asistanın GERÇEK ses seviyesi (Canlı Konuşma'da konuşurken).
+  const simgeOkuyucuRef = useRef<AnalizOkuyucu | null>(null);
+  const asistanSesSeviyesi = () => {
+    if (!simgeOkuyucuRef.current) simgeOkuyucuRef.current = new AnalizOkuyucu();
+    return simgeOkuyucuRef.current.oku(canli.getAssistantAnalyser())?.seviye ?? 0;
+  };
   useEffect(() => {
     try {
       if (localStorage.getItem("adr-asistan-kure") === "0") setKureAcik(false);
@@ -214,6 +222,7 @@ export default function ADRAssistantWidget() {
     durdur: kayitDurdur,
   } = useAudioRecorder();
   const { desteklenir: ttsDesteklenir, konusuyor, konus, durdur: ttsDurdur, kilidiAc: ttsKilidiAc } = useTextToSpeech();
+  const simgeDurumu: VoiceState | null = canliAktif ? canli.session.state : konusuyor ? "speaking" : sending ? "processing" : null;
 
   // DALGA GÖRSELLEŞTİRMESİ (klasik mod): mevcut kayıt seviyesi ref'e yansıtılır,
   // dalga bileşeni her karede okur. Kayıt eşiği altı (ortam gürültüsü) 0 sayılır.
@@ -735,13 +744,20 @@ export default function ADRAssistantWidget() {
         data-asistan-ui
         onClick={() => setOpen(true)}
         title="ADR Asistanı"
-        className="group fixed bottom-4 right-4 z-50 flex items-center gap-2 rounded-full bg-black text-white shadow-lg opacity-45 hover:opacity-100 focus:opacity-100 transition-all duration-300 px-3 py-3 hover:px-4 hover:py-2.5 focus:px-4 focus:py-2.5"
+        aria-label="ADR Asistanı"
+        className={
+          "group fixed bottom-4 right-4 z-50 flex items-center gap-0 hover:gap-3 focus:gap-3 rounded-full p-1 text-white transition-all duration-300 " +
+          "hover:bg-gradient-to-r hover:from-[#0b1026] hover:to-[#1e1b4b] focus:bg-gradient-to-r focus:from-[#0b1026] focus:to-[#1e1b4b] " +
+          "hover:pr-4 focus:pr-4 hover:shadow-[0_6px_24px_rgba(79,70,229,.35)] focus:shadow-[0_6px_24px_rgba(79,70,229,.35)] " +
+          "hover:ring-1 hover:ring-indigo-300/30 focus:ring-1 focus:ring-indigo-300/30 " +
+          (simgeDurumu ? "opacity-100" : "opacity-60 hover:opacity-100 focus:opacity-100")
+        }
       >
-        <span className="text-base leading-none">🤖</span>
-        <span className="max-w-0 group-hover:max-w-[220px] group-focus:max-w-[220px] opacity-0 group-hover:opacity-100 group-focus:opacity-100 overflow-hidden whitespace-nowrap transition-all duration-300 text-sm font-medium">
-          ADR Asistanı
+        <AiCoreOrb boyut={44} durum={simgeDurumu} seviye={asistanSesSeviyesi} />
+        <span className="max-w-0 group-hover:max-w-[240px] group-focus:max-w-[240px] opacity-0 group-hover:opacity-100 group-focus:opacity-100 overflow-hidden whitespace-nowrap transition-all duration-300 flex flex-col items-start leading-tight">
+          <span className="text-sm font-semibold tracking-tight">ADR Asistanı</span>
           {firmName && (
-            <span className="ml-1.5 text-xs bg-white/20 px-2 py-0.5 rounded-full">{firmName}</span>
+            <span className="mt-0.5 text-[11px] text-indigo-100/90 bg-white/10 border border-white/10 px-2 py-0.5 rounded-full max-w-[200px] truncate">{firmName}</span>
           )}
         </span>
       </button>
@@ -767,18 +783,20 @@ export default function ADRAssistantWidget() {
         onKeyDown={idleZamanlayiciyiSifirla}
       >
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b bg-gray-50">
-        <div>
-          <h2 className="font-semibold text-sm flex items-center gap-2">
-            🤖 ADR Asistanı
+      <div className="flex items-center justify-between gap-2 px-4 py-3 bg-gradient-to-br from-[#0b1026] via-[#141a3a] to-[#1e1b4b] text-white shadow-[0_6px_20px_rgba(30,27,75,.25)]">
+        <div className="flex items-center gap-3 min-w-0">
+          <AiCoreOrb boyut={42} durum={simgeDurumu} seviye={asistanSesSeviyesi} />
+          <div className="min-w-0">
+          <h2 className="font-semibold text-sm flex items-center gap-2 flex-wrap tracking-tight">
+            ADR Asistanı
             {sesliGorusmeAktif && (
-              <span className="text-xs bg-red-500 text-white px-2 py-0.5 rounded-full animate-pulse">
+              <span className="text-[11px] font-medium bg-rose-500/25 border border-rose-300/30 text-rose-100 px-2 py-0.5 rounded-full">
                 📞 Görüşme Aktif
               </span>
             )}
             {canliAktif && (
-              <span className="text-xs bg-purple-600 text-white px-2 py-0.5 rounded-full animate-pulse">
-                🔴{" "}
+              <span className="text-[11px] font-medium bg-indigo-500/25 border border-indigo-300/30 text-indigo-100 pl-1.5 pr-2 py-0.5 rounded-full inline-flex items-center gap-1.5">
+                <span className="h-1.5 w-1.5 rounded-full bg-fuchsia-300 animate-pulse motion-reduce:animate-none" />
                 {{
                   connecting: "Bağlanıyor...",
                   reconnecting: "Yeniden bağlanıyor...",
@@ -790,9 +808,10 @@ export default function ADRAssistantWidget() {
               </span>
             )}
           </h2>
-          <p className="text-xs text-gray-500">
+          <p className="text-xs text-indigo-200/80 truncate">
             {firmName ? `Bağlam: ${firmName}` : "Genel sohbet (firma seçili değil)"}
           </p>
+          </div>
         </div>
         <div className="flex items-center gap-1">
           {sesliGorusmeAktif && (
@@ -803,9 +822,10 @@ export default function ADRAssistantWidget() {
                 ttsDurdur();
               }}
               title="Sesli görüşmeyi bitir"
-              className="px-2.5 py-1 rounded-full text-xs font-medium bg-red-600 text-white hover:bg-red-700"
+              className="px-3 py-1 rounded-full text-xs font-medium bg-rose-600/90 text-white hover:bg-rose-600 inline-flex items-center gap-1.5"
             >
-              🛑 Bitir
+              <span className="h-2 w-2 rounded-[2px] bg-rose-100" />
+              Bitir
             </button>
           )}
           {canliAktif && (
@@ -814,8 +834,8 @@ export default function ADRAssistantWidget() {
               title={kureAcik ? "Arka plan animasyonunu gizle" : "Arka plan animasyonunu göster"}
               aria-pressed={kureAcik}
               className={
-                "w-8 h-8 rounded-full flex items-center justify-center text-sm " +
-                (kureAcik ? "bg-purple-100 text-purple-700 hover:bg-purple-200" : "text-gray-400 hover:bg-gray-200")
+                "w-8 h-8 rounded-full flex items-center justify-center text-sm transition " +
+                (kureAcik ? "bg-indigo-400/25 text-white hover:bg-indigo-400/40" : "text-indigo-200/60 hover:bg-white/10")
               }
             >
               ✨
@@ -825,15 +845,16 @@ export default function ADRAssistantWidget() {
             <button
               onClick={() => canli.disconnect()}
               title="Canlı konuşmayı bitir"
-              className="px-2.5 py-1 rounded-full text-xs font-medium bg-purple-700 text-white hover:bg-purple-800"
+              className="px-3 py-1 rounded-full text-xs font-medium bg-rose-600/90 text-white hover:bg-rose-600 inline-flex items-center gap-1.5"
             >
-              🛑 Bitir
+              <span className="h-2 w-2 rounded-[2px] bg-rose-100" />
+              Bitir
             </button>
           )}
           <button
             onClick={() => setOpen(false)}
             title="Kapat (sohbet altta 1 satırlık bara döner)"
-            className="w-8 h-8 rounded-full hover:bg-gray-200 flex items-center justify-center text-gray-500"
+            className="w-8 h-8 rounded-full bg-white/5 hover:bg-white/15 flex items-center justify-center text-indigo-100"
           >
             ✕
           </button>
@@ -856,11 +877,18 @@ export default function ADRAssistantWidget() {
           </div>
         )}
 
-        {messages.map((m) => (
+        {messages.map((m, i) => (
           <div
             key={m.id}
-            className={"flex " + (m.role === "user" ? "justify-end" : "justify-start")}
+            className={"flex items-end gap-2 " + (m.role === "user" ? "justify-end" : "justify-start")}
           >
+            {/* Asistan avatarı: art arda asistan mesajlarında yalnızca sonuncusunda */}
+            {m.role === "assistant" &&
+              (messages[i + 1]?.role !== "assistant" ? (
+                <AiCoreOrb boyut={28} halkalar={false} durum={m.error ? "error" : null} className="mb-0.5" />
+              ) : (
+                <span className="w-7 shrink-0" />
+              ))}
             <div
               className={
                 "max-w-[85%] rounded-2xl px-3.5 py-2 text-sm whitespace-pre-wrap " +
@@ -868,7 +896,7 @@ export default function ADRAssistantWidget() {
                   ? "bg-black text-white"
                   : m.error
                     ? "bg-red-50 text-red-700 border border-red-200"
-                    : "bg-indigo-50 text-gray-800 border border-indigo-100")
+                    : "bg-gradient-to-br from-indigo-50 to-violet-50 text-gray-800 border border-indigo-100 shadow-[0_1px_2px_rgba(79,70,229,.06)]")
               }
             >
               {m.content}
@@ -877,7 +905,8 @@ export default function ADRAssistantWidget() {
         ))}
 
         {sending && (
-          <div className="flex justify-start">
+          <div className="flex items-end gap-2 justify-start">
+            <AiCoreOrb boyut={28} halkalar={false} durum="processing" className="mb-0.5" />
             <div className="bg-indigo-50 border border-indigo-100 rounded-2xl px-3.5 py-2 text-sm text-gray-500">
               ADR Asistanı yazıyor...
             </div>
@@ -988,7 +1017,8 @@ export default function ADRAssistantWidget() {
             )}
             {canli.session.assistantTranscript && (
               <p className="text-xs text-purple-700 mt-0.5">
-                🤖 {canli.session.assistantTranscript}
+                <AiCoreOrb boyut={14} halkalar={false} className="align-[-2px] mr-1" />
+                {canli.session.assistantTranscript}
               </p>
             )}
           </div>

@@ -12,3 +12,48 @@ body {
   background: var(--background);
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }
+
+/* ---------------------------------------------------------------- AI CORE
+   ADR Asistanı simgesi (src/components/adr-assistant/AiCoreOrb.tsx).
+   --ai-lvl: 0..1 gerçek ses seviyesi (yalnızca konuşurken JS yazar). */
+.ai-core { --ai-lvl: 0; isolation: isolate; }
+.ai-core-govde {
+  background:
+    radial-gradient(circle at 50% 55%, rgba(99,102,241,.55) 0%, rgba(30,27,75,.0) 62%),
+    radial-gradient(circle at 35% 30%, #312e81 0%, #1e1b4b 45%, #0b1026 100%);
+  box-shadow:
+    inset 0 0 0 1px rgba(165,180,252,.45),
+    inset 0 -6px 12px rgba(139,92,246,.35),
+    0 0 10px rgba(99,102,241,.35);
+}
+.ai-core-cekirdek {
+  inset: 26%;
+  background: radial-gradient(circle at 42% 38%, #ffffff 0%, #bae6fd 18%, #818cf8 48%, #c026d3 78%, rgba(192,38,211,0) 100%);
+  box-shadow: 0 0 8px rgba(165,180,252,.8);
+  transform: scale(calc(1 + var(--ai-lvl) * .32));
+  animation: ai-nefes 3.6s ease-in-out infinite;
+  transition: filter .4s;
+}
+.ai-core-halka1 { animation: ai-don 14s linear infinite; }
+.ai-core-halka2 { animation: ai-don 20s linear infinite reverse; }
+
+.ai-core[data-ai-mod="dinle"] .ai-core-halka1 { animation-duration: 8s; }
+.ai-core[data-ai-mod="dinle"] .ai-core-halka2 { animation-duration: 12s; }
+.ai-core[data-ai-mod="dusun"] .ai-core-halka1 { animation-duration: 2.4s; }
+.ai-core[data-ai-mod="dusun"] .ai-core-halka2 { animation-duration: 3.4s; }
+.ai-core[data-ai-mod="dusun"] .ai-core-cekirdek { animation-duration: 1.2s; filter: hue-rotate(-25deg); }
+.ai-core[data-ai-mod="konus"] .ai-core-halka1 { animation-duration: 3s; }
+.ai-core[data-ai-mod="konus"] .ai-core-halka2 { animation-duration: 4.5s; }
+.ai-core[data-ai-mod="konus"] .ai-core-cekirdek { animation: none; filter: brightness(calc(1 + var(--ai-lvl) * .35)); }
+.ai-core[data-ai-mod="hata"] .ai-core-cekirdek { filter: hue-rotate(120deg) saturate(1.4); animation: none; }
+.ai-core[data-ai-mod="hata"] .ai-core-halka1,
+.ai-core[data-ai-mod="hata"] .ai-core-halka2 { animation-play-state: paused; }
+
+@keyframes ai-don { to { transform: rotate(360deg); } }
+@keyframes ai-nefes {
+  0%, 100% { transform: scale(calc(.94 + var(--ai-lvl) * .32)); opacity: .92; }
+  50% { transform: scale(calc(1.04 + var(--ai-lvl) * .32)); opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ai-core-halka1, .ai-core-halka2, .ai-core-cekirdek { animation: none !important; }
+}
