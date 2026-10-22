@@ -76,19 +76,33 @@ export default function Sidebar() {
             // görmez — bunlar TMGD'nin kendi çalışma araçları. Yalnızca
             // uygulama içi "Karışık Yükleme" kontrolü görünür kalır.
             .filter((app) => !isCompany || !app.href.startsWith("http"))
-            .map((app) => (
-            <a
-              key={app.href}
-              href={app.href}
-              target={app.href.startsWith("http") ? "_blank" : undefined}
-              rel={app.href.startsWith("http") ? "noopener noreferrer" : undefined}
-              className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-gray-600 hover:bg-gray-100"
-            >
-              <span>{app.icon}</span>
-              <span>{app.title}</span>
-              {app.href.startsWith("http") && <span className="ml-auto text-gray-300 text-xs">↗</span>}
-            </a>
-          ))}
+            .map((app) =>
+              app.href.startsWith("http") ? (
+                <a
+                  key={app.href}
+                  href={app.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-gray-600 hover:bg-gray-100"
+                >
+                  <span>{app.icon}</span>
+                  <span>{app.title}</span>
+                  <span className="ml-auto text-gray-300 text-xs">↗</span>
+                </a>
+              ) : (
+                // Uygulama içi bağlantı: Next Link (istemci tarafı geçiş). Düz <a>
+                // TAM SAYFA YENİLEMESİ yapıyordu — Canlı Konuşma (WebSocket,
+                // mikrofon, ses) ve asistan durumu sıfırlanıyordu.
+                <Link
+                  key={app.href}
+                  href={app.href}
+                  className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-gray-600 hover:bg-gray-100"
+                >
+                  <span>{app.icon}</span>
+                  <span>{app.title}</span>
+                </Link>
+              )
+            )}
         </div>
 
         {/* Mevzuat — kanun/yönetmelik/genelge kütüphanesi.

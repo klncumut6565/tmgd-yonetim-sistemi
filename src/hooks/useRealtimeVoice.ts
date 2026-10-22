@@ -174,7 +174,7 @@ export function useRealtimeVoice(options: RealtimeVoiceOptions = {}) {
 
       // SAYFA KONTROLÜ — tarayıcıda, kullanıcının o an baktığı sayfa üzerinde.
       if (name === "scroll_page" || name === "click_on_page") {
-        const sonuc = name === "scroll_page" ? sayfayiKaydir(args) : await ogeyeTikla(args);
+        const sonuc = name === "scroll_page" ? sayfayiKaydir(args) : await ogeyeTikla(args, (yol) => router.push(yol));
         if (sonuc.ok === true) optionsRef.current.onPageAction?.();
         return sonuc;
       }

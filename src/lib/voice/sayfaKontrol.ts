@@ -273,7 +273,29 @@ function listeyiOzetle(adaylar: Aday[], maks: number): string[] {
   return [...s];
 }
 
-export async function ogeyeTikla(args: { label?: unknown; confirm?: unknown }): Promise<Record<string, unknown>> {
+/** Tıklanan öğe uygulama içi bir bağlantıysa hedef yolu döndürür (aksi hâlde null). */
+function uygulamaIciHedef(el: HTMLElement): string | null {
+  const a = el.closest("a[href]") as HTMLAnchorElement | null;
+  if (!a || (a.target && a.target !== "_self") || a.hasAttribute("download")) return null;
+  try {
+    const u = new URL(a.href, window.location.href);
+    if (u.origin !== window.location.origin) return null;
+    return u.pathname + u.search + u.hash;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * @param gezin Uygulama içi bağlantılar için istemci tarafı yönlendirme
+ *   (router.push). Verilirse bağlantılar el.click() yerine bununla açılır —
+ *   düz <a> etiketleri tam sayfa yenilemesi yapıp Canlı Konuşma'yı
+ *   (WebSocket, mikrofon, ses) koparmasın.
+ */
+export async function ogeyeTikla(
+  args: { label?: unknown; confirm?: unknown },
+  gezin?: (yol: string) => void
+): Promise<Record<string, unknown>> {
   if (typeof document === "undefined") return { error: "Sayfa erişilemiyor." };
   const sorgu = typeof args.label === "string" ? args.label.trim() : "";
   if (!sorgu) return { error: "label (tıklanacak öğenin ekrandaki yazısı) eksik." };
@@ -304,6 +326,12 @@ export async function ogeyeTikla(args: { label?: unknown; confirm?: unknown }): 
   el.scrollIntoView({ behavior: "smooth", block: "center" });
   vurgula(el);
   const oncekiYol = window.location.pathname + window.location.search;
+  const hedefYol = gezin ? uygulamaIciHedef(el) : null;
+  if (hedefYol && gezin) {
+    gezin(hedefYol);
+    await new Promise((r) => setTimeout(r, 300));
+    return { ok: true, clicked: etiket, type: "baglanti", navigated_to: hedefYol.split("?")[0] };
+  }
   el.click();
   // DOM güncellensin (sekme / açılır bölüm)
   await new Promise((r) => setTimeout(r, 200));
