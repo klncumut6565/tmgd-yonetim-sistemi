@@ -10,6 +10,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase/client";
 import { useUser } from "@/hooks/useUser";
 import { useSpeechToText } from "@/hooks/useSpeechToText";
+import FirmBelgeBildirimleri from "@/components/notes/FirmBelgeBildirimleri";
 
 type Note = {
   id: string;
@@ -169,7 +170,8 @@ export default function FirmNotesTab({ firmId }: { firmId: string }) {
   }
 
   return (
-    <div className="max-w-3xl">
+    <div className="grid gap-6 lg:grid-cols-[minmax(0,48rem)_minmax(18rem,1fr)] items-start">
+    <div className="min-w-0">
       <div className="mb-4">
         <h2 className="text-lg font-bold">📝 Notlar</h2>
         <p className="text-sm text-gray-500">
@@ -301,6 +303,8 @@ export default function FirmNotesTab({ firmId }: { firmId: string }) {
           </div>
         ))}
       </div>
+    </div>
+    <FirmBelgeBildirimleri firmId={firmId} />
     </div>
   );
 }
