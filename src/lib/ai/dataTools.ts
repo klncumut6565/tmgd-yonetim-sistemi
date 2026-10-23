@@ -410,8 +410,8 @@ export async function getVisitOverview(supabase: SupabaseClient, month?: string,
   const son = `${ay}-${String(sonGun).padStart(2, '0')}`
 
   const [{ data: firmalar }, { data: ziyaretler }, { data: atamalar, error: atamaHata }] = await Promise.all([
-    // Kapsamdışı firmalar takvim/ziyaret takibine dahil edilmez.
-    supabase.from('firms').select('id, name').or('status.is.null,status.neq.tmfb_kapsamdisi').order('name'),
+    // Kapsamdışı ve pasif firmalar takvim/ziyaret takibine dahil edilmez.
+    supabase.from('firms').select('id, name').or('status.is.null,status.not.in.(tmfb_kapsamdisi,passive)').order('name'),
     supabase.from('visits').select('firm_id, visit_date').gte('visit_date', bas).lte('visit_date', son),
     supabase.from('user_firms').select('firm_id, user_id, profiles ( full_name, role )'),
   ])
@@ -1112,11 +1112,14 @@ export async function addVisit(
     return { ok: false, error: 'Firma belirtilmedi (firm_name ya da firm_id gerekli).' }
   }
 
-  // Kapsamdışı firmalar takvime eklenmez.
+  // Kapsamdışı ve pasif firmalar takvime eklenmez.
   {
     const { data: durum } = await supabase.from('firms').select('status').eq('id', firma!.id).maybeSingle()
     if ((durum as { status?: string } | null)?.status === 'tmfb_kapsamdisi') {
       return { ok: false, error: `"${firma!.name}" kapsamdışı bir firma; kapsamdışı firmalar takvime eklenmez. Kullanıcıya bunu bildir.` }
+    }
+    if ((durum as { status?: string } | null)?.status === 'passive') {
+      return { ok: false, error: `"${firma!.name}" pasif bir firma; pasif firmalar takvime eklenmez. Kullanıcıya bunu bildir.` }
     }
   }
 

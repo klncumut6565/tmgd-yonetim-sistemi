@@ -179,12 +179,12 @@ function FirmaTakvimiIcerik() {
     setHata("");
 
     const [firmRes, visitRes, atamaRes] = await Promise.all([
-      // Kapsamdışı (TMFB Kapsamdışı) firmalar takvime HİÇ dahil edilmez:
+      // Kapsamdışı (TMFB Kapsamdışı) ve PASİF firmalar takvime HİÇ dahil edilmez:
       // ne seçim listesinde, ne "ziyaret edilmeyen" listesinde, ne takvimde.
       supabase
         .from("firms")
         .select("id, name")
-        .or(`status.is.null,status.neq.${TMFB_KAPSAMDISI}`)
+        .or(`status.is.null,status.not.in.(${TMFB_KAPSAMDISI},passive)`)
         .order("name"),
       supabase
         .from("visits")

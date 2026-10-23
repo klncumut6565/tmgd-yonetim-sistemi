@@ -51,6 +51,7 @@ export default function FirmsPage() {
   const [search, setSearch] = useState("");
   const [atananIdler, setAtananIdler] = useState<Set<string>>(new Set());
   const [tmfbAcik, setTmfbAcik] = useState(false);
+  const [pasifAcik, setPasifAcik] = useState(false);
   const [error, setError] = useState("");
 
   // Firma silme onayı
@@ -341,7 +342,13 @@ export default function FirmsPage() {
   // TMFB Kapsamdışı firmalar normal listeye karışmaz; yalnızca o firmaya
   // atanmış kullanıcı ve süper yönetici görür.
   const normalFirmalar = useMemo(
-    () => filtered.filter((f) => f.status !== TMFB_KAPSAMDISI),
+    () => filtered.filter((f) => f.status !== TMFB_KAPSAMDISI && f.status !== "passive"),
+    [filtered]
+  );
+  // Pasif firmalar da ana listeye karışmaz; Kapsamdışı bölümünün hemen
+  // altında ayrı, kapalı "Pasif Firmalar" bölümünde listelenir.
+  const pasifFirmalar = useMemo(
+    () => filtered.filter((f) => f.status === "passive"),
     [filtered]
   );
   const tmfbFirmalar = useMemo(
@@ -353,6 +360,9 @@ export default function FirmsPage() {
   useEffect(() => {
     if (search.trim() && tmfbFirmalar.length > 0) setTmfbAcik(true);
   }, [search, tmfbFirmalar.length]);
+  useEffect(() => {
+    if (search.trim() && pasifFirmalar.length > 0) setPasifAcik(true);
+  }, [search, pasifFirmalar.length]);
 
   // Tablo satırı — normal liste ve "TMFB Kapsamdışı" bölümü aynı satırı kullanır
   const satirCiz = (firm: Firm, index: number, tmfb: boolean) => (
@@ -534,6 +544,24 @@ export default function FirmsPage() {
               {tmfbAcik && (
                 <table className="w-full text-sm">
                   <tbody>{tmfbFirmalar.map((firm, index) => satirCiz(firm, index, true))}</tbody>
+                </table>
+              )}
+            </div>
+          )}
+
+          {pasifFirmalar.length > 0 && (
+            <div className="mt-3 border border-gray-300 rounded-xl overflow-hidden">
+              <button
+                type="button"
+                onClick={() => setPasifAcik((v) => !v)}
+                className="w-full flex items-center justify-between px-4 py-3 bg-gray-100 text-gray-700 text-sm font-medium"
+              >
+                <span>Pasif Firmalar ({pasifFirmalar.length})</span>
+                <span>{pasifAcik ? "▲ Gizle" : "▼ Göster"}</span>
+              </button>
+              {pasifAcik && (
+                <table className="w-full text-sm text-gray-500">
+                  <tbody>{pasifFirmalar.map((firm, index) => satirCiz(firm, index, false))}</tbody>
                 </table>
               )}
             </div>
