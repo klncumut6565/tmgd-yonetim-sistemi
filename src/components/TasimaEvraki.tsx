@@ -97,6 +97,17 @@ type Envanter = {
   atik_kodu: string | null;
 };
 
+/** Firma bazlı şoför / plaka rehberi kayıtları (migration 074). */
+type KayitliSofor = { id: string; full_name: string };
+type KayitliPlaka = { id: string; plate_number: string };
+
+/** Plakayı tek biçime getirir: büyük harf, tek boşluk ("34abc123" → "34 ABC 123"). */
+function plakaBicimle(ham: string): string {
+  const t = ham.toLocaleUpperCase("tr-TR").replace(/\s+/g, "").trim();
+  const m = t.match(/^(\d{2})([A-ZÇĞİÖŞÜ]{1,3})(\d{2,5})$/);
+  return m ? `${m[1]} ${m[2]} ${m[3]}` : ham.toLocaleUpperCase("tr-TR").replace(/\s+/g, " ").trim();
+}
+
 /** Firma bazlı alıcı rehberi kaydı (firm_consignees) */
 type Consignee = {
   id: string;
@@ -854,6 +865,11 @@ export default function TasimaEvraki({
   const [tasiyiciListesi, setTasiyiciListesi] = useState<Consignee[]>([]);
   const [tasiyiciKaydediliyor, setTasiyiciKaydediliyor] = useState(false);
   const [tasiyici, setTasiyici] = useState("");
+  // Şoför / plaka rehberi (migration 074) — her firmada (taşımacı olmasa da).
+  const [soforRehberi, setSoforRehberi] = useState<KayitliSofor[]>([]);
+  const [plakaRehberi, setPlakaRehberi] = useState<KayitliPlaka[]>([]);
+  const [soforKaydediliyor, setSoforKaydediliyor] = useState(false);
+  const [plakaKaydediliyor, setPlakaKaydediliyor] = useState(false);
   const [surucuId, setSurucuId] = useState("");
   const [aracId, setAracId] = useState("");
   // Sistemde kayıtlı olmayan sürücü/araç için serbest metin girişi —
@@ -918,7 +934,7 @@ export default function TasimaEvraki({
   const [eq, setEq] = useState(false);
 
   const yukle = useCallback(async () => {
-    const [env, sur, arc, evr, alc, tsy, frm] = await Promise.all([
+    const [env, sur, arc, evr, alc, tsy, frm, sfr, plk] = await Promise.all([
       supabase.from("firm_chemicals")
         .select("id, un_number, proper_shipping_name, adr_class, classification_code, packing_group, tunnel_code, transport_category, labels, trade_name, atik_kodu")
         .eq("firm_id", firmId).order("un_number"),
@@ -940,6 +956,12 @@ export default function TasimaEvraki({
       supabase.from("firms")
         .select("address, district, city, logo_url, activities")
         .eq("id", firmId).single(),
+      supabase.from("firm_saved_drivers")
+        .select("id, full_name")
+        .eq("firm_id", firmId).order("full_name"),
+      supabase.from("firm_saved_plates")
+        .select("id, plate_number")
+        .eq("firm_id", firmId).order("plate_number"),
     ]);
     if (env.error && /does not exist|not find the table/i.test(env.error.message || "")) {
       setHata("Veritabanı güncellemesi (027_adr_transport_envanter.sql) henüz çalıştırılmamış.");
@@ -955,6 +977,9 @@ export default function TasimaEvraki({
     // Taşıyıcı rehberi henüz oluşturulmamışsa (migration 058 çalışmadıysa)
     // sessizce boş geç — evrak düzenleme yine de çalışsın.
     setTasiyiciListesi((tsy.data as Consignee[]) || []);
+    // Şoför/plaka rehberi (074 çalışmadıysa sessizce boş).
+    setSoforRehberi((sfr.data as KayitliSofor[]) || []);
+    setPlakaRehberi((plk.data as KayitliPlaka[]) || []);
     setLogoUrl((frm.data as { logo_url: string | null } | null)?.logo_url ?? null);
     setFirmaFaaliyetleri((frm.data as { activities: string[] | null } | null)?.activities || []);
 
@@ -1335,6 +1360,62 @@ export default function TasimaEvraki({
     setTasiyiciKaydediliyor(false);
     if (hata) { setMesaj(hata); return; }
     setMesaj(`✓ "${unvan}" taşıyıcı rehberine kaydedildi.`);
+    yukle();
+  }
+
+  /** Elle yazılan şoför adını firmanın şoför rehberine kaydeder (varsa tekrar eklemez). */
+  async function soforuRehbereKaydet() {
+    const ad = surucuManuel.replace(/\s+/g, " ").trim();
+    if (!ad) { setMesaj("Önce şoför adını yaz."); return; }
+    if (soforRehberi.some((x) => x.full_name.toLocaleLowerCase("tr-TR") === ad.toLocaleLowerCase("tr-TR"))) {
+      setMesaj(`"${ad}" zaten şoför rehberinde.`);
+      return;
+    }
+    setSoforKaydediliyor(true);
+    const { error } = await supabase.from("firm_saved_drivers").insert({ firm_id: firmId, full_name: ad });
+    setSoforKaydediliyor(false);
+    if (error) {
+      setMesaj(
+        /does not exist|not find the table/i.test(error.message)
+          ? "Şoför rehberi için veritabanı güncellemesi (074_firma_sofor_plaka_rehberi.sql) gerekli."
+          : /row-level security|42501/i.test(error.message + (error.code ?? ""))
+            ? "Bu firmanın rehberine kayıt yetkin bulunmuyor."
+            : /duplicate|23505/i.test(error.message + (error.code ?? ""))
+              ? `"${ad}" zaten şoför rehberinde.`
+              : "Kaydedilemedi: " + error.message
+      );
+      return;
+    }
+    setMesaj(`✓ "${ad}" şoför rehberine kaydedildi.`);
+    yukle();
+  }
+
+  /** Elle yazılan plakayı firmanın plaka rehberine kaydeder (biçimlendirip, tekrar eklemeden). */
+  async function plakayiRehbereKaydet() {
+    const plaka = plakaBicimle(aracManuel);
+    if (!plaka) { setMesaj("Önce plakayı yaz."); return; }
+    const anahtar = (x: string) => x.toLocaleUpperCase("tr-TR").replace(/\s+/g, "");
+    if (plakaRehberi.some((x) => anahtar(x.plate_number) === anahtar(plaka))) {
+      setMesaj(`"${plaka}" zaten plaka rehberinde.`);
+      return;
+    }
+    setPlakaKaydediliyor(true);
+    const { error } = await supabase.from("firm_saved_plates").insert({ firm_id: firmId, plate_number: plaka });
+    setPlakaKaydediliyor(false);
+    if (error) {
+      setMesaj(
+        /does not exist|not find the table/i.test(error.message)
+          ? "Plaka rehberi için veritabanı güncellemesi (074_firma_sofor_plaka_rehberi.sql) gerekli."
+          : /row-level security|42501/i.test(error.message + (error.code ?? ""))
+            ? "Bu firmanın rehberine kayıt yetkin bulunmuyor."
+            : /duplicate|23505/i.test(error.message + (error.code ?? ""))
+              ? `"${plaka}" zaten plaka rehberinde.`
+              : "Kaydedilemedi: " + error.message
+      );
+      return;
+    }
+    setAracManuel(plaka);
+    setMesaj(`✓ "${plaka}" plaka rehberine kaydedildi.`);
     yukle();
   }
 
@@ -1845,73 +1926,133 @@ export default function TasimaEvraki({
                 value={notlar} onChange={(e) => setNotlar(e.target.value)} disabled={!canWrite} />
             </div>
 
-            {/* Sürücü ve Araç alanları yalnızca firmanın kayıtlı faaliyet
-                konuları arasında "tasimaci" varsa gösterilir — taşımacılık
-                faaliyeti olmayan bir firma için bu evrağı dolduran zaten
-                sürücü/araç bilgisi girmeyecektir. */}
-            {firmaFaaliyetleri.includes("tasimaci") && (
-              <>
-                <div>
-                  <label className={ETIKET}>Sürücü</label>
-                  <select className={GIRIS} value={surucuId}
-                    onChange={(e) => {
-                      setSurucuId(e.target.value);
-                      if (e.target.value) setSurucuManuel("");
-                    }}
-                    disabled={!canWrite}>
-                    <option value="">Seçilmedi (opsiyonel)</option>
-                    {suruculer.map((s) => (
-                      <option key={s.id} value={s.id}>{s.first_name} {s.last_name}</option>
-                    ))}
-                  </select>
-                  <input
-                    className={GIRIS + " mt-1.5"}
-                    placeholder="veya elle yaz — örn. alt yüklenici sürücüsü"
-                    value={surucuManuel}
-                    onChange={(e) => {
-                      setSurucuManuel(e.target.value);
-                      if (e.target.value) setSurucuId("");
-                    }}
-                    disabled={!canWrite || !!surucuId}
-                  />
-                  {surucuId ? (
-                    <p className="text-[11px] text-gray-400 mt-1">Kayıtlı sürücü seçildi — elle yazmak için önce seçimi kaldır.</p>
-                  ) : (
-                    <p className="text-[11px] text-gray-400 mt-1">Sistemde kayıtlı değilse (ör. alt yüklenici) buraya elle yaz.</p>
+            {/* Şoför ve Plaka — HER firmada görünür (taşımacı olmasa da; yükleyen /
+                gönderen firmalar da evrağa şoför ve plaka yazar). Listede:
+                firmanın Sürücüler/Araçlar modülündeki kayıtları + bu firmanın
+                şoför/plaka REHBERİ (alıcı rehberi gibi: bir kez kaydedilir,
+                sonraki evraklarda listeden seçilir). */}
+            <div>
+              <label className={ETIKET}>Şoför adı soyadı</label>
+              {(suruculer.length > 0 || soforRehberi.length > 0) && (
+                <select
+                  className={GIRIS + " mb-1.5"}
+                  value={surucuId ? `s:${surucuId}` : ""}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    if (v.startsWith("s:")) {
+                      setSurucuId(v.slice(2));
+                      setSurucuManuel("");
+                    } else if (v.startsWith("r:")) {
+                      const k = soforRehberi.find((x) => x.id === v.slice(2));
+                      setSurucuId("");
+                      setSurucuManuel(k?.full_name ?? "");
+                    } else {
+                      setSurucuId("");
+                    }
+                  }}
+                  disabled={!canWrite}
+                >
+                  <option value="">📋 Kayıtlı şoförlerden seç...</option>
+                  {suruculer.length > 0 && (
+                    <optgroup label="Firma sürücüleri (SRC-5 kontrollü)">
+                      {suruculer.map((x) => (
+                        <option key={x.id} value={`s:${x.id}`}>{x.first_name} {x.last_name}</option>
+                      ))}
+                    </optgroup>
                   )}
-                </div>
+                  {soforRehberi.length > 0 && (
+                    <optgroup label="Şoför rehberi">
+                      {soforRehberi.map((x) => (
+                        <option key={x.id} value={`r:${x.id}`}>{x.full_name}</option>
+                      ))}
+                    </optgroup>
+                  )}
+                </select>
+              )}
+              <input
+                className={GIRIS}
+                placeholder="Şoför adı soyadı"
+                value={seciliSurucu ? `${seciliSurucu.first_name} ${seciliSurucu.last_name}` : surucuManuel}
+                onChange={(e) => {
+                  setSurucuId("");
+                  setSurucuManuel(e.target.value);
+                }}
+                disabled={!canWrite}
+              />
+              {canWrite && !surucuId && surucuManuel.trim() &&
+                !soforRehberi.some((x) => x.full_name.toLocaleLowerCase("tr-TR") === surucuManuel.replace(/\s+/g, " ").trim().toLocaleLowerCase("tr-TR")) && (
+                <button
+                  onClick={soforuRehbereKaydet}
+                  disabled={soforKaydediliyor}
+                  className="text-xs text-blue-600 hover:underline mt-1.5 disabled:opacity-50"
+                >
+                  {soforKaydediliyor ? "Kaydediliyor..." : "💾 Bu şoförü rehbere kaydet"}
+                </button>
+              )}
+            </div>
 
-                <div>
-                  <label className={ETIKET}>Araç</label>
-                  <select className={GIRIS} value={aracId}
-                    onChange={(e) => {
-                      setAracId(e.target.value);
-                      if (e.target.value) setAracManuel("");
-                    }}
-                    disabled={!canWrite}>
-                    <option value="">Seçilmedi (opsiyonel)</option>
-                    {araclar.map((a) => (
-                      <option key={a.id} value={a.id}>{a.plate_number}{a.brand ? ` · ${a.brand}` : ""}</option>
-                    ))}
-                  </select>
-                  <input
-                    className={GIRIS + " mt-1.5"}
-                    placeholder="veya elle yaz — örn. plaka"
-                    value={aracManuel}
-                    onChange={(e) => {
-                      setAracManuel(e.target.value);
-                      if (e.target.value) setAracId("");
-                    }}
-                    disabled={!canWrite || !!aracId}
-                  />
-                  {aracId ? (
-                    <p className="text-[11px] text-gray-400 mt-1">Kayıtlı araç seçildi — elle yazmak için önce seçimi kaldır.</p>
-                  ) : (
-                    <p className="text-[11px] text-gray-400 mt-1">Sistemde kayıtlı değilse buraya elle yaz.</p>
+            <div>
+              <label className={ETIKET}>Araç plakası</label>
+              {(araclar.length > 0 || plakaRehberi.length > 0) && (
+                <select
+                  className={GIRIS + " mb-1.5"}
+                  value={aracId ? `a:${aracId}` : ""}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    if (v.startsWith("a:")) {
+                      setAracId(v.slice(2));
+                      setAracManuel("");
+                    } else if (v.startsWith("r:")) {
+                      const k = plakaRehberi.find((x) => x.id === v.slice(2));
+                      setAracId("");
+                      setAracManuel(k?.plate_number ?? "");
+                    } else {
+                      setAracId("");
+                    }
+                  }}
+                  disabled={!canWrite}
+                >
+                  <option value="">📋 Kayıtlı plakalardan seç...</option>
+                  {araclar.length > 0 && (
+                    <optgroup label="Firma araçları">
+                      {araclar.map((x) => (
+                        <option key={x.id} value={`a:${x.id}`}>{x.plate_number}{x.brand ? ` · ${x.brand}` : ""}</option>
+                      ))}
+                    </optgroup>
                   )}
-                </div>
-              </>
-            )}
+                  {plakaRehberi.length > 0 && (
+                    <optgroup label="Plaka rehberi">
+                      {plakaRehberi.map((x) => (
+                        <option key={x.id} value={`r:${x.id}`}>{x.plate_number}</option>
+                      ))}
+                    </optgroup>
+                  )}
+                </select>
+              )}
+              <input
+                className={GIRIS}
+                placeholder="Plaka — örn. 34 ABC 123"
+                value={aracId ? (araclar.find((x) => x.id === aracId)?.plate_number ?? "") : aracManuel}
+                onChange={(e) => {
+                  setAracId("");
+                  setAracManuel(e.target.value);
+                }}
+                onBlur={() => {
+                  if (!aracId && aracManuel.trim()) setAracManuel(plakaBicimle(aracManuel));
+                }}
+                disabled={!canWrite}
+              />
+              {canWrite && !aracId && aracManuel.trim() &&
+                !plakaRehberi.some((x) => x.plate_number.toLocaleUpperCase("tr-TR").replace(/\s+/g, "") === aracManuel.toLocaleUpperCase("tr-TR").replace(/\s+/g, "")) && (
+                <button
+                  onClick={plakayiRehbereKaydet}
+                  disabled={plakaKaydediliyor}
+                  className="text-xs text-blue-600 hover:underline mt-1.5 disabled:opacity-50"
+                >
+                  {plakaKaydediliyor ? "Kaydediliyor..." : "💾 Bu plakayı rehbere kaydet"}
+                </button>
+              )}
+            </div>
           </div>
         </section>
 
