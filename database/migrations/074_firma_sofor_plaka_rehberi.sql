@@ -11,9 +11,9 @@
 -- rehberleriyle AYNI desende, her firma kendi sofor ve plaka rehberini tutar.
 -- Bir kez kaydedilir, sonraki evraklarda listeden secilir.
 --
--- YETKI: transport_documents'in canli kurallariyla tutarli —
+-- YETKI: Tasima Evraki kurallariyla tutarli (bkz. 075) —
 --   okuma : yonetici (is_admin) VEYA firmaya atanmis kullanici
---   yazma : yonetici VEYA (yazabilir() VE firmaya atanmis)
+--   yazma : yonetici VEYA ((yazabilir() VEYA firma_kullanicisi()) VE firmaya atanmis)
 -- ============================================================================
 
 CREATE TABLE IF NOT EXISTS public.firm_saved_drivers (
@@ -66,13 +66,13 @@ DROP POLICY IF EXISTS firm_saved_drivers_write ON public.firm_saved_drivers;
 CREATE POLICY firm_saved_drivers_write ON public.firm_saved_drivers
 FOR ALL USING (
   public.is_admin()
-  OR (public.yazabilir() AND EXISTS (
+  OR ((public.yazabilir() OR public.firma_kullanicisi()) AND EXISTS (
     SELECT 1 FROM public.user_firms uf
     WHERE uf.firm_id = firm_saved_drivers.firm_id AND uf.user_id = auth.uid()))
 )
 WITH CHECK (
   public.is_admin()
-  OR (public.yazabilir() AND EXISTS (
+  OR ((public.yazabilir() OR public.firma_kullanicisi()) AND EXISTS (
     SELECT 1 FROM public.user_firms uf
     WHERE uf.firm_id = firm_saved_drivers.firm_id AND uf.user_id = auth.uid()))
 );
@@ -85,13 +85,13 @@ DROP POLICY IF EXISTS firm_saved_plates_write ON public.firm_saved_plates;
 CREATE POLICY firm_saved_plates_write ON public.firm_saved_plates
 FOR ALL USING (
   public.is_admin()
-  OR (public.yazabilir() AND EXISTS (
+  OR ((public.yazabilir() OR public.firma_kullanicisi()) AND EXISTS (
     SELECT 1 FROM public.user_firms uf
     WHERE uf.firm_id = firm_saved_plates.firm_id AND uf.user_id = auth.uid()))
 )
 WITH CHECK (
   public.is_admin()
-  OR (public.yazabilir() AND EXISTS (
+  OR ((public.yazabilir() OR public.firma_kullanicisi()) AND EXISTS (
     SELECT 1 FROM public.user_firms uf
     WHERE uf.firm_id = firm_saved_plates.firm_id AND uf.user_id = auth.uid()))
 );
