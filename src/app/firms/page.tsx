@@ -349,6 +349,11 @@ export default function FirmsPage() {
     [filtered, atananIdler, isSuperAdmin]
   );
 
+  // Arama yapılırken kapsamdışı bölümde eşleşme varsa bölüm otomatik açılır.
+  useEffect(() => {
+    if (search.trim() && tmfbFirmalar.length > 0) setTmfbAcik(true);
+  }, [search, tmfbFirmalar.length]);
+
   // Tablo satırı — normal liste ve "TMFB Kapsamdışı" bölümü aynı satırı kullanır
   const satirCiz = (firm: Firm, index: number, tmfb: boolean) => (
                   <tr
@@ -523,7 +528,7 @@ export default function FirmsPage() {
                 onClick={() => setTmfbAcik((v) => !v)}
                 className="w-full flex items-center justify-between px-4 py-3 bg-purple-100 text-purple-900 text-sm font-medium"
               >
-                <span>TMFB Kapsamdışı Firmalar ({tmfbFirmalar.length})</span>
+                <span>Kapsamdışı Firmalar ({tmfbFirmalar.length})</span>
                 <span>{tmfbAcik ? "▲ Gizle" : "▼ Göster"}</span>
               </button>
               {tmfbAcik && (

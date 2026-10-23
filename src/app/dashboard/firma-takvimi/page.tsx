@@ -18,6 +18,7 @@ import { useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
 import { useUser } from "@/hooks/useUser";
 import { hataCevir } from "@/lib/hataCevir";
+import { TMFB_KAPSAMDISI } from "@/lib/firmaGorunurluk";
 
 type Firm = { id: string; name: string };
 
@@ -178,7 +179,13 @@ function FirmaTakvimiIcerik() {
     setHata("");
 
     const [firmRes, visitRes, atamaRes] = await Promise.all([
-      supabase.from("firms").select("id, name").order("name"),
+      // Kapsamdışı (TMFB Kapsamdışı) firmalar takvime HİÇ dahil edilmez:
+      // ne seçim listesinde, ne "ziyaret edilmeyen" listesinde, ne takvimde.
+      supabase
+        .from("firms")
+        .select("id, name")
+        .or(`status.is.null,status.neq.${TMFB_KAPSAMDISI}`)
+        .order("name"),
       supabase
         .from("visits")
         .select("id, firm_id, visit_date, visit_type, summary")
@@ -195,8 +202,10 @@ function FirmaTakvimiIcerik() {
     if (firmRes.error) setHata("Firmalar yüklenemedi: " + hataCevir(firmRes.error));
     else setFirmalar((firmRes.data as Firm[]) || []);
 
+    // Kapsamdışı firmaların (varsa eski) ziyaret kayıtları takvimde gösterilmez.
+    const takvimFirmaIdleri = new Set(((firmRes.data as Firm[]) || []).map((f) => f.id));
     if (visitRes.error) setHata("Ziyaretler yüklenemedi: " + hataCevir(visitRes.error));
-    else setZiyaretler((visitRes.data as Visit[]) || []);
+    else setZiyaretler(((visitRes.data as Visit[]) || []).filter((z) => takvimFirmaIdleri.has(z.firm_id)));
 
     // Firma -> danışman eşlemesi.
     // ÖNCEKİ HATA: yalnızca role === "tmgd" olan atamalar alınıyordu; bu
