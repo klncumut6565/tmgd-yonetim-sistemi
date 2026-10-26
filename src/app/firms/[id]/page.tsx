@@ -753,6 +753,13 @@ function FirmDetailInner({
     tur: "pdf" | "gorsel" | "diger";
   } | null>(null);
   const [onizlemeYukleniyor, setOnizlemeYukleniyor] = useState(false);
+  // Panel yüklenirken kapatılırsa, geç gelen bağlantı paneli yeniden açmasın.
+  const onizlemeIstekRef = useRef(0);
+  const onizlemeKapat = useCallback(() => {
+    onizlemeIstekRef.current += 1;
+    setOnizlemeYukleniyor(false);
+    setOnizleme(null);
+  }, []);
 
   function dosyaTuru(ad: string): "pdf" | "gorsel" | "diger" {
     const u = ad.toLowerCase();
@@ -763,6 +770,7 @@ function FirmDetailInner({
 
   const onizlemeAc = useCallback(
     async (dosya: { id: string; file_path: string; file_name: string }) => {
+      const istek = ++onizlemeIstekRef.current;
       setOnizlemeYukleniyor(true);
       setOnizleme(null);
       // 1 saat: paneli açık bırakıp başka maddelere bakan kullanıcıda
@@ -770,6 +778,7 @@ function FirmDetailInner({
       const { data, error } = await supabase.storage
         .from("firm-files")
         .createSignedUrl(dosya.file_path, 3600);
+      if (istek !== onizlemeIstekRef.current) return; // bu arada kapatıldı / başka dosya açıldı
       setOnizlemeYukleniyor(false);
       if (error || !data?.signedUrl) {
         setFileMsg("Önizleme bağlantısı oluşturulamadı: " + hataCevir(error));
@@ -784,6 +793,16 @@ function FirmDetailInner({
     },
     []
   );
+
+  // Esc ile önizleme panelini kapat.
+  useEffect(() => {
+    if (!onizleme && !onizlemeYukleniyor) return;
+    const tus = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onizlemeKapat();
+    };
+    window.addEventListener("keydown", tus);
+    return () => window.removeEventListener("keydown", tus);
+  }, [onizleme, onizlemeYukleniyor, onizlemeKapat]);
 
   async function downloadItemFile(path: string) {
     const { data, error } = await supabase.storage
@@ -1233,7 +1252,7 @@ function FirmDetailInner({
       {tab === "belge_takip" && (
         <div className="flex flex-col lg:flex-row gap-6 items-stretch lg:items-start">
           {/* SOL: belge takip listesi */}
-          <div className="flex-1 min-w-0 max-w-4xl">
+          <div className="flex-1 min-w-0 max-w-5xl">
           {/* Genel ilerleme */}
           <div className="flex items-center justify-between border rounded-xl p-4 mb-4">
             <div>
@@ -1338,8 +1357,10 @@ function FirmDetailInner({
 
                         return (
                           <div key={itemKey} className="px-4 py-2 text-sm hover:bg-gray-50">
-                            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
-                              <label className={"flex items-center gap-3 flex-1 min-w-0 " + (canWrite ? "cursor-pointer" : "")}>
+                            {/* sm:flex-wrap — dar alanda tarih / dosya alanları üst üste
+                                binmek yerine alt satıra geçer. */}
+                            <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-2 sm:gap-x-3 sm:gap-y-1.5">
+                              <label className={"flex items-center gap-3 flex-1 min-w-0 sm:min-w-[14rem] " + (canWrite ? "cursor-pointer" : "")}>
                                 <input
                                   type="checkbox"
                                   checked={done}
@@ -1361,7 +1382,7 @@ function FirmDetailInner({
                                   </span>
                                 )}
                                 {isZiyaret && visitDate && (
-                                  <span className="text-[10px] px-1.5 py-0.5 rounded-full shrink-0 bg-green-100 text-green-700">
+                                  <span className="text-[10px] px-1.5 py-0.5 rounded-full shrink-0 whitespace-nowrap bg-green-100 text-green-700">
                                     ✓ Ziyaretler'de kayıtlı
                                   </span>
                                 )}
@@ -1371,7 +1392,7 @@ function FirmDetailInner({
                                 /* Ziyaret Tarihi — Ziyaretler özelliğiyle bağlantılı: girilen
                                    tarih gerçek bir visits kaydı oluşturur/günceller. */
                                 <div className="flex flex-wrap items-center gap-1 sm:shrink-0 text-xs text-gray-400">
-                                  <span title="Ziyaret Tarihi — Ziyaretler sekmesiyle bağlantılıdır">📅 Ziyaret Tarihi:</span>
+                                  <span className="whitespace-nowrap" title="Ziyaret Tarihi — Ziyaretler sekmesiyle bağlantılıdır">📅 Ziyaret Tarihi:</span>
                                   <DateInput
                                     value={visitDate}
                                     disabled={!canWrite}
@@ -1510,17 +1531,26 @@ function FirmDetailInner({
           </div>
           </div>
 
-          {/* SAĞ: dosya önizleme paneli — geniş ekranlarda boş kalan alanı
-              kullanır, dar ekranlarda gizlenir (mobilde dosyalar indirilerek
-              görüntülenir, panel yeri daraltmasın diye). */}
-          <aside className="hidden xl:block w-[440px] shrink-0 sticky top-4">
-            <div className="border rounded-xl overflow-hidden bg-white">
+          {/* SAĞ: dosya önizleme paneli — YALNIZCA bir dosyaya tıklanınca açılır
+              (önceden hep açıktı ve 440px yer kaplayıp soldaki listeyi
+              daraltıyordu; Ziyaret Raporları satırlarında yazılar üst üste
+              biniyordu). Geniş ekranda listenin yanında, dar ekranda sağdan
+              kayan pencere olarak görünür; ✕ / Esc / dışarı tıklama kapatır. */}
+          {(onizleme || onizlemeYukleniyor) && (
+          <>
+          <div
+            className="fixed inset-0 z-40 bg-black/30 xl:hidden"
+            onClick={onizlemeKapat}
+          />
+          <aside className="fixed inset-y-0 right-0 z-40 w-full sm:w-[480px] p-2 xl:p-0 xl:static xl:z-auto xl:w-[440px] shrink-0 xl:sticky xl:top-4">
+            <div className="border rounded-xl overflow-hidden bg-white shadow-2xl xl:shadow-none h-full xl:h-auto flex flex-col">
               <div className="flex items-center justify-between gap-2 px-3 py-2 border-b bg-gray-50">
                 <span className="text-sm font-semibold truncate">
                   {onizleme ? onizleme.ad : "Dosya Önizleme"}
                 </span>
-                {onizleme && (
+                {(onizleme || onizlemeYukleniyor) && (
                   <div className="flex items-center gap-1 shrink-0">
+                    {onizleme && (
                     <a
                       href={onizleme.url}
                       target="_blank"
@@ -1530,9 +1560,10 @@ function FirmDetailInner({
                     >
                       ↗
                     </a>
+                    )}
                     <button
-                      onClick={() => setOnizleme(null)}
-                      title="Kapat"
+                      onClick={onizlemeKapat}
+                      title="Kapat (Esc)"
                       className="text-xs px-2 py-1 rounded text-gray-400 hover:text-red-500 hover:bg-red-50"
                     >
                       ✕
@@ -1541,20 +1572,10 @@ function FirmDetailInner({
                 )}
               </div>
 
-              <div className="h-[calc(100vh-9rem)] min-h-[420px] bg-gray-50">
+              <div className="flex-1 xl:flex-none xl:h-[calc(100vh-9rem)] min-h-[420px] bg-gray-50">
                 {onizlemeYukleniyor && (
                   <div className="h-full flex items-center justify-center text-sm text-gray-400">
                     Önizleme hazırlanıyor...
-                  </div>
-                )}
-
-                {!onizlemeYukleniyor && !onizleme && (
-                  <div className="h-full flex flex-col items-center justify-center text-center px-6 text-gray-400">
-                    <span className="text-4xl mb-3">📄</span>
-                    <p className="text-sm">
-                      Soldaki listeden bir dosya adına tıklayınca içeriği
-                      burada görüntülenir.
-                    </p>
                   </div>
                 )}
 
@@ -1597,6 +1618,8 @@ function FirmDetailInner({
               </div>
             </div>
           </aside>
+          </>
+          )}
         </div>
       )}
 
