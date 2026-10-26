@@ -267,6 +267,9 @@ export default function DashboardPage() {
         if (gorulen.has(bid)) continue;
         // TMGD Sertifikası kendi bölümünde gösteriliyor — burada elenir.
         if (/TMGD Sertifika/i.test(String(b.title))) continue;
+        // Faaliyet Tespit Raporu (Ek-3) süreli bir belge değil — geçerlilik
+        // tarihi girilmiş olsa bile panelde gösterilmez.
+        if (/Faaliyet Tespit Raporu/i.test(String(b.title))) continue;
         gorulen.add(bid);
         // Başlıktaki "Belge Takip: " / "Araç Evrakı: " ön eki kaldırılır —
         // panelde zaten bölüm başlığı bağlamı veriyor.
