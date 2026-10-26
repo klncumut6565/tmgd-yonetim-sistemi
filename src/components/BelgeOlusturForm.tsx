@@ -601,7 +601,7 @@ export default function BelgeOlusturForm({ fixedFirmId, initialFirmId, compact =
             const birlesik = await PDFDocument.create();
             const formPdf = await PDFDocument.load(formBytes);
 
-            // K5: içerik sayfalarına da kapaktaki gibi standart BAŞLIK KUTUSU (sol üst logo, ortada form
+            // K5 / K6 / K7: içerik sayfalarına da kapaktaki gibi standart BAŞLIK KUTUSU (sol üst logo, ortada form
             // adı, sağda Doküman No / Yayın / Revizyon Tarihi / Sayfa No) basılır; orijinal formun kendi
             // üst başlığı (form adı, açıklama, Form No / Yayın / Rev satırı) kırpılıp içerik kutunun altına yerleşir.
             const kirpma = FORM_KIRPMA[actualCode];
@@ -1357,6 +1357,21 @@ const FORM_KIRPMA: Record<string, { ust: number; alt: number }[]> = {
   K5: [
     { ust: 134, alt: 805 },
     { ust: 28, alt: 662 },
+  ],
+  // K6: orijinal başlık tablosu (KONTROL DÖKÜMANI / Doküman No / Yayın /
+  // Revizyon / "Sayfa 1 / 1") kesilir; içerik "Bu form; ..." açıklamasından
+  // başlar. 2. sayfanın kendi başlığı yok, yalnızca alttaki imza tablosuna
+  // kadar alınır.
+  K6: [
+    { ust: 110, alt: 808 },
+    { ust: 30, alt: 512 },
+  ],
+  // K7 (Letter boyutlu kaynak): sağ üstteki "ADR Taşıt Kontrol Formu"
+  // üstbilgisi, form başlığı ve alt başlık ile alttaki "Sayfa x / 2"
+  // altbilgisi kesilir — sayfa no artık standart başlık kutusunda.
+  K7: [
+    { ust: 86, alt: 738 },
+    { ust: 46, alt: 738 },
   ],
 };
 
