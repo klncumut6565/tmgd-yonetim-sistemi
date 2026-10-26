@@ -36,7 +36,7 @@ export default function Sidebar() {
   const visibleMenu = menu.filter((item) => !(isCompany && item.hideForCompany));
 
   return (
-    <aside className="w-60 border-r min-h-screen p-4 shrink-0">
+    <aside className="w-60 md:w-52 border-r min-h-screen p-4 md:p-3 shrink-0">
       <div className="font-bold text-lg mb-6">TMGD Sistemi</div>
 
       <nav className="space-y-1">
