@@ -1306,6 +1306,8 @@ type Satir =
   | { tur: "baslik"; metin: string }
   | { tur: "altbaslik"; metin: string }
   | { tur: "paragraf"; metin: string }
+  // Şablondaki "note" bloğu: küçük punto, italik açıklama satırı.
+  | { tur: "not"; metin: string }
   | { tur: "madde"; metin: string; numara?: number }
   | { tur: "tablo"; headers?: string[]; rows: string[][]; note?: string; colWidths?: number[] }
   | { tur: "gorseller"; ids: string[]; sutun: number; yukseklik: number; note?: string }
@@ -1389,12 +1391,28 @@ function cerceveCiz(doc: JsPDFType) {
 }
 const FONT = "LiberationSans"; // Türkçe karakter destekli gömülü font (bkz. pdfFonts.ts)
 const RENK_VURGU: [number, number, number] = [30, 64, 175]; // kurumsal mavi (subheading, çizgiler)
-const SATIR_YUKSEKLIGI: Record<"baslik" | "altbaslik" | "paragraf" | "madde", number> = {
+const SATIR_YUKSEKLIGI: Record<"baslik" | "altbaslik" | "paragraf" | "madde" | "not", number> = {
   baslik: 7,
   altbaslik: 6.5,
   paragraf: 4.6,
   madde: 4.6,
+  not: 4.0,
 };
+/** "note" blokları için punto (paragraf 9.5). */
+const NOT_PUNTO = 8.5;
+
+/** İtalik fontu (yalnızca "note" bloğu olan belgelerde) jsPDF'e tanıtır.
+ *  Yüklenemezse false döner; not satırları o zaman normal yazıyla basılır. */
+async function italikFontuKaydet(doc: JsPDFType): Promise<boolean> {
+  try {
+    const { LIBERATION_SANS_ITALIC_B64 } = await import("@/lib/pdfFontItalik");
+    doc.addFileToVFS("LiberationSans-Italic.ttf", LIBERATION_SANS_ITALIC_B64);
+    doc.addFont("LiberationSans-Italic.ttf", FONT, "italic");
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 // jsPDF'e gömülü TTF fontu bir kez tanıtır. Her doc örneği için ayrı çağrılmalı.
 async function fontuKaydet(doc: JsPDFType) {
@@ -1450,6 +1468,14 @@ function duzMetneCevir(doc: JsPDFType, sablon: BelgeSablonu, belgeAdi: string): 
       doc.setFontSize(9.5);
       doc.splitTextToSize(b.text, genislik).forEach((t: string) =>
         satirlar.push({ tur: "paragraf", metin: t })
+      );
+    } else if (b.type === "note") {
+      // Ölçüm normal fontla (italik henüz tanıtılmamış olabilir); Liberation
+      // Sans italik ve normal genişlikleri neredeyse aynıdır.
+      doc.setFontSize(NOT_PUNTO);
+      doc.setFont(FONT, "normal");
+      doc.splitTextToSize(b.text, genislik).forEach((t: string) =>
+        satirlar.push({ tur: "not", metin: t })
       );
     } else if (b.type === "bullet") {
       doc.setFontSize(9.5);
@@ -2329,6 +2355,7 @@ export async function renderYapilandirilmisBelge(
   }
 
   const satirlar = duzMetneCevir(doc, sablon, tamBaslik);
+  const italikVar = satirlar.some((s) => s.tur === "not") ? await italikFontuKaydet(doc) : false;
   if (notlar.trim()) {
     satirlar.push({ tur: "altbaslik", metin: "Ek Notlar" });
     doc.setFontSize(9.5);
@@ -2423,6 +2450,12 @@ export async function renderYapilandirilmisBelge(
         doc.setFont(FONT, "normal");
         doc.text(satir.metin, M, y);
         y += SATIR_YUKSEKLIGI.paragraf;
+      } else if (satir.tur === "not") {
+        doc.setFontSize(NOT_PUNTO);
+        doc.setFont(FONT, italikVar ? "italic" : "normal");
+        doc.text(satir.metin, M, y);
+        doc.setFont(FONT, "normal");
+        y += SATIR_YUKSEKLIGI.not;
       } else if (satir.tur === "tablo") {
         tabloCiz(doc, satir, M, y, genislik);
         y += tabloYuksekligiHesapla(doc, satir, genislik);

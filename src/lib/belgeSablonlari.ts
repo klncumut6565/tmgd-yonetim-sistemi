@@ -11,6 +11,8 @@
 
 export type TemplateBlock =
   | { type: "paragraph"; text: string }
+  // Küçük punto, italik açıklama notu (ör. prosedür başındaki "Not: Bu prosedür ... esas alınarak hazırlanmıştır.")
+  | { type: "note"; text: string }
   | { type: "subheading"; text: string }
   | { type: "bullet"; items: string[] }
   | { type: "numbered"; items: string[] }
@@ -420,8 +422,7 @@ export const BELGE_SABLONLARI: Record<string, BelgeSablonu> = {
     docType: "PROSEDÜR",
     yayinTarihi: "01.11.2024",
     blocks: [
-      { type: "paragraph", text: "Boşaltma Öncesi / Sırası / Sonrası Önlemler" },
-      { type: "paragraph", text: "Not: Bu prosedür; 18/6/2022 tarihli ve 31870 sayılı Resmî Gazete’de yayımlanan Tehlikeli Maddelerin Karayoluyla Taşınması Hakkında Yönetmelik (6/2/2025 tarihli ve 32805 sayılı değişiklik dahil) ile ADR hükümleri esas alınarak hazırlanmıştır. Yönetmelik ve ADR baskısı güncellendiğinde prosedür TMGD tarafından gözden geçirilmelidir. Köşeli parantez içindeki alanlar işletmeye özgü bilgilerle doldurulmalıdır." },
+      { type: "note", text: "Not: Bu prosedür; 18/6/2022 tarihli ve 31870 sayılı Resmî Gazete’de yayımlanan Tehlikeli Maddelerin Karayoluyla Taşınması Hakkında Yönetmelik (6/2/2025 tarihli ve 32805 sayılı değişiklik dahil) ile ADR hükümleri esas alınarak hazırlanmıştır. Yönetmelik ve ADR baskısı güncellendiğinde prosedür TMGD tarafından gözden geçirilmelidir. Köşeli parantez içindeki alanlar işletmeye özgü bilgilerle doldurulmalıdır." },
       { type: "subheading", text: "1. Amaç" },
       { type: "paragraph", text: "Bu prosedür, ADR kapsamında taşınan tehlikeli maddelerin işletme tarafından boşaltan sıfatıyla güvenli ve mevzuata uygun şekilde boşaltılmasını; boşaltma öncesinde, sırasında ve sonrasında alınması gereken önlemlerin, yapılacak kontrollerin, tutulacak kayıtların ve görev-sorumlulukların belirlenmesini amaçlar." },
       { type: "paragraph", text: "Prosedürün hedefleri şunlardır:" },
