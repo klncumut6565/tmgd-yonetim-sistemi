@@ -8,7 +8,6 @@
 
 import { Suspense, use, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { createPortal } from "react-dom";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase/client";
 import { authFetch } from "@/lib/supabase/authFetch";
@@ -1538,12 +1537,12 @@ function FirmDetailInner({
               biniyordu). Geniş ekranda listenin yanında, dar ekranda sağdan
               kayan pencere olarak görünür; ✕ / Esc / dışarı tıklama kapatır. */}
           {(onizleme || onizlemeYukleniyor) && (
-          <DarEkrandaGovdeye>
+          <>
           <div
-            className="fixed inset-0 z-50 bg-black/30 xl:hidden"
+            className="fixed inset-0 z-40 bg-black/30 xl:hidden"
             onClick={onizlemeKapat}
           />
-          <aside className="fixed top-0 right-0 z-50 h-[100dvh] w-full sm:w-[480px] p-2 xl:p-0 xl:static xl:z-auto xl:h-auto xl:w-[440px] shrink-0 xl:sticky xl:top-4">
+          <aside className="fixed inset-y-0 right-0 z-40 w-full sm:w-[480px] p-2 xl:p-0 xl:static xl:z-auto xl:w-[440px] shrink-0 xl:sticky xl:top-4">
             <div className="border rounded-xl overflow-hidden bg-white shadow-2xl xl:shadow-none h-full xl:h-auto flex flex-col">
               <div className="flex items-center justify-between gap-2 px-3 py-2 border-b bg-gray-50">
                 <span className="text-sm font-semibold truncate">
@@ -1573,7 +1572,7 @@ function FirmDetailInner({
                 )}
               </div>
 
-              <div className="flex-1 min-h-0 xl:flex-none xl:h-[calc(100vh-9rem)] xl:min-h-[420px] bg-gray-50">
+              <div className="flex-1 xl:flex-none xl:h-[calc(100vh-9rem)] min-h-[420px] bg-gray-50">
                 {onizlemeYukleniyor && (
                   <div className="h-full flex items-center justify-center text-sm text-gray-400">
                     Önizleme hazırlanıyor...
@@ -1619,7 +1618,7 @@ function FirmDetailInner({
               </div>
             </div>
           </aside>
-          </DarEkrandaGovdeye>
+          </>
           )}
         </div>
       )}
@@ -1973,27 +1972,6 @@ function FirmDetailInner({
 }
 
 // Firma Bilgileri sekmesinin salt-okunur görünümünde tek bir etiket/değer satırı
-/**
- * Dar ekranda çocuklarını doğrudan <body>'ye taşır (portal). Neden: sekme
- * geçiş animasyonu (tabFlipIn … forwards) sekme kapsayıcısında `transform`
- * bırakıyor; transform'lu bir atanın içindeki `position: fixed` öğe ekrana
- * değil O ATAYA göre konumlanır — mobil önizleme penceresi ekran yerine uzun
- * listenin yüksekliğini alıyordu. Geniş ekranda (xl, ≥1280px) panel listenin
- * yanında satır içi kalır.
- */
-function DarEkrandaGovdeye({ children }: { children: React.ReactNode }) {
-  const [genis, setGenis] = useState<boolean | null>(null);
-  useEffect(() => {
-    const mq = window.matchMedia("(min-width: 1280px)");
-    const guncelle = () => setGenis(mq.matches);
-    guncelle();
-    mq.addEventListener("change", guncelle);
-    return () => mq.removeEventListener("change", guncelle);
-  }, []);
-  if (genis === null) return null;
-  return genis ? <>{children}</> : createPortal(children, document.body);
-}
-
 function Bilgi({ label, value }: { label: string; value: string | null | undefined }) {
   return (
     <div>
