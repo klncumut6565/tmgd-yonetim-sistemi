@@ -188,7 +188,9 @@ type FirmaBelgeSatiri = {
 }
 
 function takipteSayilirMi(code: string): boolean {
-  return !(code === 'D4' || code === 'D5' || code.startsWith('AS'))
+  // D2 Güvenlik Bilgi Formları (GBF/SDS) Dosyası — sayılmaz.
+  // D3 Kaza / Olay Bildirim: yalnızca olay olursa düzenlenir ("varsa") — sayılmaz.
+  return !(code === 'D2' || code === 'D3' || code === 'D4' || code === 'D5' || code.startsWith('AS'))
 }
 
 /** Tamamlanmış (done=true) belge anahtarlarını firmaya göre toplar (sayfalı okuma). */

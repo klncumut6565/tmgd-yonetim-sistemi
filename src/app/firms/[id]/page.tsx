@@ -853,8 +853,11 @@ function FirmDetailInner({
         //  - D4 "Diğer": zorunlu olmayan, serbest ek belgeler.
         //  - AS1-AS7 "Araç ve Sürücü Belgeleri": ADR/TMGD kapsamı dışında,
         //    taşımacılık faaliyetinin kendi mevzuat belgeleri.
+        //  - D2 "Güvenlik Bilgi Formları (GBF/SDS) Dosyası": ilerlemeye sayılmaz.
         //  - D5 "Dilekçe": zorunlu olmayan, ilerlemeye sayılmaz.
-        if (it.code === "D4" || it.code === "D5" || it.code.startsWith("AS")) return;
+        //  - D3 "Kaza / Olay Bildirim Raporları": yalnızca olay olursa düzenlenir
+        //    ("varsa"), olmaması eksiklik değildir.
+        if (it.code === "D2" || it.code === "D3" || it.code === "D4" || it.code === "D5" || it.code.startsWith("AS")) return;
         total++;
         if (doneSet.has(`${it.code}|${it.period}`)) done++;
       })

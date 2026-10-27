@@ -459,6 +459,7 @@ export function buildChecklist(
               { code: "D1", period: "", label: "Emniyet Planı (ADR 1.10.3.2 kapsamındaysa) / Değerlendirme Kaydı" },
               { code: "D2", period: "", label: "Güvenlik Bilgi Formları (GBF/SDS) Dosyası" },
             ]),
+        // D3 — genel ilerleme yüzdesine DAHİL EDİLMEZ (yalnızca olay olursa düzenlenir).
         { code: "D3", period: "", label: "Kaza / Olay Bildirim Raporları (ADR 1.8.5.3 — varsa)" },
         // D5 Dilekçe — genel ilerleme yüzdesine DAHİL EDİLMEZ (bkz. firms/[id]).
         { code: "D5", period: "", label: "Dilekçe" },
