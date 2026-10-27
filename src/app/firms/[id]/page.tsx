@@ -27,6 +27,7 @@ import KimyasalEnvanter from "@/components/KimyasalEnvanter";
 import TasimaEvraki from "@/components/TasimaEvraki";
 import Sevkiyatlar from "@/components/Sevkiyatlar";
 import GorevliListesi from "@/components/GorevliListesi";
+import PdfSayfaGoruntuleyici from "@/components/PdfSayfaGoruntuleyici";
 import SurucuListesi from "@/components/SurucuListesi";
 import AracEvraklari from "@/components/AracEvraklari";
 import BelgeOlusturForm from "@/components/BelgeOlusturForm";
@@ -753,6 +754,17 @@ function FirmDetailInner({
     tur: "pdf" | "gorsel" | "diger";
   } | null>(null);
   const [onizlemeYukleniyor, setOnizlemeYukleniyor] = useState(false);
+  // Dar ekranda (< xl) PDF iframe yerine sayfa genişliğine sığdırılmış canvas
+  // görüntüleyiciyle gösterilir (mobil tarayıcılar iframe PDF'ini aşırı
+  // büyütüp kaydırılamaz hale getiriyordu).
+  const [genisEkran, setGenisEkran] = useState(true);
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 1280px)");
+    const guncelle = () => setGenisEkran(mq.matches);
+    guncelle();
+    mq.addEventListener("change", guncelle);
+    return () => mq.removeEventListener("change", guncelle);
+  }, []);
   // Panel yüklenirken kapatılırsa, geç gelen bağlantı paneli yeniden açmasın.
   const onizlemeIstekRef = useRef(0);
   const onizlemeKapat = useCallback(() => {
@@ -1011,9 +1023,13 @@ function FirmDetailInner({
           transform-style: preserve-3d;
           transform-origin: center;
         }
+        /* "forwards" ve transform-style: preserve-3d BİLİNÇLİ OLARAK YOK:
+           animasyon bittikten sonra sekmede transform kalırsa içindeki
+           position: fixed öğeler (mobil dosya önizleme penceresi) ekrana göre
+           değil sekmeye göre boyutlanıyordu. Son kare zaten varsayılan
+           görünümle aynı (opacity 1, dönme 0), görünür fark yok. */
         .tab-flip-in {
-          animation: tabFlipIn 180ms ease-out forwards;
-          transform-style: preserve-3d;
+          animation: tabFlipIn 180ms ease-out;
           transform-origin: center;
         }
       `}</style>
@@ -1572,14 +1588,18 @@ function FirmDetailInner({
                 )}
               </div>
 
-              <div className="flex-1 xl:flex-none xl:h-[calc(100vh-9rem)] min-h-[420px] bg-gray-50">
+              <div className="flex-1 min-h-0 xl:flex-none xl:h-[calc(100vh-9rem)] xl:min-h-[420px] bg-gray-50">
                 {onizlemeYukleniyor && (
                   <div className="h-full flex items-center justify-center text-sm text-gray-400">
                     Önizleme hazırlanıyor...
                   </div>
                 )}
 
-                {!onizlemeYukleniyor && onizleme?.tur === "pdf" && (
+                {!onizlemeYukleniyor && onizleme?.tur === "pdf" && !genisEkran && (
+                  <PdfSayfaGoruntuleyici url={onizleme.url} />
+                )}
+
+                {!onizlemeYukleniyor && onizleme?.tur === "pdf" && genisEkran && (
                   <iframe
                     src={onizleme.url}
                     title={onizleme.ad}
