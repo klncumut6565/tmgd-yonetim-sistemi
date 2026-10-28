@@ -21,8 +21,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase/client";
 import { authFetch } from "@/lib/supabase/authFetch";
 import { hataCevir } from "@/lib/hataCevir";
-import { surucuListesiExcelOlustur } from "@/lib/surucuListesiExcel";
-import { surucuListesiPdfOlustur, type LogoData, type SurucuBelgeEki } from "@/lib/surucuListesiPdf";
+import type { LogoData, SurucuBelgeEki } from "@/lib/surucuListesiPdf";
 import { pdfIlkSayfayiGorselYap } from "@/lib/pdfSayfaGorseli";
 import DateInput from "@/components/DateInput";
 import { useUser } from "@/hooks/useUser";
@@ -434,7 +433,7 @@ export default function SurucuListesi({
     setBusy(true);
     setError("");
     try {
-      const buf = await surucuListesiExcelOlustur({
+      const buf = await (await import("@/lib/surucuListesiExcel")).surucuListesiExcelOlustur({
         firmaAdi,
         hazirlayanAdi,
         onaylayanAdi,
@@ -570,7 +569,7 @@ export default function SurucuListesi({
     setError("");
     try {
       const [logo, ekler] = await Promise.all([logoDataUrl(), eklerHazirla()]);
-      const blob = await surucuListesiPdfOlustur({
+      const blob = await (await import("@/lib/surucuListesiPdf")).surucuListesiPdfOlustur({
         firmaAdi,
         hazirlayanAdi,
         onaylayanAdi,
@@ -603,7 +602,7 @@ export default function SurucuListesi({
     try {
       const [logo, ekler] = await Promise.all([logoDataUrl(), eklerHazirla()]);
 
-      const blob = await surucuListesiPdfOlustur({
+      const blob = await (await import("@/lib/surucuListesiPdf")).surucuListesiPdfOlustur({
         firmaAdi,
         hazirlayanAdi,
         onaylayanAdi,

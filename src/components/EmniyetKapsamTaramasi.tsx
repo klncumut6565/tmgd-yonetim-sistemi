@@ -24,14 +24,10 @@ import {
   type ScopeSummary,
   type ItemScopeResult,
 } from "@/lib/adrSecurityPlan";
-import {
-  guvenlikPlaniIncelemeRaporuUret,
-  type GuvenlikPlaniRaporVerisi,
-} from "@/lib/guvenlikPlaniIncelemePdf";
+import type { GuvenlikPlaniRaporVerisi } from "@/lib/guvenlikPlaniIncelemePdf";
 import type { LogoData } from "@/lib/aracEvraklariPdf";
-import { renderYapilandirilmisBelge, type KaseCizim } from "@/components/BelgeOlusturForm";
-import { BELGE_SABLONLARI, type TemplateBlock } from "@/lib/belgeSablonlari";
-import { hazirlayanKasesi, kontrolEdenKasesi } from "@/lib/kaseler";
+import type { KaseCizim } from "@/components/BelgeOlusturForm";
+import type { TemplateBlock } from "@/lib/belgeSablonlari";
 import { guzergahKrokisiUret } from "@/lib/rotaKrokisi";
 import type { RotaNoktasi } from "@/components/RotaHaritasi";
 
@@ -385,7 +381,7 @@ export default function EmniyetKapsamTaramasi({ firmId, firmaAdi }: Props) {
         imzaliKase,
         aliciBosaltanBeyani,
       };
-      const doc = await guvenlikPlaniIncelemeRaporuUret(veri);
+      const doc = await (await import("@/lib/guvenlikPlaniIncelemePdf")).guvenlikPlaniIncelemeRaporuUret(veri);
       const blobUrl = URL.createObjectURL(doc.output("blob"));
       pencere.location.href = blobUrl;
     } catch (e) {
@@ -415,7 +411,7 @@ export default function EmniyetKapsamTaramasi({ firmId, firmaAdi }: Props) {
         imzaliKase,
         aliciBosaltanBeyani,
       };
-      const doc = await guvenlikPlaniIncelemeRaporuUret(veri);
+      const doc = await (await import("@/lib/guvenlikPlaniIncelemePdf")).guvenlikPlaniIncelemeRaporuUret(veri);
       doc.save(`guvenlik_plani_inceleme_${bugun.replace(/\./g, "-")}.pdf`);
     } finally {
       setPdfUretiliyor(false);
@@ -514,6 +510,14 @@ export default function EmniyetKapsamTaramasi({ firmId, firmaAdi }: Props) {
       }
     }
     try {
+      // Ağır modüller (şablonlar, kaşe görselleri, PDF çizici) yalnızca
+      // belge üretilirken yüklenir — /adr sayfası açılışını hafifletir.
+      const [{ BELGE_SABLONLARI }, { hazirlayanKasesi, kontrolEdenKasesi }, { renderYapilandirilmisBelge }] =
+        await Promise.all([
+          import("@/lib/belgeSablonlari"),
+          import("@/lib/kaseler"),
+          import("@/components/BelgeOlusturForm"),
+        ]);
       const temelSablon = BELGE_SABLONLARI.EMNIYET_PLANI;
       if (!temelSablon) throw new Error("EMNİYET PLANI şablonu bulunamadı.");
 

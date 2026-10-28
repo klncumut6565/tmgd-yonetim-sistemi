@@ -26,12 +26,10 @@ import {
   catalogForActivities,
   type ActivityKey,
 } from "@/lib/belgeKatalogu";
-import { kapakSayfasiOlustur } from "@/lib/kapakSayfasi";
-import { belgeSablonu, BelgeSablonu } from "@/lib/belgeSablonlari";
+import type { BelgeSablonu } from "@/lib/belgeSablonlari";
 import { logoyuKucult } from "@/lib/pdfGorsel";
 import { TMFB_KAPSAMDISI, atananFirmaIdleri } from "@/lib/firmaGorunurluk";
-import { BELGE_GORSELLERI } from "@/lib/belgeGorselleri";
-import { hazirlayanKasesi, kontrolEdenKasesi } from "@/lib/kaseler";
+import { hazirlayanKaseKodu } from "@/lib/kaseSecici";
 import {
   SIAM_LOGO_B64,
   SIAM_LOGO_EN_BOY,
@@ -125,10 +123,10 @@ export default function BelgeOlusturForm({ fixedFirmId, initialFirmId, compact =
   const [imzaliKase, setImzaliKase] = useState(false);
   const [hazirlayanAdi, setHazirlayanAdi] = useState("");
   // Atanmış TMGD'nin kayıtlı bir kaşesi var mı — kutuda bilgilendirme için.
-  const hazirlayanKaseVar = !!hazirlayanKasesi(hazirlayanAdi);
+  const hazirlayanKaseVar = !!hazirlayanKaseKodu(hazirlayanAdi);
   // İmzalı sürüm ayrı bir görsel olarak kayıtlıysa seçenek gösterilir.
   const imzaliKaseVar =
-    hazirlayanKasesi(hazirlayanAdi, true) !== hazirlayanKasesi(hazirlayanAdi);
+    hazirlayanKaseKodu(hazirlayanAdi, true) !== hazirlayanKaseKodu(hazirlayanAdi);
   const [hazirlayanDurum, setHazirlayanDurum] = useState<"yok" | "bulundu" | "yükleniyor">("yok");
   const [kapakUretiliyor, setKapakUretiliyor] = useState(false);
   const [kapakMesaj, setKapakMesaj] = useState("");
@@ -317,7 +315,7 @@ export default function BelgeOlusturForm({ fixedFirmId, initialFirmId, compact =
         }
       );
 
-      const blob = await kapakSayfasiOlustur({
+      const blob = await (await import("@/lib/kapakSayfasi")).kapakSayfasiOlustur({
         firmaAdi: firm.name,
         sozlesmeBaslangic: firm.contract_start,
         faaliyetler: (firm.activities || []) as ActivityKey[],
@@ -466,6 +464,15 @@ export default function BelgeOlusturForm({ fixedFirmId, initialFirmId, compact =
     setBusy(true);
     setMsg("");
     setError("");
+
+    // Ağır modüller (şablonlar ~500 KB, kaşe görselleri ~600 KB, belge
+    // görselleri ~440 KB) sayfa açılışında değil, yalnızca belge üretilirken
+    // yüklenir.
+    const [{ belgeSablonu }, { hazirlayanKasesi, kontrolEdenKasesi }] = await Promise.all([
+      import("@/lib/belgeSablonlari"),
+      import("@/lib/kaseler"),
+      belgeGorselleriniYukle(),
+    ]);
 
     // Önizlemede: tarayıcının popup engelleyicisini atlatmak için TÜM
     // pencereler, herhangi bir async işlemden ÖNCE (senkron, tıklama
@@ -2248,6 +2255,16 @@ function kapakSayfasiCiz(
   }
 }
 
+/** Belge içerik görselleri (~440 KB) — ilk ihtiyaçta dinamik yüklenir. */
+let BELGE_GORSELLERI: Record<string, string> = {};
+let belgeGorselleriSozu: Promise<void> | null = null;
+function belgeGorselleriniYukle(): Promise<void> {
+  belgeGorselleriSozu ??= import("@/lib/belgeGorselleri").then((m) => {
+    BELGE_GORSELLERI = m.BELGE_GORSELLERI;
+  });
+  return belgeGorselleriSozu;
+}
+
 export async function renderYapilandirilmisBelge(
   doc: JsPDFType,
   firmAdi: string,
@@ -2263,6 +2280,8 @@ export async function renderYapilandirilmisBelge(
   // Deneme kaşeleri — HAZIRLAYAN ve KONTROL EDEN kutularına basılır.
   kaseler?: { hazirlayan?: KaseCizim; kontrol?: KaseCizim }
 ) {
+  // Belge görselleri ilk ihtiyaçta yüklenir (EmniyetKapsamTaramasi da bu fonksiyonu çağırır).
+  await belgeGorselleriniYukle();
   await fontuKaydet(doc);
 
   // İçerik satırlarının/tablo genişliklerinin hesaplanması (duzMetneCevir,

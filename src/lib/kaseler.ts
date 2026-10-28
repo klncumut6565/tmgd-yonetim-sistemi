@@ -1,3 +1,5 @@
+import { hazirlayanKaseKodu } from "./kaseSecici";
+
 // GÖMÜLÜ KAŞELER
 //
 // TMGD kaşeleri belge PDF'lerine basılmak üzere base64 (PNG, şeffaf zeminli)
@@ -5670,23 +5672,17 @@ export function hazirlayanKasesi(
   ad: string,
   imzali = false
 ): GomuluKase | undefined {
-  // Ad, Türkçe karakterler ASCII karşılıklarına indirgenerek karşılaştırılır:
-  // aynı kişi kayıtlarda "Maşallah TEKİNOK" / "MASALLAH TEKINOK" gibi farklı
-  // yazılmış olabilir; bu normalize etme sayesinde ikisi de eşleşir.
-  const sade = ad
-    .toLocaleUpperCase("tr")
-    .replace(/[ÇĞİIÖŞÜ]/g, (c) => ({ Ç: "C", Ğ: "G", İ: "I", I: "I", Ö: "O", Ş: "S", Ü: "U" })[c] ?? c)
-    .replace(/[^A-Z]/g, "");
-
-  if (sade.includes("UMUTKILIN")) return KASE_UMUT_KILINC;
-  if (sade.includes("TEKINOK")) {
-    return imzali ? KASE_MASALLAH_TEKINOK_IMZALI : KASE_MASALLAH_TEKINOK;
+  // Eşleştirme mantığı hafif kaseSecici.ts'te; burada yalnızca görsele çevrilir.
+  switch (hazirlayanKaseKodu(ad, imzali)) {
+    case "UMUT_KILINC":
+      return KASE_UMUT_KILINC;
+    case "MASALLAH_TEKINOK":
+      return KASE_MASALLAH_TEKINOK;
+    case "MASALLAH_TEKINOK_IMZALI":
+      return KASE_MASALLAH_TEKINOK_IMZALI;
+    case "AYLIN_ZUMBUL_UCAR":
+      return KASE_AYLIN_ZUMBUL_UCAR;
+    default:
+      return undefined;
   }
-  // "Zümbül" soyadı kaşe görselinde "Zünbül" gibi de okunabiliyordu (kalın
-  // baskı fontunda M/N karışabiliyor); veritabanındaki gerçek yazımdan
-  // bağımsız çalışsın diye ikisi de kontrol ediliyor.
-  if (sade.includes("ZUMBULUCAR") || sade.includes("ZUNBULUCAR")) {
-    return KASE_AYLIN_ZUMBUL_UCAR;
-  }
-  return undefined;
 }

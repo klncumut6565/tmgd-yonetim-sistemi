@@ -31,13 +31,8 @@ import type { jsPDF as JsPDFType } from "jspdf";
 import { checkPair, CheckResult, UnRow as MixUnRow } from "@/lib/adrMix";
 import { checkSecurityPlan, type SecurityPlanItem } from "@/lib/adrSecurityPlan";
 import { yasakTasimaKontrolListe } from "@/lib/adrYasakTasima";
-import {
-  LIBERATION_SANS_REGULAR_B64,
-  LIBERATION_SANS_BOLD_B64,
-} from "@/lib/pdfFonts";
 import DateInput from "@/components/DateInput";
 import type { LogoData } from "@/lib/aracEvraklariPdf";
-import { belgeSablonu } from "@/lib/belgeSablonlari";
 
 import { depoDosyasiGetir } from "@/lib/depoOnbellek";
 // ── Tipler ────────────────────────────────────────────────────────────────
@@ -275,7 +270,7 @@ async function k3FormuCiz(
   const kutuG = W - 2 * KENAR;
   const ortaG = kutuG - 38 - 45;
   const belgeAdi = "Sevkiyat Uygunluk Kontrol Formu (Gönderen · Yükleyen · Dolduran)";
-  const yayinTarihi = belgeSablonu("K3")?.yayinTarihi ?? "";
+  const yayinTarihi = (await import("@/lib/belgeSablonlari")).belgeSablonu("K3")?.yayinTarihi ?? "";
   doc.setFont(FONT, "bold");
   doc.setFontSize(9.5);
   const olcuSatirlari: string[] = doc.splitTextToSize(belgeAdi, W - 2 * ICM - 38 - 45 - 6);
@@ -489,6 +484,8 @@ async function evrakPdfUret(args: {
   const { default: jsPDF } = (await import("jspdf")) as unknown as {
     default: new (o?: object) => JsPDFType;
   };
+  // Gömülü font (~1.1 MB) yalnızca PDF üretilirken yüklenir.
+  const { LIBERATION_SANS_REGULAR_B64, LIBERATION_SANS_BOLD_B64 } = await import("@/lib/pdfFonts");
   const doc = new jsPDF({ compress: true, unit: "mm", format: "a4" });
   doc.addFileToVFS("LiberationSans-Regular.ttf", LIBERATION_SANS_REGULAR_B64);
   doc.addFont("LiberationSans-Regular.ttf", FONT, "normal");

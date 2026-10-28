@@ -30,8 +30,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase/client";
 import { useUser } from "@/hooks/useUser";
 import { hataCevir } from "@/lib/hataCevir";
-import { gorevliListesiExcelOlustur } from "@/lib/gorevliListesiExcel";
-import { gorevliListesiPdfOlustur, type LogoData } from "@/lib/gorevliListesiPdf";
+import type { LogoData } from "@/lib/gorevliListesiPdf";
 
 import { depoDosyasiGetir } from "@/lib/depoOnbellek";
 type GorevliKaydi = {
@@ -349,7 +348,7 @@ export default function GorevliListesi({
     setBusy(true);
     setError("");
     try {
-      const buf = await gorevliListesiExcelOlustur({
+      const buf = await (await import("@/lib/gorevliListesiExcel")).gorevliListesiExcelOlustur({
         firmaAdi,
         hazirlayanAdi,
         bugun: bugununTarihi(),
@@ -392,7 +391,7 @@ export default function GorevliListesi({
     setError("");
     try {
       const logo = await logoDataUrl();
-      const blob = await gorevliListesiPdfOlustur({
+      const blob = await (await import("@/lib/gorevliListesiPdf")).gorevliListesiPdfOlustur({
         firmaAdi,
         hazirlayanAdi,
         onaylayanAdi,
@@ -417,7 +416,7 @@ export default function GorevliListesi({
     setError("");
     try {
       const logo = await logoDataUrl();
-      const blob = await gorevliListesiPdfOlustur({
+      const blob = await (await import("@/lib/gorevliListesiPdf")).gorevliListesiPdfOlustur({
         firmaAdi,
         hazirlayanAdi,
         onaylayanAdi,

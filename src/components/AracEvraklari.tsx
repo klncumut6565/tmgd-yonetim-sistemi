@@ -31,11 +31,7 @@ import { hataCevir } from "@/lib/hataCevir";
 import { pdfIlkSayfayiGorselYap } from "@/lib/pdfSayfaGorseli";
 import { useUser } from "@/hooks/useUser";
 import { depoDosyasiGetir } from "@/lib/depoOnbellek";
-import {
-  aracEvraklariPdfOlustur,
-  type AracEvrakBelgesi,
-  type LogoData,
-} from "@/lib/aracEvraklariPdf";
+import type { AracEvrakBelgesi, LogoData } from "@/lib/aracEvraklariPdf";
 
 type Arac = { id: string; plate_number: string };
 
@@ -623,7 +619,7 @@ export default function AracEvraklari({
     try {
       const logo = await logoDataUrl();
       const belgeler = await belgelerHazirla();
-      const blob = await aracEvraklariPdfOlustur({
+      const blob = await (await import("@/lib/aracEvraklariPdf")).aracEvraklariPdfOlustur({
         firmaAdi,
         plaka: secilenArac.plate_number,
         hazirlayanAdi,
@@ -660,7 +656,7 @@ export default function AracEvraklari({
       const logo = await logoDataUrl();
       const belgeler = await belgelerHazirla();
 
-      const blob = await aracEvraklariPdfOlustur({
+      const blob = await (await import("@/lib/aracEvraklariPdf")).aracEvraklariPdfOlustur({
         firmaAdi,
         plaka: secilenArac.plate_number,
         hazirlayanAdi,
