@@ -186,6 +186,7 @@ const SPECIAL_ITEMS: Record<string, { label: string; section: string }> = {
   AS5: { label: "Araç Sigorta/Kasko veya Tehlikeli Madde Mali Sorumluluk Sigortası", section: "Araç ve Sürücü Belgeleri" },
   AS6: { label: "Karayolu ile Atık Taşıma Uygunluk Belgesi", section: "Araç ve Sürücü Belgeleri" },
   AS7: { label: "SRC-5 Belgeli Şoför Sertifikası", section: "Araç ve Sürücü Belgeleri" },
+  AS8: { label: "MSDS/SDS Raporu", section: "Araç ve Sürücü Belgeleri" },
 };
 
 // Herhangi bir madde kodu (+ dönem) için okunabilir isim döndürür.
@@ -445,6 +446,7 @@ export function buildChecklist(
               { code: "AS5", period: "", label: "Araç Sigorta/Kasko veya Tehlikeli Madde Mali Sorumluluk Sigortası" },
               { code: "AS6", period: "", label: "Karayolu ile Atık Taşıma Uygunluk Belgesi" },
               { code: "AS7", period: "", label: "SRC-5 Belgeli Şoför Sertifikası" },
+              { code: "AS8", period: "", label: "MSDS/SDS Raporu" },
             ],
           },
         ]

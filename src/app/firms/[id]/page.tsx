@@ -851,7 +851,7 @@ function FirmDetailInner({
       sec.items.forEach((it) => {
         // Genel ilerleme yüzdesine DAHİL EDİLMEYENLER:
         //  - D4 "Diğer": zorunlu olmayan, serbest ek belgeler.
-        //  - AS1-AS7 "Araç ve Sürücü Belgeleri": ADR/TMGD kapsamı dışında,
+        //  - AS1-AS8 "Araç ve Sürücü Belgeleri" (AS8 = MSDS/SDS Raporu): ADR/TMGD kapsamı dışında,
         //    taşımacılık faaliyetinin kendi mevzuat belgeleri.
         //  - D2 "Güvenlik Bilgi Formları (GBF/SDS) Dosyası": ilerlemeye sayılmaz.
         //  - D5 "Dilekçe": zorunlu olmayan, ilerlemeye sayılmaz.
