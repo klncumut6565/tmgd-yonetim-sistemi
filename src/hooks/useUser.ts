@@ -2,8 +2,13 @@
 
 // Oturum açan kullanıcının profili: onay durumu, rolü, temel bilgileri.
 // Tüm korumalı sayfalar ve Sidebar bunu kullanır.
+//
+// PERFORMANS: Oturum + profil yalnızca BİR KEZ, <UserProvider> içinde
+// (useUserState) yüklenir ve context ile paylaşılır. Önceden her useUser()
+// çağrısı (sayfa başına 8-10 bileşen) kendi profiles sorgusunu ve kendi
+// auth dinleyicisini açıyordu.
 
-import { useEffect, useRef, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase/client";
 
 export type Profile = {
@@ -27,7 +32,8 @@ export type UseUserResult = {
 // database/004_rol_yetkileri.sql'deki yazabilir() ile birebir aynı liste
 const YAZABILEN_ROLLER = ["super_admin", "admin", "tmgd", "assistant"];
 
-export function useUser(): UseUserResult {
+/** Yalnızca UserProvider kullanır — bileşenler useUser() çağırmalı. */
+export function useUserState(): UseUserResult {
   const [loading, setLoading] = useState(true);
   const [authed, setAuthed] = useState(false);
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -116,12 +122,32 @@ export function useUser(): UseUserResult {
   const isApproved =
     profile?.approval_status === "approved" && !!profile?.is_active;
 
-  return {
-    loading,
-    authed,
-    profile,
-    isSuperAdmin: profile?.role === "super_admin",
-    isApproved,
-    canWrite: isApproved && YAZABILEN_ROLLER.includes(profile?.role || ""),
-  };
+  // Context değeri yalnızca gerçek değişiklikte yenilenir; aksi halde tüm
+  // tüketiciler gereksiz yere yeniden render olur.
+  return useMemo(
+    () => ({
+      loading,
+      authed,
+      profile,
+      isSuperAdmin: profile?.role === "super_admin",
+      isApproved,
+      canWrite: isApproved && YAZABILEN_ROLLER.includes(profile?.role || ""),
+    }),
+    [loading, authed, profile, isApproved]
+  );
+}
+
+const VARSAYILAN: UseUserResult = {
+  loading: true,
+  authed: false,
+  profile: null,
+  isSuperAdmin: false,
+  isApproved: false,
+  canWrite: false,
+};
+
+export const UserContext = createContext<UseUserResult>(VARSAYILAN);
+
+export function useUser(): UseUserResult {
+  return useContext(UserContext);
 }

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import AppShell from "@/components/AppShell";
+import UserProvider from "@/components/UserProvider";
 
 export const metadata: Metadata = {
   title: "TMGD Yönetim Sistemi",
@@ -15,7 +16,9 @@ export default function RootLayout({
   return (
     <html lang="tr">
       <body>
-        <AppShell>{children}</AppShell>
+        <UserProvider>
+          <AppShell>{children}</AppShell>
+        </UserProvider>
       </body>
     </html>
   );
