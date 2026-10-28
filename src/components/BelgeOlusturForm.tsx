@@ -30,6 +30,7 @@ import type { BelgeSablonu } from "@/lib/belgeSablonlari";
 import { logoyuKucult } from "@/lib/pdfGorsel";
 import { TMFB_KAPSAMDISI, atananFirmaIdleri } from "@/lib/firmaGorunurluk";
 import { hazirlayanKaseKodu } from "@/lib/kaseSecici";
+import DateInput from "@/components/DateInput";
 import {
   SIAM_LOGO_B64,
   SIAM_LOGO_EN_BOY,
@@ -121,6 +122,12 @@ export default function BelgeOlusturForm({ fixedFirmId, initialFirmId, compact =
   // olan TMGD'ler için anlamlıdır; varsayılan KAPALI, çünkü imzalı kaşe
   // kişinin imzasını da her belgeye kopyalar.
   const [imzaliKase, setImzaliKase] = useState(false);
+  // YAYIN / REVİZYON TARİHİ — işaretlenirse başlık tablosundaki tarihler
+  // kullanıcının girdiği değerlerle basılır. Boş bırakılan alan varsayılana
+  // döner (yayın: şablondaki sabit tarih, revizyon: belge oluşturma günü).
+  const [tarihElle, setTarihElle] = useState(false);
+  const [yayinTarihiIso, setYayinTarihiIso] = useState("");
+  const [revizyonTarihiIso, setRevizyonTarihiIso] = useState("");
   const [hazirlayanAdi, setHazirlayanAdi] = useState("");
   // Atanmış TMGD'nin kayıtlı bir kaşesi var mı — kutuda bilgilendirme için.
   const hazirlayanKaseVar = !!hazirlayanKaseKodu(hazirlayanAdi);
@@ -490,6 +497,14 @@ export default function BelgeOlusturForm({ fixedFirmId, initialFirmId, compact =
           ? await logoDataUrl(firm.logo_url)
           : null;
       const bugun = new Date().toLocaleDateString("tr-TR");
+      // Başlık tablosu tarihleri (elle belirleme kutusu işaretliyse).
+      const belgeTarihleri: BelgeTarihleri | undefined = tarihElle
+        ? {
+            yayin: isoTarihiTr(yayinTarihiIso) || undefined,
+            revizyon: isoTarihiTr(revizyonTarihiIso) || undefined,
+          }
+        : undefined;
+      const revizyonMetni = belgeTarihleri?.revizyon || bugun;
 
       // KAŞELER — yalnızca kutu işaretliyse basılır. Görseller kodda gömülü
       // (src/lib/kaseler.ts); HAZIRLAYAN için atanmış TMGD'nin adına göre
@@ -563,11 +578,14 @@ export default function BelgeOlusturForm({ fixedFirmId, initialFirmId, compact =
             // Şablon her zaman tanımlıdır; yine de eksikse kapak, içeriği
             // olmayan asgari bir şablonla üretilir (belge üretimi kapak
             // yüzünden hiç yapılamamasın).
-            const kSablon: BelgeSablonu = belgeSablonu(actualCode) ?? {
-              docType: "KONTROL FORMU",
-              yayinTarihi: "",
-              blocks: [],
-            };
+            const kSablon: BelgeSablonu = yayinTarihiUygula(
+              belgeSablonu(actualCode) ?? {
+                docType: "KONTROL FORMU",
+                yayinTarihi: "",
+                blocks: [],
+              },
+              belgeTarihleri
+            );
             const firmaFaaliyetleri = firm.activities || [];
             const belgeFaaliyetleri =
               item.activities.length === 0
@@ -589,7 +607,7 @@ export default function BelgeOlusturForm({ fixedFirmId, initialFirmId, compact =
               item.name,
               kSablon,
               logo,
-              bugun,
+              revizyonMetni,
               kFaaliyetKapsami,
               hazirlayanAdi,
               onaylayanAdi.trim(),
@@ -616,7 +634,7 @@ export default function BelgeOlusturForm({ fixedFirmId, initialFirmId, compact =
               const formSayfa = formPdf.getPageCount();
               for (let p = 0; p < formSayfa; p++) {
                 kapakDoc.addPage();
-                baslikTablosuCiz(kapakDoc, firm.name, actualCode, item.name, kSablon, logo, bugun, p + 2, 1 + formSayfa, kBaslikYuksekligi, kAdLines);
+                baslikTablosuCiz(kapakDoc, firm.name, actualCode, item.name, kSablon, logo, revizyonMetni, p + 2, 1 + formSayfa, kBaslikYuksekligi, kAdLines);
               }
             }
             const kapakPdf = await PDFDocument.load(
@@ -735,7 +753,8 @@ export default function BelgeOlusturForm({ fixedFirmId, initialFirmId, compact =
             onaylayanAdi.trim(),
             faaliyetKapsami,
             yatayMi,
-            kaseler
+            kaseler,
+            belgeTarihleri
           );
         } else {
           await fontuKaydet(doc);
@@ -985,6 +1004,44 @@ export default function BelgeOlusturForm({ fixedFirmId, initialFirmId, compact =
                 </span>
               </span>
             </label>
+          )}
+
+          {/* YAYIN / REVİZYON TARİHİ — işaretlenirse PDF başlık tablosundaki
+              tarihler buradan basılır. */}
+          <label className="mb-4 flex items-start gap-2 text-sm border rounded-lg p-3 cursor-pointer hover:bg-gray-50">
+            <input
+              type="checkbox"
+              checked={tarihElle}
+              onChange={(e) => setTarihElle(e.target.checked)}
+              className="w-4 h-4 mt-0.5"
+            />
+            <span>
+              <span className="text-gray-700 font-medium">
+                Yayın ve revizyon tarihlerini elle belirle
+              </span>
+              <span className="block text-xs text-gray-500 mt-0.5">
+                İşaretlenmezse yayın tarihi şablondaki sabit tarih, revizyon
+                tarihi belgenin oluşturulduğu gün olarak basılır.
+              </span>
+            </span>
+          </label>
+          {tarihElle && (
+            <div className="mb-4 -mt-2 ml-6 grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+              <div>
+                <span className="block text-gray-600 mb-1">Yayın Tarihi</span>
+                <DateInput value={yayinTarihiIso} onChange={setYayinTarihiIso} />
+                <span className="block text-xs text-gray-400 mt-1">
+                  Boş bırakılırsa şablondaki tarih kullanılır.
+                </span>
+              </div>
+              <div>
+                <span className="block text-gray-600 mb-1">Revizyon Tarihi</span>
+                <DateInput value={revizyonTarihiIso} onChange={setRevizyonTarihiIso} />
+                <span className="block text-xs text-gray-400 mt-1">
+                  Boş bırakılırsa bugünün tarihi kullanılır.
+                </span>
+              </div>
+            </div>
           )}
 
           <div className="mb-4 text-sm">
@@ -2255,6 +2312,22 @@ function kapakSayfasiCiz(
   }
 }
 
+/** Başlık tablosuna basılacak, kullanıcının elle belirlediği tarihler
+ *  (GG.AA.YYYY). Boş alan varsayılan davranışa döner. */
+export type BelgeTarihleri = { yayin?: string; revizyon?: string };
+
+/** "2026-10-28" → "28.10.2026"; geçersiz/boşsa "". */
+function isoTarihiTr(iso: string): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || "");
+  return m ? `${m[3]}.${m[2]}.${m[1]}` : "";
+}
+
+/** Elle yayın tarihi girildiyse şablonun sabit yayın tarihini onunla değiştirir
+ *  (şablon nesnesinin kendisi DEĞİŞTİRİLMEZ — kopyası döner). */
+function yayinTarihiUygula(sablon: BelgeSablonu, tarihler?: BelgeTarihleri): BelgeSablonu {
+  return tarihler?.yayin ? { ...sablon, yayinTarihi: tarihler.yayin } : sablon;
+}
+
 /** Belge içerik görselleri (~440 KB) — ilk ihtiyaçta dinamik yüklenir. */
 let BELGE_GORSELLERI: Record<string, string> = {};
 let belgeGorselleriSozu: Promise<void> | null = null;
@@ -2278,8 +2351,11 @@ export async function renderYapilandirilmisBelge(
   faaliyetKapsami: string,
   yatayMi: boolean,
   // Deneme kaşeleri — HAZIRLAYAN ve KONTROL EDEN kutularına basılır.
-  kaseler?: { hazirlayan?: KaseCizim; kontrol?: KaseCizim }
+  kaseler?: { hazirlayan?: KaseCizim; kontrol?: KaseCizim },
+  // Kullanıcının elle belirlediği yayın/revizyon tarihleri (varsa).
+  tarihler?: BelgeTarihleri
 ) {
+  sablon = yayinTarihiUygula(sablon, tarihler);
   // Belge görselleri ilk ihtiyaçta yüklenir (EmniyetKapsamTaramasi da bu fonksiyonu çağırır).
   await belgeGorselleriniYukle();
   await fontuKaydet(doc);
@@ -2292,7 +2368,8 @@ export async function renderYapilandirilmisBelge(
   // hemen önce).
   sayfaYonunuAyarla(yatayMi);
 
-  const bugun = new Date().toLocaleDateString("tr-TR");
+  // Başlık tablosundaki "Revizyon Tarihi": elle girildiyse o, yoksa bugün.
+  const bugun = tarihler?.revizyon || new Date().toLocaleDateString("tr-TR");
   // İçerik ana başlığında kod ön eki (SA1 — vb.) kullanılmaz; kod zaten
   // başlık kutusundaki "Doküman No" alanında yer alır.
   const tamBaslik = belgeAdi;
