@@ -11,7 +11,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
 import { useUser } from "@/hooks/useUser";
-import { TMFB_KAPSAMDISI, atananFirmaIdleri } from "@/lib/firmaGorunurluk";
+import { TMFB_KAPSAMDISI, atananFirmaIdleri, kapsamdisiTumunuGorur } from "@/lib/firmaGorunurluk";
 import { hataCevir } from "@/lib/hataCevir";
 import { ACTIVITIES, ACTIVITY_LABELS, buildChecklist } from "@/lib/belgeKatalogu";
 
@@ -341,7 +341,7 @@ export default function FirmsPage() {
   }, [firms, search]);
 
   // TMFB Kapsamdışı firmalar normal listeye karışmaz; yalnızca o firmaya
-  // atanmış kullanıcı ve süper yönetici görür.
+  // atanmış kullanıcı, süper yönetici ve yönetici görür.
   const normalFirmalar = useMemo(
     () => filtered.filter((f) => f.status !== TMFB_KAPSAMDISI && f.status !== "passive"),
     [filtered]
@@ -353,8 +353,8 @@ export default function FirmsPage() {
     [filtered]
   );
   const tmfbFirmalar = useMemo(
-    () => filtered.filter((f) => f.status === TMFB_KAPSAMDISI && (isSuperAdmin || atananIdler.has(f.id))),
-    [filtered, atananIdler, isSuperAdmin]
+    () => filtered.filter((f) => f.status === TMFB_KAPSAMDISI && (kapsamdisiTumunuGorur(profile?.role) || atananIdler.has(f.id))),
+    [filtered, atananIdler, profile?.role]
   );
 
   // Arama yapılırken kapsamdışı bölümde eşleşme varsa bölüm otomatik açılır.

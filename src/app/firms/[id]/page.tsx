@@ -12,7 +12,7 @@ import Link from "next/link";
 import { supabase } from "@/lib/supabase/client";
 import { authFetch } from "@/lib/supabase/authFetch";
 import { useUser } from "@/hooks/useUser";
-import { TMFB_KAPSAMDISI, atananFirmaIdleri } from "@/lib/firmaGorunurluk";
+import { TMFB_KAPSAMDISI, atananFirmaIdleri, kapsamdisiTumunuGorur } from "@/lib/firmaGorunurluk";
 import { hataCevir } from "@/lib/hataCevir";
 import {
   ACTIVITIES,
@@ -205,8 +205,9 @@ function FirmDetailInner({
 }) {
   const { id } = use(params);
   const searchParams = useSearchParams();
-  const { canWrite, profile, isSuperAdmin } = useUser();
-  // TMFB Kapsamdışı firmalar yalnızca atanmış kullanıcıya açılır.
+  const { canWrite, profile } = useUser();
+  // TMFB Kapsamdışı firmalar yalnızca atanmış kullanıcıya açılır
+  // (süper yönetici ve yönetici hepsini görür).
   const [atananIdler, setAtananIdler] = useState<Set<string> | null>(null);
   useEffect(() => {
     if (!profile?.id) return;
@@ -929,11 +930,11 @@ function FirmDetailInner({
     return <div className="p-8 text-gray-500">Yükleniyor...</div>;
   }
 
-  if (firm && firm.status === TMFB_KAPSAMDISI && !isSuperAdmin && atananIdler === null) {
+  if (firm && firm.status === TMFB_KAPSAMDISI && !kapsamdisiTumunuGorur(profile?.role) && atananIdler === null) {
     return <div className="p-8 text-gray-500">Yükleniyor...</div>;
   }
 
-  if (!firm || (firm.status === TMFB_KAPSAMDISI && !isSuperAdmin && !atananIdler?.has(firm.id))) {
+  if (!firm || (firm.status === TMFB_KAPSAMDISI && !kapsamdisiTumunuGorur(profile?.role) && !atananIdler?.has(firm.id))) {
     return (
       <div className="p-8">
         <p className="text-gray-600 mb-4">

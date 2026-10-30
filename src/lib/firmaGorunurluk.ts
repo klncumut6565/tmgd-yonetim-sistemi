@@ -3,10 +3,15 @@ import { supabase } from "@/lib/supabase/client";
 // "TMFB Kapsamdışı" firma durumu (migration 072).
 // Bu durumdaki firmalar Firmalar listesinde normal listeye karışmaz, ayrı
 // renkli bölümde gösterilir ve YALNIZCA o firmaya atanmış (user_firms)
-// kullanıcılar tarafından görülür. İstisna: süper yönetici (Yönetim menüsü
-// sahibi) hepsini görür — böylece kimseye atanmadan kapsamdışı yapılan bir
+// kullanıcılar tarafından görülür. İstisna: süper yönetici ve yönetici
+// (admin) hepsini görür — böylece kimseye atanmadan kapsamdışı yapılan bir
 // firma kaybolmaz; Yönetim → Firma Atamaları'ndan sonradan atanabilir.
 export const TMFB_KAPSAMDISI = "tmfb_kapsamdisi";
+
+/** Kapsamdışı firmaların TAMAMINI görebilen roller (atama şartı yok). */
+export function kapsamdisiTumunuGorur(role: string | null | undefined): boolean {
+  return role === "super_admin" || role === "admin";
+}
 
 /** Oturumdaki kullanıcının atandığı firma id'leri. */
 export async function atananFirmaIdleri(userId: string | null | undefined): Promise<Set<string>> {

@@ -28,7 +28,7 @@ import {
 } from "@/lib/belgeKatalogu";
 import type { BelgeSablonu } from "@/lib/belgeSablonlari";
 import { logoyuKucult } from "@/lib/pdfGorsel";
-import { TMFB_KAPSAMDISI, atananFirmaIdleri } from "@/lib/firmaGorunurluk";
+import { TMFB_KAPSAMDISI, atananFirmaIdleri, kapsamdisiTumunuGorur } from "@/lib/firmaGorunurluk";
 import { hazirlayanKaseKodu } from "@/lib/kaseSecici";
 import DateInput from "@/components/DateInput";
 import {
@@ -190,7 +190,7 @@ export default function BelgeOlusturForm({ fixedFirmId, initialFirmId, compact =
         atanan = await atananFirmaIdleri(uid);
         if (uid) {
           const { data: p } = await supabase.from("profiles").select("role").eq("id", uid).single();
-          superAdmin = (p as { role?: string } | null)?.role === "super_admin";
+          superAdmin = kapsamdisiTumunuGorur((p as { role?: string } | null)?.role);
         }
       }
       const gelenFirmalar: Firm[] = tumGelen.filter(
