@@ -15,7 +15,7 @@
 // envanterindeki HER madde, miktarından bağımsız olarak Tablo 1.10.3.1.2
 // kapsamına girip girmediği açısından AYRI AYRI değerlendirilir.
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import { supabase } from "@/lib/supabase/client";
 import {
@@ -32,6 +32,13 @@ import { guzergahKrokisiUret } from "@/lib/rotaKrokisi";
 import type { RotaNoktasi } from "@/components/RotaHaritasi";
 
 import { depoDosyasiGetir } from "@/lib/depoOnbellek";
+import EmniyetPlaniManuelAlanlar from "@/components/EmniyetPlaniManuelAlanlar";
+import {
+  manuelAlanlariUygula,
+  varsayilanManuelVeri,
+  veriyiNormallestir,
+  type EmniyetPlaniManuelVeri,
+} from "@/lib/emniyetPlaniManuelAlanlar";
 // Leaflet (window/document'a ihtiyaç duyar) yalnızca istemcide, dinamik
 // olarak yüklenir — Next.js sunucu tarafı render'ında (SSR) çökmesin diye.
 const RotaHaritasi = dynamic(() => import("@/components/RotaHaritasi"), {
@@ -77,6 +84,36 @@ export default function EmniyetKapsamTaramasi({ firmId, firmaAdi }: Props) {
   const [rotaNoktalari, setRotaNoktalari] = useState<RotaNoktasi[]>([]);
   const [emniyetPlaniUretiliyor, setEmniyetPlaniUretiliyor] = useState(false);
   const [emniyetPlaniMesaj, setEmniyetPlaniMesaj] = useState("");
+
+  // Elle doldurulan alanlar (Bölüm 3, EK-2, EK-3, EK-4, EK-6) — firma
+  // bazında bu tarayıcıda saklanır; PDF üretilirken şablona uygulanır.
+  const manuelAnahtar = `emniyet-plani-manuel:${firmId}`;
+  const [manuelVeri, setManuelVeri] = useState<EmniyetPlaniManuelVeri>(() => varsayilanManuelVeri(firmaAdi));
+  useEffect(() => {
+    try {
+      const ham = window.localStorage.getItem(manuelAnahtar);
+      setManuelVeri(ham ? veriyiNormallestir(JSON.parse(ham), firmaAdi) : varsayilanManuelVeri(firmaAdi));
+    } catch {
+      setManuelVeri(varsayilanManuelVeri(firmaAdi));
+    }
+  }, [manuelAnahtar, firmaAdi]);
+  function manuelVeriDegisti(v: EmniyetPlaniManuelVeri) {
+    setManuelVeri(v);
+    try {
+      window.localStorage.setItem(manuelAnahtar, JSON.stringify(v));
+    } catch {
+      /* depolama kapalı olabilir — form yine çalışır */
+    }
+  }
+  function manuelVeriSifirla() {
+    const v = varsayilanManuelVeri(firmaAdi);
+    setManuelVeri(v);
+    try {
+      window.localStorage.removeItem(manuelAnahtar);
+    } catch {
+      /* yoksay */
+    }
+  }
 
   // Taranan ham kalemler (orijinal L1 sırasıyla) + ilk taramada belirlenen
   // gösterim sırası (kapsamda > belirsiz > kapsam dışı) sabit tutulur —
@@ -525,7 +562,8 @@ export default function EmniyetKapsamTaramasi({ firmId, firmaAdi }: Props) {
       // (varsa) güzergah tablosu + krokiyi ekle. Orijinal şablon
       // DEĞİŞTİRİLMEZ — kopyası üzerinde çalışılır.
       const yeniBlocks: TemplateBlock[] = [];
-      for (const b of temelSablon.blocks) {
+      // Önce ekranda elle girilen alanlar (Bölüm 3, EK-2/3/4/6) uygulanır.
+      for (const b of manuelAlanlariUygula(temelSablon.blocks, manuelVeri)) {
         if (b.type === "table" && b.headers?.[0] === "UN No" && b.headers?.[1] === "Uygun Taşıma Adı") {
           yeniBlocks.push(ek1TabloBlogu(summary));
         } else {
@@ -635,6 +673,12 @@ export default function EmniyetKapsamTaramasi({ firmId, firmaAdi }: Props) {
                   Oluştur ile aynı biçimde üretilen tam metni indirebilirsin.
                 </p>
               </div>
+
+              <EmniyetPlaniManuelAlanlar
+                veri={manuelVeri}
+                onChange={manuelVeriDegisti}
+                onSifirla={manuelVeriSifirla}
+              />
 
               <div>
                 <span className="text-sm font-medium text-gray-700 block mb-1">
