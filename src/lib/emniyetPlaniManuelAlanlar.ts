@@ -70,6 +70,48 @@ export function varsayilanManuelVeri(firmaAdi: string): EmniyetPlaniManuelVeri {
   };
 }
 
+/** Firma kaydından otomatik gelen değerler (Bölüm 3). */
+export type FirmaOtomatikBilgi = {
+  tmfbMetni?: string; // "İST.U-NET.TMFB.59.2703 - 26/02/2028"
+  faaliyetMetni?: string; // "Gönderen / Taşımacı / Yükleyen"
+};
+
+/** TMFB no + geçerlilik tarihini tek satır metne çevirir. */
+export function tmfbMetni(no?: string | null, gecerlilik?: string | null): string {
+  const n = (no || "").trim();
+  let t = "";
+  if (gecerlilik) {
+    const [y, m, d] = String(gecerlilik).slice(0, 10).split("-");
+    if (y && m && d) t = `${d}/${m}/${y}`;
+  }
+  return n && t ? `${n} - ${t}` : n || (t ? `Geçerlilik: ${t}` : "");
+}
+
+/**
+ * Bölüm 3'te BOŞ olan "TMFB No / Geçerlilik" ve "Faaliyet Konuları"
+ * alanlarını firma kaydından doldurur. Kullanıcının elle girdiği değerin
+ * üzerine YAZMAZ.
+ */
+export function firmaBilgileriniDoldur(
+  veri: EmniyetPlaniManuelVeri,
+  oto: FirmaOtomatikBilgi
+): EmniyetPlaniManuelVeri {
+  const hedef: Record<string, string | undefined> = {
+    "TMFB No / Geçerlilik": oto.tmfbMetni,
+    "Faaliyet Konuları": oto.faaliyetMetni,
+  };
+  let degisti = false;
+  const isletme = veri.isletme.map((a) => {
+    const deger = hedef[a.etiket];
+    if (deger && !a.deger.trim()) {
+      degisti = true;
+      return { ...a, deger };
+    }
+    return a;
+  });
+  return degisti ? { ...veri, isletme } : veri;
+}
+
 export function bosSatir(n: number): string[] {
   return Array.from({ length: n }, () => "");
 }

@@ -33,7 +33,11 @@ import type { RotaNoktasi, RotaOzeti } from "@/components/RotaHaritasi";
 
 import { depoDosyasiGetir } from "@/lib/depoOnbellek";
 import EmniyetPlaniManuelAlanlar from "@/components/EmniyetPlaniManuelAlanlar";
+import { ACTIVITY_LABELS } from "@/lib/belgeKatalogu";
 import {
+  firmaBilgileriniDoldur,
+  tmfbMetni,
+  type FirmaOtomatikBilgi,
   manuelAlanlariUygula,
   varsayilanManuelVeri,
   veriyiNormallestir,
@@ -98,6 +102,50 @@ export default function EmniyetKapsamTaramasi({ firmId, firmaAdi }: Props) {
   // bazında bu tarayıcıda saklanır; PDF üretilirken şablona uygulanır.
   const manuelAnahtar = `emniyet-plani-manuel:${firmId}`;
   const [manuelVeri, setManuelVeri] = useState<EmniyetPlaniManuelVeri>(() => varsayilanManuelVeri(firmaAdi));
+  // Firma kaydından otomatik gelen Bölüm 3 değerleri (TMFB, faaliyet konuları)
+  const [firmaOto, setFirmaOto] = useState<FirmaOtomatikBilgi>({});
+  useEffect(() => {
+    let iptal = false;
+    (async () => {
+      // TMFB sütunları migration 077 ile gelir; yoksa yalnızca faaliyetler okunur.
+      let { data, error } = await supabase
+        .from("firms")
+        .select("activities, tmfb_numarasi, tmfb_gecerlilik_tarihi")
+        .eq("id", firmId)
+        .maybeSingle();
+      if (error) {
+        ({ data, error } = await supabase.from("firms").select("activities").eq("id", firmId).maybeSingle());
+      }
+      const f = (data || {}) as {
+        activities?: string[] | null;
+        tmfb_numarasi?: string | null;
+        tmfb_gecerlilik_tarihi?: string | null;
+      };
+      // Geçerlilik tarihi firma kaydında yoksa Belge Takip → G1 (TMFB) satırındaki tarih kullanılır.
+      let gecerlilik = f.tmfb_gecerlilik_tarihi || null;
+      if (!gecerlilik) {
+        const { data: g1 } = await supabase
+          .from("firm_belgeleri")
+          .select("valid_until")
+          .eq("firm_id", firmId)
+          .eq("code", "G1")
+          .not("valid_until", "is", null)
+          .order("valid_until", { ascending: false })
+          .limit(1);
+        gecerlilik = (g1 as { valid_until: string }[] | null)?.[0]?.valid_until || null;
+      }
+      if (iptal) return;
+      setFirmaOto({
+        tmfbMetni: tmfbMetni(f.tmfb_numarasi, gecerlilik) || undefined,
+        faaliyetMetni:
+          (f.activities || []).map((a) => ACTIVITY_LABELS[a] || a).join(" / ") || undefined,
+      });
+    })();
+    return () => {
+      iptal = true;
+    };
+  }, [firmId]);
+
   useEffect(() => {
     try {
       const ham = window.localStorage.getItem(manuelAnahtar);
@@ -106,6 +154,12 @@ export default function EmniyetKapsamTaramasi({ firmId, firmaAdi }: Props) {
       setManuelVeri(varsayilanManuelVeri(firmaAdi));
     }
   }, [manuelAnahtar, firmaAdi]);
+
+  // Firma bilgileri gelince BOŞ olan alanlar otomatik doldurulur (elle
+  // girilenlerin üzerine yazılmaz).
+  useEffect(() => {
+    setManuelVeri((v) => firmaBilgileriniDoldur(v, firmaOto));
+  }, [firmaOto]);
   function manuelVeriDegisti(v: EmniyetPlaniManuelVeri) {
     setManuelVeri(v);
     try {
@@ -115,7 +169,7 @@ export default function EmniyetKapsamTaramasi({ firmId, firmaAdi }: Props) {
     }
   }
   function manuelVeriSifirla() {
-    const v = varsayilanManuelVeri(firmaAdi);
+    const v = firmaBilgileriniDoldur(varsayilanManuelVeri(firmaAdi), firmaOto);
     setManuelVeri(v);
     try {
       window.localStorage.removeItem(manuelAnahtar);

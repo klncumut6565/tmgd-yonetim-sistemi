@@ -57,6 +57,9 @@ type Firm = {
   activities: string[] | null;
   contract_start: string | null;
   logo_url: string | null;
+  // Migration 077 — çalıştırılmadıysa undefined gelir.
+  tmfb_numarasi?: string | null;
+  tmfb_gecerlilik_tarihi?: string | null;
 };
 
 type Row = Record<string, unknown> & { id: string };
@@ -882,9 +885,7 @@ function FirmDetailInner({
     setSaving(true);
     setSaveMsg("");
 
-    const { error } = await supabase
-      .from("firms")
-      .update({
+    const temelAlanlar = {
         name: form.name,
         tax_number: form.tax_number,
         city: form.city,
@@ -896,11 +897,26 @@ function FirmDetailInner({
         status: form.status,
         activities: form.activities || [],
         contract_start: form.contract_start || null,
-      })
+    };
+    const tmfbAlanlari = {
+      tmfb_numarasi: (form.tmfb_numarasi || "").trim() || null,
+      tmfb_gecerlilik_tarihi: form.tmfb_gecerlilik_tarihi ? String(form.tmfb_gecerlilik_tarihi).slice(0, 10) : null,
+    };
+    let { error } = await supabase
+      .from("firms")
+      .update({ ...temelAlanlar, ...tmfbAlanlari })
       .eq("id", id);
 
+    // Migration 077 henüz çalıştırılmadıysa TMFB sütunları yoktur — diğer
+    // alanları yine kaydet, kullanıcıyı uyar.
+    let tmfbUyari = "";
+    if (error && /tmfb_(numarasi|gecerlilik_tarihi)/i.test(error.message || "")) {
+      ({ error } = await supabase.from("firms").update(temelAlanlar).eq("id", id));
+      tmfbUyari = " (TMFB alanları kaydedilemedi — migration 077 çalıştırılmalı)";
+    }
+
     setSaving(false);
-    setSaveMsg(error ? "Kaydedilemedi: " + hataCevir(error) : "✓ Kaydedildi");
+    setSaveMsg(error ? "Kaydedilemedi: " + hataCevir(error) : "✓ Kaydedildi" + tmfbUyari);
     if (!error) {
       setEditMode(false);
       loadFirm();
@@ -1080,6 +1096,11 @@ function FirmDetailInner({
               </div>
             </div>
 
+            <Bilgi label="TMFB No" value={firm.tmfb_numarasi} />
+            <Bilgi
+              label="TMFB Geçerlilik Tarihi"
+              value={firm.tmfb_gecerlilik_tarihi ? new Date(firm.tmfb_gecerlilik_tarihi).toLocaleDateString("tr-TR") : null}
+            />
             <Bilgi
               label="Sözleşme / Başlangıç Tarihi"
               value={firm.contract_start ? new Date(firm.contract_start).toLocaleDateString("tr-TR") : null}
@@ -1178,6 +1199,24 @@ function FirmDetailInner({
                 })}
               </div>
             </div>
+
+            <label className="block">
+              <span className="text-sm text-gray-600">TMFB No</span>
+              <input
+                className="border p-2 w-full rounded mt-1"
+                placeholder="Örn. İST.U-NET.TMFB.59.2703"
+                value={form.tmfb_numarasi || ""}
+                onChange={set("tmfb_numarasi")}
+              />
+            </label>
+            <label className="block">
+              <span className="text-sm text-gray-600">TMFB Geçerlilik Tarihi</span>
+              <DateInput
+                value={form.tmfb_gecerlilik_tarihi ? String(form.tmfb_gecerlilik_tarihi).slice(0, 10) : ""}
+                onChange={(date) => setForm((f) => ({ ...f, tmfb_gecerlilik_tarihi: date }))}
+                className="mt-1"
+              />
+            </label>
 
             <label className="block">
               <span className="text-sm text-gray-600">
