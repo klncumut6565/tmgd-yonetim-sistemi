@@ -29,7 +29,7 @@ import type { LogoData } from "@/lib/aracEvraklariPdf";
 import type { KaseCizim } from "@/components/BelgeOlusturForm";
 import type { TemplateBlock } from "@/lib/belgeSablonlari";
 import { guzergahKrokisiUret } from "@/lib/rotaKrokisi";
-import type { RotaNoktasi } from "@/components/RotaHaritasi";
+import type { RotaNoktasi, RotaOzeti } from "@/components/RotaHaritasi";
 
 import { depoDosyasiGetir } from "@/lib/depoOnbellek";
 import EmniyetPlaniManuelAlanlar from "@/components/EmniyetPlaniManuelAlanlar";
@@ -49,6 +49,13 @@ const RotaHaritasi = dynamic(() => import("@/components/RotaHaritasi"), {
     </div>
   ),
 });
+
+/** Dakikayı "2 sa 15 dk" biçimine çevirir (EK-7 güzergah notu için). */
+function sureMetni(dk: number): string {
+  const sa = Math.floor(dk / 60);
+  const d = Math.round(dk % 60);
+  return sa > 0 ? `${sa} sa ${d} dk` : `${d} dk`;
+}
 
 type UnRow = {
   id: string;
@@ -82,6 +89,8 @@ export default function EmniyetKapsamTaramasi({ firmId, firmaAdi }: Props) {
   // güzergah seçer; PDF üretilirken EK-1 taranan envanterle, EK-7 seçilen
   // güzergahın krokisiyle doldurulur.
   const [rotaNoktalari, setRotaNoktalari] = useState<RotaNoktasi[]>([]);
+  // Haritada hesaplanan güzergah özeti (karayolu mesafesi / tahmini süre).
+  const [rotaOzeti, setRotaOzeti] = useState<RotaOzeti | null>(null);
   const [emniyetPlaniUretiliyor, setEmniyetPlaniUretiliyor] = useState(false);
   const [emniyetPlaniMesaj, setEmniyetPlaniMesaj] = useState("");
 
@@ -508,12 +517,22 @@ export default function EmniyetKapsamTaramasi({ firmId, firmaAdi }: Props) {
       {
         type: "table",
         headers: ["Sıra", "Nokta", "Enlem", "Boylam"],
-        rows: rotaNoktalari.map((n, i) => [
+        rows: rotaNoktalari.map((n, i) => {
+          const rol = n.tur
+            ? n.tur === "baslangic" ? "Başlangıç" : n.tur === "varis" ? "Varış" : "Ara durak"
+            : i === 0 ? "Başlangıç" : i === rotaNoktalari.length - 1 ? "Varış" : "Ara durak";
+          return [
           String(i + 1),
-          i === 0 ? `${n.ad} (Başlangıç)` : i === rotaNoktalari.length - 1 ? `${n.ad} (Varış)` : n.ad,
+          `${n.ad} (${rol})`,
           n.lat.toFixed(5),
           n.lng.toFixed(5),
-        ]),
+          ];
+        }),
+        note: rotaOzeti
+          ? rotaOzeti.yolaGore
+            ? `Karayolu güzergah mesafesi: ${rotaOzeti.mesafeKm.toFixed(1)} km · Tahmini sürüş süresi: ${sureMetni(rotaOzeti.sureDk)} (OSRM / OpenStreetMap verisiyle hesaplanmıştır; trafik ve yol koşullarına göre değişebilir).`
+            : `Noktalar arası toplam kuş uçuşu mesafe: ${rotaOzeti.mesafeKm.toFixed(1)} km (karayolu güzergahı hesaplanamadı).`
+          : undefined,
       },
     ];
     const kroki = await guzergahKrokisiUret(rotaNoktalari);
@@ -685,10 +704,16 @@ export default function EmniyetKapsamTaramasi({ firmId, firmaAdi }: Props) {
                   EK-7 — Rota Bilgileri (opsiyonel)
                 </span>
                 <p className="text-xs text-gray-500 mb-2">
-                  Taşıma güzergahını haritada işaretlersen, belgede EK-7&apos;ye durak listesi ve
-                  şematik bir güzergah krokisi otomatik eklenir. Nokta seçmezsen EK-7 boş başlıkla kalır.
+                  Başlangıç (A) ve varış (B) noktasını adres yazarak ya da haritaya tıklayarak seç;
+                  gerekirse ara durak ekle. Karayolu güzergahı, mesafe ve tahmini süre otomatik
+                  hesaplanır; belgede EK-7&apos;ye nokta listesi, mesafe/süre bilgisi ve güzergah
+                  krokisi eklenir. Nokta seçmezsen EK-7 boş başlıkla kalır.
                 </p>
-                <RotaHaritasi noktalar={rotaNoktalari} onNoktalarDegisti={setRotaNoktalari} />
+                <RotaHaritasi
+                  noktalar={rotaNoktalari}
+                  onNoktalarDegisti={setRotaNoktalari}
+                  onRotaOzeti={setRotaOzeti}
+                />
               </div>
 
               <div className="flex flex-wrap items-center gap-2">
