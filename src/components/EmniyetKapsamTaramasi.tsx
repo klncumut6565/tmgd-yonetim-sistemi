@@ -535,7 +535,13 @@ export default function EmniyetKapsamTaramasi({ firmId, firmaAdi }: Props) {
           : undefined,
       },
     ];
-    const kroki = await guzergahKrokisiUret(rotaNoktalari);
+    // Haritada karayolu güzergahı hesaplandıysa kroki de AYNI yolu çizer.
+    const kroki = await guzergahKrokisiUret(
+      rotaNoktalari,
+      rotaOzeti?.yolaGore && rotaOzeti.cizgi
+        ? { cizgi: rotaOzeti.cizgi, mesafeKm: rotaOzeti.mesafeKm, sureDk: rotaOzeti.sureDk }
+        : null
+    );
     if (kroki) {
       bloklar.push({
         type: "dynamicImage",
@@ -543,8 +549,11 @@ export default function EmniyetKapsamTaramasi({ firmId, firmaAdi }: Props) {
         enBoyOrani: kroki.enBoyOrani,
         yukseklikMm: 140,
         note:
-          "Kroki, seçilen durak noktalarından üretilen şematik bir çizimdir; ölçekli " +
-          "harita değildir. Gerçek sürüş güzergahı yol ağına göre farklılık gösterebilir.",
+          rotaOzeti?.yolaGore && rotaOzeti.cizgi
+            ? "Kroki, haritada seçilen noktalar arasındaki karayolu güzergahını (OpenStreetMap / OSRM) gösterir. " +
+              "Fiili sürüş güzergahı trafik, araç tipi ve yol kısıtlamalarına göre değişebilir."
+            : "Kroki, seçilen durak noktalarından üretilen şematik bir çizimdir; ölçekli " +
+              "harita değildir. Gerçek sürüş güzergahı yol ağına göre farklılık gösterebilir.",
       });
     }
     return bloklar;

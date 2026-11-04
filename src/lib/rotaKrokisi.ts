@@ -58,10 +58,23 @@ async function tileYukle(z: number, x: number, y: number): Promise<HTMLImageElem
   });
 }
 
+/** Haritada hesaplanan karayolu güzergahı (varsa) — kroki düz çizgi yerine bunu çizer. */
+export type KrokiYolBilgisi = {
+  cizgi: [number, number][]; // [lat, lng] dizisi (OSRM geometrisi)
+  mesafeKm: number;
+  sureDk?: number;
+};
+
 export async function guzergahKrokisiUret(
-  noktalar: RotaNoktasi[]
+  noktalar: RotaNoktasi[],
+  yol?: KrokiYolBilgisi | null
 ): Promise<{ dataUrl: string; enBoyOrani: number } | null> {
   if (noktalar.length < 2) return null;
+  // Karayolu geometrisi varsa çizgi onu izler; yoksa duraklar düz bağlanır.
+  const yolVar = !!yol && yol.cizgi.length >= 2;
+  const cizgiNoktalari: { lat: number; lng: number }[] = yolVar
+    ? yol!.cizgi.map(([lat, lng]) => ({ lat, lng }))
+    : noktalar;
 
   const canvas = document.createElement("canvas");
   canvas.width = CANVAS_W;
@@ -91,8 +104,10 @@ export async function guzergahKrokisiUret(
   let zoom = 14;
   let x0 = 0, y0 = 0, x1 = 0, y1 = 0;
   for (; zoom >= 2; zoom--) {
-    const xs = noktalar.map((n) => lonToX(n.lng, zoom));
-    const ys = noktalar.map((n) => latToY(n.lat, zoom));
+    // Görünüm hem durakları hem (varsa) yol çizgisinin tamamını kapsar.
+    const kapsam = [...noktalar, ...cizgiNoktalari];
+    const xs = kapsam.map((n) => lonToX(n.lng, zoom));
+    const ys = kapsam.map((n) => latToY(n.lat, zoom));
     const minX = Math.min(...xs), maxX = Math.max(...xs);
     const minY = Math.min(...ys), maxY = Math.max(...ys);
     const genW = Math.max(maxX - minX, 1);
@@ -111,7 +126,7 @@ export async function guzergahKrokisiUret(
   const ofsetPX = haritaSol + (haritaG - gosterilenG) / 2 - x0 * olcek;
   const ofsetPY = haritaUst + (haritaY - gosterilenY) / 2 - y0 * olcek;
 
-  function projeksiyon(n: RotaNoktasi): [number, number] {
+  function projeksiyon(n: { lat: number; lng: number }): [number, number] {
     return [lonToX(n.lng, zoom) * olcek + ofsetPX, latToY(n.lat, zoom) * olcek + ofsetPY];
   }
 
@@ -151,24 +166,61 @@ export async function guzergahKrokisiUret(
 
   // ---- Bağlantı çizgisi (güzergah) ----
   const noktaKoordlari = noktalar.map(projeksiyon);
-  ctx.strokeStyle = "#dc2626";
-  ctx.lineWidth = 5;
+  const cizgiKoordlari = cizgiNoktalari.map(projeksiyon);
+  const yolCiz = () => {
+    ctx.beginPath();
+    cizgiKoordlari.forEach(([x, y], i) => {
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    });
+    ctx.stroke();
+  };
   ctx.lineCap = "round";
   ctx.lineJoin = "round";
-  ctx.beginPath();
-  noktaKoordlari.forEach(([x, y], i) => {
-    if (i === 0) ctx.moveTo(x, y);
-    else ctx.lineTo(x, y);
-  });
-  ctx.stroke();
+  // Beyaz alt kontur + kırmızı çizgi — harita üzerinde net seçilsin.
+  ctx.strokeStyle = "rgba(255,255,255,0.9)";
+  ctx.lineWidth = 10;
+  yolCiz();
+  ctx.strokeStyle = "#dc2626";
+  ctx.lineWidth = 5;
+  yolCiz();
 
-  // Yön okları (her bacağın orta noktasında)
+  // Yön okları: çizgi uzunluğu boyunca eşit aralıklı (yol eğrisini izler).
+  const parcaBoylari: number[] = [];
+  let toplamPiksel = 0;
+  for (let i = 0; i < cizgiKoordlari.length - 1; i++) {
+    const [ax, ay] = cizgiKoordlari[i];
+    const [bx, by] = cizgiKoordlari[i + 1];
+    const d = Math.hypot(bx - ax, by - ay);
+    parcaBoylari.push(d);
+    toplamPiksel += d;
+  }
+  const okKonumlari: { mx: number; my: number; aci: number }[] = [];
+  const okSayisi = yolVar ? Math.max(2, Math.min(6, Math.round(toplamPiksel / 260))) : 0;
+  if (yolVar) {
+    for (let k = 1; k <= okSayisi; k++) {
+      let hedef = (toplamPiksel * k) / (okSayisi + 1);
+      for (let i = 0; i < parcaBoylari.length; i++) {
+        if (hedef <= parcaBoylari[i] || i === parcaBoylari.length - 1) {
+          const [ax, ay] = cizgiKoordlari[i];
+          const [bx, by] = cizgiKoordlari[i + 1];
+          const t = parcaBoylari[i] ? Math.min(1, hedef / parcaBoylari[i]) : 0;
+          okKonumlari.push({ mx: ax + (bx - ax) * t, my: ay + (by - ay) * t, aci: Math.atan2(by - ay, bx - ax) });
+          break;
+        }
+        hedef -= parcaBoylari[i];
+      }
+    }
+  } else {
+    // Düz bağlantıda her bacağın orta noktası
+    for (let i = 0; i < noktaKoordlari.length - 1; i++) {
+      const [x1p, y1p] = noktaKoordlari[i];
+      const [x2p, y2p] = noktaKoordlari[i + 1];
+      okKonumlari.push({ mx: (x1p + x2p) / 2, my: (y1p + y2p) / 2, aci: Math.atan2(y2p - y1p, x2p - x1p) });
+    }
+  }
   ctx.fillStyle = "#dc2626";
-  for (let i = 0; i < noktaKoordlari.length - 1; i++) {
-    const [x1p, y1p] = noktaKoordlari[i];
-    const [x2p, y2p] = noktaKoordlari[i + 1];
-    const mx = (x1p + x2p) / 2, my = (y1p + y2p) / 2;
-    const aci = Math.atan2(y2p - y1p, x2p - x1p);
+  for (const { mx, my, aci } of okKonumlari) {
     const okBoy = 14;
     ctx.save();
     ctx.translate(mx, my);
@@ -237,22 +289,29 @@ export async function guzergahKrokisiUret(
   ctx.fillText("K", kX, kY + 48);
 
   // ---- Alt bilgi: mesafe + OSM atfı ----
-  let toplamMesafe = 0;
-  for (let i = 0; i < noktalar.length - 1; i++) {
-    toplamMesafe += mesafeKm(noktalar[i], noktalar[i + 1]);
+  let altSatir: string;
+  if (yolVar) {
+    const sure = yol!.sureDk && yol!.sureDk > 0
+      ? ` · Tahmini sürüş süresi: ${Math.floor(yol!.sureDk / 60) > 0 ? `${Math.floor(yol!.sureDk / 60)} sa ` : ""}${Math.round(yol!.sureDk % 60)} dk`
+      : "";
+    altSatir = `Karayolu güzergah mesafesi: ${yol!.mesafeKm.toFixed(1)} km${sure}`;
+  } else {
+    let toplamMesafe = 0;
+    for (let i = 0; i < noktalar.length - 1; i++) {
+      toplamMesafe += mesafeKm(noktalar[i], noktalar[i + 1]);
+    }
+    altSatir = `Toplam güzergah (kuş uçuşu, yaklaşık): ${toplamMesafe.toFixed(0)} km`;
   }
   ctx.font = "22px Arial";
   ctx.textAlign = "left";
   ctx.fillStyle = "#000000";
-  ctx.fillText(
-    `Toplam güzergah (kuş uçuşu, yaklaşık): ${toplamMesafe.toFixed(0)} km`,
-    KENAR_BOSLUK,
-    CANVAS_H - 66
-  );
+  ctx.fillText(altSatir, KENAR_BOSLUK, CANVAS_H - 66);
   ctx.font = "16px Arial";
   ctx.fillStyle = "#6b7280";
   ctx.fillText(
-    "Harita: © OpenStreetMap katkıda bulunanları. Kroki şematiktir; gerçek sürüş güzergahı yol ağına göre farklılık gösterebilir.",
+    yolVar
+      ? "Harita: © OpenStreetMap katkıda bulunanları · Güzergah: OSRM. Süre tahminidir; trafik, araç tipi ve yol koşullarına göre değişebilir."
+      : "Harita: © OpenStreetMap katkıda bulunanları. Kroki şematiktir; gerçek sürüş güzergahı yol ağına göre farklılık gösterebilir.",
     KENAR_BOSLUK,
     CANVAS_H - 40
   );

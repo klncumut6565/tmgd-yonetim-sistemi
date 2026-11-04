@@ -32,7 +32,13 @@ export type RotaNoktasi = {
   tur?: RotaNoktaTuru;
 };
 
-export type RotaOzeti = { mesafeKm: number; sureDk: number; yolaGore: boolean };
+export type RotaOzeti = {
+  mesafeKm: number;
+  sureDk: number;
+  yolaGore: boolean;
+  /** Karayolu geometrisi [lat, lng] — krokide aynı güzergahı çizmek için. */
+  cizgi?: [number, number][];
+};
 
 type Props = {
   noktalar: RotaNoktasi[];
@@ -400,7 +406,7 @@ export default function RotaHaritasi({
         if (ac.signal.aborted) return;
         if (g) {
           setGuzergah(g);
-          onRotaOzeti?.({ mesafeKm: g.mesafeKm, sureDk: g.sureDk, yolaGore: true });
+          onRotaOzeti?.({ mesafeKm: g.mesafeKm, sureDk: g.sureDk, yolaGore: true, cizgi: g.cizgi });
           setGorunum({ anahtar: `rota-${koordAnahtari}`, noktalar: g.cizgi });
         } else {
           throw new Error("rota yok");
