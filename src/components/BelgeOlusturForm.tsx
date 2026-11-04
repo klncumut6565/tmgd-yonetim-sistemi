@@ -1316,7 +1316,7 @@ function renderBasitBelge(
   doc.setFontSize(10);
   doc.setFont(FONT, "normal");
   doc.setTextColor(90, 90, 90);
-  doc.text(`Doküman No: TMGDK-${item.code}`, logo ? 45 : 15, 27);
+  doc.text(`Doküman No: ${dokumanNo(item.code)}`, logo ? 45 : 15, 27);
   doc.text(`Tarih: ${bugun}`, logo ? 45 : 15, 32);
   doc.setTextColor(0, 0, 0);
 
@@ -1579,18 +1579,24 @@ function duzMetneCevir(doc: JsPDFType, sablon: BelgeSablonu, belgeAdi: string): 
   return satirlar;
 }
 
+// Doküman numarası: kurum öneki (TMGDK-P1, TMGDK-L1 ...). Kendi adını
+// taşıyan kodlarda (EMNIYET_PLANI) önek eklenmez — "TMGDK-EMNIYET_PLANI"
+// gereksiz uzun; yalnızca kod basılır.
+const ONEKSIZ_KODLAR = new Set(["EMNIYET_PLANI"]);
+function dokumanNo(code: string): string {
+  return ONEKSIZ_KODLAR.has(code) ? code : `TMGDK-${code}`;
+}
+
 // ---- Tablo ölçümü + çizimi -------------------------------------------
-// Sütun genişlikleri: ilk sütun biraz daha geniş (etiket sütunu), kalanlar eşit paylaşır.
+// Sütun genişlikleri: özel oran (colWidths) verilmemişse TÜM sütunlar eşit
+// paylaşır — iki sütunlu tablolarda orta çizgi sayfanın tam ortasına düşer.
 function tabloKolonGenislikleri(genislik: number, kolonSayisi: number, ozelOranlar?: number[]): number[] {
   if (kolonSayisi <= 1) return [genislik];
   if (ozelOranlar && ozelOranlar.length === kolonSayisi) {
     const toplam = ozelOranlar.reduce((a, b) => a + b, 0);
     return ozelOranlar.map((o) => (genislik * o) / toplam);
   }
-  const ilkOran = 1.3;
-  const toplamOran = ilkOran + (kolonSayisi - 1);
-  const birim = genislik / toplamOran;
-  return [birim * ilkOran, ...Array(kolonSayisi - 1).fill(birim)];
+  return Array(kolonSayisi).fill(genislik / kolonSayisi);
 }
 
 function tabloHucreSatirlari(
@@ -2064,7 +2070,7 @@ function baslikTablosuCiz(
   // Her metin kendi satırının dikey ortasına hizalanır (+1.2 ≈ font yarısı)
   const sagMetinY = (satirIndex: number) =>
     ustY + sagSatirY * satirIndex + sagSatirY / 2 + 1.2;
-  doc.text(`Doküman No: TMGDK-${code}`, sagX, sagMetinY(0));
+  doc.text(`Doküman No: ${dokumanNo(code)}`, sagX, sagMetinY(0));
   doc.text(`Yayın Tarihi: ${sablon.yayinTarihi}`, sagX, sagMetinY(1));
   doc.text(`Revizyon Tarihi: ${bugun}`, sagX, sagMetinY(2));
   doc.text(
