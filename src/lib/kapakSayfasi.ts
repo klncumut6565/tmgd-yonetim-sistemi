@@ -268,6 +268,23 @@ export async function kapakSayfasiOlustur(veri: KapakVerisi): Promise<Blob> {
     d.border = KENARLIK;
   });
 
+  // ---- Yazdırma ayarı: TÜM İÇERİK TEK A4 SAYFA ----
+  // Sayfa boyutu tanımsızken Excel varsayılan %100 ölçekle 4 sayfaya
+  // bölüyordu. "Sayfaya sığdır" (1 sayfa genişlik × 1 sayfa yükseklik),
+  // dar kenar boşlukları ve yazdırma alanı ile çıktı tek sayfa olur.
+  const sonSatir = 8 + satirlar.length - 1;
+  ws.pageSetup = {
+    paperSize: 9, // A4
+    orientation: "portrait",
+    fitToPage: true,
+    fitToWidth: 1,
+    fitToHeight: 1,
+    horizontalCentered: true,
+    verticalCentered: false,
+    printArea: `A5:D${sonSatir}`,
+    margins: { left: 0.4, right: 0.4, top: 0.4, bottom: 0.4, header: 0.2, footer: 0.2 },
+  };
+
   const buf = await wb.xlsx.writeBuffer();
   return new Blob([buf], {
     type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
