@@ -14,6 +14,10 @@
 // doğrudan drivers / vehicles tabloları firm_id ile sorgulanır — ek
 // migration gerekmez. Belge Takip / Araç Evrakı belgeleri expiring_documents
 // view'ından firm_id ile süzülür.
+//
+// DİKKAT ÇEKME: Notlar sekmesi her açıldığında (bileşen her yüklendiğinde)
+// bildirim satırları 5 saniye yanıp söner — süresi geçmiş olanlar kırmızı,
+// yaklaşanlar turuncu. Süre sonunda normal görünüme döner.
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase/client";
@@ -54,7 +58,31 @@ function DaysBadge({ d }: { d: number }) {
   return <span className={"px-2 py-0.5 rounded text-xs whitespace-nowrap " + cls}>{label}</span>;
 }
 
-function Bolum({ baslik, kalemler, bosMetin }: { baslik: string; kalemler: Kalem[]; bosMetin: string }) {
+const YANIP_SONME_MS = 5000;
+
+// Satır arka planını yanıp söndüren animasyon (5 sn = 5 tur × 1 sn).
+// Hareket azaltma tercihi açık kullanıcılarda yanıp sönme yerine sabit vurgu.
+const YANIP_SONME_CSS = `
+@keyframes belgeYanipGecmis { 0%,100% { background:#fee2e2; box-shadow: inset 4px 0 0 #dc2626; } 50% { background:#ffffff; box-shadow: inset 4px 0 0 transparent; } }
+@keyframes belgeYanipYaklasan { 0%,100% { background:#fef3c7; box-shadow: inset 4px 0 0 #f59e0b; } 50% { background:#ffffff; box-shadow: inset 4px 0 0 transparent; } }
+.belge-yanip-gecmis { animation: belgeYanipGecmis 1s ease-in-out 5; }
+.belge-yanip-yaklasan { animation: belgeYanipYaklasan 1s ease-in-out 5; }
+@media (prefers-reduced-motion: reduce) {
+  .belge-yanip-gecmis { animation: none; background:#fee2e2; box-shadow: inset 4px 0 0 #dc2626; }
+  .belge-yanip-yaklasan { animation: none; background:#fef3c7; box-shadow: inset 4px 0 0 #f59e0b; }
+}`;
+
+function Bolum({
+  baslik,
+  kalemler,
+  bosMetin,
+  yanip,
+}: {
+  baslik: string;
+  kalemler: Kalem[];
+  bosMetin: string;
+  yanip: boolean;
+}) {
   return (
     <div>
       <h4 className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1.5">
@@ -65,7 +93,13 @@ function Bolum({ baslik, kalemler, bosMetin }: { baslik: string; kalemler: Kalem
       ) : (
         <ul className="space-y-1.5">
           {kalemler.map((k) => (
-            <li key={k.id} className="flex items-start justify-between gap-2 text-sm border-b last:border-0 pb-1.5">
+            <li
+              key={k.id}
+              className={
+                "flex items-start justify-between gap-2 text-sm border-b last:border-0 py-1 px-2 -mx-2 rounded" +
+                (yanip ? (k.days_left < 0 ? " belge-yanip-gecmis" : " belge-yanip-yaklasan") : "")
+              }
+            >
               <div className="min-w-0">
                 <div className="font-medium truncate">{k.label}</div>
                 <div className="text-xs text-gray-500">
@@ -87,6 +121,9 @@ export default function FirmBelgeBildirimleri({ firmId }: { firmId: string }) {
   const [belgeler, setBelgeler] = useState<Kalem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  // Yükleme bitince 5 sn yanıp sönme; sekme her açıldığında bileşen yeniden
+  // yüklendiği için her açılışta tekrarlanır.
+  const [yanip, setYanip] = useState(false);
 
   useEffect(() => {
     let iptal = false;
@@ -194,6 +231,7 @@ export default function FirmBelgeBildirimleri({ firmId }: { firmId: string }) {
       setAraclar(veh.sort(sirala));
       setBelgeler(blg.sort(sirala));
       setLoading(false);
+      if (drv.length + veh.length + blg.length > 0) setYanip(true);
     }
     load();
     return () => {
@@ -201,11 +239,18 @@ export default function FirmBelgeBildirimleri({ firmId }: { firmId: string }) {
     };
   }, [firmId]);
 
+  useEffect(() => {
+    if (!yanip) return;
+    const t = setTimeout(() => setYanip(false), YANIP_SONME_MS);
+    return () => clearTimeout(t);
+  }, [yanip]);
+
   const toplam = suruculer.length + araclar.length + belgeler.length;
   const gecmis = [...suruculer, ...araclar, ...belgeler].filter((k) => k.days_left < 0).length;
 
   return (
     <aside className="border rounded-xl p-4 bg-white lg:sticky lg:top-4">
+      <style>{YANIP_SONME_CSS}</style>
       <div className="flex items-center justify-between mb-1">
         <h3 className="font-bold">🔔 Belge Bildirimleri</h3>
         {!loading && toplam > 0 && (
@@ -226,9 +271,9 @@ export default function FirmBelgeBildirimleri({ firmId }: { firmId: string }) {
           {gecmis > 0 && (
             <p className="text-xs bg-gray-800 text-white rounded px-2 py-1">⚠️ {gecmis} belgenin süresi GEÇMİŞ.</p>
           )}
-          <Bolum baslik="Sürücü Belgeleri" kalemler={suruculer} bosMetin={`${GENEL_UYARI_GUN} gün içinde süresi dolan sürücü belgesi yok. ✓`} />
-          <Bolum baslik="Araç Belgeleri" kalemler={araclar} bosMetin={`${GENEL_UYARI_GUN} gün içinde süresi dolan araç belgesi yok. ✓`} />
-          <Bolum baslik="Firma Belgeleri" kalemler={belgeler} bosMetin="Yaklaşan firma belgesi yok. ✓" />
+          <Bolum baslik="Sürücü Belgeleri" kalemler={suruculer} yanip={yanip} bosMetin={`${GENEL_UYARI_GUN} gün içinde süresi dolan sürücü belgesi yok. ✓`} />
+          <Bolum baslik="Araç Belgeleri" kalemler={araclar} yanip={yanip} bosMetin={`${GENEL_UYARI_GUN} gün içinde süresi dolan araç belgesi yok. ✓`} />
+          <Bolum baslik="Firma Belgeleri" kalemler={belgeler} yanip={yanip} bosMetin="Yaklaşan firma belgesi yok. ✓" />
         </div>
       )}
     </aside>
