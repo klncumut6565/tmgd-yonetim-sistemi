@@ -31,3 +31,8 @@ next-env.d.ts
 # vercel
 .vercel
 .ai_cache/
+
+# graphify: sadece graph.json + GRAPH_REPORT.md commit edilir
+graphify-out/*
+!graphify-out/graph.json
+!graphify-out/GRAPH_REPORT.md
