@@ -68,10 +68,20 @@ export async function r2ImzaliPut(yol: string, saniye = 900): Promise<string> {
 
 /** Sunucudan doğrudan yükleme (mobil tarama callback'i, taşıma aracı). */
 export async function r2Yaz(yol: string, govde: Blob | ArrayBuffer | Uint8Array, contentType?: string) {
-  const r = await aws().fetch(nesneUrl(yol).toString(), {
+  // Gövde önce tam bayt dizisine çevrilir ve imzalı adrese DOĞRUDAN gönderilir:
+  // böylece fetch Content-Length başlığını kendisi ekler. (aws4fetch'in kendi
+  // fetch'i gövdeyi akışa çevirip "chunked" gönderiyordu → R2 411 MissingContentLength.)
+  const bayt =
+    govde instanceof Uint8Array
+      ? govde
+      : new Uint8Array(govde instanceof Blob ? await govde.arrayBuffer() : govde)
+  const r = await fetch(await r2ImzaliPut(yol, 600), {
     method: 'PUT',
-    body: govde as BodyInit,
-    headers: contentType ? { 'Content-Type': contentType } : undefined,
+    body: bayt as BodyInit,
+    headers: {
+      'Content-Length': String(bayt.byteLength),
+      ...(contentType ? { 'Content-Type': contentType } : {}),
+    },
   })
   if (!r.ok) throw new Error(`R2 PUT ${r.status}: ${(await r.text()).slice(0, 200)}`)
 }

@@ -1,17 +1,17 @@
 # Graph Report - tmgd-yonetim-sistemi  (2026-11-17)
 
 ## Corpus Check
-- 231 files · ~335,232 words
+- 231 files · ~335,288 words
 - Verdict: corpus is large enough that graph structure adds value.
 - Unclassified: 4 file(s) not represented in the graph (top: (none) 2, .example 1, .css 1)
 
 ## Summary
-- 1441 nodes · 3276 edges · 85 communities (74 shown, 11 thin omitted)
+- 1441 nodes · 3275 edges · 85 communities (74 shown, 11 thin omitted)
 - Extraction: 99% EXTRACTED · 1% INFERRED · 0% AMBIGUOUS · INFERRED: 39 edges (avg confidence: 0.86)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `958a3fc3`
+- Built from commit: `1cc35c65`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -102,8 +102,8 @@
 2. `useUser()` - 69 edges
 3. `react` - 53 edges
 4. `FirmDetailInner()` - 46 edges
-5. `supabase` - 42 edges
-6. `next` - 42 edges
+5. `next` - 42 edges
+6. `supabase` - 42 edges
 7. `authFetch()` - 36 edges
 8. `createAdminClient()` - 34 edges
 9. `ADRAssistantWidget()` - 32 edges
@@ -116,10 +116,10 @@
   README.md → src/hooks/useUser.ts
 - `Bu sürümde bulunup düzeltilen hatalar` --references--> `login()`  [INFERRED]
   README.md → src/app/login/page.tsx
-- `loadFirms()` --calls--> `hataCevir()`  [EXTRACTED]
-  src/components/FirmScopedCrud.tsx → src/lib/hataCevir.ts
-- `mobildenTara()` --calls--> `authFetch()`  [EXTRACTED]
-  src/app/firms/[id]/page.tsx → src/lib/supabase/authFetch.ts
+- `generate()` --calls--> `belgeSablonu()`  [EXTRACTED]
+  src/components/BelgeOlusturForm.tsx → src/lib/belgeSablonlari.ts
+- `load()` --calls--> `authFetch()`  [EXTRACTED]
+  src/components/audit/AuditLogWidget.tsx → src/lib/supabase/authFetch.ts
 
 ## Import Cycles
 - None detected.
@@ -423,7 +423,7 @@ Cohesion: 0.40
 Nodes (5): scripts, build, dev, lint, start
 
 ## Knowledge Gaps
-- **20 isolated node(s):** `RFC-3339`, `ADR-0001`, `ADR-0007`, `ADR-2023`, `ADR-0001` (+15 more)
+- **20 isolated node(s):** `RFC-3339`, `ADR-0005`, `ADR-0001`, `ADR-0007`, `ADR-2023` (+15 more)
   These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 500 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
 - **11 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
@@ -431,16 +431,16 @@ Nodes (5): scripts, build, dev, lint, start
 _Questions this graph is uniquely positioned to answer:_
 
 - **Why does `react` connect `react` to `ADRAssistantWidget.tsx`, `GorevliListesi.tsx`, `FiyatlandirmaPlanlari.tsx`, `package.json`, `BelgeOlusturForm.tsx`, `dashboard/page.tsx`, `TasimaEvraki.tsx`, `next`, `emniyetPlaniManuelAlanlar.ts`, `RotaHaritasi.tsx`, `[id]/page.tsx`, `adr/page.tsx`, `AppShell.tsx`, `FirmScopedCrud.tsx`, `authFetch`, `FirmaTakvimiIcerik`, `useRealtimeVoice.ts`, `dependencies`, `mevzuat/page.tsx`, `AracEvraklari.tsx`, `EmniyetKapsamTaramasi.tsx`, `dosyaSikistir.ts`, `[slug]/page.tsx`, `firms/page.tsx`, `settings/page.tsx`, `reports/page.tsx`, `useUser`, `Sevkiyatlar.tsx`?**
-  _High betweenness centrality (0.134) - this node is a cross-community bridge._
+  _High betweenness centrality (0.168) - this node is a cross-community bridge._
 - **Are the 2 inferred relationships involving `useUser()` (e.g. with `Bilinen sınırlamalar (kaynaktan miras)` and `Mobil Belge Tarama Entegrasyonu (tarayici_ios)`) actually correct?**
   _`useUser()` has 2 INFERRED edges - model-reasoned connections that need verification._
-- **What connects `RFC-3339`, `ADR-0001`, `ADR-0007` to the rest of the system?**
+- **What connects `RFC-3339`, `ADR-0005`, `ADR-0001` to the rest of the system?**
   _20 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `createAdminClient` be split into smaller, more focused modules?**
-  _Cohesion score 0.05642633228840126 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.05616509926854754 - nodes in this community are weakly interconnected._
 - **Why does `next` connect `createAdminClient` to `ADRAssistantWidget.tsx`, `actions.ts`, `package.json`, `BelgeOlusturForm.tsx`, `dashboard/page.tsx`, `react`, `next`, `[id]/page.tsx`, `adr/page.tsx`, `AppShell.tsx`, `FirmScopedCrud.tsx`, `authFetch`, `FirmaTakvimiIcerik`, `useRealtimeVoice.ts`, `dependencies`, `EmniyetKapsamTaramasi.tsx`, `[slug]/page.tsx`, `firms/page.tsx`, `settings/page.tsx`, `reports/page.tsx`, `getAsistanKullanicisiFromRequest`?**
-  _High betweenness centrality (0.130) - this node is a cross-community bridge._
+  _High betweenness centrality (0.139) - this node is a cross-community bridge._
 - **Should `ADRAssistantWidget.tsx` be split into smaller, more focused modules?**
   _Cohesion score 0.05263157894736842 - nodes in this community are weakly interconnected._
 - **Why does `useUser()` connect `useUser` to `ADRAssistantWidget.tsx`, `GorevliListesi.tsx`, `depoYukle`, `FiyatlandirmaPlanlari.tsx`, `hataCevir`, `SurucuListesi`, `BelgeOlusturForm.tsx`, `dashboard/page.tsx`, `react`, `TasimaEvraki.tsx`, `TasimaEvraki`, `next`, `[id]/page.tsx`, `[id]/page.tsx`, `AppShell.tsx`, `FirmScopedCrud.tsx`, `authFetch`, `FirmaTakvimiIcerik`, `mevzuat/page.tsx`, `DocumentsPage`, `AracEvraklari.tsx`, `FirmsPage`, `dosyaSikistir`, `BelgeOlusturForm`, `firms/page.tsx`, `WorkflowRulesPage`, `settings/page.tsx`, `reports/page.tsx`, `TasksPageInner`, `UsersTab`, `Sevkiyatlar.tsx`?**
-  _High betweenness centrality (0.090) - this node is a cross-community bridge._
+  _High betweenness centrality (0.091) - this node is a cross-community bridge._
