@@ -1,7 +1,7 @@
 # Graph Report - tmgd-yonetim-sistemi  (2026-11-17)
 
 ## Corpus Check
-- 225 files · ~332,305 words
+- 225 files · ~332,333 words
 - Verdict: corpus is large enough that graph structure adds value.
 - Unclassified: 4 file(s) not represented in the graph (top: (none) 2, .example 1, .css 1)
 
@@ -11,7 +11,7 @@
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `807ac888`
+- Built from commit: `43164ed5`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -107,9 +107,9 @@
   README.md → src/hooks/useUser.ts
 - `Bu sürümde bulunup düzeltilen hatalar` --references--> `login()`  [INFERRED]
   README.md → src/app/login/page.tsx
+- `load()` --calls--> `authFetch()`  [EXTRACTED]
+  src/components/audit/AuditLogWidget.tsx → src/lib/supabase/authFetch.ts
 - `hizliEkle()` --calls--> `hataCevir()`  [EXTRACTED]
-  src/app/dashboard/firma-takvimi/page.tsx → src/lib/hataCevir.ts
-- `ziyaretSil()` --calls--> `hataCevir()`  [EXTRACTED]
   src/app/dashboard/firma-takvimi/page.tsx → src/lib/hataCevir.ts
 
 ## Import Cycles
@@ -382,16 +382,16 @@ Nodes (5): scripts, build, dev, lint, start
 _Questions this graph is uniquely positioned to answer:_
 
 - **Why does `react` connect `react` to `ADRAssistantWidget.tsx`, `GorevliListesi.tsx`, `FiyatlandirmaPlanlari.tsx`, `package.json`, `BelgeOlusturForm.tsx`, `dashboard/page.tsx`, `aracEvraklariPdf.ts`, `firma-takvimi/page.tsx`, `TasimaEvraki.tsx`, `next`, `[id]/page.tsx`, `emniyetPlaniManuelAlanlar.ts`, `RotaHaritasi.tsx`, `guvenlikPlaniIncelemePdf.ts`, `ADRAssistantWidget.tsx`, `adr/page.tsx`, `NotificationBell.tsx`, `authFetch`, `useRealtimeVoice.ts`, `dependencies`, `dosyaSikistir.ts`, `useUser.ts`, `EmniyetKapsamTaramasi.tsx`, `[slug]/page.tsx`, `FirmBelgeBildirimleri.tsx`, `useUser`, `Sevkiyatlar.tsx`?**
-  _High betweenness centrality (0.131) - this node is a cross-community bridge._
+  _High betweenness centrality (0.164) - this node is a cross-community bridge._
 - **Are the 2 inferred relationships involving `useUser()` (e.g. with `Bilinen sınırlamalar (kaynaktan miras)` and `Mobil Belge Tarama Entegrasyonu (tarayici_ios)`) actually correct?**
   _`useUser()` has 2 INFERRED edges - model-reasoned connections that need verification._
 - **What connects `RFC-3339`, `ADR-0001`, `ADR-0007` to the rest of the system?**
   _20 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `createAdminClient` be split into smaller, more focused modules?**
   _Cohesion score 0.05754527162977867 - nodes in this community are weakly interconnected._
-- **Why does `useUser()` connect `useUser` to `ADRAssistantWidget.tsx`, `GorevliListesi.tsx`, `FirmScopedCrud`, `FiyatlandirmaPlanlari.tsx`, `hataCevir`, `SurucuListesi`, `BelgeOlusturForm.tsx`, `dashboard/page.tsx`, `aracEvraklariPdf.ts`, `firma-takvimi/page.tsx`, `TasimaEvraki.tsx`, `TasimaEvraki`, `next`, `[id]/page.tsx`, `guvenlikPlaniIncelemePdf.ts`, `ADRAssistantWidget.tsx`, `react`, `NotificationBell.tsx`, `authFetch`, `dosyaSikistir.ts`, `DocumentsPage`, `AracEvraklari`, `useUser.ts`, `dosyaSikistir`, `BelgeOlusturForm`, `FirmBelgeBildirimleri.tsx`, `reports/page.tsx`, `TasksPageInner`, `Sevkiyatlar.tsx`?**
-  _High betweenness centrality (0.128) - this node is a cross-community bridge._
+- **Why does `next` connect `useUser.ts` to `createAdminClient`, `authFetch`, `NotificationBell.tsx`, `useRealtimeVoice.ts`, `dependencies`, `actions.ts`, `package.json`, `BelgeOlusturForm.tsx`, `dashboard/page.tsx`, `EmniyetKapsamTaramasi.tsx`, `firma-takvimi/page.tsx`, `[slug]/page.tsx`, `next`, `[id]/page.tsx`, `guvenlikPlaniIncelemePdf.ts`, `ADRAssistantWidget.tsx`, `adr/page.tsx`, `react`?**
+  _High betweenness centrality (0.140) - this node is a cross-community bridge._
 - **Should `ADRAssistantWidget.tsx` be split into smaller, more focused modules?**
   _Cohesion score 0.05384615384615385 - nodes in this community are weakly interconnected._
-- **Why does `next` connect `useUser.ts` to `createAdminClient`, `authFetch`, `NotificationBell.tsx`, `useRealtimeVoice.ts`, `dependencies`, `actions.ts`, `package.json`, `BelgeOlusturForm.tsx`, `dashboard/page.tsx`, `EmniyetKapsamTaramasi.tsx`, `firma-takvimi/page.tsx`, `[slug]/page.tsx`, `next`, `[id]/page.tsx`, `guvenlikPlaniIncelemePdf.ts`, `ADRAssistantWidget.tsx`, `adr/page.tsx`, `react`?**
-  _High betweenness centrality (0.127) - this node is a cross-community bridge._
+- **Why does `useUser()` connect `useUser` to `ADRAssistantWidget.tsx`, `GorevliListesi.tsx`, `FirmScopedCrud`, `FiyatlandirmaPlanlari.tsx`, `hataCevir`, `SurucuListesi`, `BelgeOlusturForm.tsx`, `dashboard/page.tsx`, `aracEvraklariPdf.ts`, `firma-takvimi/page.tsx`, `TasimaEvraki.tsx`, `TasimaEvraki`, `next`, `[id]/page.tsx`, `guvenlikPlaniIncelemePdf.ts`, `ADRAssistantWidget.tsx`, `react`, `NotificationBell.tsx`, `authFetch`, `dosyaSikistir.ts`, `DocumentsPage`, `AracEvraklari`, `useUser.ts`, `dosyaSikistir`, `BelgeOlusturForm`, `FirmBelgeBildirimleri.tsx`, `reports/page.tsx`, `TasksPageInner`, `Sevkiyatlar.tsx`?**
+  _High betweenness centrality (0.128) - this node is a cross-community bridge._

@@ -21,7 +21,14 @@ const KAYNAK = 'firm-files'
 const YEDEK = 'firm-files-yedek'
 
 function gecerliYol(yol: unknown): yol is string {
-  return typeof yol === 'string' && yol.length > 0 && yol.length < 1024 && !yol.includes('..')
+  // Sadece '..' KLASÖR parçalarını reddet — "Rev..pdf" gibi dosya adları geçerli.
+  return (
+    typeof yol === 'string' &&
+    yol.length > 0 &&
+    yol.length < 1024 &&
+    !yol.startsWith('/') &&
+    !yol.split('/').some((p) => p === '..' || p === '.' || p === '')
+  )
 }
 
 export async function GET(req: NextRequest) {
