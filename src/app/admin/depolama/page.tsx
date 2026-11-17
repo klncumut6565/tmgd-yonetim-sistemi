@@ -83,11 +83,23 @@ export default function DepolamaPage() {
         return { yol: a.yol, eski: s.eskiBoyut, yeni: s.eskiBoyut, durum: "değişmedi" };
       }
 
-      const { token } = await apiPost({ islem: "hazirla", yol: a.yol }); // yedek + imzalı adres
-      const { error: upErr } = await supabase.storage
-        .from("firm-files")
-        .uploadToSignedUrl(a.yol, token, s.dosya, { contentType: a.mime, upsert: true });
-      if (upErr) throw new Error("Yüklenemedi: " + upErr.message);
+      // Geçici ağ kopmalarına ("Failed to fetch") karşı 3 deneme. Orijinal yedekte
+      // durduğu ve yükleme tek parça yapıldığı için yarım kalan deneme dosyayı bozmaz.
+      let sonHata = "";
+      for (let deneme = 1; deneme <= 3; deneme++) {
+        try {
+          const { token } = await apiPost({ islem: "hazirla", yol: a.yol }); // yedek + imzalı adres
+          const { error: upErr } = await supabase.storage
+            .from("firm-files")
+            .uploadToSignedUrl(a.yol, token, s.dosya, { contentType: a.mime, upsert: true });
+          if (!upErr) { sonHata = ""; break; }
+          sonHata = upErr.message;
+        } catch (e) {
+          sonHata = (e as Error).message;
+        }
+        await new Promise((r) => setTimeout(r, 2000 * deneme));
+      }
+      if (sonHata) throw new Error("Yüklenemedi: " + sonHata);
 
       await apiPost({ islem: "tamamla", yol: a.yol, durum: "sikistirildi", eskiBoyut: s.eskiBoyut, yeniBoyut: s.yeniBoyut });
       return { yol: a.yol, eski: s.eskiBoyut, yeni: s.yeniBoyut, durum: "sıkıştırıldı" };
