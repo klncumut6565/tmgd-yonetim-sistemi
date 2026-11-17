@@ -32,6 +32,7 @@ import { pdfIlkSayfayiGorselYap } from "@/lib/pdfSayfaGorseli";
 import { useUser } from "@/hooks/useUser";
 import { depoDosyasiGetir } from "@/lib/depoOnbellek";
 import type { AracEvrakBelgesi, LogoData } from "@/lib/aracEvraklariPdf";
+import { dosyaSikistir } from "@/lib/dosyaSikistir";
 
 type Arac = { id: string; plate_number: string };
 
@@ -358,7 +359,8 @@ export default function AracEvraklari({
     setBusy(true);
     setError("");
     try {
-      for (const file of Array.from(files)) {
+      for (const hamDosya of Array.from(files)) {
+        const file = await dosyaSikistir(hamDosya);
         const uzanti = file.name.includes(".") ? file.name.split(".").pop() : "";
         const yol = `${firmId}/firma-ortak-belgeler/${tur}_${Date.now()}_${Math.random().toString(36).slice(2, 7)}${uzanti ? "." + uzanti : ""}`;
         const { error: upErr } = await supabase.storage.from("firm-files").upload(yol, file, { upsert: false });
@@ -404,7 +406,8 @@ export default function AracEvraklari({
     setBusy(true);
     setError("");
     try {
-      for (const file of Array.from(files)) {
+      for (const hamDosya of Array.from(files)) {
+        const file = await dosyaSikistir(hamDosya);
         const uzanti = file.name.includes(".") ? file.name.split(".").pop() : "";
         const yol = `${firmId}/firm_arac_evraklari/${secilenAracId}/${anahtar}_${Date.now()}_${Math.random().toString(36).slice(2, 7)}${uzanti ? "." + uzanti : ""}`;
         const { error: upErr } = await supabase.storage.from("firm-files").upload(yol, file, { upsert: false });

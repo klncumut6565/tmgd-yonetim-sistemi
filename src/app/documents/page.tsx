@@ -13,6 +13,7 @@ import { useUser } from "@/hooks/useUser";
 import { hataCevir } from "@/lib/hataCevir";
 import DateInput from "@/components/DateInput";
 import CompanyBlockGuard from "@/components/CompanyBlockGuard";
+import { dosyaSikistir } from "@/lib/dosyaSikistir";
 
 type Firm = { id: string; name: string };
 type DocType = { id: string; code: string; name: string };
@@ -188,12 +189,13 @@ export default function DocumentsPage() {
 
     // 2) Dosya varsa Storage'a yükle
     if (fFile && newDoc) {
+      const yuklenecek = await dosyaSikistir(fFile);
       const ext = fFile.name.split(".").pop();
       const path = `${firmId}/${newDoc.id}/v1.${ext}`;
 
       const { error: uploadErr } = await supabase.storage
         .from("firm-files")
-        .upload(path, fFile, { upsert: true });
+        .upload(path, yuklenecek, { upsert: true });
 
       if (uploadErr) {
         // Belge kaydedildi ama dosya yüklenmedi — uyar, devam et
@@ -211,7 +213,7 @@ export default function DocumentsPage() {
           storage_path: path,
           file_extension: ext,
           mime_type: fFile.type,
-          file_size: fFile.size,
+          file_size: yuklenecek.size,
           version_no: 1,
           is_latest: true,
         });

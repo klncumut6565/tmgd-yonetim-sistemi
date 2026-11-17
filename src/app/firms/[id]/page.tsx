@@ -42,6 +42,7 @@ import {
   VISIT_FIELDS,
   VISIT_REPORT_TEMPLATE,
 } from "@/lib/firmScopedFields";
+import { dosyaSikistir } from "@/lib/dosyaSikistir";
 
 type Firm = {
   id: string;
@@ -711,7 +712,8 @@ function FirmDetailInner({
     setUploadingKey(key);
     setFileMsg("");
 
-    for (const file of files) {
+    for (const hamDosya of files) {
+      const file = await dosyaSikistir(hamDosya);
       const safeName = file.name.replace(/[^a-zA-Z0-9_.-]/g, "_");
       const path = `${id}/belge-takip/${code}_${period || "genel"}/${Date.now()}_${safeName}`;
 

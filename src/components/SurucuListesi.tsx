@@ -27,6 +27,7 @@ import DateInput from "@/components/DateInput";
 import { useUser } from "@/hooks/useUser";
 
 import { depoDosyasiGetir } from "@/lib/depoOnbellek";
+import { dosyaSikistir } from "@/lib/dosyaSikistir";
 type SurucuKaydi = {
   id: string;
   firm_id: string;
@@ -279,6 +280,7 @@ export default function SurucuListesi({
     setRows((prev) => prev.map((r) => (r.key === satir.key ? { ...r, kaydediliyor: true } : r)));
     setError("");
     try {
+      file = await dosyaSikistir(file);
       const uzanti = file.name.includes(".") ? file.name.split(".").pop() : "";
       const guvenliAd = `${tur}_${Date.now()}${uzanti ? "." + uzanti : ""}`;
       const yol = `${firmId}/firm_surucu_listesi/${satir.id}/${guvenliAd}`;

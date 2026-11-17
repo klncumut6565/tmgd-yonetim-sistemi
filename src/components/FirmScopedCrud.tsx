@@ -15,6 +15,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase/client";
 import { useUser } from "@/hooks/useUser";
 import { hataCevir } from "@/lib/hataCevir";
+import { dosyaSikistir } from "@/lib/dosyaSikistir";
 
 export type FieldType = "text" | "number" | "date" | "select" | "textarea";
 
@@ -282,6 +283,7 @@ export default function FirmScopedCrud({
 
     // Dosya adındaki Türkçe karakter ve boşluklar Storage yolunda sorun
     // çıkarabildiği için yol güvenli hale getirilir; orijinal ad ayrıca saklanır.
+    file = await dosyaSikistir(file);
     const uzanti = file.name.includes(".") ? file.name.split(".").pop() : "";
     const guvenliAd = `${Date.now()}${uzanti ? "." + uzanti : ""}`;
     const yol = `${firmId}/${table}/${rowId}/${guvenliAd}`;

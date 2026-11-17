@@ -16,6 +16,7 @@ import Link from "next/link";
 import { supabase } from "@/lib/supabase/client";
 import { useUser } from "@/hooks/useUser";
 import { hataCevir } from "@/lib/hataCevir";
+import { dosyaSikistir } from "@/lib/dosyaSikistir";
 
 type AtikFirmasi = {
   id: string;
@@ -182,18 +183,19 @@ export default function AtikFirmalariPage() {
     let yeniMime: string | null = null;
 
     if (dosya) {
+      const yuklenecek = await dosyaSikistir(dosya);
       const uzanti = dosya.name.split(".").pop() || "pdf";
       yeniYol = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${uzanti}`;
       const { error: upErr } = await supabase.storage
         .from("atik-firmalari-tmfb")
-        .upload(yeniYol, dosya, { contentType: dosya.type || undefined });
+        .upload(yeniYol, yuklenecek, { contentType: dosya.type || undefined });
       if (upErr) {
         setYukleniyor(false);
         setMesaj("Dosya yüklenemedi: " + upErr.message);
         return;
       }
       yeniAd = dosya.name;
-      yeniBoyut = dosya.size;
+      yeniBoyut = yuklenecek.size;
       yeniMime = dosya.type || null;
     }
 
