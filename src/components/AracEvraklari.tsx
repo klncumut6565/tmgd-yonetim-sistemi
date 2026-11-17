@@ -33,6 +33,7 @@ import { useUser } from "@/hooks/useUser";
 import { depoDosyasiGetir } from "@/lib/depoOnbellek";
 import type { AracEvrakBelgesi, LogoData } from "@/lib/aracEvraklariPdf";
 import { dosyaSikistir } from "@/lib/dosyaSikistir";
+import { depoImzaliUrl, depoSil, depoYukle } from "@/lib/depo";
 
 type Arac = { id: string; plate_number: string };
 
@@ -363,7 +364,7 @@ export default function AracEvraklari({
         const file = await dosyaSikistir(hamDosya);
         const uzanti = file.name.includes(".") ? file.name.split(".").pop() : "";
         const yol = `${firmId}/firma-ortak-belgeler/${tur}_${Date.now()}_${Math.random().toString(36).slice(2, 7)}${uzanti ? "." + uzanti : ""}`;
-        const { error: upErr } = await supabase.storage.from("firm-files").upload(yol, file, { upsert: false });
+        const { error: upErr } = await depoYukle(yol, file, { upsert: false });
         if (upErr) throw upErr;
 
         const { error: dbErr } = await supabase.from("firm_arac_evrak_dosyalari").insert({
@@ -374,7 +375,7 @@ export default function AracEvraklari({
           file_name: file.name,
         });
         if (dbErr) {
-          await supabase.storage.from("firm-files").remove([yol]);
+          await depoSil([yol]);
           throw dbErr;
         }
       }
@@ -393,7 +394,7 @@ export default function AracEvraklari({
     try {
       const { error: dbErr } = await supabase.from("firm_arac_evrak_dosyalari").delete().eq("id", dosya.id);
       if (dbErr) throw dbErr;
-      await supabase.storage.from("firm-files").remove([dosya.file_path]);
+      await depoSil([dosya.file_path]);
       setOrtakDosyalar((prev) => ({ ...prev, [tur]: prev[tur].filter((d) => d.id !== dosya.id) }));
     } catch (e) {
       setError(hataCevir(e as { message?: string }));
@@ -410,7 +411,7 @@ export default function AracEvraklari({
         const file = await dosyaSikistir(hamDosya);
         const uzanti = file.name.includes(".") ? file.name.split(".").pop() : "";
         const yol = `${firmId}/firm_arac_evraklari/${secilenAracId}/${anahtar}_${Date.now()}_${Math.random().toString(36).slice(2, 7)}${uzanti ? "." + uzanti : ""}`;
-        const { error: upErr } = await supabase.storage.from("firm-files").upload(yol, file, { upsert: false });
+        const { error: upErr } = await depoYukle(yol, file, { upsert: false });
         if (upErr) throw upErr;
 
         const { error: dbErr } = await supabase.from("firm_arac_evrak_dosyalari").insert({
@@ -421,7 +422,7 @@ export default function AracEvraklari({
           file_name: file.name,
         });
         if (dbErr) {
-          await supabase.storage.from("firm-files").remove([yol]);
+          await depoSil([yol]);
           throw dbErr;
         }
       }
@@ -440,7 +441,7 @@ export default function AracEvraklari({
     try {
       const { error: dbErr } = await supabase.from("firm_arac_evrak_dosyalari").delete().eq("id", dosya.id);
       if (dbErr) throw dbErr;
-      await supabase.storage.from("firm-files").remove([dosya.file_path]);
+      await depoSil([dosya.file_path]);
       setAracDosyalar((prev) => ({ ...prev, [anahtar]: prev[anahtar].filter((d) => d.id !== dosya.id) }));
     } catch (e) {
       setError(hataCevir(e as { message?: string }));
@@ -492,7 +493,7 @@ export default function AracEvraklari({
   }
 
   async function belgeGoruntule(yol: string) {
-    const { data } = await supabase.storage.from("firm-files").createSignedUrl(yol, 600);
+    const { data } = await depoImzaliUrl(yol, 600);
     if (data?.signedUrl) window.open(data.signedUrl, "_blank");
   }
 

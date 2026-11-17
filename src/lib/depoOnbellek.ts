@@ -9,6 +9,7 @@
 // 2) PDF ÜRETİMİ: Logo ve belge ekleri sayfa oturumu boyunca bellekte tutulur → önizleme ve indirme
 //    aynı dosyayı ikinci kez indirmez.
 import { supabase } from "@/lib/supabase/client";
+import { depoImzaliUrl, depoImzaliUrller, depoYukle } from "@/lib/depo";
 
 const LOGO_BUCKET = "firm-files";
 const URL_TTL_SN = 6 * 3600; // imzalı bağlantı ömrü
@@ -66,9 +67,7 @@ export async function logoKucukKopyaYukle(yol: string, kaynak: Blob): Promise<bo
       (await new Promise<Blob | null>((r) => c.toBlob(r, "image/webp", 0.85))) ??
       (await new Promise<Blob | null>((r) => c.toBlob(r, "image/png")));
     if (!blob) return false;
-    const { error } = await supabase.storage
-      .from(LOGO_BUCKET)
-      .upload(logoKucukYolu(yol), blob, { upsert: false, contentType: blob.type, cacheControl: "31536000" });
+    const { error } = await depoYukle(logoKucukYolu(yol), blob, { upsert: false, contentType: blob.type });
     return !error;
   } catch {
     return false;
@@ -107,27 +106,25 @@ export async function firmaLogoAdresleri(yollar: string[]): Promise<Record<strin
 
   const bitis = Date.now() + URL_TTL_SN * 1000;
   const yeni: Record<string, Kayit> = {};
-  const depo = supabase.storage.from(LOGO_BUCKET);
-
   // 1) Küçük kopyalar (tek istek)
-  const { data: kucukler } = await depo.createSignedUrls(eksik.map(logoKucukYolu), URL_TTL_SN);
+  const kucukler = await depoImzaliUrller(eksik.map(logoKucukYolu), URL_TTL_SN);
   const kucukYok: string[] = [];
   eksik.forEach((y, i) => {
-    const s = kucukler?.[i];
-    if (s && !s.error && s.signedUrl) yeni[y] = { url: s.signedUrl, bitis };
+    const u = kucukler[i];
+    if (u) yeni[y] = { url: u, bitis };
     else kucukYok.push(y);
   });
 
   // 2) Küçük kopyası olmayanlar için orijinal (tek istek) + arka planda küçük kopya üretimi
   if (kucukYok.length) {
-    const { data: orijinaller } = await depo.createSignedUrls(kucukYok, URL_TTL_SN);
+    const orijinaller = await depoImzaliUrller(kucukYok, URL_TTL_SN);
     const uretilecek: { yol: string; url: string }[] = [];
     kucukYok.forEach((y, i) => {
-      const s = orijinaller?.[i];
-      if (s && !s.error && s.signedUrl) {
+      const u = orijinaller[i];
+      if (u) {
         // Orijinal kısa süre saklanır: küçük kopya üretilince bir sonraki açılışta o kullanılsın
-        yeni[y] = { url: s.signedUrl, bitis: Date.now() + 20 * 60_000 };
-        uretilecek.push({ yol: y, url: s.signedUrl });
+        yeni[y] = { url: u, bitis: Date.now() + 20 * 60_000 };
+        uretilecek.push({ yol: y, url: u });
       }
     });
     if (uretilecek.length) setTimeout(() => void eksikKucukleriUret(uretilecek), 1500);
@@ -160,7 +157,10 @@ export function depoDosyasiGetir(bucket: string, yol: string): Promise<Blob | nu
   const var_ = dosyaBellegi.get(anahtar);
   if (var_) return var_;
   const p = (async () => {
-    const { data: signed } = await supabase.storage.from(bucket).createSignedUrl(yol, 600);
+    const { data: signed } =
+      bucket === LOGO_BUCKET
+        ? await depoImzaliUrl(yol, 600)
+        : await supabase.storage.from(bucket).createSignedUrl(yol, 600);
     if (!signed?.signedUrl) return null;
     const res = await fetch(signed.signedUrl);
     if (!res.ok) return null;

@@ -16,6 +16,7 @@ import { hataCevir } from "@/lib/hataCevir";
 import { ACTIVITIES, ACTIVITY_LABELS, buildChecklist } from "@/lib/belgeKatalogu";
 
 import { firmaLogoAdresleri, logoKucukKopyaYukle } from "@/lib/depoOnbellek";
+import { depoYukle } from "@/lib/depo";
 type Firm = {
   id: string;
   name: string;
@@ -258,9 +259,7 @@ export default function FirmsPage() {
     if (logoFile) {
       const safeName = logoFile.name.replace(/[^a-zA-Z0-9_.-]/g, "_");
       const path = `${created.id}/logo/${Date.now()}_${safeName}`;
-      const { error: upErr } = await supabase.storage
-        .from("firm-files")
-        .upload(path, logoFile, { upsert: true });
+      const { error: upErr } = await depoYukle(path, logoFile, { upsert: true });
 
       if (upErr) {
         setError("Firma eklendi ama logo yüklenemedi: " + hataCevir(upErr));

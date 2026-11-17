@@ -43,6 +43,7 @@ import {
   VISIT_REPORT_TEMPLATE,
 } from "@/lib/firmScopedFields";
 import { dosyaSikistir } from "@/lib/dosyaSikistir";
+import { depoImzaliUrl, depoYukle } from "@/lib/depo";
 
 type Firm = {
   id: string;
@@ -717,9 +718,7 @@ function FirmDetailInner({
       const safeName = file.name.replace(/[^a-zA-Z0-9_.-]/g, "_");
       const path = `${id}/belge-takip/${code}_${period || "genel"}/${Date.now()}_${safeName}`;
 
-      const { error: upErr } = await supabase.storage
-        .from("firm-files")
-        .upload(path, file, { upsert: true });
+      const { error: upErr } = await depoYukle(path, file, { upsert: true });
 
       if (upErr) {
         setFileMsg(`"${file.name}" yüklenemedi: ` + hataCevir(upErr));
@@ -793,9 +792,7 @@ function FirmDetailInner({
       setOnizleme(null);
       // 1 saat: paneli açık bırakıp başka maddelere bakan kullanıcıda
       // bağlantının erken düşmemesi için.
-      const { data, error } = await supabase.storage
-        .from("firm-files")
-        .createSignedUrl(dosya.file_path, 3600);
+      const { data, error } = await depoImzaliUrl(dosya.file_path, 3600);
       if (istek !== onizlemeIstekRef.current) return; // bu arada kapatıldı / başka dosya açıldı
       setOnizlemeYukleniyor(false);
       if (error || !data?.signedUrl) {
@@ -823,9 +820,7 @@ function FirmDetailInner({
   }, [onizleme, onizlemeYukleniyor, onizlemeKapat]);
 
   async function downloadItemFile(path: string) {
-    const { data, error } = await supabase.storage
-      .from("firm-files")
-      .createSignedUrl(path, 300);
+    const { data, error } = await depoImzaliUrl(path, 300);
     if (error || !data?.signedUrl) {
       setFileMsg("İndirme bağlantısı oluşturulamadı: " + hataCevir(error));
       return;
@@ -929,9 +924,7 @@ function FirmDetailInner({
     setLogoUploading(true);
     const safeName = file.name.replace(/[^a-zA-Z0-9_.-]/g, "_");
     const path = `${id}/logo/${Date.now()}_${safeName}`;
-    const { error: upErr } = await supabase.storage
-      .from("firm-files")
-      .upload(path, file, { upsert: true });
+    const { error: upErr } = await depoYukle(path, file, { upsert: true });
 
     if (upErr) {
       setSaveMsg("Logo yüklenemedi: " + hataCevir(upErr));

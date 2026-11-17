@@ -27,6 +27,32 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { r2Etkin, r2Sil, r2Yaz } from '@/lib/r2'
+// ---- Dosya deposu: R2 tanımlıysa R2, değilse Supabase (firm-files) ----
+async function depoyaYaz(
+  supabase: ReturnType<typeof createAdminClient>,
+  yol: string,
+  dosya: Blob
+): Promise<{ error: { message: string } | null }> {
+  if (r2Etkin()) {
+    try {
+      await r2Yaz(yol, dosya, 'application/pdf')
+      return { error: null }
+    } catch (e) {
+      return { error: { message: (e as Error).message } }
+    }
+  }
+  const { error } = await supabase.storage
+    .from('firm-files')
+    .upload(yol, dosya, { upsert: true, contentType: 'application/pdf' })
+  return { error: error ? { message: error.message } : null }
+}
+
+async function depodanSil(supabase: ReturnType<typeof createAdminClient>, yol: string) {
+  if (r2Etkin()) await r2Sil(yol).catch(() => {})
+  await supabase.storage.from('firm-files').remove([yol])
+}
+
 
 export const dynamic = 'force-dynamic'
 
@@ -111,9 +137,7 @@ export async function POST(req: NextRequest) {
       }
       yol = `${oturum.firm_id}/firma-ortak-belgeler/${tur}_${Date.now()}.pdf`
 
-      const { error: yuklemeHata } = await supabase.storage
-        .from('firm-files')
-        .upload(yol, dosya, { upsert: false, contentType: 'application/pdf' })
+      const { error: yuklemeHata } = await depoyaYaz(supabase, yol, dosya)
       if (yuklemeHata) {
         return corsJson({ error: 'Dosya kaydedilemedi: ' + yuklemeHata.message }, 500)
       }
@@ -126,7 +150,7 @@ export async function POST(req: NextRequest) {
         file_name: guvenliAd,
       })
       if (dbHata) {
-        await supabase.storage.from('firm-files').remove([yol])
+        await depodanSil(supabase, yol)
         return corsJson({ error: 'Belge kaydı oluşturulamadı: ' + dbHata.message }, 500)
       }
     } else if (hedefTipi === 'arac_ozel') {
@@ -140,9 +164,7 @@ export async function POST(req: NextRequest) {
       }
       yol = `${oturum.firm_id}/firm_arac_evraklari/${vehicleId}/${anahtar}_${Date.now()}.pdf`
 
-      const { error: yuklemeHata } = await supabase.storage
-        .from('firm-files')
-        .upload(yol, dosya, { upsert: false, contentType: 'application/pdf' })
+      const { error: yuklemeHata } = await depoyaYaz(supabase, yol, dosya)
       if (yuklemeHata) {
         return corsJson({ error: 'Dosya kaydedilemedi: ' + yuklemeHata.message }, 500)
       }
@@ -156,7 +178,7 @@ export async function POST(req: NextRequest) {
       })
 
       if (dbHata) {
-        await supabase.storage.from('firm-files').remove([yol])
+        await depodanSil(supabase, yol)
         return corsJson({ error: 'Belge kaydı oluşturulamadı: ' + dbHata.message }, 500)
       }
     } else if (hedefTipi === 'surucu_belge') {
@@ -168,9 +190,7 @@ export async function POST(req: NextRequest) {
       }
       yol = `${oturum.firm_id}/firm_surucu_listesi/${satirId}/${tur}_${Date.now()}.pdf`
 
-      const { error: yuklemeHata } = await supabase.storage
-        .from('firm-files')
-        .upload(yol, dosya, { upsert: false, contentType: 'application/pdf' })
+      const { error: yuklemeHata } = await depoyaYaz(supabase, yol, dosya)
       if (yuklemeHata) {
         return corsJson({ error: 'Dosya kaydedilemedi: ' + yuklemeHata.message }, 500)
       }
@@ -184,7 +204,7 @@ export async function POST(req: NextRequest) {
         .update({ [alan.yol]: yol, [alan.ad]: guvenliAd })
         .eq('id', satirId)
       if (dbHata) {
-        await supabase.storage.from('firm-files').remove([yol])
+        await depodanSil(supabase, yol)
         return corsJson({ error: 'Belge kaydı oluşturulamadı: ' + dbHata.message }, 500)
       }
     } else {
@@ -192,9 +212,7 @@ export async function POST(req: NextRequest) {
       const donem = oturum.period || 'genel'
       yol = `${oturum.firm_id}/belge-takip/${oturum.code}_${donem}/${Date.now()}_${guvenliAd}`
 
-      const { error: yuklemeHata } = await supabase.storage
-        .from('firm-files')
-        .upload(yol, dosya, { upsert: true, contentType: 'application/pdf' })
+      const { error: yuklemeHata } = await depoyaYaz(supabase, yol, dosya)
       if (yuklemeHata) {
         return corsJson({ error: 'Dosya kaydedilemedi: ' + yuklemeHata.message }, 500)
       }
@@ -207,7 +225,7 @@ export async function POST(req: NextRequest) {
         file_name: guvenliAd,
       })
       if (dbHata) {
-        await supabase.storage.from('firm-files').remove([yol])
+        await depodanSil(supabase, yol)
         return corsJson({ error: 'Belge kaydı oluşturulamadı: ' + dbHata.message }, 500)
       }
 

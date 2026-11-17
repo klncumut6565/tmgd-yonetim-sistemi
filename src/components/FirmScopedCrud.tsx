@@ -16,6 +16,7 @@ import { supabase } from "@/lib/supabase/client";
 import { useUser } from "@/hooks/useUser";
 import { hataCevir } from "@/lib/hataCevir";
 import { dosyaSikistir } from "@/lib/dosyaSikistir";
+import { depoImzaliUrl, depoSil, depoYukle } from "@/lib/depo";
 
 export type FieldType = "text" | "number" | "date" | "select" | "textarea";
 
@@ -260,9 +261,7 @@ export default function FirmScopedCrud({
   async function onizlemeAc(d: KayitDosya) {
     setOnizlemeYukleniyor(true);
     setOnizleme(null);
-    const { data, error } = await supabase.storage
-      .from("firm-files")
-      .createSignedUrl(d.file_path, 3600);
+    const { data, error } = await depoImzaliUrl(d.file_path, 3600);
     setOnizlemeYukleniyor(false);
     if (error || !data?.signedUrl) {
       setDosyaMsg("Önizleme bağlantısı oluşturulamadı: " + hataCevir(error));
@@ -288,9 +287,7 @@ export default function FirmScopedCrud({
     const guvenliAd = `${Date.now()}${uzanti ? "." + uzanti : ""}`;
     const yol = `${firmId}/${table}/${rowId}/${guvenliAd}`;
 
-    const { error: upErr } = await supabase.storage
-      .from("firm-files")
-      .upload(yol, file, { upsert: false });
+    const { error: upErr } = await depoYukle(yol, file, { upsert: false });
 
     if (upErr) {
       setDosyaYukleniyor(false);
@@ -309,7 +306,7 @@ export default function FirmScopedCrud({
     setDosyaYukleniyor(false);
     if (dbErr) {
       // Kayıt açılamadıysa yüklenen dosyayı geride bırakma
-      await supabase.storage.from("firm-files").remove([yol]);
+      await depoSil([yol]);
       setDosyaMsg("Dosya kaydedilemedi: " + hataCevir(dbErr));
       return;
     }
@@ -326,7 +323,7 @@ export default function FirmScopedCrud({
       setDosyaMsg("Dosya silinemedi: " + hataCevir(error));
       return;
     }
-    await supabase.storage.from("firm-files").remove([d.file_path]);
+    await depoSil([d.file_path]);
     if (onizleme?.id === d.id) setOnizleme(null);
     if (firmId) await loadDosyalar(firmId);
   }

@@ -28,6 +28,7 @@ import { useUser } from "@/hooks/useUser";
 
 import { depoDosyasiGetir } from "@/lib/depoOnbellek";
 import { dosyaSikistir } from "@/lib/dosyaSikistir";
+import { depoImzaliUrl, depoSil, depoYukle } from "@/lib/depo";
 type SurucuKaydi = {
   id: string;
   firm_id: string;
@@ -285,9 +286,7 @@ export default function SurucuListesi({
       const guvenliAd = `${tur}_${Date.now()}${uzanti ? "." + uzanti : ""}`;
       const yol = `${firmId}/firm_surucu_listesi/${satir.id}/${guvenliAd}`;
 
-      const { error: upErr } = await supabase.storage
-        .from("firm-files")
-        .upload(yol, file, { upsert: false });
+      const { error: upErr } = await depoYukle(yol, file, { upsert: false });
       if (upErr) throw upErr;
 
       const alan = BELGE_ALANLARI[tur];
@@ -296,7 +295,7 @@ export default function SurucuListesi({
         .update({ [alan.yol]: yol, [alan.ad]: file.name })
         .eq("id", satir.id);
       if (dbErr) {
-        await supabase.storage.from("firm-files").remove([yol]);
+        await depoSil([yol]);
         throw dbErr;
       }
 
@@ -328,7 +327,7 @@ export default function SurucuListesi({
         .update({ [alan.yol]: null, [alan.ad]: null })
         .eq("id", satir.id);
       if (dbErr) throw dbErr;
-      await supabase.storage.from("firm-files").remove([yol]);
+      await depoSil([yol]);
       setRows((prev) =>
         prev.map((r) => (r.key === satir.key ? { ...r, [alan.yol]: null, [alan.ad]: null } : r))
       );
@@ -338,7 +337,7 @@ export default function SurucuListesi({
   }
 
   async function belgeGoruntule(yol: string) {
-    const { data } = await supabase.storage.from("firm-files").createSignedUrl(yol, 600);
+    const { data } = await depoImzaliUrl(yol, 600);
     if (data?.signedUrl) window.open(data.signedUrl, "_blank");
   }
 

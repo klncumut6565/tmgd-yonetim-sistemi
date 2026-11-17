@@ -11,6 +11,7 @@
   "dependencies": {
     "@supabase/supabase-js": "2.45.4",
     "@types/leaflet": "^1.9.22",
+    "aws4fetch": "^1.0.20",
     "exceljs": "^4.4.0",
     "js-yaml": "^5.2.2",
     "jspdf": "^4.2.1",

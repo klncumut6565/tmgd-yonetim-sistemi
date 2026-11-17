@@ -43,6 +43,7 @@ import {
   veriyiNormallestir,
   type EmniyetPlaniManuelVeri,
 } from "@/lib/emniyetPlaniManuelAlanlar";
+import { depoImzaliUrl } from "@/lib/depo";
 // Leaflet (window/document'a ihtiyaç duyar) yalnızca istemcide, dinamik
 // olarak yüklenir — Next.js sunucu tarafı render'ında (SSR) çökmesin diye.
 const RotaHaritasi = dynamic(() => import("@/components/RotaHaritasi"), {
@@ -260,9 +261,7 @@ export default function EmniyetKapsamTaramasi({ firmId, firmaAdi }: Props) {
       }
 
       // 2) İndir
-      const { data: url } = await supabase.storage
-        .from("firm-files")
-        .createSignedUrl(dosya.file_path, 300);
+      const { data: url } = await depoImzaliUrl(dosya.file_path, 300);
       if (!url?.signedUrl) {
         setMesaj("Dosya indirilemedi.");
         return;

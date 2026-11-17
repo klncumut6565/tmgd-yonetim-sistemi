@@ -20,6 +20,7 @@ import type { jsPDF as JsPDFType } from "jspdf";
 import { supabase } from "@/lib/supabase/client";
 import { hataCevir } from "@/lib/hataCevir";
 import { useUser } from "@/hooks/useUser";
+import { depoImzaliUrl, depoYukle } from "@/lib/depo";
 
 type UnRow = {
   id: string;
@@ -238,9 +239,7 @@ export default function KimyasalEnvanter({
       }
 
       // 2) İndir
-      const { data: url } = await supabase.storage
-        .from("firm-files")
-        .createSignedUrl(dosya.file_path, 300);
+      const { data: url } = await depoImzaliUrl(dosya.file_path, 300);
       if (!url?.signedUrl) {
         setMesaj("Dosya indirilemedi.");
         return;
@@ -561,9 +560,7 @@ export default function KimyasalEnvanter({
       const dosyaAdi = `L1_Envanter_Listesi_${bugun.replace(/\./g, "-")}.pdf`;
       const yol = `${firmId}/belge-takip/L1_genel/${Date.now()}_${dosyaAdi}`;
 
-      const { error: upErr } = await supabase.storage
-        .from("firm-files")
-        .upload(yol, pdfBlob, { upsert: true, contentType: "application/pdf" });
+      const { error: upErr } = await depoYukle(yol, pdfBlob, { upsert: true, contentType: "application/pdf" });
       if (upErr) {
         setMesaj("L1 yüklenemedi: " + hataCevir(upErr));
         return;

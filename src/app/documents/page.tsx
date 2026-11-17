@@ -14,6 +14,7 @@ import { hataCevir } from "@/lib/hataCevir";
 import DateInput from "@/components/DateInput";
 import CompanyBlockGuard from "@/components/CompanyBlockGuard";
 import { dosyaSikistir } from "@/lib/dosyaSikistir";
+import { depoImzaliUrl, depoYukle } from "@/lib/depo";
 
 type Firm = { id: string; name: string };
 type DocType = { id: string; code: string; name: string };
@@ -193,9 +194,7 @@ export default function DocumentsPage() {
       const ext = fFile.name.split(".").pop();
       const path = `${firmId}/${newDoc.id}/v1.${ext}`;
 
-      const { error: uploadErr } = await supabase.storage
-        .from("firm-files")
-        .upload(path, yuklenecek, { upsert: true });
+      const { error: uploadErr } = await depoYukle(path, yuklenecek, { upsert: true });
 
       if (uploadErr) {
         // Belge kaydedildi ama dosya yüklenmedi — uyar, devam et
@@ -234,9 +233,7 @@ export default function DocumentsPage() {
   }
 
   async function getDownloadUrl(path: string) {
-    const { data } = await supabase.storage
-      .from("firm-files")
-      .createSignedUrl(path, 60);
+    const { data } = await depoImzaliUrl(path, 60);
     if (data?.signedUrl) window.open(data.signedUrl, "_blank");
   }
 

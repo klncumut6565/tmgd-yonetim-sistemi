@@ -201,6 +201,8 @@ export default function DepolamaPage() {
           </tbody>
         </table>
       )}
+
+      <R2Aktarim />
     </div>
   );
 }
@@ -210,6 +212,116 @@ function Kutu({ baslik, deger }: { baslik: string; deger: string }) {
     <div className="p-3 rounded border bg-white">
       <div className="text-xs text-gray-500">{baslik}</div>
       <div className="font-semibold">{deger}</div>
+    </div>
+  );
+}
+
+// ============================================================ R2'YE TAŞIMA
+type R2Durum = { durum: string; mesaj?: string };
+type R2Ozet = { toplam_dosya: number; toplam_bayt: number; tasinan: number; tasinan_bayt: number; hatali: number };
+
+function R2Aktarim() {
+  const [r2, setR2] = useState<R2Durum | null>(null);
+  const [ozet, setOzet] = useState<R2Ozet | null>(null);
+  const [adaylar, setAdaylar] = useState<Aday[]>([]);
+  const [hata, setHata] = useState("");
+  const [calisiyor, setCalisiyor] = useState(false);
+  const [islenen, setIslenen] = useState(0);
+  const [hatalar, setHatalar] = useState<string[]>([]);
+  const durdur = useRef(false);
+
+  const yukle = useCallback(async () => {
+    setHata("");
+    const r = await authFetch("/api/admin/r2-aktar");
+    const j = await r.json().catch(() => ({}));
+    setR2(j.r2 ?? null);
+    if (!r.ok) setHata(j.error || "Bilgi alınamadı.");
+    setOzet(j.ozet ?? null);
+    setAdaylar(j.adaylar ?? []);
+  }, []);
+
+  useEffect(() => {
+    yukle();
+  }, [yukle]);
+
+  async function baslat() {
+    durdur.current = false;
+    setCalisiyor(true);
+    setIslenen(0);
+    setHatalar([]);
+    const kuyruk = [...adaylar];
+    const isci = async () => {
+      while (!durdur.current) {
+        const a = kuyruk.shift();
+        if (!a) return;
+        const r = await authFetch("/api/admin/r2-aktar", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ yol: a.yol }),
+        }).catch(() => null);
+        if (!r || !r.ok) {
+          const j = r ? await r.json().catch(() => ({})) : {};
+          setHatalar((l) => [`${a.yol.slice(a.yol.lastIndexOf("/") + 1)}: ${j.error || "bağlantı hatası"}`, ...l].slice(0, 20));
+        }
+        setIslenen((n) => n + 1);
+      }
+    };
+    await Promise.all([isci(), isci(), isci()]);
+    setCalisiyor(false);
+    await yukle();
+  }
+
+  const yuzde = adaylar.length ? Math.round((islenen / adaylar.length) * 100) : 0;
+
+  return (
+    <div className="mt-10 pt-6 border-t">
+      <h2 className="text-2xl font-bold mb-3">Cloudflare R2&apos;ye Taşı</h2>
+      <div className="mb-4 p-4 rounded bg-blue-50 text-blue-900 text-sm space-y-1">
+        <p>Dosyalar R2&apos;ye <b>aynı yollarla</b> kopyalanır, veritabanı kayıtları değişmez. <b>Supabase&apos;deki dosyalar SİLİNMEZ.</b></p>
+        <p>Taşıma sürerken sistem çalışmaya devam eder: dosya R2&apos;de varsa oradan, yoksa Supabase&apos;den açılır.</p>
+      </div>
+
+      {r2 && (
+        <div className={`mb-4 p-3 rounded text-sm ${r2.durum === "tamam" ? "bg-green-50 text-green-800" : "bg-red-50 text-red-700"}`}>
+          {r2.durum === "tamam" ? "✓ R2 bağlantısı çalışıyor (yazma/okuma/silme testi başarılı)." : `R2 bağlantısı: ${r2.mesaj}`}
+        </div>
+      )}
+      {hata && <div className="mb-4 p-3 rounded bg-red-50 text-red-700 text-sm">{hata}</div>}
+
+      {ozet && (
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4">
+          <Kutu baslik="Supabase'deki dosyalar" deger={`${ozet.toplam_dosya} · ${mb(ozet.toplam_bayt)}`} />
+          <Kutu baslik="R2'ye taşınan" deger={`${ozet.tasinan} · ${mb(ozet.tasinan_bayt)}`} />
+          <Kutu baslik="Hatalı" deger={String(ozet.hatali)} />
+        </div>
+      )}
+
+      <div className="mb-4 flex items-center gap-3">
+        {!calisiyor ? (
+          <button
+            onClick={baslat}
+            disabled={!adaylar.length || r2?.durum !== "tamam"}
+            className="px-4 py-2 rounded bg-orange-600 text-white disabled:opacity-40"
+          >
+            {adaylar.length ? `R2'ye Taşımayı Başlat (${adaylar.length} dosya)` : "Taşınacak dosya yok"}
+          </button>
+        ) : (
+          <button onClick={() => (durdur.current = true)} className="px-4 py-2 rounded bg-red-600 text-white">Durdur</button>
+        )}
+        {!calisiyor && <button onClick={yukle} className="px-3 py-2 rounded border text-sm">Yenile</button>}
+      </div>
+
+      {(calisiyor || islenen > 0) && (
+        <div className="mb-4">
+          <div className="h-3 rounded bg-gray-200 overflow-hidden">
+            <div className="h-full bg-orange-500 transition-all" style={{ width: `${yuzde}%` }} />
+          </div>
+          <p className="text-sm text-gray-600 mt-1">{islenen} / {adaylar.length} dosya</p>
+        </div>
+      )}
+      {hatalar.length > 0 && (
+        <ul className="text-xs text-red-600 space-y-1">{hatalar.map((h, i) => <li key={i}>{h}</li>)}</ul>
+      )}
     </div>
   );
 }
