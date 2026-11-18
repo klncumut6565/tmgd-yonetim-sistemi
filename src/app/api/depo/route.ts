@@ -2,7 +2,7 @@
 //
 // Yetkiler Supabase Storage RLS politikalarıyla AYNI:
 //   okuma : is_admin() VEYA is_assigned(<yolun ilk parçası = firm_id>)
-//   yazma : is_admin() VEYA yazabilir()
+//   yazma : is_admin() VEYA (yazabilir() VE is_assigned(<firm_id>))
 //   silme : is_admin()
 //
 // Okuma: dosya R2'de varsa R2'den, yoksa Supabase'den imzalı adres verilir
@@ -94,6 +94,11 @@ export async function POST(req: NextRequest) {
     if (!k.admin) {
       const { data: yazar } = await k.db.rpc('yazabilir')
       if (yazar !== true) return NextResponse.json({ error: 'Yükleme yetkiniz yok.' }, { status: 403 })
+      // Yalnız atandığı firmanın klasörüne (Storage politikası 081 ile aynı)
+      const firma = yol.split('/')[0]
+      if (!UUID.test(firma)) return NextResponse.json({ error: 'Geçersiz yol.' }, { status: 400 })
+      const { data: atanmis } = await k.db.rpc('is_assigned', { p_firm_id: firma })
+      if (atanmis !== true) return NextResponse.json({ error: 'Bu firmaya yükleme yetkiniz yok.' }, { status: 403 })
     }
     if (!r2Etkin()) return NextResponse.json({ supabase: true })
 
