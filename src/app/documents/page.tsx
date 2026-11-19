@@ -14,7 +14,7 @@ import { hataCevir } from "@/lib/hataCevir";
 import DateInput from "@/components/DateInput";
 import CompanyBlockGuard from "@/components/CompanyBlockGuard";
 import { dosyaSikistir } from "@/lib/dosyaSikistir";
-import { depoImzaliUrl, depoYukle } from "@/lib/depo";
+import { depoImzaliUrl, depoSil, depoYukle } from "@/lib/depo";
 
 type Firm = { id: string; name: string };
 type DocType = { id: string; code: string; name: string };
@@ -228,8 +228,17 @@ export default function DocumentsPage() {
   async function handleDelete(doc: Doc) {
     if (!window.confirm(`"${doc.title}" belgesini silmek istediğine emin misin?`)) return;
     const { error } = await supabase.from("documents").delete().eq("id", doc.id);
-    if (error) setError(hataCevir(error));
-    else loadAll();
+    if (error) {
+      setError(hataCevir(error));
+      return;
+    }
+    // Belgenin dosyalarını da depodan (R2 + Supabase) kalıcı sil
+    const yollar = (doc.files || []).map((f) => f.storage_path).filter(Boolean);
+    if (yollar.length) {
+      const { error: silErr } = await depoSil(yollar);
+      if (silErr) setError("Belge silindi ama dosyası depodan silinemedi: " + silErr.message);
+    }
+    loadAll();
   }
 
   async function getDownloadUrl(path: string) {

@@ -43,7 +43,7 @@ import {
   VISIT_REPORT_TEMPLATE,
 } from "@/lib/firmScopedFields";
 import { dosyaSikistir } from "@/lib/dosyaSikistir";
-import { depoImzaliUrl, depoYukle } from "@/lib/depo";
+import { depoImzaliUrl, depoSil, depoYukle } from "@/lib/depo";
 
 type Firm = {
   id: string;
@@ -828,9 +828,9 @@ function FirmDetailInner({
     window.open(data.signedUrl, "_blank");
   }
 
-  async function removeAttachment(attachmentId: string) {
+  async function removeAttachment(attachmentId: string, filePath?: string) {
     if (!canWrite) return;
-    const ok = window.confirm("Bu dosyayı listeden kaldırmak istiyor musun?");
+    const ok = window.confirm("Bu dosya KALICI olarak silinecek. Emin misin?");
     if (!ok) return;
 
     const { error } = await supabase
@@ -841,6 +841,11 @@ function FirmDetailInner({
     if (error) {
       setFileMsg("Kaldırılamadı: " + hataCevir(error));
       return;
+    }
+    // Kayıt silindi; dosyanın kendisini de depodan (R2 + Supabase) sil
+    if (filePath) {
+      const { error: silErr } = await depoSil([filePath]);
+      if (silErr) setFileMsg("Kayıt silindi ama dosya depodan silinemedi: " + silErr.message);
     }
     loadBelgeler();
   }
@@ -1563,7 +1568,7 @@ function FirmDetailInner({
                                     </button>
                                     {canWrite && (
                                       <button
-                                        onClick={() => removeAttachment(f.id)}
+                                        onClick={() => removeAttachment(f.id, f.file_path)}
                                         title="Kaldır"
                                         className="shrink-0 px-1.5 py-0.5 rounded text-gray-400 hover:text-red-500 hover:bg-red-50"
                                       >
@@ -1735,7 +1740,7 @@ function FirmDetailInner({
                         {canWrite && (
                           <td className="p-3 text-right">
                             <button
-                              onClick={() => removeAttachment(f.id)}
+                              onClick={() => removeAttachment(f.id, f.file_path)}
                               className="text-xs text-gray-400 hover:text-red-500"
                             >
                               Kaldır

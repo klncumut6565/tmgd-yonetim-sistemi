@@ -3,7 +3,7 @@
 // Yetkiler Supabase Storage RLS politikalarıyla AYNI:
 //   okuma : is_admin() VEYA is_assigned(<yolun ilk parçası = firm_id>)
 //   yazma : is_admin() VEYA (yazabilir() VE is_assigned(<firm_id>))
-//   silme : is_admin()
+//   silme : is_admin() VEYA (yazabilir() VE is_assigned(<firm_id>)) — dosya R2 + Supabase'den kalıcı silinir
 //
 // Okuma: dosya R2'de varsa R2'den, yoksa Supabase'den imzalı adres verilir
 //        (taşıma sürerken kesinti olmaz).
@@ -110,8 +110,18 @@ export async function POST(req: NextRequest) {
 
   // ---------------------------------------------------------------- SİL
   if (islem === 'sil') {
-    if (!k.admin) return NextResponse.json({ error: 'Silme yetkiniz yok.' }, { status: 403 })
     const yollar = (Array.isArray(govde.yollar) ? govde.yollar : []).filter(gecerliYol).slice(0, 100)
+    if (!k.admin) {
+      // Yazma yetkili kullanıcı (tmgd/assistant) yalnız ATANDIĞI firmanın dosyalarını silebilir
+      const { data: yazar } = await k.db.rpc('yazabilir')
+      if (yazar !== true) return NextResponse.json({ error: 'Silme yetkiniz yok.' }, { status: 403 })
+      const firmalar = [...new Set(yollar.map((y: string) => y.split('/')[0]))] as string[]
+      for (const firma of firmalar) {
+        if (!UUID.test(firma)) return NextResponse.json({ error: 'Geçersiz yol.' }, { status: 400 })
+        const { data: atanmis } = await k.db.rpc('is_assigned', { p_firm_id: firma })
+        if (atanmis !== true) return NextResponse.json({ error: 'Bu firmanın dosyasını silme yetkiniz yok.' }, { status: 403 })
+      }
+    }
     if (r2Etkin()) await Promise.all(yollar.map((y: string) => r2Sil(y).catch(() => {})))
     await createAdminClient().storage.from(BUCKET).remove(yollar)
     return NextResponse.json({ ok: true })

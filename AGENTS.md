@@ -21,8 +21,9 @@ Claude Code, Codex ve diğer kod ajanları için proje kuralları. ECC (affaan-m
 9. **Raporla:** tsc/lint/build sonucu + "canlıda doğrulandı / doğrulanmadı" ayrı. Migration varsa "Supabase SQL Editor'de çalıştırılacak: NNN_..." açıkça yazılır.
 
 ## DOKUNULMAZLAR
-- Yüklenmiş firma dosyaları ASLA silinmez (kota dolsa bile). Çözüm: sıkıştırma (orijinal önce `firm-files-yedek`'e) veya R2'ye aynı yolla taşıma. E-imzalı ve şifreli PDF'lere dokunulmaz.
-- Silme/temizleme işlemi (DB satırı, bucket, dosya) kullanıcı açıkça istemeden yazılmaz.
+- Sistem firma dosyalarını KENDİLİĞİNDEN ASLA silmez (kota dolsa bile, toplu temizlik yok). Çözüm: sıkıştırma (orijinal önce `firm-files-yedek`'e) veya R2'ye aynı yolla taşıma. E-imzalı ve şifreli PDF'lere dokunulmaz.
+- İstisna: yetkili kullanıcının (admin, ya da firmaya atanmış tmgd/assistant) arayüzden "sil" dediği dosya, kaydıyla birlikte R2 + Supabase'den kalıcı silinir (`/api/depo` islem: sil). Önce kayıt, sonra dosya silinir.
+- Bunun dışında silme/temizleme işlemi (DB satırı, bucket, dosya) kullanıcı açıkça istemeden yazılmaz.
 - `SUPABASE_SERVICE_ROLE_KEY` ve R2 anahtarları yalnız sunucuda (`src/lib/supabase/admin.ts`, API route'ları). `NEXT_PUBLIC_` olarak ASLA.
 - Belge kuralları: `TMGDK-` öneki, SİAM TMGDK logo/QR kapak, çerçeve yalnız kapakta, Liberation Sans (Türkçe karakter), GG.AA.YYYY tarih, Türkçe arayüz.
 - Belge şablon kütüphanesi (P, T, K, L, SA kodları) ve K1–K9 kontrol formlarının mevcut düzeni.
