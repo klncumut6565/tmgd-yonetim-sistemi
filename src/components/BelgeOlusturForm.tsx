@@ -1369,10 +1369,10 @@ function renderBasitBelge(
 type Satir =
   | { tur: "baslik"; metin: string }
   | { tur: "altbaslik"; metin: string }
-  | { tur: "paragraf"; metin: string }
+  | { tur: "paragraf"; metin: string; parcalar?: Parca[] }
   // Şablondaki "note" bloğu: küçük punto, italik açıklama satırı.
-  | { tur: "not"; metin: string }
-  | { tur: "madde"; metin: string; numara?: number }
+  | { tur: "not"; metin: string; parcalar?: Parca[] }
+  | { tur: "madde"; metin: string; numara?: number; parcalar?: Parca[] }
   | { tur: "tablo"; headers?: string[]; rows: string[][]; note?: string; colWidths?: number[] }
   | { tur: "gorseller"; ids: string[]; sutun: number; yukseklik: number; note?: string }
   // Dinamik olarak (kayıt anında, örn. Emniyet Planı Ek-7 güzergah krokisi)
@@ -1454,6 +1454,128 @@ function cerceveCiz(doc: JsPDFType) {
   doc.setLineWidth(0.3);
 }
 const FONT = "LiberationSans"; // Türkçe karakter destekli gömülü font (bkz. pdfFonts.ts)
+
+// ---- Satır içi vurgu (kalın / italik) --------------------------------
+// Şablon metinlerinde Word aslındaki vurgular işaretlerle taşınır:
+//   {b}kalın{/b}   {i}italik{/i}   (iç içe: {b}{i}kalın italik{/i}{/b})
+// Paragraf, not, madde ve tablo hücrelerinde desteklenir. İşaretler
+// basılmaz; ilgili font yüklenemezse o kısım normal/kalın basılır.
+type Stil = "normal" | "bold" | "italic" | "bolditalic";
+type Parca = { t: string; s: Stil };
+const VURGU_ISARETI = /\{(\/?)(b|i)\}/g;
+/** Satır içi vurgu işaretlerini siler (düz metin gereken yerler için). */
+function vurguIsaretleriniTemizle(metin: string): string {
+  return metin.replace(VURGU_ISARETI, "");
+}
+// Render başında hangi ek font varyantlarının jsPDF'e tanıtıldığı.
+const yukluStiller = { italic: false, bolditalic: false };
+function yazilabilirStil(st: Stil): Stil {
+  if (st === "italic" && !yukluStiller.italic) return "normal";
+  if (st === "bolditalic" && !yukluStiller.bolditalic) return "bold";
+  return st;
+}
+function stilBirlestir(temel: Stil, kalin: boolean, italik: boolean): Stil {
+  const b = kalin || temel === "bold" || temel === "bolditalic";
+  const i = italik || temel === "italic" || temel === "bolditalic";
+  return b && i ? "bolditalic" : b ? "bold" : i ? "italic" : "normal";
+}
+/** İşaretli metni stil parçalarına ayırır. */
+function vurguParcalari(metin: string, temel: Stil): Parca[] {
+  const parcalar: Parca[] = [];
+  let b = 0;
+  let i = 0;
+  let son = 0;
+  const ekle = (t: string) => {
+    if (!t) return;
+    const st = stilBirlestir(temel, b > 0, i > 0);
+    const onceki = parcalar[parcalar.length - 1];
+    if (onceki && onceki.s === st) onceki.t += t;
+    else parcalar.push({ t, s: st });
+  };
+  for (const m of metin.matchAll(VURGU_ISARETI)) {
+    ekle(metin.slice(son, m.index));
+    const kapanis = m[1] === "/";
+    if (m[2] === "b") b = Math.max(0, b + (kapanis ? -1 : 1));
+    else i = Math.max(0, i + (kapanis ? -1 : 1));
+    son = (m.index ?? 0) + m[0].length;
+  }
+  ekle(metin.slice(son));
+  return parcalar;
+}
+function parcaGenisligi(doc: JsPDFType, p: Parca): number {
+  doc.setFont(FONT, yazilabilirStil(p.s));
+  return doc.getTextWidth(p.t);
+}
+/** İşaretli metni (\n ile ayrılmış satırlar dahil) verilen genişliğe
+ *  sığacak şekilde, her biri stil parçalarından oluşan satırlara böler.
+ *  Çağırmadan önce punto ayarlanmış olmalıdır. */
+function vurguluSatirlaraBol(doc: JsPDFType, metin: string, genislik: number, temel: Stil = "normal"): Parca[][] {
+  const sonuc: Parca[][] = [];
+  for (const paragraf of metin.split("\n")) {
+    // parçaları kelime/boşluk birimlerine ayır
+    const birimler: Parca[] = [];
+    vurguParcalari(paragraf, temel).forEach((p) =>
+      p.t.split(/(\s+)/).forEach((t) => t && birimler.push({ t, s: p.s }))
+    );
+    let satir: Parca[] = [];
+    let w = 0;
+    const satirEkle = (p: Parca) => {
+      const onceki = satir[satir.length - 1];
+      if (onceki && onceki.s === p.s) onceki.t += p.t;
+      else satir.push({ ...p });
+    };
+    const satirBitir = () => {
+      // sondaki boşlukları at
+      while (satir.length && !satir[satir.length - 1].t.trimEnd()) satir.pop();
+      if (satir.length) satir[satir.length - 1].t = satir[satir.length - 1].t.trimEnd();
+      sonuc.push(satir);
+      satir = [];
+      w = 0;
+    };
+    for (const birim of birimler) {
+      const bosluk = !birim.t.trim();
+      if (bosluk && satir.length === 0) continue; // satır başı boşluğu
+      const bw = parcaGenisligi(doc, birim);
+      if (!bosluk && bw > genislik) {
+        // Tek başına sütuna sığmayan çok uzun kelime: jsPDF splitTextToSize
+        // ile aynı şekilde, mevcut satırın kalan boşluğundan başlayarak
+        // harf bazında bölünür.
+        doc.setFont(FONT, yazilabilirStil(birim.s));
+        let kalan = birim.t;
+        let n = 0;
+        while (n < kalan.length && w + doc.getTextWidth(kalan.slice(0, n + 1)) <= genislik) n++;
+        if (n > 0) satirEkle({ t: kalan.slice(0, n), s: birim.s });
+        kalan = kalan.slice(n);
+        if (satir.length > 0) satirBitir();
+        const parcalar: string[] = doc.splitTextToSize(kalan, genislik);
+        parcalar.forEach((pt, k) => {
+          satirEkle({ t: pt, s: birim.s });
+          if (k < parcalar.length - 1) satirBitir();
+          else w = parcaGenisligi(doc, { t: pt, s: birim.s });
+        });
+        continue;
+      }
+      if (!bosluk && w + bw > genislik && satir.length > 0) satirBitir();
+      satirEkle(birim);
+      w += bw;
+    }
+    satirBitir();
+  }
+  return sonuc;
+}
+function parcaMetni(parcalar: Parca[]): string {
+  return parcalar.map((p) => p.t).join("");
+}
+/** Stil parçalarından oluşan tek satırı (x, y) noktasından başlayarak basar. */
+function vurguluSatirCiz(doc: JsPDFType, parcalar: Parca[], x: number, y: number) {
+  let kx = x;
+  for (const p of parcalar) {
+    doc.setFont(FONT, yazilabilirStil(p.s));
+    doc.text(p.t, kx, y);
+    kx += doc.getTextWidth(p.t);
+  }
+  doc.setFont(FONT, "normal");
+}
 const RENK_VURGU: [number, number, number] = [30, 64, 175]; // kurumsal mavi (subheading, çizgiler)
 const SATIR_YUKSEKLIGI: Record<"baslik" | "altbaslik" | "paragraf" | "madde" | "not", number> = {
   baslik: 7,
@@ -1464,6 +1586,19 @@ const SATIR_YUKSEKLIGI: Record<"baslik" | "altbaslik" | "paragraf" | "madde" | "
 };
 /** "note" blokları için punto (paragraf 9.5). */
 const NOT_PUNTO = 8.5;
+
+/** Kalın italik fontu (yalnızca {b}{i} birlikte kullanılan belgelerde)
+ *  jsPDF'e tanıtır. Yüklenemezse false döner; o kısımlar kalın basılır. */
+async function kalinItalikFontuKaydet(doc: JsPDFType): Promise<boolean> {
+  try {
+    const { LIBERATION_SANS_BOLD_ITALIC_B64 } = await import("@/lib/pdfFontKalinItalik");
+    doc.addFileToVFS("LiberationSans-BoldItalic.ttf", LIBERATION_SANS_BOLD_ITALIC_B64);
+    doc.addFont("LiberationSans-BoldItalic.ttf", FONT, "bolditalic");
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 /** İtalik fontu (yalnızca "note" bloğu olan belgelerde) jsPDF'e tanıtır.
  *  Yüklenemezse false döner; not satırları o zaman normal yazıyla basılır. */
@@ -1530,29 +1665,28 @@ function duzMetneCevir(doc: JsPDFType, sablon: BelgeSablonu, belgeAdi: string): 
       satirlar.push({ tur: "altbaslik", metin: b.text });
     } else if (b.type === "paragraph") {
       doc.setFontSize(9.5);
-      doc.splitTextToSize(b.text, genislik).forEach((t: string) =>
-        satirlar.push({ tur: "paragraf", metin: t })
+      vurguluSatirlaraBol(doc, b.text, genislik).forEach((parcalar) =>
+        satirlar.push({ tur: "paragraf", metin: parcaMetni(parcalar), parcalar })
       );
     } else if (b.type === "note") {
-      // Ölçüm normal fontla (italik henüz tanıtılmamış olabilir); Liberation
-      // Sans italik ve normal genişlikleri neredeyse aynıdır.
+      // İtalik font render başında (varsa) tanıtılmış olur; yoksa normal
+      // fontla ölçülür — Liberation Sans italik/normal genişlikleri yakındır.
       doc.setFontSize(NOT_PUNTO);
-      doc.setFont(FONT, "normal");
-      doc.splitTextToSize(b.text, genislik).forEach((t: string) =>
-        satirlar.push({ tur: "not", metin: t })
+      vurguluSatirlaraBol(doc, b.text, genislik, "italic").forEach((parcalar) =>
+        satirlar.push({ tur: "not", metin: parcaMetni(parcalar), parcalar })
       );
     } else if (b.type === "bullet") {
       doc.setFontSize(9.5);
       b.items.forEach((item) => {
-        doc.splitTextToSize(`•  ${item}`, genislik - 4).forEach((line: string) =>
-          satirlar.push({ tur: "madde", metin: line })
+        vurguluSatirlaraBol(doc, `•  ${item}`, genislik - 4).forEach((parcalar) =>
+          satirlar.push({ tur: "madde", metin: parcaMetni(parcalar), parcalar })
         );
       });
     } else if (b.type === "numbered") {
       doc.setFontSize(9.5);
       b.items.forEach((item, i) => {
-        doc.splitTextToSize(`${i + 1}.  ${item}`, genislik - 4).forEach((line: string) =>
-          satirlar.push({ tur: "madde", metin: line })
+        vurguluSatirlaraBol(doc, `${i + 1}.  ${item}`, genislik - 4).forEach((parcalar) =>
+          satirlar.push({ tur: "madde", metin: parcaMetni(parcalar), parcalar })
         );
       });
     } else if (b.type === "table") {
@@ -1605,10 +1739,9 @@ function tabloHucreSatirlari(
   genislik: number,
   fontSize: number,
   kalin: boolean
-): string[] {
+): Parca[][] {
   doc.setFontSize(fontSize);
-  doc.setFont(FONT, kalin ? "bold" : "normal");
-  return metin.split("\n").flatMap((parca) => doc.splitTextToSize(parca, genislik - 3));
+  return vurguluSatirlaraBol(doc, metin, genislik - 3, kalin ? "bold" : "normal");
 }
 
 const TABLO_SATIR_YUKSEKLIGI = 4.0;
@@ -1674,14 +1807,19 @@ function tabloCiz(
     doc.setLineWidth(0.2);
 
     let kx = x;
+    // jsPDF'in çok satırlı doc.text() aralığıyla aynı satır aralığı (mm)
+    const satirAraligi = (fontSize * doc.getLineHeightFactor() * 25.4) / 72;
     hucreSatirlari.forEach((satirlar, i) => {
       doc.setFontSize(fontSize);
-      doc.setFont(FONT, kalin ? "bold" : "normal");
       doc.setTextColor(kalin && doluRenk ? 255 : 20, kalin && doluRenk ? 255 : 20, kalin && doluRenk ? 255 : 20);
-      doc.text(satirlar, kx + TABLO_PADDING + 0.5, y + TABLO_PADDING + TABLO_SATIR_YUKSEKLIGI * 0.75, {
-        align: "left",
-        maxWidth: kolonGenislikleri[i] - 3,
-      });
+      satirlar.forEach((parcalar, k) =>
+        vurguluSatirCiz(
+          doc,
+          parcalar,
+          kx + TABLO_PADDING + 0.5,
+          y + TABLO_PADDING + TABLO_SATIR_YUKSEKLIGI * 0.75 + k * satirAraligi
+        )
+      );
       doc.rect(kx, y, kolonGenislikleri[i], satirYuksekligi);
       kx += kolonGenislikleri[i];
     });
@@ -1697,7 +1835,7 @@ function tabloCiz(
     doc.setFontSize(7.5);
     doc.setFont(FONT, "normal");
     doc.setTextColor(110, 110, 110);
-    const noteLines = doc.splitTextToSize(tablo.note, genislik);
+    const noteLines = doc.splitTextToSize(vurguIsaretleriniTemizle(tablo.note), genislik);
     doc.text(noteLines, x, y);
     doc.setTextColor(0, 0, 0);
   }
@@ -2456,8 +2594,18 @@ export async function renderYapilandirilmisBelge(
     return;
   }
 
+  // Ek font varyantları, satırlar ÖLÇÜLMEDEN önce tanıtılır ki kalın/italik
+  // kısımların genişliği doğru hesaplansın. Yalnızca gereken varyant yüklenir.
+  const blokMetni = JSON.stringify(sablon.blocks);
+  const italikGerekli = sablon.blocks.some((b) => b.type === "note") || blokMetni.includes("{i}");
+  const italikVar = italikGerekli ? await italikFontuKaydet(doc) : false;
+  yukluStiller.italic = italikVar;
+  // Kalın italik: {b} ile {i} birlikte ya da italik "note" bloğu içinde {b}
+  const kalinItalikGerekli =
+    (blokMetni.includes("{i}") && blokMetni.includes("{b}")) ||
+    sablon.blocks.some((b) => b.type === "note" && b.text.includes("{b}"));
+  yukluStiller.bolditalic = italikVar && kalinItalikGerekli ? await kalinItalikFontuKaydet(doc) : false;
   const satirlar = duzMetneCevir(doc, sablon, tamBaslik);
-  const italikVar = satirlar.some((s) => s.tur === "not") ? await italikFontuKaydet(doc) : false;
   if (notlar.trim()) {
     satirlar.push({ tur: "altbaslik", metin: "Ek Notlar" });
     doc.setFontSize(9.5);
@@ -2550,12 +2698,16 @@ export async function renderYapilandirilmisBelge(
       } else if (satir.tur === "paragraf") {
         doc.setFontSize(9.5);
         doc.setFont(FONT, "normal");
-        doc.text(satir.metin, M, y);
+        if (satir.parcalar) vurguluSatirCiz(doc, satir.parcalar, M, y);
+        else doc.text(satir.metin, M, y);
         y += SATIR_YUKSEKLIGI.paragraf;
       } else if (satir.tur === "not") {
         doc.setFontSize(NOT_PUNTO);
-        doc.setFont(FONT, italikVar ? "italic" : "normal");
-        doc.text(satir.metin, M, y);
+        if (satir.parcalar) vurguluSatirCiz(doc, satir.parcalar, M, y);
+        else {
+          doc.setFont(FONT, italikVar ? "italic" : "normal");
+          doc.text(satir.metin, M, y);
+        }
         doc.setFont(FONT, "normal");
         y += SATIR_YUKSEKLIGI.not;
       } else if (satir.tur === "tablo") {
@@ -2585,7 +2737,8 @@ export async function renderYapilandirilmisBelge(
       } else {
         doc.setFontSize(9.5);
         doc.setFont(FONT, "normal");
-        doc.text(satir.metin, M + 2, y);
+        if (satir.parcalar) vurguluSatirCiz(doc, satir.parcalar, M + 2, y);
+        else doc.text(satir.metin, M + 2, y);
         y += SATIR_YUKSEKLIGI.madde;
       }
     }
