@@ -1374,6 +1374,9 @@ type Satir =
   | { tur: "not"; metin: string; parcalar?: Parca[] }
   | { tur: "madde"; metin: string; numara?: number; parcalar?: Parca[] }
   | { tur: "tablo"; headers?: string[]; rows: string[][]; note?: string; colWidths?: number[] }
+  // Tablodan hemen sonra gelen metnin tablo çerçevesine yapışmaması için
+  // araya konan dikey boşluk (bkz. tabloSonrasiBosluklariEkle).
+  | { tur: "bosluk"; mm: number }
   | { tur: "gorseller"; ids: string[]; sutun: number; yukseklik: number; note?: string }
   // Dinamik olarak (kayıt anında, örn. Emniyet Planı Ek-7 güzergah krokisi)
   // üretilen, statik BELGE_GORSELLERI kaydına ihtiyaç duymayan tek bir
@@ -1745,6 +1748,9 @@ function tabloHucreSatirlari(
 }
 
 const TABLO_SATIR_YUKSEKLIGI = 4.0;
+// Tablo altı notunun taban çizgisi ile tablonun alt çizgisi arası: 7,5 pt
+// notun harf üstü taban çizgisinin ~2,4 mm üstünde → ~5 mm net boşluk.
+const TABLO_NOTU_BOSLUGU = 7.4;
 const TABLO_PADDING = 1.2;
 
 function tabloYuksekligiHesapla(
@@ -1771,7 +1777,7 @@ function tabloYuksekligiHesapla(
   if (tablo.note) {
     doc.setFontSize(7.5);
     doc.setFont(FONT, "normal");
-    yukseklik += doc.splitTextToSize(tablo.note, genislik).length * 3.8 + 3;
+    yukseklik += doc.splitTextToSize(vurguIsaretleriniTemizle(tablo.note), genislik).length * 3.8 + 0.5 + TABLO_NOTU_BOSLUGU;
   }
   return yukseklik + 2; // alt boşluk
 }
@@ -1831,7 +1837,7 @@ function tabloCiz(
   tablo.rows.forEach((row, i) => satirCiz(row, 8, false, i % 2 === 1 ? [245, 247, 251] : null));
 
   if (tablo.note) {
-    y += 2.5;
+    y += TABLO_NOTU_BOSLUGU;
     doc.setFontSize(7.5);
     doc.setFont(FONT, "normal");
     doc.setTextColor(110, 110, 110);
@@ -1903,7 +1909,33 @@ function gorsellerCiz(
   }
 }
 
+// Tablo çerçevesinin alt çizgisi ile altındaki metnin harf üstleri
+// arasında en az ~5 mm (yarım santim) boşluk kalacak şekilde ayarlanmıştır.
+// Metin satırları taban çizgisinden çizildiği için (9,5 pt'de harf üstü
+// taban çizgisinin ~3 mm üstünde) ek boşluk buna göre hesaplanır.
+// tabloYuksekligiHesapla tablonun altına zaten 2 mm bırakır.
+const TABLO_SONRASI_METIN_BOSLUGU = 6.2; // 2 + 6,2 − ~3,1 (harf üstü) ≈ 5 mm
+const TABLO_SONRASI_ALTBASLIK_BOSLUGU = 1.6; // başlık çubuğu y−3,2'den başlar: 2 + 4,6 − 3,2 + 1,6 = 5 mm
+/** Tablodan hemen sonra metin (paragraf, not, madde, alt başlık) geliyorsa
+ *  araya boşluk satırı ekler. Sayfalama ve çizim aynı satırı kullandığı
+ *  için ikisi tutarlı kalır; sayfa başına denk gelen boşluk atılır. */
+function tabloSonrasiBosluklariEkle(satirlar: Satir[]): Satir[] {
+  const sonuc: Satir[] = [];
+  satirlar.forEach((satir, i) => {
+    sonuc.push(satir);
+    const sonraki = satirlar[i + 1];
+    if (satir.tur !== "tablo" || !sonraki) return;
+    if (sonraki.tur === "paragraf" || sonraki.tur === "not" || sonraki.tur === "madde") {
+      sonuc.push({ tur: "bosluk", mm: TABLO_SONRASI_METIN_BOSLUGU });
+    } else if (sonraki.tur === "altbaslik") {
+      sonuc.push({ tur: "bosluk", mm: TABLO_SONRASI_ALTBASLIK_BOSLUGU });
+    }
+  });
+  return sonuc;
+}
+
 function satirYuksekligi(doc: JsPDFType, satir: Satir, genislik: number): number {
+  if (satir.tur === "bosluk") return satir.mm;
   if (satir.tur === "gorseller") return gorsellerYuksekligiHesapla(doc, satir, genislik);
   if (satir.tur === "dinamikGorsel") return dinamikGorselYuksekligiHesapla(satir, genislik);
   if (satir.tur === "tablo") return tabloYuksekligiHesapla(doc, satir, genislik);
@@ -1997,6 +2029,16 @@ function sayfalaraBol(
     const satir = kuyruk.shift()!;
     const kendiYuksekligi = satirYuksekligi(doc, satir, genislik);
     const kalanBoslukBu = kullanilabilirYukseklik - mevcutYukseklik;
+
+    // Tablo sonrası boşluk: sayfa başına düşüyorsa ya da sayfada yer
+    // kalmadıysa gereksizdir (sonraki satır zaten yeni sayfada başlar).
+    if (satir.tur === "bosluk") {
+      if (mevcutSayfa.length > 0 && kendiYuksekligi <= kalanBoslukBu) {
+        mevcutSayfa.push(satir);
+        mevcutYukseklik += kendiYuksekligi;
+      }
+      continue;
+    }
 
     // Dul/yetim önleme + boş sayfa önleme: bir altbaşlığın hemen ardından
     // gelen tablo mevcut sayfaya toplu sığmıyorsa, önce tabloyu BÖLMEYİ
@@ -2621,7 +2663,7 @@ export async function renderYapilandirilmisBelge(
   // kutunun alt kenarından sonra makul bir nefes payıyla devam eder.
   const headerAlt = CERCEVE_KENAR + baslikYukseklik + 8;
 
-  const sayfalar = sayfalaraBol(doc, satirlar, headerAlt);
+  const sayfalar = sayfalaraBol(doc, tabloSonrasiBosluklariEkle(satirlar), headerAlt);
   const genislik = W - 2 * M;
 
   // Orijinal Word belgesindeki tam sayfa özet poster (varsa) önceden
@@ -2710,6 +2752,8 @@ export async function renderYapilandirilmisBelge(
         }
         doc.setFont(FONT, "normal");
         y += SATIR_YUKSEKLIGI.not;
+      } else if (satir.tur === "bosluk") {
+        y += satir.mm;
       } else if (satir.tur === "tablo") {
         tabloCiz(doc, satir, M, y, genislik);
         y += tabloYuksekligiHesapla(doc, satir, genislik);
