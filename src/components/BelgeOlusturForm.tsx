@@ -1985,13 +1985,22 @@ function tabloyuBol(
       (hucre, j) => tabloHucreSatirlari(doc, hucre, kolonGenislikleri[j], 8, false).length
     );
     const rowYukseklik = Math.max(...satirSayilari) * TABLO_SATIR_YUKSEKLIGI + TABLO_PADDING * 2;
-    if (yukseklik + rowYukseklik > kalanBosluk) break;
+    // tabloYuksekligiHesapla tablonun altına 2 mm boşluk ekler; ilk parça
+    // da bu boşlukla birlikte sığmalı.
+    if (yukseklik + rowYukseklik + 2 > kalanBosluk) break;
     yukseklik += rowYukseklik;
     bolunecekIndex = i;
   }
 
   if (bolunecekIndex < 0) return null; // başlık + 1 satır bile sığmıyor
-  if (bolunecekIndex === tablo.rows.length - 1) return null; // zaten tamamı sığıyor
+  if (bolunecekIndex === tablo.rows.length - 1) {
+    // Tüm satırlar sığıyor; tablo notu da sığıyorsa bölmeye gerek yok.
+    // Not sığmıyorsa son satır notla birlikte sonraki sayfaya devreder
+    // (not kalanParca'da kalır), böylece not imza alanına taşmaz.
+    if (!tablo.note || tabloYuksekligiHesapla(doc, tablo, genislik) <= kalanBosluk) return null;
+    if (bolunecekIndex === 0) return null;
+    bolunecekIndex -= 1;
+  }
 
   return {
     ilkParca: {
@@ -2076,10 +2085,11 @@ function sayfalaraBol(
       }
     }
 
-    // Bağımsız (bir altbaşlığa hemen bağlı olmayan) büyük tablo: mevcut
-    // sayfada bir miktar içerik varsa ve tablo sığmıyorsa, aynı şekilde
-    // bölmeyi dene.
-    if (satir.tur === "tablo" && mevcutSayfa.length > 0 && kendiYuksekligi > kalanBoslukBu) {
+    // Bağımsız (bir altbaşlığa hemen bağlı olmayan) büyük tablo: kalan
+    // boşluğa sığmıyorsa bölmeyi dene. Sayfa BOŞ olsa da denenir: önceki
+    // sayfadan devreden tablo parçası (kalanParca) tek sayfadan da uzunsa
+    // yeniden bölünmeli — aksi halde imza tablosunun üstüne taşıyordu.
+    if (satir.tur === "tablo" && kendiYuksekligi > kalanBoslukBu) {
       const bolunmus = tabloyuBol(doc, satir, genislik, kalanBoslukBu);
       if (bolunmus) {
         mevcutSayfa.push(bolunmus.ilkParca);
