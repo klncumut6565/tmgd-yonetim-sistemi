@@ -137,6 +137,7 @@ function BelgeSatiri({
   tarayiciYapilandirilmis,
   belgeGoruntule,
   gecerlilikGuncelle,
+  gecerlilikGoster = true,
 }: {
   baslik: string;
   dosyalar: BelgeDosyasi[];
@@ -148,6 +149,8 @@ function BelgeSatiri({
   tarayiciYapilandirilmis: boolean;
   belgeGoruntule: (yol: string) => void;
   gecerlilikGuncelle: (dosya: BelgeDosyasi, yeniTarih: string) => void;
+  /** false ise "Geçerlilik" tarih alanı gösterilmez (ör. Ek-11 MSDS/SDS Raporu). */
+  gecerlilikGoster?: boolean;
 }) {
   return (
     <div className="py-2 px-3 border rounded-lg bg-white">
@@ -211,6 +214,7 @@ function BelgeSatiri({
               {/* GEÇERLİLİK TARİHİ — dolu olduğunda bu belge, gösterge
                   paneli ve bildirim zilindeki süre uyarılarına firma
                   adıyla birlikte girer. Boş bırakılırsa takip edilmez. */}
+              {gecerlilikGoster && (
               <div className="mt-1 flex items-center gap-2">
                 <span className="text-gray-500 shrink-0">Geçerlilik:</span>
                 <DateInput
@@ -223,6 +227,7 @@ function BelgeSatiri({
                   <GecerlilikRozeti tarih={d.gecerlilik_tarihi} />
                 )}
               </div>
+              )}
             </div>
           ))}
         </div>
@@ -931,6 +936,7 @@ export default function AracEvraklari({
               tarayiciYapilandirilmis={tarayiciYapilandirilmis}
               belgeGoruntule={belgeGoruntule}
               gecerlilikGuncelle={gecerlilikGuncelle}
+              gecerlilikGoster={false}
             />
             <div className="-mt-1 px-3 text-xs text-gray-500 space-y-1">
               {belgeTakipMsds.length > 0 && (
