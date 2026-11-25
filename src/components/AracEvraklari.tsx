@@ -28,7 +28,7 @@ import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase/client";
 import { authFetch } from "@/lib/supabase/authFetch";
 import { hataCevir } from "@/lib/hataCevir";
-import { pdfIlkSayfayiGorselYap, pdfTumSayfalariGorselYap } from "@/lib/pdfSayfaGorseli";
+import { pdfTumSayfalariGorselYap } from "@/lib/pdfSayfaGorseli";
 import { useUser } from "@/hooks/useUser";
 import { depoDosyasiGetir } from "@/lib/depoOnbellek";
 import type { AracEvrakBelgesi, LogoData } from "@/lib/aracEvraklariPdf";
@@ -591,22 +591,26 @@ export default function AracEvraklari({
 
   /** Bir depo yolundaki dosyayı (görsel veya PDF) fetch edip PDF'e
    *  gömülebilecek hazır bir JPEG dataURL'e çevirir. */
-  async function belgeDataUrlHazirla(yol: string): Promise<string | null> {
+  /** Bir dosyayı PDF'e basılacak sayfa görsellerine çevirir. PDF ise TÜM
+   *  sayfaları (sırayla), görsel ise tek sayfa döner; okunamazsa boş liste. */
+  async function belgeSayfalariHazirla(yol: string): Promise<string[]> {
     try {
       // Oturum boyunca bellekte tutulur: önizleme + indirme dosyayı bir kez indirir (veri tasarrufu)
       const blob = await depoDosyasiGetir("firm-files", yol);
-      if (!blob) return null;
+      if (!blob) return [];
       if (blob.type === "application/pdf" || yol.toLowerCase().endsWith(".pdf")) {
-        return await pdfIlkSayfayiGorselYap(await blob.arrayBuffer());
+        return await pdfTumSayfalariGorselYap(await blob.arrayBuffer());
       }
-      return await new Promise<string>((resolve, reject) => {
-        const r = new FileReader();
-        r.onload = () => resolve(r.result as string);
-        r.onerror = reject;
-        r.readAsDataURL(blob);
-      });
+      return [
+        await new Promise<string>((resolve, reject) => {
+          const r = new FileReader();
+          r.onload = () => resolve(r.result as string);
+          r.onerror = reject;
+          r.readAsDataURL(blob);
+        }),
+      ];
     } catch {
-      return null;
+      return [];
     }
   }
 
@@ -669,8 +673,7 @@ export default function AracEvraklari({
       const dosyalar = ortakDosyalar[ortak.anahtar];
       const dataUrls: string[] = [];
       for (const d of dosyalar) {
-        const url = await belgeDataUrlHazirla(d.file_path);
-        if (url) dataUrls.push(url);
+        dataUrls.push(...(await belgeSayfalariHazirla(d.file_path)));
       }
       belgeler.push({ ekNo: ortak.ekNo, baslik: ortak.baslik, dataUrls });
     }
@@ -679,8 +682,7 @@ export default function AracEvraklari({
       const dosyalar = aracDosyalar[slot.anahtar];
       const dataUrls: string[] = [];
       for (const d of dosyalar) {
-        const url = await belgeDataUrlHazirla(d.file_path);
-        if (url) dataUrls.push(url);
+        dataUrls.push(...(await belgeSayfalariHazirla(d.file_path)));
       }
       // Ek-10'un başlığı sabit değil, seçime göre belirlenir.
       const baslik =
