@@ -33,3 +33,42 @@ export async function pdfIlkSayfayiGorselYap(pdfBuffer: ArrayBuffer): Promise<st
   await sayfa.render({ canvasContext: context, viewport }).promise;
   return canvas.toDataURL("image/jpeg", 0.85);
 }
+
+/**
+ * Yüklenen bir PDF'in TÜM SAYFALARINI sırayla rastere edip JPEG dataURL
+ * listesi olarak döner. Araç Evrakı'ndaki MSDS/SDS Raporu eki için: MSDS'ler
+ * çok sayfalıdır (genellikle 8-20 sayfa) ve hepsinin çıktıya girmesi gerekir.
+ * Sayfalar tek tek işlenir, her sayfadan sonra canvas serbest bırakılır
+ * (uzun belgelerde bellek şişmesin diye).
+ */
+export async function pdfTumSayfalariGorselYap(pdfBuffer: ArrayBuffer): Promise<string[]> {
+  const pdfjsLib = await import("pdfjs-dist");
+  pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
+    "pdfjs-dist/build/pdf.worker.min.js",
+    import.meta.url
+  ).toString();
+
+  const belge = await pdfjsLib.getDocument({ data: pdfBuffer }).promise;
+  const sonuc: string[] = [];
+  for (let n = 1; n <= belge.numPages; n++) {
+    const sayfa = await belge.getPage(n);
+    // pdfIlkSayfayiGorselYap ile aynı çözünürlük (~110 DPI): MSDS'lerin küçük
+    // puntolu tabloları okunaklı kalır.
+    const viewport = sayfa.getViewport({ scale: 1.5 });
+    const canvas = document.createElement("canvas");
+    canvas.width = viewport.width;
+    canvas.height = viewport.height;
+    const context = canvas.getContext("2d");
+    if (!context) throw new Error("Canvas bağlamı oluşturulamadı.");
+    // Şeffaf zeminli PDF'ler JPEG'de siyah çıkmasın
+    context.fillStyle = "#ffffff";
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    await sayfa.render({ canvasContext: context, viewport }).promise;
+    sonuc.push(canvas.toDataURL("image/jpeg", 0.85));
+    sayfa.cleanup();
+    canvas.width = 0;
+    canvas.height = 0;
+  }
+  await belge.destroy();
+  return sonuc;
+}

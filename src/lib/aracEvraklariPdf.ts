@@ -47,7 +47,36 @@ export type AracEvraklariPdfVerisi = {
    *  Ek-10 (araca özel) — ekNo sırasına göre otomatik sıralanır. Ek-6 ve
    *  Ek-8 buraya DAHİL EDİLMEZ (jenerik, sabit içerik — bkz. dosya başı). */
   belgeler: AracEvrakBelgesi[];
+  /** MSDS/SDS Raporu sayfaları (tüm yüklenen MSDS'lerin tüm sayfaları,
+   *  sırayla). Kapak listesine GİRMEZ, ek numarası ve sayfa başlığı
+   *  ALMAZ — PDF'in sonuna, tam sayfa olarak doğrudan eklenir. */
+  msdsSayfalari?: string[];
 };
+
+/** MSDS sayfasını başlıksız, A4'e sığacak şekilde (oran korunarak, ortalı)
+ *  tam sayfa basar. Yatay sayfalar yatay A4 sayfaya basılır. */
+async function msdsSayfasiEkle(doc: JsPDFType, dataUrl: string) {
+  const oran = await gorselEnBoyOraniOku(dataUrl);
+  const yatay = oran > 1;
+  doc.addPage("a4", yatay ? "landscape" : "portrait");
+  const sw = yatay ? H : W;
+  const sh = yatay ? W : H;
+  const kenar = 5;
+  let g = sw - 2 * kenar;
+  let y = g / oran;
+  if (y > sh - 2 * kenar) {
+    y = sh - 2 * kenar;
+    g = y * oran;
+  }
+  try {
+    doc.addImage(dataUrl, "JPEG", (sw - g) / 2, (sh - y) / 2, g, y);
+  } catch {
+    doc.setFontSize(9);
+    doc.setFont(FONT, "normal");
+    doc.setTextColor(150, 0, 0);
+    doc.text("MSDS sayfası görüntülenemedi.", sw / 2, 20, { align: "center" });
+  }
+}
 
 function fontuKaydet(doc: JsPDFType) {
   doc.addFileToVFS("LiberationSans-Regular.ttf", LIBERATION_SANS_REGULAR_B64);
@@ -330,6 +359,10 @@ export async function aracEvraklariPdfOlustur(veri: AracEvraklariPdfVerisi): Pro
       await gorselliEkSayfasiEkle(doc, ekNo, "ADR ÇANTASI İÇERİĞİ", g.gorsel, veri.logo);
     }
   }
+
+  // MSDS/SDS Raporu: kapak listesinde ve sayfa başlığında YER ALMAZ;
+  // yüklenen tüm MSDS'lerin tüm sayfaları en sona doğrudan eklenir.
+  for (const sayfa of veri.msdsSayfalari ?? []) await msdsSayfasiEkle(doc, sayfa);
 
   return doc.output("blob");
 }

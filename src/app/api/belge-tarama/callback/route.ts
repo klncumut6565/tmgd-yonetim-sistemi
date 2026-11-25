@@ -132,7 +132,8 @@ export async function POST(req: NextRequest) {
       // desteği). INSERT edilir, ÜZERİNE YAZILMAZ — mobilden taranan
       // belge de mevcut dosyaların yanına eklenir.
       const tur = String(hedefVeri.tur)
-      if (tur !== 'tmfb' && tur !== 'k1') {
+      // 'msds' = Araç Evrakı → MSDS/SDS Raporu (firma ortak, ek numarasız)
+      if (tur !== 'tmfb' && tur !== 'k1' && tur !== 'msds') {
         return corsJson({ error: 'Geçersiz hedef: tur.' }, 400)
       }
       yol = `${oturum.firm_id}/firma-ortak-belgeler/${tur}_${Date.now()}.pdf`

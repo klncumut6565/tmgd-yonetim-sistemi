@@ -28,7 +28,7 @@ import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase/client";
 import { authFetch } from "@/lib/supabase/authFetch";
 import { hataCevir } from "@/lib/hataCevir";
-import { pdfIlkSayfayiGorselYap } from "@/lib/pdfSayfaGorseli";
+import { pdfIlkSayfayiGorselYap, pdfTumSayfalariGorselYap } from "@/lib/pdfSayfaGorseli";
 import { useUser } from "@/hooks/useUser";
 import { depoDosyasiGetir } from "@/lib/depoOnbellek";
 import type { AracEvrakBelgesi, LogoData } from "@/lib/aracEvraklariPdf";
@@ -59,6 +59,21 @@ const ORTAK_BELGE_TURLERI = [
   { anahtar: "k1", ekNo: 2, baslik: "K1/K2 Taşıma Yetki Belgesi" },
 ] as const;
 type OrtakBelgeTuru = (typeof ORTAK_BELGE_TURLERI)[number]["anahtar"];
+
+/**
+ * MSDS/SDS RAPORU — firma ortak (tüm araçlarda kullanılır, vehicle_id NULL,
+ * belge_turu "msds"). Diğer eklerden farkı:
+ *   - Ek numarası, kapak listesi satırı ve sayfa başlığı YOKTUR.
+ *   - Yüklenen tüm MSDS'lerin TÜM SAYFALARI (PDF ise her sayfa) PDF'in en
+ *     sonuna, tam sayfa olarak doğrudan eklenir.
+ *   - Belge Takip → "MSDS/SDS Raporu" (AS8) satırına yüklenmiş dosyalar da
+ *     otomatik olarak dahil edilir (aynı dosya iki kez basılmaz).
+ */
+const MSDS_TURU = "msds";
+const MSDS_BASLIK = "MSDS/SDS Raporu";
+type YuklenebilirOrtakTur = OrtakBelgeTuru | typeof MSDS_TURU;
+/** Belge Takip AS8'den gelen (salt okunur) dosya. */
+type BelgeTakipDosyasi = { id: string; file_path: string; file_name: string };
 
 const ARAC_BELGE_SLOTLARI = [
   { anahtar: "tasit_karti", ekNo: 3, baslik: "Taşıt Kartı" },
@@ -248,6 +263,9 @@ export default function AracEvraklari({
     src5_belgesi: [],
     tasima_evraklari: [],
   });
+  // MSDS/SDS Raporu: bu pencereden yüklenenler + Belge Takip AS8 dosyaları
+  const [msdsDosyalar, setMsdsDosyalar] = useState<BelgeDosyasi[]>([]);
+  const [belgeTakipMsds, setBelgeTakipMsds] = useState<BelgeTakipDosyasi[]>([]);
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [hazirlayanAdi, setHazirlayanAdi] = useState("");
   const { canWrite } = useUser();
@@ -268,8 +286,16 @@ export default function AracEvraklari({
       .order("created_at");
     if (err) return;
     const gruplu: Record<OrtakBelgeTuru, BelgeDosyasi[]> = { tmfb: [], k1: [] };
+    const msds: BelgeDosyasi[] = [];
     for (const row of (data as DosyaSatiri[]) || []) {
-      if (row.belge_turu === "tmfb" || row.belge_turu === "k1") {
+      if (row.belge_turu === MSDS_TURU) {
+        msds.push({
+          id: row.id,
+          file_path: row.file_path,
+          file_name: row.file_name,
+          gecerlilik_tarihi: row.gecerlilik_tarihi ?? null,
+        });
+      } else if (row.belge_turu === "tmfb" || row.belge_turu === "k1") {
         gruplu[row.belge_turu].push({
           id: row.id,
           file_path: row.file_path,
@@ -279,6 +305,41 @@ export default function AracEvraklari({
       }
     }
     setOrtakDosyalar(gruplu);
+    setMsdsDosyalar(msds);
+  }, [firmId]);
+
+  /** Belge Takip → "MSDS/SDS Raporu" (AS8) dosyaları: çoklu ek tablosu
+   *  (firm_belge_dosyalari) + eski tek dosya alanı (firm_belgeleri.file_path). */
+  const belgeTakipMsdsYukle = useCallback(async () => {
+    const [ekRes, eskiRes] = await Promise.all([
+      supabase
+        .from("firm_belge_dosyalari")
+        .select("id, file_path, file_name")
+        .eq("firm_id", firmId)
+        .eq("code", "AS8")
+        .order("uploaded_at", { ascending: true }),
+      supabase
+        .from("firm_belgeleri")
+        .select("id, file_path")
+        .eq("firm_id", firmId)
+        .eq("code", "AS8")
+        .not("file_path", "is", null),
+    ]);
+    const liste: BelgeTakipDosyasi[] = [];
+    const goruldu = new Set<string>();
+    for (const r of (ekRes.data as BelgeTakipDosyasi[] | null) || []) {
+      if (!goruldu.has(r.file_path)) {
+        goruldu.add(r.file_path);
+        liste.push(r);
+      }
+    }
+    for (const r of (eskiRes.data as { id: string; file_path: string }[] | null) || []) {
+      if (r.file_path && !goruldu.has(r.file_path)) {
+        goruldu.add(r.file_path);
+        liste.push({ id: r.id, file_path: r.file_path, file_name: r.file_path.split("/").pop() || "MSDS" });
+      }
+    }
+    setBelgeTakipMsds(liste);
   }, [firmId]);
 
   const aracDosyalariYukle = useCallback(async (vehicleId: string) => {
@@ -328,7 +389,7 @@ export default function AracEvraklari({
 
         setLogoUrl((firmRes.data as { logo_url: string | null } | null)?.logo_url ?? null);
         setHazirlayanAdi((tmgdRes.data as string) || "");
-        await ortakDosyalariYukle();
+        await Promise.all([ortakDosyalariYukle(), belgeTakipMsdsYukle()]);
       } catch (e) {
         if (!iptal) setError(hataCevir(e as { message?: string }));
       } finally {
@@ -356,7 +417,7 @@ export default function AracEvraklari({
 
   /** Firma ortak belgesi (TMFB/K1) yükler — mevcut dosyaların yanına EKLER,
    *  üzerine yazmaz (birden fazla dosya biriktirilebilir). */
-  async function ortakBelgeYukle(tur: OrtakBelgeTuru, files: FileList) {
+  async function ortakBelgeYukle(tur: YuklenebilirOrtakTur, files: FileList) {
     setBusy(true);
     setError("");
     try {
@@ -388,14 +449,15 @@ export default function AracEvraklari({
     }
   }
 
-  async function ortakBelgeSil(tur: OrtakBelgeTuru, dosya: BelgeDosyasi) {
+  async function ortakBelgeSil(tur: YuklenebilirOrtakTur, dosya: BelgeDosyasi) {
     if (!confirm(`"${dosya.file_name}" silinsin mi? (Tüm araçları etkiler)`)) return;
     setError("");
     try {
       const { error: dbErr } = await supabase.from("firm_arac_evrak_dosyalari").delete().eq("id", dosya.id);
       if (dbErr) throw dbErr;
       await depoSil([dosya.file_path]);
-      setOrtakDosyalar((prev) => ({ ...prev, [tur]: prev[tur].filter((d) => d.id !== dosya.id) }));
+      if (tur === MSDS_TURU) setMsdsDosyalar((prev) => prev.filter((d) => d.id !== dosya.id));
+      else setOrtakDosyalar((prev) => ({ ...prev, [tur]: prev[tur].filter((d) => d.id !== dosya.id) }));
     } catch (e) {
       setError(hataCevir(e as { message?: string }));
     }
@@ -543,6 +605,56 @@ export default function AracEvraklari({
     }
   }
 
+  /** MSDS/SDS Raporu sayfaları: bu pencereden yüklenenler + Belge Takip
+   *  AS8 dosyaları (aynı dosya bir kez). PDF'lerin TÜM sayfaları, görseller
+   *  tek sayfa olarak alınır. PDF/görsel olmayan dosyalar (Word, Excel)
+   *  basılamaz — sayıları döndürülür, kullanıcıya bildirilir. */
+  async function msdsSayfalariHazirla(): Promise<{ sayfalar: string[]; atlanan: string[] }> {
+    const sayfalar: string[] = [];
+    const atlanan: string[] = [];
+    const goruldu = new Set<string>();
+    const kaynaklar = [...msdsDosyalar, ...belgeTakipMsds];
+    for (const d of kaynaklar) {
+      if (goruldu.has(d.file_path)) continue;
+      goruldu.add(d.file_path);
+      try {
+        const blob = await depoDosyasiGetir("firm-files", d.file_path);
+        if (!blob) {
+          atlanan.push(d.file_name);
+          continue;
+        }
+        const ad = d.file_path.toLowerCase();
+        if (blob.type === "application/pdf" || ad.endsWith(".pdf")) {
+          sayfalar.push(...(await pdfTumSayfalariGorselYap(await blob.arrayBuffer())));
+        } else if (blob.type.startsWith("image/") || /\.(jpe?g|png|webp)$/.test(ad)) {
+          sayfalar.push(
+            await new Promise<string>((resolve, reject) => {
+              const r = new FileReader();
+              r.onload = () => resolve(r.result as string);
+              r.onerror = reject;
+              r.readAsDataURL(blob);
+            })
+          );
+        } else {
+          atlanan.push(d.file_name);
+        }
+      } catch {
+        atlanan.push(d.file_name);
+      }
+    }
+    return { sayfalar, atlanan };
+  }
+
+  /** Atlanan MSDS dosyaları varsa kullanıcıya bildirir. */
+  function msdsAtlananUyarisi(atlanan: string[]) {
+    if (atlanan.length > 0) {
+      setError(
+        `MSDS/SDS Raporu: ${atlanan.length} dosya PDF'e eklenemedi (yalnızca PDF ve görsel dosyalar basılabilir): ` +
+          atlanan.join(", ")
+      );
+    }
+  }
+
   /** Ek-1..Ek-10 belge listesini (her türe ait tüm dosyaların dataUrl'leri
    *  dahil) hazırlar — hem indirme hem önizleme AYNI bu fonksiyonu kullanır. */
   async function belgelerHazirla(): Promise<AracEvrakBelgesi[]> {
@@ -623,6 +735,7 @@ export default function AracEvraklari({
     try {
       const logo = await logoDataUrl();
       const belgeler = await belgelerHazirla();
+      const msds = await msdsSayfalariHazirla();
       const blob = await (await import("@/lib/aracEvraklariPdf")).aracEvraklariPdfOlustur({
         firmaAdi,
         plaka: secilenArac.plate_number,
@@ -630,7 +743,9 @@ export default function AracEvraklari({
         bugun: bugununTarihi(),
         logo,
         belgeler,
+        msdsSayfalari: msds.sayfalar,
       });
+      msdsAtlananUyarisi(msds.atlanan);
       // Kullanıcı bu arada sekmeyi kapatmış olabilir.
       if (pencere.closed) return;
 
@@ -659,7 +774,7 @@ export default function AracEvraklari({
     try {
       const logo = await logoDataUrl();
       const belgeler = await belgelerHazirla();
-
+      const msds = await msdsSayfalariHazirla();
       const blob = await (await import("@/lib/aracEvraklariPdf")).aracEvraklariPdfOlustur({
         firmaAdi,
         plaka: secilenArac.plate_number,
@@ -667,7 +782,9 @@ export default function AracEvraklari({
         bugun: bugununTarihi(),
         logo,
         belgeler,
+        msdsSayfalari: msds.sayfalar,
       });
+      msdsAtlananUyarisi(msds.atlanan);
 
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -753,6 +870,7 @@ export default function AracEvraklari({
               gecerlilikGuncelle={gecerlilikGuncelle}
             />
           ))}
+
         </div>
       </div>
 
@@ -801,6 +919,43 @@ export default function AracEvraklari({
                 gecerlilikGuncelle={gecerlilikGuncelle}
               />
             ))}
+            {/* EK-11 MSDS/SDS RAPORU — firma ortak (vehicle_id NULL); PDF'te ek numarası ve kapak/sayfa başlığı yok;
+                tüm MSDS'lerin tüm sayfaları PDF'in sonuna doğrudan eklenir. */}
+            <BelgeSatiri
+              baslik={`Ek-11 — ${MSDS_BASLIK}`}
+              dosyalar={msdsDosyalar}
+              onYukle={(files) => ortakBelgeYukle(MSDS_TURU, files)}
+              onSil={(dosya) => ortakBelgeSil(MSDS_TURU, dosya)}
+              onMobilTara={() => mobildenTara("arac_ortak", { tur: MSDS_TURU })}
+              canWrite={canWrite}
+              tarayiciYapilandirilmis={tarayiciYapilandirilmis}
+              belgeGoruntule={belgeGoruntule}
+              gecerlilikGuncelle={gecerlilikGuncelle}
+            />
+            <div className="-mt-1 px-3 text-xs text-gray-500 space-y-1">
+              {belgeTakipMsds.length > 0 && (
+                <div>
+                  <p>Belge Takip → MSDS/SDS Raporu&apos;ndan otomatik eklenecek:</p>
+                  <ul className="mt-0.5 space-y-0.5">
+                    {belgeTakipMsds.map((d) => (
+                      <li key={d.id}>
+                        <button
+                          type="button"
+                          onClick={() => belgeGoruntule(d.file_path)}
+                          className="text-blue-600 hover:underline truncate max-w-[260px] text-left"
+                          title={d.file_name}
+                        >
+                          📄 {d.file_name}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              <p className="text-gray-400">
+                Tüm araçlarda ortaktır (bir kez yüklemek yeter). Kapak sayfasında yer almaz, sayfa başlığı eklenmez — yüklenen tüm MSDS&apos;lerin tüm sayfaları PDF&apos;in sonuna doğrudan eklenir.
+              </p>
+            </div>
           </div>
           {/* EK-10 BAŞLIK SEÇİMİ — bu ek'e hangi belgenin konulduğu firmaya
               göre değiştiğinden başlık seçilebilir. Seçim hem yukarıdaki
