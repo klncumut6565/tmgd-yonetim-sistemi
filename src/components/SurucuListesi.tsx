@@ -22,7 +22,7 @@ import { supabase } from "@/lib/supabase/client";
 import { authFetch } from "@/lib/supabase/authFetch";
 import { hataCevir } from "@/lib/hataCevir";
 import type { LogoData, SurucuBelgeEki } from "@/lib/surucuListesiPdf";
-import { pdfIlkSayfayiGorselYap } from "@/lib/pdfSayfaGorseli";
+import { pdfTumSayfalariGorselYap } from "@/lib/pdfSayfaGorseli";
 import DateInput from "@/components/DateInput";
 import { useUser } from "@/hooks/useUser";
 
@@ -494,34 +494,33 @@ export default function SurucuListesi({
     }
   }
 
-  /** Bir dosyayı (image veya PDF) fetch edip SurucuBelgeEki için hazır bir
-   *  JPEG dataURL'e çevirir. PDF ise ilk sayfası rastere edilir. */
+  /** Bir dosyayı (image veya PDF) fetch edip SurucuBelgeEki sayfalarına
+   *  çevirir. PDF ise TÜM sayfaları (ör. ehliyetin ön ve arka yüzü) sırayla
+   *  rastere edilir, her sayfa ayrı ek sayfası olur; görsel tek sayfadır. */
   async function belgeEkiHazirla(
     yol: string,
     adSoyad: string,
     tur: SurucuBelgeEki["tur"]
-  ): Promise<SurucuBelgeEki | null> {
+  ): Promise<SurucuBelgeEki[]> {
     try {
       // Oturum boyunca bellekte tutulur: önizleme + indirme dosyayı bir kez indirir (veri tasarrufu)
       const blob = await depoDosyasiGetir("firm-files", yol);
-      if (!blob) return null;
+      if (!blob) return [];
 
-      let dataUrl: string;
       if (blob.type === "application/pdf" || yol.toLowerCase().endsWith(".pdf")) {
-        dataUrl = await pdfIlkSayfayiGorselYap(await blob.arrayBuffer());
-      } else {
-        dataUrl = await gorseliKucult(blob);
+        const sayfalar = await pdfTumSayfalariGorselYap(await blob.arrayBuffer());
+        return sayfalar.map((dataUrl) => ({ adSoyad, tur, dataUrl }));
       }
-      return { adSoyad, tur, dataUrl };
+      return [{ adSoyad, tur, dataUrl: await gorseliKucult(blob) }];
     } catch {
-      return null; // bir ek hazırlanamazsa PDF yine de eksiksiz üretilir
+      return []; // bir ek hazırlanamazsa PDF yine de eksiksiz üretilir
     }
   }
 
   /** Sürücülerin SRC5/Ehliyet dosyalarını PDF eki olarak hazırlar — hem
    *  indirme hem önizleme AYNI bu fonksiyonu kullanır. */
   async function eklerHazirla(): Promise<SurucuBelgeEki[]> {
-    const ekIstekleri: Promise<SurucuBelgeEki | null>[] = [];
+    const ekIstekleri: Promise<SurucuBelgeEki[]>[] = [];
     for (const r of kayitliSatirlar) {
       if (r.src5_dosya_yolu) {
         ekIstekleri.push(belgeEkiHazirla(r.src5_dosya_yolu, r.ad_soyad, "SRC5 Sertifikası"));
@@ -530,7 +529,7 @@ export default function SurucuListesi({
         ekIstekleri.push(belgeEkiHazirla(r.ehliyet_dosya_yolu, r.ad_soyad, "Ehliyet"));
       }
     }
-    return (await Promise.all(ekIstekleri)).filter((e): e is SurucuBelgeEki => e !== null);
+    return (await Promise.all(ekIstekleri)).flat();
   }
 
   /**
